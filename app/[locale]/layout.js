@@ -17,12 +17,10 @@ export default async function LocaleLayout({ children, params }) {
   const messages = await getMessages();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <body className={`${inter.variable} ${robotoMono.variable} min-h-screen bg-background antialiased`}>
+      <main className={`${inter.variable} ${robotoMono.variable} min-h-screen bg-background antialiased`}>
         <RootLayoutClient locale={locale} messages={messages}>
           {children}
         </RootLayoutClient>
-      </body>
-    </html>
+      </main>
   );
 }

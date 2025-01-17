@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { MainNav } from './MainNav';
 import LanguageSwitcher from './LanguageSwitcher';
+import { ThemeToggle } from './ui/ThemeToggle';
 
 export function Header() {
   const t = useTranslations();
@@ -15,6 +16,7 @@ export function Header() {
         </div>
         <MainNav />
         <div className="ml-auto flex items-center space-x-4">
+          <ThemeToggle />
           <LanguageSwitcher />
         </div>
       </div>
