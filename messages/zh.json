@@ -1,0 +1,37 @@
+{
+  "app": {
+    "title": "团队同步",
+    "description": "项目管理系统"
+  },
+  "nav": {
+    "home": "首页",
+    "projects": "项目",
+    "tasks": "任务",
+    "settings": "设置"
+  },
+  "projects": {
+    "title": "项目",
+    "create": "创建项目",
+    "status": {
+      "pending": "待处理",
+      "inProgress": "进行中",
+      "completed": "已完成"
+    }
+  },
+  "tasks": {
+    "title": "任务",
+    "create": "创建任务",
+    "status": {
+      "todo": "待办",
+      "inProgress": "进行中",
+      "completed": "已完成"
+    }
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "edit": "编辑",
+    "loading": "加载中..."
+  }
+}

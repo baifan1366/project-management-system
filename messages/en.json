@@ -1,0 +1,37 @@
+{
+  "app": {
+    "title": "Team Sync",
+    "description": "Project Management System"
+  },
+  "nav": {
+    "home": "Home",
+    "projects": "Projects",
+    "tasks": "Tasks",
+    "settings": "Settings"
+  },
+  "projects": {
+    "title": "Projects",
+    "create": "Create Project",
+    "status": {
+      "pending": "Pending",
+      "inProgress": "In Progress",
+      "completed": "Completed"
+    }
+  },
+  "tasks": {
+    "title": "Tasks",
+    "create": "Create Task",
+    "status": {
+      "todo": "To Do",
+      "inProgress": "In Progress",
+      "completed": "Completed"
+    }
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading..."
+  }
+}

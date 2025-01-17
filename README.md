@@ -123,6 +123,46 @@ dispatch(setProjects(newProjects))
 
 For more information about Redux Toolkit, visit the [official documentation](https://redux-toolkit.js.org/).
 
+## Internationalization (i18n)
+
+This project uses `next-intl` for internationalization. Currently supported languages:
+- English (en)
+- Chinese (zh)
+
+### Usage in Components
+
+```javascript
+import { useTranslations } from 'next-intl';
+
+export default function MyComponent() {
+  const t = useTranslations();
+  
+  return (
+    <div>
+      <h1>{t('projects.title')}</h1>
+      <button>{t('common.save')}</button>
+    </div>
+  );
+}
+```
+
+### Adding New Languages
+
+1. Create a new JSON file in the `messages` directory (e.g., `messages/ja.json`)
+2. Add the locale to the supported locales list in `middleware.js`
+3. Add the locale to `generateStaticParams` in `app/[locale]/layout.js`
+
+### Language Switching
+
+The `LanguageSwitcher` component is available to switch between languages:
+
+```javascript
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+
+// Use in your layout or component
+<LanguageSwitcher />
+```
+
 ## API Routes
 
 The project includes the following API endpoints:
