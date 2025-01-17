@@ -35,17 +35,45 @@ npx shadcn@latest add button
 
 Available components can be found in the [shadcn/ui components](https://ui.shadcn.com/docs/components) documentation.
 
-## Learn More
+## Live Demo
 
-To learn more about Next.js, take a look at the following resources:
+The project is deployed and accessible at: [https://team-sync-system.vercel.app/](https://team-sync-system.vercel.app/)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment Setup
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+To run this project locally, you need to set up the following environment variables in a `.env` file:
 
-## Deploy on Vercel
+```env
+# Database Configuration
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+> Note: Never commit the actual `.env` file to version control. The above is just a template of required variables.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Supabase Setup
+
+This project uses Supabase as the backend database and authentication service. To set up Supabase:
+
+1. Install Supabase client:
+```bash
+npm install @supabase/supabase-js
+```
+
+2. Import and use Supabase client in your components:
+```javascript
+import { supabase } from '@/lib/supabase'
+
+// Example query
+const { data, error } = await supabase
+  .from('your_table')
+  .select('*')
+```
+
+3. Available Database Tables:
+   - `users` - User profiles and authentication
+   - `projects` - Project information
+   - `tasks` - Task management
+   - `comments` - User comments and feedback
+
+For more information about using Supabase, check out the [Supabase documentation](https://supabase.com/docs).
