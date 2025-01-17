@@ -77,3 +77,91 @@ const { data, error } = await supabase
    - `comments` - User comments and feedback
 
 For more information about using Supabase, check out the [Supabase documentation](https://supabase.com/docs).
+
+## Redux Setup
+
+This project uses Redux Toolkit for state management. To set up Redux:
+
+1. Install Redux Toolkit and React-Redux:
+```bash
+npm install @reduxjs/toolkit react-redux
+```
+
+2. Create a slice (example):
+```javascript
+import { createSlice } from '@reduxjs/toolkit'
+
+export const projectSlice = createSlice({
+  name: 'projects',
+  initialState: {
+    projects: [],
+    loading: false,
+  },
+  reducers: {
+    setProjects: (state, action) => {
+      state.projects = action.payload
+    },
+    setLoading: (state, action) => {
+      state.loading = action.payload
+    },
+  },
+})
+```
+
+3. Use Redux in components:
+```javascript
+import { useSelector, useDispatch } from 'react-redux'
+import { setProjects } from './projectSlice'
+
+// In your component
+const projects = useSelector((state) => state.projects.projects)
+const dispatch = useDispatch()
+
+// Update state
+dispatch(setProjects(newProjects))
+```
+
+For more information about Redux Toolkit, visit the [official documentation](https://redux-toolkit.js.org/).
+
+## API Routes
+
+The project includes the following API endpoints:
+
+### Projects
+
+```bash
+GET /api/projects
+# Returns list of all projects
+
+POST /api/projects
+# Create a new project
+# Body: { title: string, description: string }
+```
+
+### Tasks
+
+```bash
+GET /api/tasks
+# Returns all tasks
+# Optional query param: ?projectId=123
+
+POST /api/tasks
+# Create a new task
+# Body: { title: string, description: string, project_id: number, status: string }
+```
+
+Example usage with the API helper:
+
+```javascript
+import { api } from '@/lib/api'
+
+// Fetch projects
+const projects = await api.projects.list()
+
+// Create a new task
+const newTask = await api.tasks.create({
+  title: 'New Task',
+  description: 'Task description',
+  project_id: 1,
+  status: 'pending'
+})
