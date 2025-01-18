@@ -205,3 +205,73 @@ const newTask = await api.tasks.create({
   project_id: 1,
   status: 'pending'
 })
+```
+
+## Drag and Drop
+
+This project implements drag and drop functionality using [@hello-pangea/dnd](https://github.com/hello-pangea/dnd) (based on react-beautiful-dnd).
+
+1. Install dependency:
+```bash
+npm install @hello-pangea/dnd
+```
+
+2. Usage in components:
+```javascript
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+
+function TaskList() {
+  const onDragEnd = (result) => {
+    // Handle logic after drag ends
+  };
+
+  return (
+    <DragDropContext onDragEnd={onDragEnd}>
+      <Droppable droppableId="tasks">
+        {(provided) => (
+          <div {...provided.droppableProps} ref={provided.innerRef}>
+            {/* Draggable items */}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    </DragDropContext>
+  );
+}
+```
+
+## Gantt Chart
+
+This project uses [Gantt Chart](https://github.com/frappe/gantt) for project timeline visualization.
+
+1. Install dependency:
+```bash
+npm install frappe-gantt
+```
+
+2. Basic usage example:
+```javascript
+import { Gantt } from 'frappe-gantt';
+
+function ProjectTimeline() {
+  useEffect(() => {
+    const tasks = [
+      {
+        id: '1',
+        name: 'Task 1',
+        start: '2024-03-01',
+        end: '2024-03-05',
+        progress: 20
+      }
+    ];
+
+    const gantt = new Gantt('#gantt', tasks, {
+      view_mode: 'Week',
+      on_click: (task) => {
+        console.log(task);
+      }
+    });
+  }, []);
+
+  return <div id="gantt"></div>;
+}
