@@ -7,7 +7,9 @@
     "home": "首页",
     "projects": "项目",
     "tasks": "任务",
-    "settings": "设置"
+    "settings": "设置",
+    "login": "登录",
+    "signup": "注册"
   },
   "projects": {
     "title": "项目",
@@ -33,5 +35,49 @@
     "delete": "删除",
     "edit": "编辑",
     "loading": "加载中..."
+  },
+  "Pricing": {
+    "title": "选择您的计划",
+    "starterPlan": "入门版",
+    "proPlan": "专业版",
+    "enterprisePlan": "企业版",
+    "contactUs": "联系我们",
+    "features": {
+      "basic": "基础功能",
+      "projects": "{count} 个项目",
+      "teamMembers": "{count} 个团队成员",
+      "everything": "包含入门版所有功能",
+      "unlimited": "无限项目和团队",
+      "support": "24/7 优先支持"
+    }
+  },
+  "Dashboard": {
+    "welcome": "欢迎来到您的仪表盘",
+    "quickAccess": "快速访问",
+    "teams": "团队",
+    "projects": "项目",
+    "manageTeams": "管理您的团队",
+    "manageProjects": "管理您的项目",
+    "recentActivity": "最近活动",
+    "noRecentActivity": "暂无最近活动"
+  },
+  "Teams": {
+    "teams": "团队",
+    "createTeam": "创建团队",
+    "members": "成员",
+    "manage": "管理",
+    "activeProjects": "个活跃项目",
+    "noTeams": "暂未创建任何团队"
+  },
+  "Projects": {
+    "projects": "项目",
+    "createProject": "创建项目",
+    "all": "所有项目",
+    "active": "进行中",
+    "completed": "已完成",
+    "team": "团队",
+    "inProgress": "进行中",
+    "progress": "进度",
+    "noProjects": "暂未创建任何项目"
   }
 }

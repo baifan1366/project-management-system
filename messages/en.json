@@ -7,7 +7,9 @@
     "home": "Home",
     "projects": "Projects",
     "tasks": "Tasks",
-    "settings": "Settings"
+    "settings": "Settings",
+    "login": "Login",
+    "signup": "Sign Up"
   },
   "projects": {
     "title": "Projects",
@@ -33,5 +35,49 @@
     "delete": "Delete",
     "edit": "Edit",
     "loading": "Loading..."
+  },
+  "Pricing": {
+    "title": "Choose Your Plan",
+    "starterPlan": "Starter",
+    "proPlan": "Professional",
+    "enterprisePlan": "Enterprise",
+    "contactUs": "Contact Us",
+    "features": {
+      "basic": "Basic Features",
+      "projects": "{count} Projects",
+      "teamMembers": "{count} Team Members",
+      "everything": "Everything in Starter",
+      "unlimited": "Unlimited Projects & Teams",
+      "support": "24/7 Priority Support"
+    }
+  },
+  "Dashboard": {
+    "welcome": "Welcome to Your Dashboard",
+    "quickAccess": "Quick Access",
+    "teams": "Teams",
+    "projects": "Projects",
+    "manageTeams": "Manage your teams",
+    "manageProjects": "Manage your projects",
+    "recentActivity": "Recent Activity",
+    "noRecentActivity": "No recent activity"
+  },
+  "Teams": {
+    "teams": "Teams",
+    "createTeam": "Create Team",
+    "members": "members",
+    "manage": "Manage",
+    "activeProjects": "active projects",
+    "noTeams": "No teams created yet"
+  },
+  "Projects": {
+    "projects": "Projects",
+    "createProject": "Create Project",
+    "all": "All Projects",
+    "active": "Active",
+    "completed": "Completed",
+    "team": "Team",
+    "inProgress": "In Progress",
+    "progress": "Progress",
+    "noProjects": "No projects created yet"
   }
 }
