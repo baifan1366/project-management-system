@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "Team Sync",
+    "description": "Sistem Pengurusan Projek"
+  },
+  "nav": {
+    "home": "Laman Utama",
+    "projects": "Projek",
+    "tasks": "Tugas",
+    "settings": "Tetapan",
+    "login": "Log Masuk",
+    "signup": "Daftar"
+  },
+  "projects": {
+    "title": "Projek",
+    "create": "Cipta Projek",
+    "status": {
+      "pending": "Menunggu",
+      "inProgress": "Sedang Berlangsung",
+      "completed": "Selesai"
+    }
+  },
+  "tasks": {
+    "title": "Tugas",
+    "create": "Cipta Tugas",
+    "status": {
+      "todo": "Perlu Dilakukan",
+      "inProgress": "Sedang Berlangsung",
+      "completed": "Selesai"
+    }
+  },
+  "common": {
+    "save": "Simpan",
+    "cancel": "Batal",
+    "delete": "Padam",
+    "edit": "Sunting",
+    "loading": "Memuatkan..."
+  },
+  "Pricing": {
+    "title": "Pilih Pelan Anda",
+    "starterPlan": "Permulaan",
+    "proPlan": "Profesional",
+    "enterprisePlan": "Perusahaan",
+    "contactUs": "Hubungi Kami",
+    "features": {
+      "basic": "Ciri-ciri Asas",
+      "projects": "{count} Projek",
+      "teamMembers": "{count} Ahli Pasukan",
+      "everything": "Semua dalam Pelan Permulaan",
+      "unlimited": "Projek & Pasukan Tanpa Had",
+      "support": "Sokongan Keutamaan 24/7"
+    }
+  },
+  "Dashboard": {
+    "welcome": "Selamat Datang ke Papan Pemuka Anda",
+    "quickAccess": "Akses Pantas",
+    "teams": "Pasukan",
+    "projects": "Projek",
+    "manageTeams": "Urus pasukan anda",
+    "manageProjects": "Urus projek anda",
+    "recentActivity": "Aktiviti Terkini",
+    "noRecentActivity": "Tiada aktiviti terkini"
+  },
+  "Teams": {
+    "teams": "Pasukan",
+    "createTeam": "Cipta Pasukan",
+    "members": "ahli",
+    "manage": "Urus",
+    "activeProjects": "projek aktif",
+    "noTeams": "Belum ada pasukan yang dicipta"
+  },
+  "Projects": {
+    "projects": "Projek",
+    "createProject": "Cipta Projek",
+    "all": "Semua Projek",
+    "active": "Aktif",
+    "completed": "Selesai",
+    "team": "Pasukan",
+    "inProgress": "Sedang Berlangsung",
+    "progress": "Kemajuan",
+    "noProjects": "Belum ada projek yang dicipta"
+  }
+} 
