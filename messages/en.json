@@ -79,5 +79,11 @@
     "inProgress": "In Progress",
     "progress": "Progress",
     "noProjects": "No projects created yet"
+  },
+  "ChatDialog":{
+      "privateMessages": "Private Messages",
+      "groupChat": "Group Chat",
+      "privateMessagesContent": "This is the content for private messages.",
+      "groupChatContent": "This is the content for group chat."
   }
 }
