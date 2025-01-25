@@ -3,6 +3,15 @@
     "title": "Team Sync",
     "description": "Project Management System"
   },
+  "Header": {
+    "projectName": "Team Sync",
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "tasks": "Tasks",
+    "pricing": "Pricing",
+    "login": "Login",
+    "signup": "Sign Up"
+  },
   "nav": {
     "home": "Home",
     "projects": "Projects",
