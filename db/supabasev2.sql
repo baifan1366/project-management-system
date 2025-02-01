@@ -162,3 +162,62 @@ CREATE INDEX idx_task_project_id ON "task"("project_id");
 CREATE INDEX idx_task_assignee_id ON "task"("assignee_id");
 CREATE INDEX idx_time_entry_task_id ON "time_entry"("task_id");
 CREATE INDEX idx_time_entry_user_id ON "time_entry"("user_id");
+
+-- 聊天会话表（用于管理私聊和群聊会话）
+CREATE TABLE "chat_session" (
+  "id" SERIAL PRIMARY KEY,
+  "type" TEXT NOT NULL CHECK ("type" IN ('PRIVATE', 'GROUP')),
+  "name" VARCHAR(255),
+  "team_id" INT REFERENCES "team"("id") ON DELETE CASCADE,
+  "created_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "chk_session_team" CHECK (
+    ("type" = 'GROUP' AND "team_id" IS NOT NULL) OR
+    ("type" = 'PRIVATE' AND "team_id" IS NULL)
+  )
+);
+
+-- 聊天参与者表
+CREATE TABLE "chat_participant" (
+  "session_id" INT NOT NULL REFERENCES "chat_session"("id") ON DELETE CASCADE,
+  "user_id" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "joined_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "role" TEXT CHECK ("role" IN ('ADMIN', 'MEMBER')) DEFAULT 'MEMBER',
+  PRIMARY KEY ("session_id", "user_id")
+);
+
+-- 聊天消息表
+CREATE TABLE "chat_message" (
+  "id" SERIAL PRIMARY KEY,
+  "session_id" INT NOT NULL REFERENCES "chat_session"("id") ON DELETE CASCADE,
+  "user_id" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "content" TEXT NOT NULL,
+  "reply_to_message_id" INT REFERENCES "chat_message"("id") ON DELETE SET NULL,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 聊天消息已读状态表
+CREATE TABLE "chat_message_read_status" (
+  "message_id" INT NOT NULL REFERENCES "chat_message"("id") ON DELETE CASCADE,
+  "user_id" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "read_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("message_id", "user_id")
+);
+
+-- 聊天附件表
+CREATE TABLE "chat_attachment" (
+  "id" SERIAL PRIMARY KEY,
+  "message_id" INT NOT NULL REFERENCES "chat_message"("id") ON DELETE CASCADE,
+  "file_url" VARCHAR(255) NOT NULL,
+  "file_name" VARCHAR(255) NOT NULL,
+  "uploaded_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 索引优化
+CREATE INDEX idx_chat_message_session ON "chat_message"("session_id");
+CREATE INDEX idx_chat_message_created ON "chat_message"("created_at");
+CREATE INDEX idx_chat_participant_user ON "chat_participant"("user_id");
+CREATE INDEX idx_chat_session_team ON "chat_session"("team_id");
