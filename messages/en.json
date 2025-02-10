@@ -89,10 +89,21 @@
     "progress": "Progress",
     "noProjects": "No projects created yet"
   },
+  "CreateProject":{
+    "createProject": "Create Project",
+    "projectName": "Project Name",
+    "team": "Team",
+    "description": "Description",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "cancel": "Cancel",
+    "create": "Create"
+  },
   "ChatDialog":{
       "privateMessages": "Private Messages",
       "groupChat": "Group Chat",
       "privateMessagesContent": "This is the content for private messages.",
       "groupChatContent": "This is the content for group chat."
   }
+
 }

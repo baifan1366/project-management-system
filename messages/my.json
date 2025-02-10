@@ -88,5 +88,21 @@
     "inProgress": "Sedang Berlangsung",
     "progress": "Kemajuan",
     "noProjects": "Belum ada projek yang dicipta"
+  },
+  "CreateProject":{
+    "createProject": "Cipta Projek",
+    "projectName": "Nama Projek",
+    "team": "Pasukan",
+    "description": "Penerangan",
+    "startDate": "Tarikh Mula",
+    "endDate": "Tarikh Tamat",
+    "cancel": "Batal",
+    "create": "Cipta"
+  },
+  "ChatDialog":{
+    "privateMessages": "Mesej Peribadi",
+    "groupChat": "Sembang Kumpulan",
+    "privateMessagesContent": "Ini adalah kandungan untuk mesej peribadi.",
+    "groupChatContent": "Ini adalah kandungan untuk sembang kumpulan."
   }
 } 

@@ -88,5 +88,21 @@
     "inProgress": "进行中",
     "progress": "进度",
     "noProjects": "暂未创建任何项目"
+  },
+  "CreateProject": {
+    "createProject": "创建项目",
+    "projectName": "项目名称",
+    "team": "团队",
+    "description": "描述",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "cancel": "取消",
+    "create": "创建"
+  },
+  "ChatDialog": {
+    "privateMessages": "私人消息",
+    "groupChat": "群组聊天",
+    "privateMessagesContent": "这里是私人消息内容。",
+    "groupChatContent": "这里是群组聊天内容。"
   }
 }
