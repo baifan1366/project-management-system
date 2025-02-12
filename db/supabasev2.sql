@@ -3,10 +3,19 @@ CREATE TABLE "user" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "email" VARCHAR(255) UNIQUE NOT NULL,
-  "password_hash" VARCHAR(255) NOT NULL,
+  "phone" VARCHAR(20) UNIQUE,
+  "password_hash" VARCHAR(255), -- 本地账户需要，OAuth 用户可能为空
   "avatar_url" VARCHAR(255),
+  "language" VARCHAR(10) DEFAULT 'en';
+  "theme" VARCHAR(50) CHECK ("theme" IN ('light', 'dark', 'system')) DEFAULT 'system',
+  "provider" VARCHAR(50) CHECK ("provider" IN ('local', 'google', 'github')) DEFAULT 'local',
+  "provider_id" VARCHAR(255) UNIQUE, -- 绑定 OAuth 的唯一 ID（如 Google/GitHub UID）
+  "mfa_secret" VARCHAR(255), -- TOTP 秘钥
+  "is_mfa_enabled" BOOLEAN DEFAULT FALSE,
+  "notifications_enabled" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  
 );
 
 -- 团队表
