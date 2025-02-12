@@ -89,15 +89,27 @@
     "progress": "Kemajuan",
     "noProjects": "Belum ada projek yang dicipta"
   },
-  "CreateProject":{
+  "CreateProject": {
     "createProject": "Cipta Projek",
     "projectName": "Nama Projek",
-    "team": "Pasukan",
-    "description": "Penerangan",
-    "startDate": "Tarikh Mula",
-    "endDate": "Tarikh Tamat",
     "cancel": "Batal",
-    "create": "Cipta"
+    "create": "Cipta",
+    "themeColor": "Warna Tema",
+    "visibility": "Keterlihatan",
+    "public": "Awam",
+    "private": "Peribadi",
+    "projectNameMin": "Nama Projek mestilah sekurang-kurangnya 2 aksara.",
+    "projectNameMax": "Nama Projek tidak boleh melebihi 50 aksara.",
+    "projectNamePlaceholder": "Masukkan nama projek",
+    "visibilityRequired": "Keterlihatan diperlukan.",
+    "visibilityPlaceholder": "Pilih keterlihatan",
+    "themeColorRequired": "Warna Tema diperlukan.",
+    "creating": "Mencipta...",
+    "pleaseWait": "Sila tunggu semasa kami mencipta projek anda.",
+    "createSuccess": "Berjaya!",
+    "projectCreated": "Projek anda telah berjaya dicipta.",
+    "createError": "Ralat mencipta projek.",
+    "pleaseTryAgain": "Sesuatu telah berlaku. Sila cuba lagi."
   },
   "ChatDialog":{
     "privateMessages": "Mesej Peribadi",

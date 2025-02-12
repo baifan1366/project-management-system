@@ -92,12 +92,24 @@
   "CreateProject":{
     "createProject": "Create Project",
     "projectName": "Project Name",
-    "team": "Team",
-    "description": "Description",
-    "startDate": "Start Date",
-    "endDate": "End Date",
     "cancel": "Cancel",
-    "create": "Create"
+    "create": "Create",
+    "themeColor": "Theme Color",
+    "visibility": "Visibility",
+    "public": "Public",
+    "private": "Private",
+    "projectNameMin": "Project Name must be at least 2 characters.",
+    "projectNameMax": "Project Name cannot exceed 50 characters.",
+    "projectNamePlaceholder": "Enter project name",
+    "visibilityRequired": "Visibility is required.",
+    "visibilityPlaceholder": "Select a visibility",
+    "themeColorRequired": "Theme Color is required.",
+    "creating": "Creating...",
+    "pleaseWait": "Please wait while we create your project.",
+    "createSuccess": "Success!",
+    "projectCreated": "Your project has been created successfully.",
+    "createError": "Error creating project.",
+    "pleaseTryAgain": "Something went wrong. Please try again."
   },
   "ChatDialog":{
       "privateMessages": "Private Messages",
@@ -105,5 +117,4 @@
       "privateMessagesContent": "This is the content for private messages.",
       "groupChatContent": "This is the content for group chat."
   }
-
 }
