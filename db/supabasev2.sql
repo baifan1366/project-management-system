@@ -40,6 +40,7 @@ CREATE TABLE "user_team" (
 CREATE TABLE "project" (
   "id" SERIAL PRIMARY KEY,
   "project_name" VARCHAR(255) NOT NULL,
+  "description" TEXT,
   "visibility" VARCHAR(20) NOT NULL,
   "theme_color" VARCHAR(20) DEFAULT 'white',
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
