@@ -24,11 +24,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useState } from "react";
+import { useDispatch } from 'react-redux';
+import { createProject } from '@/lib/redux/features/projectSlice';
 
 export default function CreateProjectPage() {
   const t = useTranslations('CreateProject');
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
+  const dispatch = useDispatch();
 
   // Schema definition
   const FormSchema = z.object({
@@ -57,16 +60,27 @@ export default function CreateProjectPage() {
   // 更新颜色选项，添加黑白色并调整顺序
   const themeColors = [
     { value: 'white', color: '#ffffff' },
-    { value: 'slate', color: '#64748b' },
-    { value: 'red', color: '#ef4444' },
-    { value: 'orange', color: '#f97316' },
-    { value: 'green', color: '#22c55e' },
-    { value: 'blue', color: '#3b82f6' },
-    { value: 'purple', color: '#a855f7' },
+    { value: 'lightGreen', color: '#bbf7d0' },
+    { value: 'lightYellow', color: '#fefcbf' },
+    { value: 'lightCoral', color: '#f08080' },
+    { value: 'lightOrange', color: '#ffedd5' },
+    { value: 'peach', color: '#ffcccb' },
+    { value: 'lightCyan', color: '#e0ffff' },
   ]
 
+  const buttonClass = `px-4 py-2 text-sm border rounded-md transition-colors duration-300 ${
+    form.watch('themeColor') === 'white' ? 'bg-black text-white dark:bg-white dark:text-black' :
+    form.watch('themeColor') === 'lightGreen' ? 'bg-[#bbf7d0] text-black' :
+    form.watch('themeColor') === 'lightYellow' ? 'bg-[#fefcbf] text-black' :
+    form.watch('themeColor') === 'lightCoral' ? 'bg-[#f08080] text-white' :
+    form.watch('themeColor') === 'lightOrange' ? 'bg-[#ffedd5] text-black' :
+    form.watch('themeColor') === 'peach' ? 'bg-[#ffcccb] text-black' :
+    form.watch('themeColor') === 'lightCyan' ? 'bg-[#e0ffff] text-black' :
+    ''
+  }`
+
   // Submit function
-  async function onSubmit(data) {
+  const onSubmit = async (data) => {
     setIsCreating(true);
     
     try {
@@ -78,21 +92,23 @@ export default function CreateProjectPage() {
         description: t('pleaseWait'),
       });
 
-      // 模拟创建项目的过程（这里您可以替换为实际的 API 调用）
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      toast({
-        title: t('createSuccess'),
-        description: t('projectCreated'),
-      });
-      // 在控制台输出所有表单数据
-      console.log({
-        projectName: projectName.trim(),
+      // 调用 Redux 的 createProject 动作
+      const resultAction = await dispatch(createProject({
+        project_name: projectName.trim(),
         visibility,
-        themeColor
-      });
-      // 创建成功后返回上一页
-      router.back();
+        theme_color: themeColor,
+        team_id: 16,
+        created_by: 9,
+      }));
+
+      if (createProject.fulfilled.match(resultAction)) {
+        toast({
+          title: t('createSuccess'),
+          description: t('projectCreated'),
+        });
+        form.reset(); //重置表单
+        router.push('/projects'); // 创建成功后返回projects页面
+      }
     } catch (error) {
       toast({
         title: t('createError'),
@@ -105,8 +121,7 @@ export default function CreateProjectPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-2xl mx-auto">
+    <div className="container mx-auto px-4 py-2">
         <div className="flex items-center mb-6">
           <button
             onClick={() => router.back()}
@@ -172,7 +187,11 @@ export default function CreateProjectPage() {
                       <SelectItem value="public">{t('public')}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <FormMessage />
+                  <div className="flex justify-end mt-1 min-h-[20px]">
+                    <div className="flex-1">
+                      <FormMessage className="text-xs" />
+                    </div>
+                  </div>                  
                 </FormItem>
               )}
             />
@@ -188,14 +207,7 @@ export default function CreateProjectPage() {
                   </FormLabel>
 
                   {/* 颜色选择器容器 - 背景色会随选中的颜色变化 */}
-                  <div 
-                    className="flex gap-3 p-4 rounded-lg transition-colors duration-200"
-                    style={{ 
-                      // 动态设置背景色为当前选中的颜色
-                      backgroundColor: themeColors.find(t => t.value === field.value)?.color || 'transparent',
-                    }}
-                  >
-                    {/* 遍历所有可选的主题颜色 */}
+                  <div className="flex gap-3 p-4 rounded-lg">
                     {themeColors.map((themeColor) => (
                       <div
                         key={themeColor.value}
@@ -209,7 +221,9 @@ export default function CreateProjectPage() {
                           //默认边框
                           themeColor.value === 'border-gray-400 dark:border-gray-300'
                         }`}
-                        onClick={() => field.onChange(themeColor.value)}
+                        onClick={() => {
+                          field.onChange(themeColor.value);
+                        }}
                       >
                         {/* 内层颜色显示区域 */}
                         <div
@@ -232,13 +246,13 @@ export default function CreateProjectPage() {
               <Button
                 type="button"
                 onClick={() => router.back()}
-                className="px-4 py-2 text-sm border rounded-md"
+                className={buttonClass}
               >
                 {t('cancel')}
               </Button>
               <Button
                 type="submit"
-                className="px-4 py-2 text-sm border rounded-md"
+                className={buttonClass}
                 disabled={isCreating}
               >
                 {isCreating ? t('creating') : t('create')}
@@ -247,6 +261,5 @@ export default function CreateProjectPage() {
           </form>
         </Form>
       </div>
-    </div>
   )
 }

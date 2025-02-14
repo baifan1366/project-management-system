@@ -6,7 +6,7 @@ CREATE TABLE "user" (
   "phone" VARCHAR(20) UNIQUE,
   "password_hash" VARCHAR(255), -- 本地账户需要，OAuth 用户可能为空
   "avatar_url" VARCHAR(255),
-  "language" VARCHAR(10) DEFAULT 'en';
+  "language" VARCHAR(10) DEFAULT 'en',
   "theme" VARCHAR(50) CHECK ("theme" IN ('light', 'dark', 'system')) DEFAULT 'system',
   "provider" VARCHAR(50) CHECK ("provider" IN ('local', 'google', 'github')) DEFAULT 'local',
   "provider_id" VARCHAR(255) UNIQUE, -- 绑定 OAuth 的唯一 ID（如 Google/GitHub UID）
@@ -39,8 +39,9 @@ CREATE TABLE "user_team" (
 -- 项目表
 CREATE TABLE "project" (
   "id" SERIAL PRIMARY KEY,
-  "name" VARCHAR(255) NOT NULL,
-  "description" TEXT,
+  "project_name" VARCHAR(255) NOT NULL,
+  "visibility" VARCHAR(20) NOT NULL,
+  "theme_color" VARCHAR(20) DEFAULT 'white',
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "created_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
