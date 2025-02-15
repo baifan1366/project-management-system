@@ -15,7 +15,6 @@ CREATE TABLE "user" (
   "notifications_enabled" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  
 );
 
 -- 团队表
@@ -232,3 +231,22 @@ CREATE INDEX idx_chat_message_session ON "chat_message"("session_id");
 CREATE INDEX idx_chat_message_created ON "chat_message"("created_at");
 CREATE INDEX idx_chat_participant_user ON "chat_participant"("user_id");
 CREATE INDEX idx_chat_session_team ON "chat_session"("team_id");
+
+-- 操作日志表
+CREATE TABLE "action_log" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" INT REFERENCES "user"("id") ON DELETE SET NULL,
+  "action_type" VARCHAR(50) NOT NULL, -- 例如：'CREATE', 'UPDATE', 'DELETE'
+  "entity_type" VARCHAR(50) NOT NULL, -- 例如：'task', 'project', 'team'
+  "entity_id" INT NOT NULL,           -- 被操作实体的ID
+  "old_values" JSONB,                 -- 修改前的值
+  "new_values" JSONB,                 -- 修改后的值
+  "ip_address" VARCHAR(45),           -- 支持 IPv6
+  "user_agent" TEXT,                  -- 用户浏览器信息
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 为操作日志表创建索引
+CREATE INDEX idx_action_log_user ON "action_log"("user_id");
+CREATE INDEX idx_action_log_entity ON "action_log"("entity_type", "entity_id");
+CREATE INDEX idx_action_log_created ON "action_log"("created_at");
