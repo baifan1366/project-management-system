@@ -1,0 +1,10 @@
+{"themeColors": [
+    { "value": "white", "themeColor": "#ffffff" ,"buttonColor":"bg-black text-white dark:bg-white dark:text-black"},
+    { "value": "lightGreen", "themeColor": "#bbf7d0" ,"buttonColor":"bg-[#bbf7d0] text-black"},
+    { "value": "lightYellow", "themeColor": "#fefcbf" ,"buttonColor":"bg-[#fefcbf] text-black"},
+    { "value": "lightCoral", "themeColor": "#f08080" ,"buttonColor":"bg-[#f08080] text-white"},
+    { "value": "lightOrange", "themeColor": "#ffedd5" ,"buttonColor":"bg-[#ffedd5] text-black"},
+    { "value": "peach", "themeColor": "#ffcccb" ,"buttonColor":"bg-[#ffcccb] text-black"},
+    { "value": "lightCyan", "themeColor": "#e0ffff" ,"buttonColor":"bg-[#e0ffff] text-black"}
+  ]
+}

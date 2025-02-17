@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch } from 'react-redux';
 import { createProject } from '@/lib/redux/features/projectSlice';
 
@@ -32,6 +32,26 @@ export default function CreateProjectPage() {
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
   const dispatch = useDispatch();
+  const [themeColors, setThemeColors] = useState([]);
+
+  useEffect(() => {
+    const fetchThemeColors = async () => {
+      try {
+        const response = await fetch('/themeColor.json');
+        const data = await response.json();
+        setThemeColors(data.themeColors);
+      } catch (error) {
+        console.error('加载主题颜色失败:', error);
+        toast({
+          title: t('error'),
+          description: t('themeColorLoadError'),
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchThemeColors();
+  }, []);
 
   // Schema definition
   const FormSchema = z.object({
@@ -58,26 +78,11 @@ export default function CreateProjectPage() {
   })
 
   // 更新颜色选项，添加黑白色并调整顺序
-  const themeColors = [
-    { value: 'white', color: '#ffffff' },
-    { value: 'lightGreen', color: '#bbf7d0' },
-    { value: 'lightYellow', color: '#fefcbf' },
-    { value: 'lightCoral', color: '#f08080' },
-    { value: 'lightOrange', color: '#ffedd5' },
-    { value: 'peach', color: '#ffcccb' },
-    { value: 'lightCyan', color: '#e0ffff' },
-  ]
 
-  const buttonClass = `px-4 py-2 text-sm border rounded-md transition-colors duration-300 ${
-    form.watch('themeColor') === 'white' ? 'bg-black text-white dark:bg-white dark:text-black' :
-    form.watch('themeColor') === 'lightGreen' ? 'bg-[#bbf7d0] text-black' :
-    form.watch('themeColor') === 'lightYellow' ? 'bg-[#fefcbf] text-black' :
-    form.watch('themeColor') === 'lightCoral' ? 'bg-[#f08080] text-white' :
-    form.watch('themeColor') === 'lightOrange' ? 'bg-[#ffedd5] text-black' :
-    form.watch('themeColor') === 'peach' ? 'bg-[#ffcccb] text-black' :
-    form.watch('themeColor') === 'lightCyan' ? 'bg-[#e0ffff] text-black' :
-    ''
-  }`
+  const selectedTheme = themeColors.find(
+    (theme) => theme.value === form.watch('themeColor')
+  );
+  const buttonClass = `px-4 py-2 text-sm border rounded-md transition-colors duration-300 ${selectedTheme?.buttonColor}`;
 
   // Submit function
   const onSubmit = async (data) => {
@@ -232,7 +237,7 @@ export default function CreateProjectPage() {
                             themeColor.value === 'white' ? 'border border-gray-200' : ''
                           }`}
                           // 设置实际的颜色值
-                          style={{ backgroundColor: themeColor.color }}
+                          style={{ backgroundColor: themeColor.themeColor }}
                         />
                       </div>
                     ))}
@@ -241,7 +246,6 @@ export default function CreateProjectPage() {
                 </FormItem>
               )}
             />
-
             <div className="flex justify-end gap-3">
               <Button
                 type="button"
@@ -250,6 +254,7 @@ export default function CreateProjectPage() {
               >
                 {t('cancel')}
               </Button>
+
               <Button
                 type="submit"
                 className={buttonClass}
