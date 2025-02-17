@@ -87,7 +87,13 @@
     "team": "Team",
     "inProgress": "In Progress",
     "progress": "Progress",
-    "noProjects": "No projects created yet"
+    "noProjects": "No projects created yet",
+    "projectName": "Project Name",
+    "visibility": "Visibility",
+    "created_at": "Created On",
+    "updated_at": "Updated On",
+    "task": "Task",
+    "projectID": "ID"
   },
   "CreateProject":{
     "createProject": "Create Project",
@@ -111,10 +117,25 @@
     "createError": "Error creating project.",
     "pleaseTryAgain": "Something went wrong. Please try again."
   },
+  "CreateTask":{
+    "createTask": "Create Task",
+    "taskName": "Task Name",
+    "cancel": "Cancel",
+    "create": "Create",
+    "taskNameMin": "Task Name must be at least 2 characters.",
+    "taskNameMax": "Task Name cannot exceed 50 characters.",
+    "taskNamePlaceholder": "Enter task name",
+    "creating": "Creating...",
+    "pleaseWait": "Please wait while we create your task.",
+    "createSuccess": "Success!",
+    "taskCreated": "Your task has been created successfully.",
+    "createError": "Error creating task.",
+    "pleaseTryAgain": "Something went wrong. Please try again."
+  },
   "ChatDialog":{
-      "privateMessages": "Private Messages",
-      "groupChat": "Group Chat",
-      "privateMessagesContent": "This is the content for private messages.",
-      "groupChatContent": "This is the content for group chat."
+    "privateMessages": "Private Messages",
+    "groupChat": "Group Chat",
+    "privateMessagesContent": "This is the content for private messages.",
+    "groupChatContent": "This is the content for group chat."
   }
 }

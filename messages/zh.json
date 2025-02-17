@@ -87,7 +87,13 @@
     "team": "团队",
     "inProgress": "进行中",
     "progress": "进度",
-    "noProjects": "暂未创建任何项目"
+    "noProjects": "暂未创建任何项目",
+    "projectName": "项目名称",
+    "visibility": "可见性",
+    "created_at": "创建于",
+    "updated_at": "更新于",
+    "task": "任务",
+    "projectID": "序号"
   },
   "CreateProject": {
     "createProject": "创建项目",
@@ -109,6 +115,21 @@
     "createSuccess": "创建成功！",
     "projectCreated": "您的项目已成功创建。",
     "createError": "创建项目时出错。",
+    "pleaseTryAgain": "发生错误，请重试。"
+  },
+  "CreateTask": {
+    "createTask": "创建任务",
+    "taskName": "任务名称",
+    "cancel": "取消",
+    "create": "创建",
+    "taskNameMin": "任务名称必须至少为 2 个字符。",
+    "taskNameMax": "任务名称不能超过 50 个字符。",
+    "taskNamePlaceholder": "请输入任务名称",
+    "creating": "正在创建...",
+    "pleaseWait": "请稍候，我们正在创建您的任务。",
+    "createSuccess": "成功！",
+    "taskCreated": "您的任务已成功创建。",
+    "createError": "创建任务时出错。",
     "pleaseTryAgain": "发生错误，请重试。"
   },
   "ChatDialog": {

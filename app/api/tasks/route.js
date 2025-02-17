@@ -7,7 +7,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
 
-    let query = supabase.from('tasks').select('*')
+    let query = supabase.from('task').select('*')
     
     if (projectId) {
       query = query.eq('project_id', projectId)
@@ -28,7 +28,7 @@ export async function POST(request) {
   try {
     const body = await request.json()
     const { data, error } = await supabase
-      .from('tasks')
+      .from('task')
       .insert([body])
       .select()
 
