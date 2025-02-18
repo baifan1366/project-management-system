@@ -252,3 +252,23 @@ CREATE TABLE "action_log" (
 CREATE INDEX idx_action_log_user ON "action_log"("user_id");
 CREATE INDEX idx_action_log_entity ON "action_log"("entity_type", "entity_id");
 CREATE INDEX idx_action_log_created ON "action_log"("created_at");
+
+-- 订阅计划表
+CREATE TABLE "subscription_plan" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(50) NOT NULL,
+  "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
+  "price" DECIMAL(10, 2) NOT NULL,
+  "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
+  "description" TEXT,
+  "features" JSONB NOT NULL, -- 存储计划包含的功能列表
+  "max_members" INT NOT NULL, -- 最大团队成员数
+  "max_projects" INT NOT NULL, -- 最大项目数
+  "storage_limit" BIGINT NOT NULL, -- 存储限制（字节）
+  "is_active" BOOLEAN DEFAULT TRUE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 为订阅计划表创建索引
+CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
