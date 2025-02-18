@@ -1,0 +1,141 @@
+{
+  "app": {
+    "title": "Team Sync",
+    "description": "Sistem Pengurusan Projek"
+  },
+  "Header": {
+    "projectName": "Team Sync",
+    "dashboard": "Papan Pemuka",
+    "projects": "Projek",
+    "tasks": "Tugas",
+    "pricing": "Harga",
+    "login": "Log Masuk",
+    "signup": "Daftar"
+  },
+  "nav": {
+    "home": "Laman Utama",
+    "projects": "Projek",
+    "tasks": "Tugas",
+    "settings": "Tetapan",
+    "login": "Log Masuk",
+    "signup": "Daftar"
+  },
+  "projects": {
+    "title": "Projek",
+    "create": "Cipta Projek",
+    "status": {
+      "pending": "Menunggu",
+      "inProgress": "Sedang Berlangsung",
+      "completed": "Selesai"
+    }
+  },
+  "tasks": {
+    "title": "Tugas",
+    "create": "Cipta Tugas",
+    "status": {
+      "todo": "Perlu Dilakukan",
+      "inProgress": "Sedang Berlangsung",
+      "completed": "Selesai"
+    }
+  },
+  "common": {
+    "save": "Simpan",
+    "cancel": "Batal",
+    "delete": "Padam",
+    "edit": "Sunting",
+    "loading": "Memuatkan..."
+  },
+  "Pricing": {
+    "title": "Pilih Pelan Anda",
+    "starterPlan": "Permulaan",
+    "proPlan": "Profesional",
+    "enterprisePlan": "Perusahaan",
+    "contactUs": "Hubungi Kami",
+    "features": {
+      "basic": "Ciri-ciri Asas",
+      "projects": "{count} Projek",
+      "teamMembers": "{count} Ahli Pasukan",
+      "everything": "Semua dalam Pelan Permulaan",
+      "unlimited": "Projek & Pasukan Tanpa Had",
+      "support": "Sokongan Keutamaan 24/7"
+    }
+  },
+  "Dashboard": {
+    "welcome": "Selamat Datang ke Papan Pemuka Anda",
+    "quickAccess": "Akses Pantas",
+    "teams": "Pasukan",
+    "projects": "Projek",
+    "manageTeams": "Urus pasukan anda",
+    "manageProjects": "Urus projek anda",
+    "recentActivity": "Aktiviti Terkini",
+    "noRecentActivity": "Tiada aktiviti terkini"
+  },
+  "Teams": {
+    "teams": "Pasukan",
+    "createTeam": "Cipta Pasukan",
+    "members": "ahli",
+    "manage": "Urus",
+    "activeProjects": "projek aktif",
+    "noTeams": "Belum ada pasukan yang dicipta"
+  },
+  "Projects": {
+    "projects": "Projek",
+    "createProject": "Cipta Projek",
+    "all": "Semua Projek",
+    "active": "Aktif",
+    "completed": "Selesai",
+    "team": "Pasukan",
+    "inProgress": "Sedang Berlangsung",
+    "progress": "Kemajuan",
+    "noProjects": "Belum ada projek yang dicipta",
+    "projectName": "Nama Projek",
+    "visibility": "Keterlihatan",
+    "created_at": "Dicipta Pada",
+    "updated_at": "Dikemas Kini Pada",
+    "task": "Tugas",
+    "projectID": "ID"
+  },
+  "CreateProject": {
+    "createProject": "Cipta Projek",
+    "projectName": "Nama Projek",
+    "cancel": "Batal",
+    "create": "Cipta",
+    "themeColor": "Warna Tema",
+    "visibility": "Keterlihatan",
+    "public": "Awam",
+    "private": "Peribadi",
+    "projectNameMin": "Nama Projek mestilah sekurang-kurangnya 2 aksara.",
+    "projectNameMax": "Nama Projek tidak boleh melebihi 50 aksara.",
+    "projectNamePlaceholder": "Masukkan nama projek",
+    "visibilityRequired": "Keterlihatan diperlukan.",
+    "visibilityPlaceholder": "Pilih keterlihatan",
+    "themeColorRequired": "Warna Tema diperlukan.",
+    "creating": "Mencipta...",
+    "pleaseWait": "Sila tunggu semasa kami mencipta projek anda.",
+    "createSuccess": "Berjaya!",
+    "projectCreated": "Projek anda telah berjaya dicipta.",
+    "createError": "Ralat mencipta projek.",
+    "pleaseTryAgain": "Sesuatu telah berlaku. Sila cuba lagi."
+  },
+  "CreateTask": {
+    "createTask": "Cipta Tugas",
+    "taskName": "Nama Tugas",
+    "cancel": "Batal",
+    "create": "Cipta",
+    "taskNameMin": "Nama Tugas mestilah sekurang-kurangnya 2 aksara.",
+    "taskNameMax": "Nama Tugas tidak boleh melebihi 50 aksara.",
+    "taskNamePlaceholder": "Masukkan nama tugas",
+    "creating": "Mencipta...",
+    "pleaseWait": "Sila tunggu semasa kami mencipta tugas anda.",
+    "createSuccess": "Berjaya!",
+    "taskCreated": "Tugas anda telah berjaya dicipta.",
+    "createError": "Ralat mencipta tugas.",
+    "pleaseTryAgain": "Sesuatu telah berlaku. Sila cuba lagi."
+  },
+  "ChatDialog":{
+    "privateMessages": "Mesej Peribadi",
+    "groupChat": "Sembang Kumpulan",
+    "privateMessagesContent": "Ini adalah kandungan untuk mesej peribadi.",
+    "groupChatContent": "Ini adalah kandungan untuk sembang kumpulan."
+  }
+} 

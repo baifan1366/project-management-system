@@ -3,6 +3,15 @@
     "title": "Team Sync",
     "description": "Project Management System"
   },
+  "Header": {
+    "projectName": "Team Sync",
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "tasks": "Tasks",
+    "pricing": "Pricing",
+    "login": "Login",
+    "signup": "Sign Up"
+  },
   "nav": {
     "home": "Home",
     "projects": "Projects",
@@ -78,6 +87,57 @@
     "team": "Team",
     "inProgress": "In Progress",
     "progress": "Progress",
-    "noProjects": "No projects created yet"
+    "noProjects": "No projects created yet",
+    "projectName": "Project Name",
+    "visibility": "Visibility",
+    "created_at": "Created On",
+    "updated_at": "Updated On",
+    "task": "Task",
+    "projectID": "ID"
+  },
+  "CreateProject":{
+    "createProject": "Create Project",
+    "projectName": "Project Name",
+    "cancel": "Cancel",
+    "create": "Create",
+    "themeColor": "Theme Color",
+    "visibility": "Visibility",
+    "public": "Public",
+    "private": "Private",
+    "projectNameMin": "Project Name must be at least 2 characters.",
+    "projectNameMax": "Project Name cannot exceed 50 characters.",
+    "projectNamePlaceholder": "Enter project name",
+    "visibilityRequired": "Visibility is required.",
+    "visibilityPlaceholder": "Select a visibility",
+    "themeColorRequired": "Theme Color is required.",
+    "creating": "Creating...",
+    "pleaseWait": "Please wait while we create your project.",
+    "createSuccess": "Success!",
+    "projectCreated": "Your project has been created successfully.",
+    "createError": "Error creating project.",
+    "pleaseTryAgain": "Something went wrong. Please try again.",
+    "error": "Error",
+    "themeColorLoadError": "Theme color load error"
+  },
+  "CreateTask":{
+    "createTask": "Create Task",
+    "taskName": "Task Name",
+    "cancel": "Cancel",
+    "create": "Create",
+    "taskNameMin": "Task Name must be at least 2 characters.",
+    "taskNameMax": "Task Name cannot exceed 50 characters.",
+    "taskNamePlaceholder": "Enter task name",
+    "creating": "Creating...",
+    "pleaseWait": "Please wait while we create your task.",
+    "createSuccess": "Success!",
+    "taskCreated": "Your task has been created successfully.",
+    "createError": "Error creating task.",
+    "pleaseTryAgain": "Something went wrong. Please try again."
+  },
+  "ChatDialog":{
+    "privateMessages": "Private Messages",
+    "groupChat": "Group Chat",
+    "privateMessagesContent": "This is the content for private messages.",
+    "groupChatContent": "This is the content for group chat."
   }
 }
