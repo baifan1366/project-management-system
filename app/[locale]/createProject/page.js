@@ -32,26 +32,6 @@ export default function CreateProjectPage() {
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
   const dispatch = useDispatch();
-  const [themeColors, setThemeColors] = useState([]);
-
-  useEffect(() => {
-    const fetchThemeColors = async () => {
-      try {
-        const response = await fetch('/themeColor.json');
-        const data = await response.json();
-        setThemeColors(data.themeColors);
-      } catch (error) {
-        console.error('加载主题颜色失败:', error);
-        toast({
-          title: t('error'),
-          description: t('themeColorLoadError'),
-          variant: "destructive",
-        });
-      }
-    };
-
-    fetchThemeColors();
-  }, []);
 
   // Schema definition
   const FormSchema = z.object({
@@ -63,7 +43,7 @@ export default function CreateProjectPage() {
     visibility: z.string().min(1, {
       message: t('visibilityRequired'),
     }),
-    themeColor: z.string().min(1, {
+    buttonVariant: z.string().min(1, {
       message: t('themeColorRequired'),
     })
   })
@@ -73,16 +53,19 @@ export default function CreateProjectPage() {
     defaultValues: {
       projectName: "",
       visibility: "",
-      themeColor: "white",
+      buttonVariant: "black",
     },
   })
 
-  // 更新颜色选项，添加黑白色并调整顺序
-
-  const selectedTheme = themeColors.find(
-    (theme) => theme.value === form.watch('themeColor')
-  );
-  const buttonClass = `px-4 py-2 text-sm border rounded-md transition-colors duration-300 ${selectedTheme?.buttonColor}`;
+  const buttonVariants = [
+    { value: 'black', label: '黑色' },
+    { value: 'red', label: '红色' },
+    { value: 'orange', label: '橙色' },
+    { value: 'green', label: '绿色' },
+    { value: 'blue', label: '蓝色' },
+    { value: 'purple', label: '紫色' },
+    { value: 'pink', label: '粉色' }
+  ];
 
   // Submit function
   const onSubmit = async (data) => {
@@ -90,7 +73,7 @@ export default function CreateProjectPage() {
     
     try {
       // 解构获取表单数据
-      const { projectName, visibility, themeColor } = data;
+      const { projectName, visibility, buttonVariant } = data;
 
       toast({
         title: t('creating'),
@@ -101,7 +84,7 @@ export default function CreateProjectPage() {
       const resultAction = await dispatch(createProject({
         project_name: projectName.trim(),
         visibility,
-        theme_color: themeColor,
+        theme_color: buttonVariant,
         team_id: 16,
         created_by: 9,
       }));
@@ -111,8 +94,8 @@ export default function CreateProjectPage() {
           title: t('createSuccess'),
           description: t('projectCreated'),
         });
-        form.reset(); //重置表单
-        router.push('/projects'); // 创建成功后返回projects页面
+        form.reset();
+        router.push('/projects');
       }
     } catch (error) {
       toast({
@@ -203,7 +186,7 @@ export default function CreateProjectPage() {
 
             <FormField
               control={form.control}
-              name="themeColor"
+              name="buttonVariant"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
@@ -211,35 +194,19 @@ export default function CreateProjectPage() {
                     <span className="text-red-500">*</span>
                   </FormLabel>
 
-                  {/* 颜色选择器容器 - 背景色会随选中的颜色变化 */}
                   <div className="flex gap-3 p-4 rounded-lg">
-                    {themeColors.map((themeColor) => (
-                      <div
-                        key={themeColor.value}
-                        // 外层圆形容器 - 处理选中状态的边框样式
-                        className={`relative w-8 h-8 cursor-pointer rounded-full border-2 ${
-                          // 当前选中的颜色显示边框
-                          field.value === themeColor.value 
-                            ? 'border-gray-400 dark:border-gray-300' 
-                            : 'border-transparent'
-                        } ${
-                          //默认边框
-                          themeColor.value === 'border-gray-400 dark:border-gray-300'
+                    {buttonVariants.map((variant) => (
+                      <Button
+                        key={variant.value}
+                        type="button"
+                        variant={variant.value}
+                        className={`w-8 h-8 p-0 rounded-full ${
+                          field.value === variant.value 
+                            ? 'ring-2 ring-gray-400 dark:ring-gray-300' 
+                            : ''
                         }`}
-                        onClick={() => {
-                          field.onChange(themeColor.value);
-                        }}
-                      >
-                        {/* 内层颜色显示区域 */}
-                        <div
-                          className={`absolute inset-1 rounded-full ${
-                            // 白色选项添加边框以便于识别
-                            themeColor.value === 'white' ? 'border border-gray-200' : ''
-                          }`}
-                          // 设置实际的颜色值
-                          style={{ backgroundColor: themeColor.themeColor }}
-                        />
-                      </div>
+                        onClick={() => field.onChange(variant.value)}
+                      />
                     ))}
                   </div>
                   <FormMessage />
@@ -250,14 +217,14 @@ export default function CreateProjectPage() {
               <Button
                 type="button"
                 onClick={() => router.back()}
-                className={buttonClass}
+                variant={form.watch('buttonVariant')}
               >
                 {t('cancel')}
               </Button>
 
               <Button
                 type="submit"
-                className={buttonClass}
+                variant={form.watch('buttonVariant')}
                 disabled={isCreating}
               >
                 {isCreating ? t('creating') : t('create')}
