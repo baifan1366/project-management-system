@@ -1,10 +1,9 @@
 -- 用户表
 CREATE TABLE "user" (
-  "id" SERIAL PRIMARY KEY,
+  "id" UUID PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "email" VARCHAR(255) UNIQUE NOT NULL,
   "phone" VARCHAR(20) UNIQUE,
-  "password_hash" VARCHAR(255), -- 本地账户需要，OAuth 用户可能为空
   "avatar_url" VARCHAR(255),
   "language" VARCHAR(10) DEFAULT 'en',
   "theme" VARCHAR(50) CHECK ("theme" IN ('light', 'dark', 'system')) DEFAULT 'system',
@@ -14,7 +13,10 @@ CREATE TABLE "user" (
   "is_mfa_enabled" BOOLEAN DEFAULT FALSE,
   "notifications_enabled" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "email_verified" BOOLEAN DEFAULT FALSE,
+  "verification_token" VARCHAR(255),
+  "verification_token_expires" TIMESTAMP
 );
 
 -- 团队表
@@ -22,14 +24,14 @@ CREATE TABLE "team" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "description" TEXT,
-  "created_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 用户与团队的关系表（多对多）
 CREATE TABLE "user_team" (
-  "user_id" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "role" TEXT NOT NULL CHECK ("role" IN ('ADMIN', 'MEMBER')) DEFAULT 'MEMBER',
   PRIMARY KEY ("user_id", "team_id")
@@ -43,7 +45,7 @@ CREATE TABLE "project" (
   "visibility" VARCHAR(20) NOT NULL,
   "theme_color" VARCHAR(20) DEFAULT 'white',
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "created_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -57,8 +59,8 @@ CREATE TABLE "task" (
   "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
   "due_date" TIMESTAMP,
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
-  "assignee_id" INT REFERENCES "user"("id") ON DELETE SET NULL,
-  "created_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "assignee_id" UUID REFERENCES "user"("id") ON DELETE SET NULL,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -69,7 +71,7 @@ CREATE TABLE "subtask" (
   "title" VARCHAR(255) NOT NULL,
   "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'DONE')) DEFAULT 'TODO',
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "created_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -79,7 +81,7 @@ CREATE TABLE "comment" (
   "id" SERIAL PRIMARY KEY,
   "text" TEXT NOT NULL,
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "user_id" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -90,7 +92,7 @@ CREATE TABLE "attachment" (
   "file_url" VARCHAR(255) NOT NULL,
   "file_name" VARCHAR(255) NOT NULL,
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "uploaded_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "uploaded_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -136,7 +138,7 @@ CREATE TABLE "task_custom_field_value" (
 CREATE TABLE "time_entry" (
   "id" SERIAL PRIMARY KEY,
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "user_id" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "start_time" TIMESTAMP NOT NULL,
   "end_time" TIMESTAMP,
   "duration" INT, -- 以秒为单位
@@ -161,7 +163,7 @@ CREATE TABLE "task_template" (
   "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
   "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "created_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -179,7 +181,7 @@ CREATE TABLE "chat_session" (
   "type" TEXT NOT NULL CHECK ("type" IN ('PRIVATE', 'GROUP')),
   "name" VARCHAR(255),
   "team_id" INT REFERENCES "team"("id") ON DELETE CASCADE,
-  "created_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "chk_session_team" CHECK (
@@ -191,7 +193,7 @@ CREATE TABLE "chat_session" (
 -- 聊天参与者表
 CREATE TABLE "chat_participant" (
   "session_id" INT NOT NULL REFERENCES "chat_session"("id") ON DELETE CASCADE,
-  "user_id" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "joined_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "role" TEXT CHECK ("role" IN ('ADMIN', 'MEMBER')) DEFAULT 'MEMBER',
   PRIMARY KEY ("session_id", "user_id")
@@ -201,7 +203,7 @@ CREATE TABLE "chat_participant" (
 CREATE TABLE "chat_message" (
   "id" SERIAL PRIMARY KEY,
   "session_id" INT NOT NULL REFERENCES "chat_session"("id") ON DELETE CASCADE,
-  "user_id" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "content" TEXT NOT NULL,
   "reply_to_message_id" INT REFERENCES "chat_message"("id") ON DELETE SET NULL,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -211,7 +213,7 @@ CREATE TABLE "chat_message" (
 -- 聊天消息已读状态表
 CREATE TABLE "chat_message_read_status" (
   "message_id" INT NOT NULL REFERENCES "chat_message"("id") ON DELETE CASCADE,
-  "user_id" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "read_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY ("message_id", "user_id")
 );
@@ -222,7 +224,7 @@ CREATE TABLE "chat_attachment" (
   "message_id" INT NOT NULL REFERENCES "chat_message"("id") ON DELETE CASCADE,
   "file_url" VARCHAR(255) NOT NULL,
   "file_name" VARCHAR(255) NOT NULL,
-  "uploaded_by" INT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "uploaded_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -235,7 +237,7 @@ CREATE INDEX idx_chat_session_team ON "chat_session"("team_id");
 -- 操作日志表
 CREATE TABLE "action_log" (
   "id" SERIAL PRIMARY KEY,
-  "user_id" INT REFERENCES "user"("id") ON DELETE SET NULL,
+  "user_id" UUID REFERENCES "user"("id") ON DELETE SET NULL,
   "action_type" VARCHAR(50) NOT NULL, -- 例如：'CREATE', 'UPDATE', 'DELETE'
   "entity_type" VARCHAR(50) NOT NULL, -- 例如：'task', 'project', 'team'
   "entity_id" INT NOT NULL,           -- 被操作实体的ID
