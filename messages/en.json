@@ -115,7 +115,9 @@
     "createSuccess": "Success!",
     "projectCreated": "Your project has been created successfully.",
     "createError": "Error creating project.",
-    "pleaseTryAgain": "Something went wrong. Please try again."
+    "pleaseTryAgain": "Something went wrong. Please try again.",
+    "error": "Error",
+    "themeColorLoadError": "Theme color load error"
   },
   "CreateTask":{
     "createTask": "Create Task",
