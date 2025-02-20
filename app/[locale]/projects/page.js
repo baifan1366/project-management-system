@@ -1,142 +1,96 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { fetchProjects, updateProjectOrder } from '@/lib/redux/features/projectSlice';
+import { useTranslations } from 'next-intl';
 import { useDispatch, useSelector } from 'react-redux';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { fetchProjects } from '@/lib/redux/features/projectSlice';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProjectsPage() {
-  const t = useTranslations('Projects');
-  const router = useRouter();
   const dispatch = useDispatch();
-  const projects = useSelector((state) => state.projects.projects) || [];
+  const { projects, status, error } = useSelector((state) => state.projects);
+  const t = useTranslations();
 
   useEffect(() => {
-    const readProjects = async () => {
-      dispatch(fetchProjects());
-    };
-    readProjects();
+    dispatch(fetchProjects());
   }, [dispatch]);
 
-  const onDragEnd = (result) => {
-    // 检查拖放结果是否有效
-    if (!result.destination) {
-      return; // 如果没有目标位置，直接返回
-    }
+  if (status === 'loading') {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-3 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
 
-    const reorderedProjects = Array.from(projects); // 创建项目数组的副本
-    const [movedProject] = reorderedProjects.splice(result.source.index, 1); // 移动被拖动的项目
-    reorderedProjects.splice(result.destination.index, 0, movedProject); // 将项目插入到目标位置
-
-    // 更新项目状态（假设你有一个更新项目顺序的 action）
-    dispatch(updateProjectOrder(reorderedProjects)); // 取消注释并实现此行以更新状态
-  };
+  if (status === 'failed') {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {error || t('common.error')}
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">{t('projects')}</h1>
-        <button 
-          onClick={() => router.push('/createProject')}
-          className="btn bg-primary text-white px-4 py-2 rounded-md">
-          {t('createProject')}
-        </button>
+    <div className="h-full">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">{t('Projects.projects')}</h1>
       </div>
-
-
-      {/* 项目过滤器 */}
-      <div className="flex gap-4 mb-6">
-        <button className="text-sm px-4 py-2 rounded-md bg-primary/10 text-primary">
-          {t('all')}
-        </button>
-        <button className="text-sm px-4 py-2 rounded-md hover:bg-primary/5">
-          {t('active')}
-        </button>
-        <button className="text-sm px-4 py-2 rounded-md hover:bg-primary/5">
-          {t('completed')}
-        </button>
-      </div>
-
-      {/* 项目列表 */}
-      <div className="grid gap-6">
-        {/* 示例项目卡片 */}
-        <div className="border rounded-lg p-6 shadow-sm">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h2 className="text-xl font-semibold">网站重构项目</h2>
-              <p className="text-sm text-muted-foreground">{t('team')}: 开发团队</p>
+      <ScrollArea className="h-[calc(100vh-10rem)]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {projects.length === 0 ? (
+            <div className="col-span-full text-center text-muted-foreground">
+              {t('Projects.noProjects')}
             </div>
-            <span className="px-2 py-1 text-sm bg-green-100 text-green-800 rounded">
-              {t('inProgress')}
-            </span>
-          </div>
-          <div className="mt-4">
-            <div className="flex justify-between text-sm text-muted-foreground mb-2">
-              <span>{t('progress')}</span>
-              <span>65%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-primary h-2 rounded-full" style={{width: '65%'}}></div>
-            </div>
-          </div>
+          ) : (
+            projects.map((project) => (
+              <Card key={project.id}>
+                <CardHeader>
+                  <CardTitle>{project.name}</CardTitle>
+                  <CardDescription>{project.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between">
+                      <span>{t('Projects.created_at')}:</span>
+                      <span>
+                        {new Date(project.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>{t('Projects.visibility')}:</span>
+                      <span>
+                        {t(`Projects.${project.visibility.toLowerCase()}`)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>{t('projects.status')}:</span>
+                      <span>
+                        {t(`projects.status.${project.status.toLowerCase()}`)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
-
-        {/* 项目数据表格 */}
-        <div className="text-center border rounded-lg">
-          <table className="min-w-full border-collapse border border-gray-200">
-            <thead>
-              <tr>
-                <th className="border px-4 py-2">{t('projectID')}</th>
-                <th className="border px-4 py-2">{t('projectName')}</th>
-                <th className="border px-4 py-2">{t('visibility')}</th>
-                <th className="border px-4 py-2">{t('created_at')}</th>
-                <th className="border px-4 py-2">{t('updated_at')}</th>
-                <th className="border px-4 py-2">{t('task')}</th>
-              </tr>
-            </thead>
-            <DragDropContext onDragEnd={onDragEnd}>
-              <Droppable droppableId="projects">
-                {(provided) => (
-                  <tbody ref={provided.innerRef} {...provided.droppableProps}>
-                    {projects.length > 0 ? (
-                      projects.map((project, index) => (
-                        <Draggable key={project.id} draggableId={project.id.toString()} index={index}>
-                          {(provided) => (
-                            <tr ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
-                              <td className="border px-4 py-2">{project.id}</td>
-                              <td className="border px-4 py-2">{project.project_name}</td>
-                              <td className="border px-4 py-2">{project.visibility}</td>
-                              <td className="border px-4 py-2">{project.created_at}</td>
-                              <td className="border px-4 py-2">{project.updated_at}</td>
-                              <td className="border px-4 py-2">
-                                <button 
-                                  onClick={() => router.push('/createTask')}
-                                  className={`btn text-white px-2 rounded-md`}
-                                  style={{ backgroundColor: project.theme_color }}>
-                                  +
-                                </button>
-                              </td>
-                            </tr>
-                          )}
-                        </Draggable>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="6" className="text-center border px-4 py-2">
-                          {t('noProjects')}
-                        </td>
-                      </tr>
-                    )}
-                    {provided.placeholder}
-                  </tbody>
-                )}
-              </Droppable>
-            </DragDropContext>
-          </table>
-        </div>
-      </div>
+      </ScrollArea>
     </div>
   );
 } 
