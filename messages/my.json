@@ -92,7 +92,6 @@
     "visibility": "Keterlihatan",
     "created_at": "Dicipta Pada",
     "updated_at": "Dikemas Kini Pada",
-    "task": "Tugas",
     "projectID": "ID"
   },
   "CreateProject": {
