@@ -20,13 +20,76 @@
     "login": "Login",
     "signup": "Sign Up"
   },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "create": "Create New",
+    "notifications": "Notifications",
+    "profile": "Profile",
+    "success": "Success",
+    "warning": "Warning",
+    "confirm": "Confirm",
+    "actions": "Actions"
+  },
+  "profile": {
+    "title": "Profile Settings",
+    "description": "Manage your account settings and preferences",
+    "email": "Email",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications",
+    "security": "Security",
+    "preferences": "Preferences",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode"
+  },
   "projects": {
     "title": "Projects",
     "create": "Create Project",
     "status": {
       "pending": "Pending",
       "inProgress": "In Progress",
-      "completed": "Completed"
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "onHold": "On Hold"
+    }
+  },
+  "Projects": {
+    "projects": "Projects",
+    "createProject": "Create Project",
+    "all": "All Projects",
+    "active": "Active",
+    "completed": "Completed",
+    "team": "Team",
+    "inProgress": "In Progress",
+    "progress": "Progress",
+    "noProjects": "No projects created yet",
+    "projectName": "Project Name",
+    "visibility": "Visibility",
+    "public": "Public",
+    "private": "Private",
+    "created_at": "Created On",
+    "updated_at": "Updated On",
+    "task": "Task",
+    "projectID": "ID",
+    "description": "Description",
+    "dueDate": "Due Date",
+    "priority": "Priority",
+    "members": "Members",
+    "filters": {
+      "all": "All",
+      "recent": "Recent",
+      "favorite": "Favorite"
+    },
+    "sort": {
+      "newest": "Newest First",
+      "oldest": "Oldest First",
+      "nameAZ": "Name A-Z",
+      "nameZA": "Name Z-A"
     }
   },
   "tasks": {
@@ -35,15 +98,29 @@
     "status": {
       "todo": "To Do",
       "inProgress": "In Progress",
-      "completed": "Completed"
+      "completed": "Completed",
+      "review": "In Review",
+      "blocked": "Blocked"
     }
   },
-  "common": {
-    "save": "Save",
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "edit": "Edit",
-    "loading": "Loading..."
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all as read",
+    "noNotifications": "No new notifications",
+    "types": {
+      "mention": "Mentioned you",
+      "assignment": "Assigned to you",
+      "update": "Project update",
+      "deadline": "Deadline approaching"
+    }
+  },
+  "errors": {
+    "general": "Something went wrong",
+    "notFound": "Resource not found",
+    "unauthorized": "Unauthorized access",
+    "forbidden": "Access forbidden",
+    "networkError": "Network error",
+    "serverError": "Server error"
   },
   "Pricing": {
     "title": "Choose Your Plan",
@@ -77,22 +154,6 @@
     "manage": "Manage",
     "activeProjects": "active projects",
     "noTeams": "No teams created yet"
-  },
-  "Projects": {
-    "projects": "Projects",
-    "createProject": "Create Project",
-    "all": "All Projects",
-    "active": "Active",
-    "completed": "Completed",
-    "team": "Team",
-    "inProgress": "In Progress",
-    "progress": "Progress",
-    "noProjects": "No projects created yet",
-    "projectName": "Project Name",
-    "visibility": "Visibility",
-    "created_at": "Created On",
-    "updated_at": "Updated On",
-    "projectID": "ID"
   },
   "CreateProject":{
     "createProject": "Create Project",
