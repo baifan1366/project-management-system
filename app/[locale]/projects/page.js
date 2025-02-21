@@ -36,13 +36,6 @@ export default function ProjectsPage() {
     );
   }
 
-    const reorderedProjects = Array.from(projects); // 创建项目数组的副本
-    const [movedProject] = reorderedProjects.splice(result.source.index, 1); // 移动被拖动的项目
-    reorderedProjects.splice(result.destination.index, 0, movedProject); // 将项目插入到目标位置
-    // 更新项目状态（假设你有一个更新项目顺序的 action）
-    dispatch(updateProjectOrder(reorderedProjects)); // 取消注释并实现此行以更新状态
-  };
-
   return (
     <div className="h-full">
       <div className="flex items-center justify-between mb-8">
@@ -90,4 +83,4 @@ export default function ProjectsPage() {
       </ScrollArea>
     </div>
   );
-} 
+}
