@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useDispatch } from 'react-redux';
 import { createProject } from '@/lib/redux/features/projectSlice';
 
@@ -85,8 +85,8 @@ export default function CreateProjectPage() {
         project_name: projectName.trim(),
         visibility,
         theme_color: buttonVariant,
-        team_id: 16,
-        created_by: 9,
+        team_id: 1,
+        created_by: "0aa36713-59b7-4265-b624-cb014f895778",
       }));
 
       if (createProject.fulfilled.match(resultAction)) {

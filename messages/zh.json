@@ -92,7 +92,6 @@
     "visibility": "可见性",
     "created_at": "创建于",
     "updated_at": "更新于",
-    "task": "任务",
     "projectID": "序号"
   },
   "CreateProject": {

@@ -92,7 +92,6 @@
     "visibility": "Visibility",
     "created_at": "Created On",
     "updated_at": "Updated On",
-    "task": "Task",
     "projectID": "ID"
   },
   "CreateProject":{

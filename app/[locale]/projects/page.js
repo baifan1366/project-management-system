@@ -29,7 +29,6 @@ export default function ProjectsPage() {
     const reorderedProjects = Array.from(projects); // 创建项目数组的副本
     const [movedProject] = reorderedProjects.splice(result.source.index, 1); // 移动被拖动的项目
     reorderedProjects.splice(result.destination.index, 0, movedProject); // 将项目插入到目标位置
-
     // 更新项目状态（假设你有一个更新项目顺序的 action）
     dispatch(updateProjectOrder(reorderedProjects)); // 取消注释并实现此行以更新状态
   };
@@ -93,7 +92,7 @@ export default function ProjectsPage() {
                 <th className="border px-4 py-2">{t('visibility')}</th>
                 <th className="border px-4 py-2">{t('created_at')}</th>
                 <th className="border px-4 py-2">{t('updated_at')}</th>
-                <th className="border px-4 py-2">{t('task')}</th>
+                <th className="border px-4 py-2"></th>
               </tr>
             </thead>
             <DragDropContext onDragEnd={onDragEnd}>
@@ -112,10 +111,14 @@ export default function ProjectsPage() {
                               <td className="border px-4 py-2">{project.updated_at}</td>
                               <td className="border px-4 py-2">
                                 <button 
-                                  onClick={() => router.push('/createTask')}
+                                  onClick={() => {
+                                    if (project && project.id) {
+                                      router.push(`/projects/${project.id}`);
+                                    } 
+                                  }}
                                   className={`btn text-white px-2 rounded-md`}
                                   style={{ backgroundColor: project.theme_color }}>
-                                  +
+                                  View
                                 </button>
                               </td>
                             </tr>
