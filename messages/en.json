@@ -18,7 +18,11 @@
     "tasks": "Tasks",
     "settings": "Settings",
     "login": "Login",
-    "signup": "Sign Up"
+    "signup": "Sign Up",
+    "search": "Search",
+    "mytasks": "My Tasks",
+    "calendar": "Calendar",
+    "chat": "Chat"
   },
   "common": {
     "save": "Save",
@@ -50,17 +54,20 @@
   "projects": {
     "title": "Projects",
     "create": "Create Project",
+    "statusTitle":"Status",
     "status": {
       "pending": "Pending",
-      "inProgress": "In Progress",
+      "in_progress": "In Progress",
       "completed": "Completed",
       "cancelled": "Cancelled",
-      "onHold": "On Hold"
+      "on_hold": "On Hold"
     }
   },
   "Projects": {
     "projects": "Projects",
     "createProject": "Create Project",
+    "createNewProject": "Create a New Project",
+    "viewProject": "View Project Details",
     "all": "All Projects",
     "active": "Active",
     "completed": "Completed",
@@ -97,10 +104,9 @@
     "create": "Create Task",
     "status": {
       "todo": "To Do",
-      "inProgress": "In Progress",
-      "completed": "Completed",
-      "review": "In Review",
-      "blocked": "Blocked"
+      "in_progress": "In Progress",
+      "done": "Done",
+      "in_review": "In Review"
     }
   },
   "notifications": {

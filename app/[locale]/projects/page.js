@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDispatch, useSelector } from 'react-redux';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { fetchProjects } from '@/lib/redux/features/projectSlice';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProjectsPage() {
   const dispatch = useDispatch();
+  const { locale } = useParams();
   const { projects, status, error } = useSelector((state) => state.projects);
   const t = useTranslations();
 
@@ -59,34 +62,40 @@ export default function ProjectsPage() {
             </div>
           ) : (
             projects.map((project) => (
-              <Card key={project.id}>
-                <CardHeader>
-                  <CardTitle>{project.name}</CardTitle>
-                  <CardDescription>{project.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-                    <div className="flex items-center justify-between">
-                      <span>{t('Projects.created_at')}:</span>
-                      <span>
-                        {new Date(project.created_at).toLocaleDateString()}
-                      </span>
+              <Link 
+                key={project.id} 
+                href={`/${locale}/projects/${project.id}`}
+                className="block"
+              >
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{project.project_name}</CardTitle>
+                    <CardDescription>{project.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between">
+                        <span>{t('Projects.created_at')}:</span>
+                        <span>
+                          {new Date(project.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>{t('Projects.visibility')}:</span>
+                        <span>
+                          {t(`Projects.${project.visibility.toLowerCase()}`)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>{t('projects.statusTitle')}:</span>
+                        <span>
+                          {t(`projects.status.${project.status.toLowerCase()}`)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span>{t('Projects.visibility')}:</span>
-                      <span>
-                        {t(`Projects.${project.visibility.toLowerCase()}`)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>{t('projects.status')}:</span>
-                      <span>
-                        {t(`projects.status.${project.status.toLowerCase()}`)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Link>
             ))
           )}
         </div>

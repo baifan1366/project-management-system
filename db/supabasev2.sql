@@ -44,6 +44,7 @@ CREATE TABLE "project" (
   "description" TEXT,
   "visibility" VARCHAR(20) NOT NULL,
   "theme_color" VARCHAR(20) DEFAULT 'white',
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD')) DEFAULT 'PENDING',
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

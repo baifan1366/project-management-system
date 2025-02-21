@@ -24,18 +24,6 @@ export function Header() {
           <div className="flex items-center justify-center mb-4">
             <span className="text-xl font-bold">TS</span>
           </div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" className="w-10 h-10">
-                  <Plus size={20} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {t('common.create')}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
         </div>
         <MainNav />
         <div className="mt-auto p-3 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
