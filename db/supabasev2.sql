@@ -270,5 +270,175 @@ CREATE TABLE "subscription_plan" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 为订阅计划表创建索引
+-- 团队订阅表
+CREATE TABLE "team_subscription" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
+  "status" TEXT NOT NULL CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED')),
+  "start_date" TIMESTAMP NOT NULL,
+  "end_date" TIMESTAMP NOT NULL,
+  "cancel_at_period_end" BOOLEAN DEFAULT FALSE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 订阅付款历史表
+CREATE TABLE "subscription_payment" (
+  "id" SERIAL PRIMARY KEY,
+  "team_subscription_id" INT NOT NULL REFERENCES "team_subscription"("id") ON DELETE CASCADE,
+  "amount" DECIMAL(10, 2) NOT NULL,
+  "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
+  "payment_method" TEXT NOT NULL,
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
+  "transaction_id" VARCHAR(255),
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 为订阅相关表创建索引
 CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
+CREATE INDEX idx_team_subscription_team ON "team_subscription"("team_id");
+CREATE INDEX idx_team_subscription_status ON "team_subscription"("status");
+CREATE INDEX idx_subscription_payment_subscription ON "subscription_payment"("team_subscription_id");
+
+-- 插入默认订阅计划数据
+INSERT INTO "subscription_plan" 
+  ("name", "type", "price", "billing_interval", "description", "features", "max_members", "max_projects", "storage_limit", "is_active")
+VALUES
+  -- Free Monthly Plan
+  (
+    'Free',
+    'FREE',
+    0,
+    'MONTHLY',
+    'Basic plan for small teams',
+    '{
+      "features": [
+        "Up to 3 team members",
+        "2 projects",
+        "Basic task management",
+        "1GB storage",
+        "Community support"
+      ]
+    }',
+    3,
+    2,
+    1073741824, -- 1GB in bytes
+    TRUE
+  ),
+  -- Pro Monthly Plan
+  (
+    'Pro',
+    'PRO',
+    29,
+    'MONTHLY',
+    'Perfect for growing teams',
+    '{
+      "features": [
+        "Up to 10 team members",
+        "Unlimited projects",
+        "Advanced task management",
+        "10GB storage",
+        "Priority support",
+        "Custom fields",
+        "Time tracking"
+      ]
+    }',
+    10,
+    -1, -- Unlimited
+    10737418240, -- 10GB in bytes
+    TRUE
+  ),
+  -- Enterprise Monthly Plan
+  (
+    'Enterprise',
+    'ENTERPRISE',
+    99,
+    'MONTHLY',
+    'For large organizations',
+    '{
+      "features": [
+        "Unlimited team members",
+        "Unlimited projects",
+        "Enterprise security",
+        "100GB storage",
+        "24/7 dedicated support",
+        "Custom branding",
+        "API access"
+      ]
+    }',
+    -1, -- Unlimited
+    -1, -- Unlimited
+    107374182400, -- 100GB in bytes
+    TRUE
+  ),
+  -- Free Yearly Plan (same as monthly)
+  (
+    'Free',
+    'FREE',
+    0,
+    'YEARLY',
+    'Basic plan for small teams',
+    '{
+      "features": [
+        "Up to 3 team members",
+        "2 projects",
+        "Basic task management",
+        "1GB storage",
+        "Community support"
+      ]
+    }',
+    3,
+    2,
+    1073741824, -- 1GB in bytes
+    TRUE
+  ),
+  -- Pro Yearly Plan
+  (
+    'Pro',
+    'PRO',
+    290,
+    'YEARLY',
+    'Perfect for growing teams with yearly discount',
+    '{
+      "features": [
+        "Up to 10 team members",
+        "Unlimited projects",
+        "Advanced task management",
+        "15GB storage",
+        "Priority support",
+        "Custom fields",
+        "Time tracking",
+        "Advanced analytics"
+      ]
+    }',
+    10,
+    -1, -- Unlimited
+    16106127360, -- 15GB in bytes
+    TRUE
+  ),
+  -- Enterprise Yearly Plan
+  (
+    'Enterprise',
+    'ENTERPRISE',
+    990,
+    'YEARLY',
+    'For large organizations with yearly discount',
+    '{
+      "features": [
+        "Unlimited team members",
+        "Unlimited projects",
+        "Enterprise security",
+        "150GB storage",
+        "24/7 dedicated support",
+        "Custom branding",
+        "API access",
+        "SSO integration",
+        "Audit logs"
+      ]
+    }',
+    -1, -- Unlimited
+    -1, -- Unlimited
+    161061273600, -- 150GB in bytes
+    TRUE
+  );
