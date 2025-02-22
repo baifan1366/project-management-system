@@ -6,28 +6,30 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'use-intl'
 import CreateTeamDialog from './TeamDialog'
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
+import { fetchTeams } from '@/lib/redux/features/teamSlice'
 import { useDispatch, useSelector } from 'react-redux'
+import { buttonVariants } from '@/components/ui/button'
 
 export default function ProjectSidebar({ projectId }) {
   const t = useTranslations('Projects');
   const pathname = usePathname();
-  const teamId = 1;
   const dispatch = useDispatch();
   const { projects } = useSelector((state) => state.projects);
+  const { teams } = useSelector((state) => state.teams);
   const project = projects.find(p => String(p.id) === String(projectId));
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
-  const menuItems = [
-    {
-      id: 'team-a',
-      label: 'TeamA',
-      href: `/projects/${projectId}/${teamId}`,
-      icon: '👥'
-    },
-  ]
+
+  const menuItems = teams.map(team => ({
+    id: team.id,
+    label: team.name,
+    href: `/projects/${projectId}/${team.id}`,
+    icon: '👥'
+  }));
 
   useEffect(() => {
     dispatch(fetchProjectById(projectId));
+    dispatch(fetchTeams());
   }, [dispatch, projectId]);
 
   return (
@@ -88,7 +90,10 @@ export default function ProjectSidebar({ projectId }) {
         <div className="mt-4">
           <button 
             onClick={() => setDialogOpen(true)} 
-            className="w-full p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500">
+            className={buttonVariants({
+              variant: project?.theme_color?.toLowerCase() || 'default',
+              className: 'w-full'
+            })}>
               {t('createTeam')}
           </button>
         </div>

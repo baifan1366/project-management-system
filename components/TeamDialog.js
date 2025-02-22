@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -17,10 +17,15 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import { useDispatch } from 'react-redux'
+import { createTeam } from '@/lib/redux/features/teamSlice'
+import { useRouter } from 'next/navigation';
 
-export default function CreateTeamDialog({ isOpen, onClose }) {
+export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const t = useTranslations('CreateTeam')
   const [isLoading, setIsLoading] = useState(false)
+  const dispatch = useDispatch()
+  const router = useRouter()
 
   const FormSchema = z.object({
     teamName: z.string().trim().min(2, {
@@ -30,28 +35,43 @@ export default function CreateTeamDialog({ isOpen, onClose }) {
     }),
     teamAccess: z.string().min(1, {
       message: t('teamAccessRequired'),
-    })
+    }).transform((val) => val.toLowerCase()),
   })
 
   const form = useForm({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       teamName: "",
-      teamAccess: ""
+      teamAccess: "",
     },
   })
 
   const onSubmit = async (data) => {
     setIsLoading(true);
-    onClose();
-  }
+    try {
+      // 解构获取表单数据
+      const { teamName, teamAccess } = data;
 
-  useEffect(() => {
-    if (isOpen) {
-      form.reset(); // 每次对话框打开时重置表单
+      // 调用 Redux 的 createProject 动作
+      const resultAction = await dispatch(createTeam({
+        name: teamName.trim(),
+        access: teamAccess,
+        created_by: "0aa36713-59b7-4265-b624-cb014f895778",
+      }));
+
+      if (createTeam.fulfilled.match(resultAction)) {
+        form.reset({ 
+          teamName: "",
+          teamAccess: "",
+        });
+        router.push(`/projects/${projectId}`); 
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
       setIsLoading(false);
     }
-  }, [isOpen]);
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -103,7 +123,7 @@ export default function CreateTeamDialog({ isOpen, onClose }) {
                     {t('teamAccess')}
                     <span className="text-red-500">*</span>
                   </FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger 
                         className={`w-full px-3 py-2 border rounded-md ${
