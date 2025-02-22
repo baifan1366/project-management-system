@@ -2,13 +2,19 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
+import { Globe } from 'lucide-react';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const languages = [
+  { code: 'en', label: 'English' },
+  { code: 'my', label: 'Malay' },
+  { code: 'zh', label: 'Chinese' },
+];
 
 export default function LanguageSwitcher() {
   const pathname = usePathname();
@@ -20,16 +26,25 @@ export default function LanguageSwitcher() {
     router.push(newPathname);
   };
 
+  const currentLanguage = languages.find(lang => lang.code.startsWith(locale)) || languages[0];
+
   return (
-    <Select defaultValue={locale} onValueChange={handleLocaleChange}>
-      <SelectTrigger className="w-[120px]">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="en">English</SelectItem>
-        <SelectItem value="zh">中文</SelectItem>
-        <SelectItem value="my">Bahasa Melayu</SelectItem>
-      </SelectContent>
-    </Select>
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex items-center gap-3 w-full px-4 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground">
+        <Globe className="w-4 h-4" />
+        <span>{currentLanguage.label}</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[200px] max-h-[400px] overflow-y-auto">
+        {languages.map((language) => (
+          <DropdownMenuItem
+            key={language.code}
+            onClick={() => handleLocaleChange(language.code.split('-')[0])}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            {language.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

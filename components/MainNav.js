@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from "@/lib/utils";
-import { Home, FolderKanban, CheckSquare, Search, ListTodo, Calendar, MessageSquare, Plus } from 'lucide-react';
+import { FolderKanban, CheckSquare, Search, Loader, Calendar, MessageSquare, Plus } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import {
   Tooltip,
@@ -12,7 +12,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProjects } from '@/lib/redux/features/projectSlice';
@@ -106,11 +105,13 @@ export function MainNav() {
 
         <div className="mt-4 px-2">
           <div className="space-y-1">
-            {status === 'loading' ? (
-              <div className="text-sm text-muted-foreground px-2">loading...</div>
-            ) : status === 'failed' ? (
+            {status === 'loading' ?(
+              <div className="flex items-center justify-center p-2">
+                <Loader className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : status === "failed" ? (
               <div className="text-sm text-red-500 px-2">error...</div>
-            ) : (
+            ): (
               <>
                 {projects.map((project) => (
                   <Tooltip key={project.id}>
