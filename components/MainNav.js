@@ -81,7 +81,7 @@ export function MainNav() {
           {routes.map((route) => {
             const Icon = route.icon;
             return (
-              <Tooltip key={route.href}>
+              <Tooltip key={route.href || route.label}>
                 <TooltipTrigger asChild>
                   <Link
                     href={route.href}
@@ -102,7 +102,6 @@ export function MainNav() {
             );
           })}
         </nav>
-
         <div className="mt-4 px-2">
           <div className="space-y-1">
             {status === 'loading' ?(
@@ -114,7 +113,8 @@ export function MainNav() {
             ): (
               <>
                 {projects.map((project) => (
-                  <Tooltip key={project.id}>
+                  
+                  <Tooltip key={project.created_at}>
                     <TooltipTrigger asChild>
                       <Link
                         href={`/${locale}/projects/${project.id}`}
