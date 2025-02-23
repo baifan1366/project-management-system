@@ -21,7 +21,7 @@ export default async function LocaleLayout({ children, params }) {
       <RootLayoutClient locale={locale} messages={messages}>
         <div className="flex">
           <div className="flex-1 pl-16">
-            <div className="h-full p-8">
+            <div className="h-full">
               {children}
             </div>
           </div>

@@ -5,7 +5,7 @@ export default async function ProjectLayout({ children, params }) {
   return (
     <div className="flex">
       <ProjectSidebar projectId={resolvedParams.id} />
-      <main className="flex-1 p-6">
+      <main className="flex-1">
         {children}
       </main>
     </div>

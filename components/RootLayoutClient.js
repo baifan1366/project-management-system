@@ -15,7 +15,7 @@ export function RootLayoutClient({ children, locale, messages }) {
       <Providers>
         <div className="relative flex min-h-screen flex-col">
           {isPricingPage ? <PricingHeader /> : <Header />}
-          <main className="flex-1 container py-6">
+          <main className="flex-1 container">
             {children}
           </main>
         </div>

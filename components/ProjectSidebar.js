@@ -10,6 +10,9 @@ import { fetchProjectTeams, updateTeamOrder, initializeTeamOrder } from '@/lib/r
 import { useDispatch, useSelector } from 'react-redux'
 import { buttonVariants } from '@/components/ui/button'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import { useTheme } from 'next-themes'
+import { Home, Search, Lock, Unlock, Eye, Pencil, Plus, Settings, Users, Bell, Archive, Zap, Edit } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function ProjectSidebar({ projectId }) {
   const t = useTranslations('Projects');
@@ -67,6 +70,11 @@ export default function ProjectSidebar({ projectId }) {
     dispatch(updateTeamOrder(updatedItems));
   };
 
+  // 获取项目名称的首字母
+  const getProjectInitial = (name) => {
+    return name ? name.charAt(0).toUpperCase() : '?';
+  };
+
   // 如果正在加载，显示加载状态
   if (status === 'loading') {
     return (
@@ -77,38 +85,77 @@ export default function ProjectSidebar({ projectId }) {
   }
 
   return (
-    <div className="w-64 bg-white h-screen p-4 shadow border-r border-gray-200 rounded-lg">
-      <div className="flex flex-col space-y-4">
+    <div className="w-64 h-screen bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r text-gray-300">
+      <div className="flex flex-col">
         {/* 项目名称下拉菜单 */}
-        <div className={`relative`}>
-          <button onClick={() => setDropdownOpen(!isDropdownOpen)} className={`flex items-center text-gray-700 w-full border border-transparent rounded-lg px-2 transition-colors duration-200 hover:bg-gray-50 hover:border-gray-200`}>
-            <span>{project ? project.project_name : ''}</span>
+        <div className="relative">
+          <button 
+            onClick={() => setDropdownOpen(!isDropdownOpen)} 
+            className="flex items-center w-full rounded-full px-4 py-2.5 text-gray-300 hover:bg-accent/50"
+          >
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-6 h-6 rounded-md flex items-center justify-center text-white text-sm font-medium"
+                style={{ backgroundColor: project?.theme_color || '#E91E63' }}
+              >
+                {getProjectInitial(project?.project_name)}
+              </div>
+              <span className="text-sm">{project ? project.project_name : 'Workspace'}</span>
+            </div>
             <span className="ml-auto">▼</span>
           </button>
-          <div className={`absolute px-2 bg-white text-gray-700 mt-1 rounded-lg shadow-md border border-gray-200 transition-opacity duration-200 ${isDropdownOpen ? 'opacity-100 border-t-0' : 'opacity-0 pointer-events-none'} w-full`}>
-            <Link href="#" className="block p-2 hover:bg-gray-50">{t('edit')}</Link>
-            <Link href="#" className="block p-2 hover:bg-gray-50">{t('members')}</Link>
-            <Link href="#" className="block p-2 hover:bg-gray-50">{t('notifications')}</Link>
-            <Link href="#" className="block p-2 hover:bg-gray-50">{t('settings')}</Link>
-            <Link href="#" className="block p-2 hover:bg-gray-50">{t('archiveProject')}</Link>
+          <div className={cn(
+            "absolute left-0 right-0 mt-1 py-1 bg-[#252525] shadow-lg z-10",
+            isDropdownOpen ? 'block' : 'hidden'
+          )}>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
+              <Zap className="h-4 w-4 text-yellow-500" />
+              <span>Upgrade</span>
+            </Link>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
+              <Edit className="h-4 w-4" />
+              <span>Edit</span>
+            </Link>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
+              <Users className="h-4 w-4" />
+              <span>Members</span>
+            </Link>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
+              <Bell className="h-4 w-4" />
+              <span>Notifications</span>
+            </Link>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
+              <Settings className="h-4 w-4" />
+              <span>Settings</span>
+            </Link>
+            <div className="my-1 border-t border-gray-700"></div>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2 text-red-500">
+              <Archive className="h-4 w-4" />
+              <span>Archive workspace</span>
+            </Link>
           </div>
         </div>
 
         {/* 搜索框 */}
-        <input
-          type="text"
-          placeholder="Search..."
-          className="px-2 rounded-lg bg-gray-50 text-gray-700 border border-gray-200"
-        />
+        <div className="px-4 py-2">
+          <div className="relative">
+            <Search className="absolute left-2 top-2 h-4 w-4 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search..."
+              className="w-full pl-8 pr-3 py-1.5 bg-[#252525] text-gray-300 placeholder-gray-500 rounded text-sm focus:outline-none"
+            />
+          </div>
+        </div>
 
         {/* 导航链接 */}
-        <nav className="space-y-2">
+        <nav className="mt-2">
           <Link
             href={`/projects/${projectId}`}
-            className="flex items-center space-x-2 p-2 rounded-lg transition-colors duration-200 hover:bg-gray-50 text-gray-700"
+            className="flex items-center px-4 py-2 text-gray-300 hover:bg-accent/50"
           >
-            <span>🏠</span>
-            <span>Home</span>
+            <Home size={16} />
+            <span className="ml-2 text-sm">Home</span>
           </Link>
           
           <DragDropContext onDragEnd={handleDragEnd}>
@@ -117,7 +164,6 @@ export default function ProjectSidebar({ projectId }) {
                 <div
                   {...provided.droppableProps}
                   ref={provided.innerRef}
-                  className="space-y-1"
                 >
                   {menuItems.map((item, index) => {
                     const isActive = pathname === item.href;
@@ -131,25 +177,25 @@ export default function ProjectSidebar({ projectId }) {
                           >
                             <Link
                               href={item.href}
-                              className={`flex items-center space-x-2 p-2 rounded-lg transition-colors duration-200 hover:bg-gray-50 text-gray-700 ${
-                                isActive ? 'bg-gray-50' : ''
-                              }`}
+                              className={cn(
+                                "flex items-center px-4 py-1.5 text-gray-300",
+                                isActive ? "bg-accent/50" : "hover:bg-accent/50"
+                              )}
                             >
                               <div className="flex items-center w-full">
-                                <span>{item.icon}</span>
-                                <span className="ml-1 flex-1">{item.label}</span>
+                                <span className="text-sm">{item.label}</span>
                                 {(() => {
                                   switch (item.access) {
                                     case 'invite_only':
-                                      return <span className="ml-auto" title="Invite Only">🔒</span>;
+                                      return <Lock className="ml-auto h-4 w-4 text-muted-foreground" />;
                                     case 'can_edit':
-                                      return <span className="ml-auto" title="Can Edit">🔓</span>;
+                                      return <Pencil className="ml-auto h-4 w-4 text-muted-foreground" />;
                                     case 'can_check':
-                                      return <span className="ml-auto" title="Can Check">🔍</span>;
+                                      return <Eye className="ml-auto h-4 w-4 text-muted-foreground" />;
                                     case 'can_view':
-                                      return <span className="ml-auto" title="Can View">🔑</span>;
+                                      return <Unlock className="ml-auto h-4 w-4 text-muted-foreground" />;
                                     default:
-                                      return <span className="ml-auto" title="No Access">🔒</span>;
+                                      return <Lock className="ml-auto h-4 w-4 text-muted-foreground" />;
                                   }
                                 })()}
                               </div>
@@ -167,22 +213,20 @@ export default function ProjectSidebar({ projectId }) {
         </nav>
 
         {/* 创建团队按钮 */}
-        <div className="mt-4">
-          <button 
-            onClick={() => setDialogOpen(true)} 
-            className={buttonVariants({
-              variant: project?.theme_color?.toLowerCase() || 'default',
-              className: 'w-full'
-            })}>
-              {t('createTeam')}
-          </button>
-        </div>
-        <CreateTeamDialog 
-          isOpen={isDialogOpen} 
-          onClose={() => setDialogOpen(false)} 
-          projectId={projectId}
-        />
+        <button 
+          onClick={() => setDialogOpen(true)} 
+          className="flex items-center w-full px-4 py-2 text-gray-300 hover:bg-accent/50"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="ml-2 text-sm">New folder</span>
+        </button>
       </div>
+
+      <CreateTeamDialog 
+        isOpen={isDialogOpen} 
+        onClose={() => setDialogOpen(false)} 
+        projectId={projectId}
+      />
     </div>
   )
 } 
