@@ -103,7 +103,12 @@
     "notifications": "Notifications",
     "settings": "Settings",
     "archiveProject": "Archive Project",
-    "createTeam": "Create Team"
+    "createTeam": "Create Team",
+    "home": "Home",
+    "new_folder": "New Folder",
+    "upgrade": "Upgrade",
+    "searchPlaceholder": "Search...",
+    "unknown": "Unknown"
   },
   "tasks": {
     "title": "Tasks",

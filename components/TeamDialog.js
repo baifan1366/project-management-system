@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -17,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { createTeam } from '@/lib/redux/features/teamSlice'
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase'
@@ -27,6 +27,9 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const [isLoading, setIsLoading] = useState(false)
   const dispatch = useDispatch()
   const router = useRouter()
+  const { projects } = useSelector((state) => state.projects)
+  const project = projects.find(p => String(p.id) === String(projectId))
+  const [themeColor, setThemeColor] = useState('');
 
   const FormSchema = z.object({
     teamName: z.string().trim().min(2, {
@@ -46,6 +49,22 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
       teamAccess: "",
     },
   })
+
+  useEffect(() => {
+    if (project) {
+      setThemeColor(project.theme_color || '#64748b');
+    }
+  }, [project]);
+
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        teamName: "",
+        teamAccess: "",
+      });
+      form.clearErrors(); // 清除错误状态
+    }
+  }, [isOpen]); // 监测 isOpen 状态
 
   const onSubmit = async (data) => {
     setIsLoading(true);
@@ -74,10 +93,6 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
       }));
 
       if (createTeam.fulfilled.match(resultAction)) {
-        form.reset({ 
-          teamName: "",
-          teamAccess: "",
-        });
         onClose();
         router.refresh(); 
       } else if (createTeam.rejected.match(resultAction)) {
@@ -172,13 +187,15 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                 type="button"
                 variant="outline"
                 onClick={onClose}
-                className="text-gray-800 dark:text-gray-200"
+                style={{ backgroundColor: themeColor }}
               >
                 {t('cancel')}
               </Button>
               <Button
                 type="submit"
+                variant="outline"
                 disabled={isLoading}
+                style={{ backgroundColor: themeColor }}
               >
                 {isLoading ? t('creating') : t('create')}
               </Button>

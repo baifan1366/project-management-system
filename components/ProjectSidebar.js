@@ -8,9 +8,7 @@ import CreateTeamDialog from './TeamDialog'
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
 import { fetchProjectTeams, updateTeamOrder, initializeTeamOrder } from '@/lib/redux/features/teamSlice'
 import { useDispatch, useSelector } from 'react-redux'
-import { buttonVariants } from '@/components/ui/button'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { useTheme } from 'next-themes'
 import { Home, Search, Lock, Unlock, Eye, Pencil, Plus, Settings, Users, Bell, Archive, Zap, Edit } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,10 +17,11 @@ export default function ProjectSidebar({ projectId }) {
   const pathname = usePathname();
   const dispatch = useDispatch();
   const { projects } = useSelector((state) => state.projects);
-  const { teams, status } = useSelector((state) => state.teams);
+  const { teams } = useSelector((state) => state.teams);
   const project = projects.find(p => String(p.id) === String(projectId));
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
+  const [themeColor, setThemeColor] = useState('');
 
   // 过滤出当前项目的团队
   const projectTeams = teams.filter(team => String(team.project_id) === String(projectId));
@@ -32,7 +31,6 @@ export default function ProjectSidebar({ projectId }) {
     id: team.id,
     label: team.name,
     href: `/projects/${projectId}/${team.id}`,
-    icon: '👥',
     access: team.access,
     order_index: team.order_index || index
   })).sort((a, b) => a.order_index - b.order_index);
@@ -52,6 +50,12 @@ export default function ProjectSidebar({ projectId }) {
       dispatch(initializeTeamOrder(projectId));
     }
   }, [projectTeams, projectId, dispatch]);
+
+  useEffect(() => {
+    if (project) {
+      setThemeColor(project.theme_color || '#64748b');
+    }
+  }, [project]);
 
   const handleDragEnd = (result) => {
     if (!result.destination) return;
@@ -75,63 +79,61 @@ export default function ProjectSidebar({ projectId }) {
     return name ? name.charAt(0).toUpperCase() : '?';
   };
 
-  // 如果正在加载，显示加载状态
-  if (status === 'loading') {
-    return (
-      <div className="w-64 bg-white h-screen p-4 shadow border-r border-gray-200 rounded-lg">
-        <div>Loading...</div>
-      </div>
-    );
-  }
+  // 判断是否使用深色文字
+  const shouldUseDarkText = (color) => {
+    // 如果是白色或非常浅的颜色，返回true
+    return color === '#FFFFFF' || color === '#FFF' || color === 'white' || 
+           color?.toLowerCase().startsWith('#f') || color?.toLowerCase().startsWith('#e');
+  };
 
   return (
-    <div className="w-64 h-screen bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r text-gray-300">
+    <div className="w-64 h-screen bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r border-border">
       <div className="flex flex-col">
         {/* 项目名称下拉菜单 */}
         <div className="relative">
           <button 
             onClick={() => setDropdownOpen(!isDropdownOpen)} 
-            className="flex items-center w-full rounded-full px-4 py-2.5 text-gray-300 hover:bg-accent/50"
+            className="flex items-center w-full px-4 py-2.5 text-foreground hover:bg-accent/50 transition-colors"
           >
             <div className="flex items-center gap-2">
               <div 
-                className="w-6 h-6 rounded-md flex items-center justify-center text-white text-sm font-medium"
+                className="w-6 h-6 rounded-md flex items-center justify-center text-white text-sm font-medium ring-offset-background transition-shadow hover:ring-2 hover:ring-ring hover:ring-offset-2"
                 style={{ backgroundColor: project?.theme_color || '#E91E63' }}
               >
                 {getProjectInitial(project?.project_name)}
               </div>
-              <span className="text-sm">{project ? project.project_name : 'Workspace'}</span>
+              <span className="text-sm font-medium">{project ? project.project_name : 'Workspace'}</span>
             </div>
-            <span className="ml-auto">▼</span>
+            <span className="ml-auto text-muted-foreground">▼</span>
           </button>
           <div className={cn(
-            "absolute left-0 right-0 mt-1 py-1 bg-[#252525] shadow-lg z-10",
+            "absolute left-0 right-0 mt-1 py-1 bg-popover border border-border rounded-md shadow-lg z-10",
             isDropdownOpen ? 'block' : 'hidden'
           )}>
-            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
-              <Zap className="h-4 w-4 text-yellow-500" />
-              <span>Upgrade</span>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
+              <Zap size={16} className="text-yellow-500" />
+              <span>{t('upgrade')}</span>
             </Link>
-            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
-              <Edit className="h-4 w-4" />
-              <span>Edit</span>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
+              <Edit size={16} className="text-muted-foreground" />
+              <span>{t('edit')}</span>
             </Link>
-            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
-              <Users className="h-4 w-4" />
-              <span>Members</span>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
+              <Users size={16} className="text-muted-foreground" />
+              <span>{t('members')}</span>
             </Link>
-            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
-              <Bell className="h-4 w-4" />
-              <span>Notifications</span>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
+              <Bell size={16} className="text-muted-foreground" />
+              <span>{t('notifications')}</span>
             </Link>
-            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2">
-              <Settings className="h-4 w-4" />
-              <span>Settings</span>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
+              <Settings size={16} className="text-muted-foreground" />
+              <span>{t('settings')}</span>
             </Link>
-            <div className="my-1 border-t border-gray-700"></div>
-            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent/50 text-sm gap-2 text-red-500">
-              <Archive className="h-4 w-4" />
-              <span>Archive workspace</span>
+            <div className="my-1 border-t border-border"></div>
+            <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-destructive transition-colors">
+              <Archive size={16} className="text-destructive" />
+              <span>{t('archiveProject')}</span>
             </Link>
           </div>
         </div>
@@ -139,11 +141,11 @@ export default function ProjectSidebar({ projectId }) {
         {/* 搜索框 */}
         <div className="px-4 py-2">
           <div className="relative">
-            <Search className="absolute left-2 top-2 h-4 w-4 text-gray-500" />
+            <Search size={16} className="absolute left-2 top-2 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search..."
-              className="w-full pl-8 pr-3 py-1.5 bg-[#252525] text-gray-300 placeholder-gray-500 rounded text-sm focus:outline-none"
+              placeholder={t('searchPlaceholder')}
+              className="w-full pl-8 pr-3 py-1.5 bg-muted text-foreground placeholder-muted-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
             />
           </div>
         </div>
@@ -152,10 +154,13 @@ export default function ProjectSidebar({ projectId }) {
         <nav className="mt-2">
           <Link
             href={`/projects/${projectId}`}
-            className="flex items-center px-4 py-2 text-gray-300 hover:bg-accent/50"
+            className={cn(
+              "flex items-center px-4 py-2 text-foreground hover:bg-accent/50 transition-colors",
+              pathname === `/projects/${projectId}` && "bg-accent text-accent-foreground"
+            )}
           >
-            <Home size={16} />
-            <span className="ml-2 text-sm">Home</span>
+            <Home size={16} className="text-muted-foreground" />
+            <span className="ml-2 text-sm">{t('home')}</span>
           </Link>
           
           <DragDropContext onDragEnd={handleDragEnd}>
@@ -164,6 +169,7 @@ export default function ProjectSidebar({ projectId }) {
                 <div
                   {...provided.droppableProps}
                   ref={provided.innerRef}
+                  className="space-y-0.5"
                 >
                   {menuItems.map((item, index) => {
                     const isActive = pathname === item.href;
@@ -178,24 +184,40 @@ export default function ProjectSidebar({ projectId }) {
                             <Link
                               href={item.href}
                               className={cn(
-                                "flex items-center px-4 py-1.5 text-gray-300",
-                                isActive ? "bg-accent/50" : "hover:bg-accent/50"
+                                "flex items-center px-4 py-1.5 text-foreground group",
+                                isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+                                "transition-colors"
                               )}
                             >
                               <div className="flex items-center w-full">
-                                <span className="text-sm">{item.label}</span>
+                                <div className="flex items-center gap-2">
+                                  <div 
+                                    className={cn(
+                                      "w-4 h-4 rounded-md flex items-center justify-center text-xs font-medium transition-all",
+                                      shouldUseDarkText(themeColor) ? "text-gray-900" : "text-white",
+                                      "ring-offset-background",
+                                      isActive
+                                        ? "ring-2 ring-ring ring-offset-2"
+                                        : "group-hover:ring-2 group-hover:ring-ring/50 group-hover:ring-offset-2"
+                                    )}
+                                    style={{ backgroundColor: themeColor }}
+                                  >
+                                    {getProjectInitial(item.label)}
+                                  </div>
+                                  <span className="text-sm">{item.label}</span>
+                                </div>
                                 {(() => {
                                   switch (item.access) {
                                     case 'invite_only':
-                                      return <Lock className="ml-auto h-4 w-4 text-muted-foreground" />;
+                                      return <Lock size={16} className="ml-auto text-muted-foreground group-hover:text-foreground transition-colors" />;
                                     case 'can_edit':
-                                      return <Pencil className="ml-auto h-4 w-4 text-muted-foreground" />;
+                                      return <Pencil size={16} className="ml-auto text-muted-foreground group-hover:text-foreground transition-colors" />;
                                     case 'can_check':
-                                      return <Eye className="ml-auto h-4 w-4 text-muted-foreground" />;
+                                      return <Eye size={16} className="ml-auto text-muted-foreground group-hover:text-foreground transition-colors" />;
                                     case 'can_view':
-                                      return <Unlock className="ml-auto h-4 w-4 text-muted-foreground" />;
+                                      return <Unlock size={16} className="ml-auto text-muted-foreground group-hover:text-foreground transition-colors" />;
                                     default:
-                                      return <Lock className="ml-auto h-4 w-4 text-muted-foreground" />;
+                                      return <Lock size={16} className="ml-auto text-muted-foreground group-hover:text-foreground transition-colors" />;
                                   }
                                 })()}
                               </div>
@@ -215,10 +237,10 @@ export default function ProjectSidebar({ projectId }) {
         {/* 创建团队按钮 */}
         <button 
           onClick={() => setDialogOpen(true)} 
-          className="flex items-center w-full px-4 py-2 text-gray-300 hover:bg-accent/50"
+          className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors mt-2"
         >
-          <Plus className="h-4 w-4" />
-          <span className="ml-2 text-sm">New folder</span>
+          <Plus size={16} className="text-muted-foreground" />
+          <span className="ml-2 text-sm">{t('new_folder')}</span>
         </button>
       </div>
 
