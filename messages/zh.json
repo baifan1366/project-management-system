@@ -18,32 +18,117 @@
     "tasks": "任务",
     "settings": "设置",
     "login": "登录",
-    "signup": "注册"
-  },
-  "projects": {
-    "title": "项目",
-    "create": "创建项目",
-    "status": {
-      "pending": "待处理",
-      "inProgress": "进行中",
-      "completed": "已完成"
-    }
-  },
-  "tasks": {
-    "title": "任务",
-    "create": "创建任务",
-    "status": {
-      "todo": "待办",
-      "inProgress": "进行中",
-      "completed": "已完成"
-    }
+    "signup": "注册",
+    "search": "搜索",
+    "mytasks": "我的任务",
+    "calendar": "日历",
+    "chat": "聊天"
   },
   "common": {
     "save": "保存",
     "cancel": "取消",
     "delete": "删除",
     "edit": "编辑",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "error": "发生错误",
+    "create": "创建新",
+    "notifications": "通知",
+    "profile": "个人资料",
+    "success": "成功",
+    "warning": "警告",
+    "confirm": "确认",
+    "actions": "操作"
+  },
+  "profile": {
+    "title": "个人资料设置",
+    "description": "管理您的帐户设置和偏好",
+    "email": "电子邮件",
+    "language": "语言",
+    "theme": "主题",
+    "notifications": "通知",
+    "security": "安全",
+    "preferences": "偏好",
+    "darkMode": "黑暗模式",
+    "lightMode": "亮模式"
+  },
+  "Projects": {
+    "create": "创建项目",
+    "statusTitle": "状态",
+    "status": {
+      "pending": "待处理",
+      "in_progress": "进行中",
+      "completed": "已完成",
+      "cancelled": "已取消",
+      "on_hold": "暂停"
+    },
+    "projects": "项目",
+    "createProject": "创建项目",
+    "createNewProject": "创建新项目",
+    "viewProject": "查看项目详情",
+    "all": "所有项目",
+    "active": "进行中",
+    "completed": "已完成",
+    "team": "团队",
+    "inProgress": "进行中",
+    "progress": "进度",
+    "noProjects": "暂未创建任何项目",
+    "projectName": "项目名称",
+    "visibility": "可见性",
+    "public": "公开",
+    "private": "私密",
+    "created_at": "创建于",
+    "updated_at": "更新于",
+    "task": "任务",
+    "projectID": "序号",
+    "description": "描述",
+    "dueDate": "截止日期",
+    "priority": "优先级",
+    "members": "成员",
+    "filters": {
+      "all": "所有",
+      "recent": "最近",
+      "favorite": "收藏"
+    },
+    "sort": {
+      "newest": "最新优先",
+      "oldest": "最旧优先",
+      "nameAZ": "名称 A-Z",
+      "nameZA": "名称 Z-A"
+    },
+    "edit": "编辑",
+    "notifications": "通知",
+    "settings": "设置",
+    "archiveProject": "归档项目",
+    "createTeam": "创建团队"
+  },  
+  "tasks": {
+    "title": "任务",
+    "create": "创建任务",
+    "status": {
+      "todo": "待办",
+      "in_progress": "进行中",
+      "done": "已完成",
+      "in_review": "审核中"
+    }
+  },
+  "notifications": {
+    "title": "通知",
+    "markAllRead": "标记全部为已读",
+    "noNotifications": "没有新通知",
+    "types": {
+      "mention": "提到您",
+      "assignment": "分配给您",
+      "update": "项目更新",
+      "deadline": "截止日期临近"
+    }
+  },
+  "errors": {
+    "general": "出现错误",
+    "notFound": "资源未找到",
+    "unauthorized": "未经授权的访问",
+    "forbidden": "访问被禁止",
+    "networkError": "网络错误",
+    "serverError": "服务器错误"
   },
   "Pricing": {
     "title": "选择您的计划",
@@ -78,22 +163,6 @@
     "activeProjects": "个活跃项目",
     "noTeams": "暂未创建任何团队"
   },
-  "Projects": {
-    "projects": "项目",
-    "createProject": "创建项目",
-    "all": "所有项目",
-    "active": "进行中",
-    "completed": "已完成",
-    "team": "团队",
-    "inProgress": "进行中",
-    "progress": "进度",
-    "noProjects": "暂未创建任何项目",
-    "projectName": "项目名称",
-    "visibility": "可见性",
-    "created_at": "创建于",
-    "updated_at": "更新于",
-    "projectID": "序号"
-  },
   "CreateProject": {
     "createProject": "创建项目",
     "projectName": "项目名称",
@@ -114,7 +183,9 @@
     "createSuccess": "创建成功！",
     "projectCreated": "您的项目已成功创建。",
     "createError": "创建项目时出错。",
-    "pleaseTryAgain": "发生错误，请重试。"
+    "pleaseTryAgain": "发生错误，请重试。",
+    "error": "发生错误",
+    "themeColorLoadError": "主题颜色加载错误"
   },
   "CreateTask": {
     "createTask": "创建任务",
@@ -136,5 +207,25 @@
     "groupChat": "群组聊天",
     "privateMessagesContent": "这里是私人消息内容。",
     "groupChatContent": "这里是群组聊天内容。"
+  },
+  "CreateTeam": {
+    "createTeam": "创建团队",
+    "createTeamDescription": "创建一个新团队以与他人协作。",
+    "teamName": "团队名称",
+    "teamNamePlaceholder": "输入团队名称",
+    "teamAccess": "团队访问权限",
+    "teamAccessPlaceholder": "选择访问权限级别",
+    "inviteOnly": "仅限邀请",
+    "everyoneCanEdit": "所有团队成员可编辑",
+    "everyoneCanCheck": "所有团队成员可查看和检查",
+    "everyoneCanView": "所有团队成员可查看",
+    "cancel": "取消",
+    "create": "创建",
+    "creating": "创建中...",
+    "close": "关闭",
+    "teamNameMin": "",
+    "teamNameMax": "",
+    "teamAccessRequired": "",
+    "teamNameRequired": ""
   }
 }

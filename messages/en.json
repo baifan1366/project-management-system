@@ -55,8 +55,7 @@
     "settings": "Settings",
     "signOut": "Sign out"
   },
-  "projects": {
-    "title": "Projects",
+  "Projects": {
     "create": "Create Project",
     "statusTitle":"Status",
     "status": {
@@ -65,9 +64,7 @@
       "completed": "Completed",
       "cancelled": "Cancelled",
       "on_hold": "On Hold"
-    }
-  },
-  "Projects": {
+    },
     "projects": "Projects",
     "createProject": "Create Project",
     "createNewProject": "Create a New Project",
@@ -101,7 +98,12 @@
       "oldest": "Oldest First",
       "nameAZ": "Name A-Z",
       "nameZA": "Name Z-A"
-    }
+    },
+    "edit": "Edit",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "archiveProject": "Archive Project",
+    "createTeam": "Create Team"
   },
   "tasks": {
     "title": "Tasks",
@@ -251,5 +253,25 @@
     "groupChat": "Group Chat",
     "privateMessagesContent": "This is the content for private messages.",
     "groupChatContent": "This is the content for group chat."
+  },
+  "CreateTeam": {
+    "createTeam": "Create Team",
+    "createTeamDescription": "Create a new team to collaborate with others.",
+    "teamName": "Team Name",
+    "teamNamePlaceholder": "Enter team name",
+    "teamAccess": "Team Access",
+    "teamAccessPlaceholder": "Select access level",
+    "inviteOnly": "Invite only",
+    "everyoneCanEdit": "Everyone at Team Sync can edit",
+    "everyoneCanCheck": "Everyone at Team Sync can check",
+    "everyoneCanView": "Everyone at Team Sync can view",
+    "cancel": "Cancel",
+    "create": "Create",
+    "creating": "Creating...",
+    "close": "Close",
+    "teamNameMin": "Team Name must be at least 2 characters.",
+    "teamNameMax": "Team Name cannot exceed 50 characters.",
+    "teamAccessRequired": "Team Access is required.",
+    "teamNameRequired": "Please enter a team name"
   }
 }

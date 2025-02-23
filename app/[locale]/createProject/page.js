@@ -87,6 +87,7 @@ export default function CreateProjectPage() {
         theme_color: buttonVariant,
         team_id: 1,
         created_by: "0aa36713-59b7-4265-b624-cb014f895778",
+        status: "PENDING"
       }));
 
       if (createProject.fulfilled.match(resultAction)) {
