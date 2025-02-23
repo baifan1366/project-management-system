@@ -113,8 +113,7 @@ export function MainNav() {
             ): (
               <>
                 {projects.map((project) => (
-                  
-                  <Tooltip key={project.created_at}>
+                  <Tooltip key={`project-${project.id}`}>
                     <TooltipTrigger asChild>
                       <Link
                         href={`/${locale}/projects/${project.id}`}
@@ -145,7 +144,7 @@ export function MainNav() {
                     </TooltipContent>
                   </Tooltip>
                 ))}
-                <Tooltip>
+                <Tooltip key="create-project-button">
                   <TooltipTrigger asChild>
                     <Link
                       href={`/${locale}/createProject`}
