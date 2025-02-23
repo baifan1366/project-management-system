@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDispatch, useSelector } from 'react-redux';
 import Link from 'next/link';
@@ -8,7 +8,6 @@ import { useParams } from 'next/navigation';
 import { fetchProjects } from '@/lib/redux/features/projectSlice';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProjectsPage() {
@@ -16,10 +15,21 @@ export default function ProjectsPage() {
   const { locale } = useParams();
   const { projects, status, error } = useSelector((state) => state.projects);
   const t = useTranslations('Projects');
+  const [formattedProjects, setFormattedProjects] = useState([]);
 
   useEffect(() => {
     dispatch(fetchProjects());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (projects.length > 0) {
+      const formatted = projects.map(project => ({
+        ...project,
+        created_at: new Date(project.created_at).toLocaleDateString('en-US', { timeZone: 'UTC' }),
+      }));
+      setFormattedProjects(formatted);
+    }
+  }, [projects]);
 
   if (status === 'loading') {
     return (
@@ -46,18 +56,18 @@ export default function ProjectsPage() {
       </div>
       <ScrollArea className="h-[calc(100vh-10rem)]">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.length === 0 ? (
+          {formattedProjects.length === 0 ? (
             <div className="col-span-full text-center text-muted-foreground">
               {t('noProjects')}
             </div>
           ) : (
-            projects.map((project) => (
+            formattedProjects.map((project) => (
               <Link 
                 key={project.id} 
                 href={`/${locale}/projects/${project.id}`}
                 className="block"
               >
-                <Card>
+                <Card suppressHydrationWarning={true}>
                   <CardHeader>
                     <CardTitle>{project.project_name}</CardTitle>
                     <CardDescription>{project.description}</CardDescription>
@@ -66,20 +76,18 @@ export default function ProjectsPage() {
                     <div className="flex flex-col gap-2 text-sm text-muted-foreground">
                       <div className="flex items-center justify-between">
                         <span>{t('created_at')}:</span>
-                        <span>
-                          {new Date(project.created_at).toLocaleDateString()}
-                        </span>
+                        <span>{project.created_at}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span>{t('visibility')}:</span>
                         <span>
-                          {t(`${project.visibility.toLowerCase()}`)}
+                          {t(`${project.visibility ? project.visibility.toLowerCase() : ''}`)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span>{t('statusTitle')}:</span>
                         <span>
-                          {t(`status.${project.status.toLowerCase()}`)}
+                          {t(`status.${project.status ? project.status.toLowerCase() : ''}`)}
                         </span>
                       </div>
                     </div>
