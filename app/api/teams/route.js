@@ -5,7 +5,8 @@ import { NextResponse } from 'next/server'
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
-    const teamId = searchParams.get('teamId')
+    const teamId = searchParams.get('id')
+    const projectId = searchParams.get('projectId')
 
     let data, error
 
@@ -15,11 +16,19 @@ export async function GET(request) {
         .from('team')
         .select('*')
         .eq('id', teamId))
+    } else if (projectId) {
+      // Fetch teams by project ID
+      ({ data, error } = await supabase
+        .from('team')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('order_index', { ascending: true }))
     } else {
       // Fetch all teams
       ({ data, error } = await supabase
         .from('team')
-        .select('*'))
+        .select('*')
+        .order('order_index', { ascending: true }))
     }
 
     if (error) {
@@ -50,9 +59,27 @@ export async function POST(request) {
       )
     }
 
+    // 获取当前项目中最大的order_index
+    const { data: existingTeams, error: fetchError } = await supabase
+      .from('team')
+      .select('order_index')
+      .eq('project_id', body.project_id)
+      .order('order_index', { ascending: false })
+      .limit(1)
+
+    if (fetchError) {
+      console.error('Error fetching max order_index:', fetchError)
+      throw fetchError
+    }
+
+    // 计算新的order_index
+    const maxOrderIndex = existingTeams?.[0]?.order_index ?? -1
+    const newOrderIndex = maxOrderIndex + 1
+
+    // 创建新团队，使用计算出的order_index
     const { data, error } = await supabase
       .from('team')
-      .insert([body])
+      .insert([{ ...body, order_index: newOrderIndex }])
       .select()
 
     if (error) {
@@ -74,53 +101,108 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json()
-    console.log('Update data:', body)
     
+    // 处理单个团队更新
     if (body.id) {
-      // 更新单个项目
       const { data, error } = await supabase
         .from('team')
         .update(body)
         .eq('id', body.id)
         .select()
 
-      if (error) {
-        console.error('Database error:', error)
-        throw error
+      if (error) throw error
+      return NextResponse.json(data[0])
+    }
+    
+    // 处理团队顺序更新
+    if (body.teams && Array.isArray(body.teams)) {
+      // 如果是初始化顺序
+      if (body.initializeOrder && body.projectId) {
+        const { data: existingTeams, error: fetchError } = await supabase
+          .from('team')
+          .select('*')
+          .eq('project_id', body.projectId)
+          .order('created_at', { ascending: true });
+
+        if (fetchError) throw fetchError;
+
+        // 批量更新所有团队的order_index，保留其他字段
+        const { error: updateError } = await supabase
+          .from('team')
+          .upsert(
+            existingTeams.map((team, index) => ({
+              ...team,
+              order_index: index
+            })),
+            { 
+              onConflict: 'id',
+              ignoreDuplicates: false,
+              returning: true
+            }
+          );
+
+        if (updateError) throw updateError;
+
+        // 获取更新后的团队列表
+        const { data, error } = await supabase
+          .from('team')
+          .select('*')
+          .eq('project_id', body.projectId)
+          .order('order_index', { ascending: true });
+
+        if (error) throw error;
+        return NextResponse.json(data);
       }
 
-      return NextResponse.json(data[0])
-    } else if (body.projects && Array.isArray(body.teams)) {
-      // 更新多个项目的顺序
-      const updates = body.teams.map(team => {
-        return supabase
-          .from('team')
-          .update({ order: team.order }) // 假设您有一个 'order' 字段
-          .eq('id', team.id)
-      });
+      // 正常的顺序更新逻辑
+      const { error: updateError } = await supabase
+        .from('team')
+        .upsert(
+          body.teams.map(team => ({
+            id: team.id,
+            name: team.name,
+            access: team.access,
+            order_index: team.order_index,
+            project_id: team.project_id,
+            created_by: team.created_by,
+            description: team.description
+          })),
+          { 
+            onConflict: 'id',
+            ignoreDuplicates: false,
+            returning: true
+          }
+        );
 
-      const results = await Promise.all(updates);
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
 
-      // 检查是否有错误
-      const error = results.find(result => result.error);
+      // 获取更新后的团队列表
+      const { data, error } = await supabase
+        .from('team')
+        .select('*')
+        .eq('project_id', body.teams[0].project_id)
+        .order('order_index', { ascending: true });
+
       if (error) {
-        console.error('Database error:', error);
+        console.error('Fetch error:', error);
         throw error;
       }
-
-      return NextResponse.json({ message: 'Team order updated successfully' });
-    } else {
-      return NextResponse.json(
-        { error: 'Team ID or teams array is required' },
-        { status: 400 }
-      )
+      return NextResponse.json(data);
     }
-  } catch (error) {
-    console.error('Error updating team:', error);
+
     return NextResponse.json(
-      { error: error.message || 'Failed to update team' },
+      { error: '无效的请求数据' },
+      { status: 400 }
+    )
+  } catch (error) {
+    console.error('更新团队时出错:', error)
+    return NextResponse.json(
+      { error: error.message || '更新团队失败' },
       { status: 500 }
-    );
+    )
   }
 }
 

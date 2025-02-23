@@ -20,6 +20,7 @@ import {
 import { useDispatch } from 'react-redux'
 import { createTeam } from '@/lib/redux/features/teamSlice'
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase'
 
 export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const t = useTranslations('CreateTeam')
@@ -52,11 +53,24 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
       // 解构获取表单数据
       const { teamName, teamAccess } = data;
 
-      // 调用 Redux 的 createProject 动作
+      // 获取当前用户信息
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        throw new Error('Failed to get user information');
+      }
+
+      if (!userData?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // 调用 Redux 的 createTeam 动作
       const resultAction = await dispatch(createTeam({
         name: teamName.trim(),
         access: teamAccess,
-        created_by: "0aa36713-59b7-4265-b624-cb014f895778",
+        created_by: userData.user.id,
+        project_id: projectId,
+        order_index: 0 // 新创建的团队默认放在最前面
       }));
 
       if (createTeam.fulfilled.match(resultAction)) {
@@ -64,10 +78,14 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
           teamName: "",
           teamAccess: "",
         });
-        router.push(`/projects/${projectId}`); 
+        onClose();
+        router.refresh(); 
+      } else if (createTeam.rejected.match(resultAction)) {
+        throw new Error(resultAction.error?.message || 'Failed to create team');
       }
     } catch (error) {
-      console.error(error);
+      console.error('Error creating team:', error);
+      // 这里可以添加错误提示UI
     } finally {
       setIsLoading(false);
     }

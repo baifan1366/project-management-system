@@ -26,6 +26,8 @@ CREATE TABLE "team" (
   "description" TEXT,
   "access" VARCHAR(20) NOT NULL CHECK ("access" IN ('invite_only', 'can_edit', 'can_check', 'can_view')),
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
+  "order_index" INT DEFAULT 0,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

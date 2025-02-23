@@ -6,31 +6,75 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'use-intl'
 import CreateTeamDialog from './TeamDialog'
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
-import { fetchTeams } from '@/lib/redux/features/teamSlice'
+import { fetchProjectTeams, updateTeamOrder, initializeTeamOrder } from '@/lib/redux/features/teamSlice'
 import { useDispatch, useSelector } from 'react-redux'
 import { buttonVariants } from '@/components/ui/button'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 
 export default function ProjectSidebar({ projectId }) {
   const t = useTranslations('Projects');
   const pathname = usePathname();
   const dispatch = useDispatch();
   const { projects } = useSelector((state) => state.projects);
-  const { teams } = useSelector((state) => state.teams);
+  const { teams, status } = useSelector((state) => state.teams);
   const project = projects.find(p => String(p.id) === String(projectId));
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
 
-  const menuItems = teams.map(team => ({
+  // 过滤出当前项目的团队
+  const projectTeams = teams.filter(team => String(team.project_id) === String(projectId));
+
+  const menuItems = projectTeams.map((team, index) => ({
+    ...team,
     id: team.id,
     label: team.name,
     href: `/projects/${projectId}/${team.id}`,
-    icon: '👥'
-  }));
+    icon: '👥',
+    access: team.access,
+    order_index: team.order_index || index
+  })).sort((a, b) => a.order_index - b.order_index);
 
+  // 加载项目和团队数据
   useEffect(() => {
-    dispatch(fetchProjectById(projectId));
-    dispatch(fetchTeams());
+    if (projectId) {
+      dispatch(fetchProjectById(projectId));
+      // 确保在项目ID变化时重新加载团队
+      dispatch(fetchProjectTeams(projectId));
+    }
   }, [dispatch, projectId]);
+
+  // 检查是否需要初始化顺序
+  useEffect(() => {
+    if (projectTeams.length > 0 && projectTeams.every(team => !team.order_index || team.order_index === 0)) {
+      dispatch(initializeTeamOrder(projectId));
+    }
+  }, [projectTeams, projectId, dispatch]);
+
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+
+    const items = Array.from(menuItems);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    // 更新每个项目的order值，保留原始团队的所有字段
+    const updatedItems = items.map((item, index) => ({
+      ...item,  // 保留所有原始字段
+      order_index: index,  // 只更新order_index
+    }));
+
+    // 更新Redux状态
+    dispatch(updateTeamOrder(updatedItems));
+  };
+
+  // 如果正在加载，显示加载状态
+  if (status === 'loading') {
+    return (
+      <div className="w-64 bg-white h-screen p-4 shadow border-r border-gray-200 rounded-lg">
+        <div>Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-64 bg-white h-screen p-4 shadow border-r border-gray-200 rounded-lg">
@@ -66,24 +110,60 @@ export default function ProjectSidebar({ projectId }) {
             <span>🏠</span>
             <span>Home</span>
           </Link>
-          {menuItems.map((item) => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`flex items-center space-x-2 p-2 rounded-lg transition-colors duration-200 hover:bg-gray-50 text-gray-700 ${
-                  isActive ? 'bg-gray-50' : ''
-                }`}
-              >
-                <div className="flex items-center w-full">
-                  <span>{item.icon}</span>
-                  <span className="ml-1 flex-1">{item.label}</span>
-                  <span className="ml-auto" title="TooltipContent">🔒</span>
+          
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="teams">
+              {(provided) => (
+                <div
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                  className="space-y-1"
+                >
+                  {menuItems.map((item, index) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Draggable key={item.id} draggableId={String(item.id)} index={index}>
+                        {(provided) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                          >
+                            <Link
+                              href={item.href}
+                              className={`flex items-center space-x-2 p-2 rounded-lg transition-colors duration-200 hover:bg-gray-50 text-gray-700 ${
+                                isActive ? 'bg-gray-50' : ''
+                              }`}
+                            >
+                              <div className="flex items-center w-full">
+                                <span>{item.icon}</span>
+                                <span className="ml-1 flex-1">{item.label}</span>
+                                {(() => {
+                                  switch (item.access) {
+                                    case 'invite_only':
+                                      return <span className="ml-auto" title="Invite Only">🔒</span>;
+                                    case 'can_edit':
+                                      return <span className="ml-auto" title="Can Edit">🔓</span>;
+                                    case 'can_check':
+                                      return <span className="ml-auto" title="Can Check">🔍</span>;
+                                    case 'can_view':
+                                      return <span className="ml-auto" title="Can View">🔑</span>;
+                                    default:
+                                      return <span className="ml-auto" title="No Access">🔒</span>;
+                                  }
+                                })()}
+                              </div>
+                            </Link>
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {provided.placeholder}
                 </div>
-              </Link>
-            )
-          })}
+              )}
+            </Droppable>
+          </DragDropContext>
         </nav>
 
         {/* 创建团队按钮 */}
@@ -100,6 +180,7 @@ export default function ProjectSidebar({ projectId }) {
         <CreateTeamDialog 
           isOpen={isDialogOpen} 
           onClose={() => setDialogOpen(false)} 
+          projectId={projectId}
         />
       </div>
     </div>
