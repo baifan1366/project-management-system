@@ -112,7 +112,7 @@ export function MainNav() {
               <div className="text-sm text-red-500 px-2">error...</div>
             ): (
               <>
-                {projects.map((project) => (
+                {projects.filter(project => project.id && project.project_name).map((project) => (
                   <Tooltip key={`project-${project.id}`}>
                     <TooltipTrigger asChild>
                       <Link
