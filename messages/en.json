@@ -133,10 +133,16 @@
     "serverError": "Server error"
   },
   "Pricing": {
-    "title": "Choose Your Plan",
-    "starterPlan": "Starter",
-    "proPlan": "Professional",
-    "enterprisePlan": "Enterprise",
+    "title": "Plans and Pricing",
+    "subtitle": "Choose the perfect plan for your journey",
+    "billingInterval": {
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "saveText": "Save up to 16%"
+    },
+    "starterPlan": "Free",
+    "proPlan": "Pro",
+    "enterprisePlan": "Pro Ultimate",
     "contactUs": "Contact Us",
     "features": {
       "basic": "Basic Features",
@@ -144,7 +150,43 @@
       "teamMembers": "{count} Team Members",
       "everything": "Everything in Starter",
       "unlimited": "Unlimited Projects & Teams",
-      "support": "24/7 Priority Support"
+      "support": "24/7 Priority Support",
+      "storage": {
+        "starter": "1GB Storage",
+        "pro": {
+          "monthly": "10GB Storage",
+          "yearly": "15GB Storage"
+        },
+        "enterprise": {
+          "monthly": "100GB Storage",
+          "yearly": "150GB Storage"
+        }
+      },
+      "additionalFeatures": {
+        "starter": {
+          "community": "Community Support",
+          "basic": "Basic Task Management"
+        },
+        "pro": {
+          "customFields": "Custom Fields",
+          "timeTracking": "Time Tracking",
+          "analytics": "Advanced Analytics",
+          "prioritySupport": "Priority Support"
+        },
+        "enterprise": {
+          "sso": "SSO Integration",
+          "audit": "Audit Logs",
+          "customBranding": "Custom Branding",
+          "api": "API Access",
+          "security": "Enterprise-grade Security",
+          "dedicated": "24/7 Dedicated Support"
+        }
+      }
+    },
+    "cta": {
+      "free": "Get Started",
+      "pro": "Subscribe Now",
+      "enterprise": "Contact Sales"
     }
   },
   "Dashboard": {
