@@ -105,10 +105,14 @@
     "archiveProject": "Archive Project",
     "createTeam": "Create Team",
     "home": "Home",
-    "new_folder": "New Folder",
+    "new_team": "New Team",
     "upgrade": "Upgrade",
     "searchPlaceholder": "Search...",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "inviteOnlyTooltip": "Only visible to your and people you invite",
+    "canEditTooltip": "Can edit",
+    "canCheckTooltip": "Can check",
+    "canViewTooltip": "Can view"
   },
   "tasks": {
     "title": "Tasks",
@@ -251,7 +255,25 @@
     "createSuccess": "Success!",
     "taskCreated": "Your task has been created successfully.",
     "createError": "Error creating task.",
-    "pleaseTryAgain": "Something went wrong. Please try again."
+    "pleaseTryAgain": "Something went wrong. Please try again.",
+    "setStatus": "Set Status",
+    "editTeamDetails": "Edit team details",
+    "manageTeamPermissions": "Manage team permissions",
+    "setColorAndIcon": "Set color & icon",
+    "manageDependencies": "Manage dependencies",
+    "copyTeamLink": "Copy team link",
+    "archive": "Archive",
+    "deleteTeam": "Delete team",
+    "list": "List",
+    "dashboard": "Dashboard",
+    "board": "Board",
+    "calendar": "Calendar",
+    "gantt": "Gantt",
+    "addTask": "Add task",
+    "filter": "Filter",
+    "sort": "Sort",
+    "group": "Group",
+    "options": "Options"
   },
   "ChatDialog":{
     "privateMessages": "Private Messages",
@@ -277,6 +299,10 @@
     "teamNameMin": "Team Name must be at least 2 characters.",
     "teamNameMax": "Team Name cannot exceed 50 characters.",
     "teamAccessRequired": "Team Access is required.",
-    "teamNameRequired": "Please enter a team name"
+    "teamNameRequired": "Please enter a team name",
+    "inviteOnlyDescription": "This project will only be visible to you and people or groups you invite.",
+    "everyoneCanEditDescription": "Project viewers will remain viewers.",
+    "everyoneCanCheckDescription": "Project editors will be downgraded to checkers.",
+    "everyoneCanViewDescription": "Project editors will be downgraded to viewers."
   }
 }
