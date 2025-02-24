@@ -304,5 +304,24 @@
     "everyoneCanEditDescription": "Project viewers will remain viewers.",
     "everyoneCanCheckDescription": "Project editors will be downgraded to checkers.",
     "everyoneCanViewDescription": "Project editors will be downgraded to viewers."
+  },
+  "Chat": {
+    "title": "Chat",
+    "searchPlaceholder": "Search chats...",
+    "newChat": "New Chat",
+    "online": "Online",
+    "offline": "Offline",
+    "inputPlaceholder": "Type a message...",
+    "send": "Send",
+    "you": "You",
+    "attachFile": "Attach file",
+    "attachImage": "Attach image",
+    "attachGift": "Send gift",
+    "emoji": "Emoji",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "close": "Close",
+    "selectChat":"Choose chat",
+    "noMessages":"No messages"
   }
 }
