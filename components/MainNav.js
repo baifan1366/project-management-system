@@ -140,7 +140,7 @@ export function MainNav() {
                       </Link>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      {t('Projects.viewProject')}
+                      {project.project_name}
                     </TooltipContent>
                   </Tooltip>
                 ))}

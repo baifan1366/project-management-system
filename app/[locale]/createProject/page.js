@@ -74,6 +74,13 @@ export default function CreateProjectPage() {
     try {
       // 解构获取表单数据
       const { projectName, visibility, buttonVariant } = data;
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        throw new Error('Failed to get user information');
+      }
+      if (!userData?.user?.id) {
+        throw new Error('User not authenticated');
+      }
 
       toast({
         title: t('creating'),
@@ -86,7 +93,7 @@ export default function CreateProjectPage() {
         visibility,
         theme_color: buttonVariant,
         team_id: 1,
-        created_by: "0aa36713-59b7-4265-b624-cb014f895778",
+        created_by: userData.user.id,
         status: "PENDING"
       }));
 
