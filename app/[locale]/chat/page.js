@@ -1,15 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Send, Paperclip, Smile, Image, Gift } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useChat } from '@/hooks/useChat';
+import { useChat } from '@/contexts/ChatContext';
+import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
 export default function ChatPage() {
   const t = useTranslations('Chat');
   const [message, setMessage] = useState('');
   const { currentSession, messages, sendMessage } = useChat();
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setCurrentUser(session.user);
+      }
+    };
+    getUser();
+  }, []);
+
+  console.log('Current session in page:', currentSession);
+  console.log('Messages in page:', messages);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
