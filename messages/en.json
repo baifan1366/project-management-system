@@ -278,5 +278,24 @@
     "teamNameMax": "Team Name cannot exceed 50 characters.",
     "teamAccessRequired": "Team Access is required.",
     "teamNameRequired": "Please enter a team name"
+  },
+  "Chat": {
+    "title": "Chat",
+    "searchPlaceholder": "Search chats...",
+    "newChat": "New Chat",
+    "online": "Online",
+    "offline": "Offline",
+    "inputPlaceholder": "Type a message...",
+    "send": "Send",
+    "you": "You",
+    "attachFile": "Attach file",
+    "attachImage": "Attach image",
+    "attachGift": "Send gift",
+    "emoji": "Emoji",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "close": "Close",
+    "selectChat":"Choose chat",
+    "noMessages":"No messages"
   }
 }
