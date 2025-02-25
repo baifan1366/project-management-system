@@ -104,9 +104,18 @@ export async function PUT(request) {
     
     // 处理单个团队更新
     if (body.id) {
+      const updateData = { ...body };
+      // 确保只更新允许的字段
+      const allowedFields = ['name', 'description', 'access', 'star'];
+      Object.keys(updateData).forEach(key => {
+        if (!allowedFields.includes(key)) {
+          delete updateData[key];
+        }
+      });
+
       const { data, error } = await supabase
         .from('team')
-        .update(body)
+        .update(updateData)
         .eq('id', body.id)
         .select()
 

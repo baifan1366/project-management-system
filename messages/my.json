@@ -49,7 +49,11 @@
     "security": "Keselamatan",
     "preferences": "Keutamaan",
     "darkMode": "Mod Gelap",
-    "lightMode": "Mod Terang"
+    "lightMode": "Mod Terang",
+    "upgrade": "Naik Taraf",
+    "refer": "Rujuk dan dapat ganjaran",
+    "settings": "Tetapan",
+    "signOut": "Log Keluar"
   },
   "Projects": {
     "create": "Cipta Projek",
@@ -99,7 +103,16 @@
     "notifications": "Notifikasi",
     "settings": "Tetapan",
     "archiveProject": "Arsipkan Projek",
-    "createTeam": "Cipta Pasukan"
+    "createTeam": "Cipta Pasukan",
+    "home": "Laman Utama",
+    "new_team": "Pasukan Baru",
+    "upgrade": "Naik Taraf",
+    "searchPlaceholder": "Carian...",
+    "unknown": "Tidak Diketahui",
+    "inviteOnlyTooltip": "Hanya boleh dilihat oleh anda dan orang yang anda jemput",
+    "canEditTooltip": "Boleh mengedit",
+    "canCheckTooltip": "Boleh memeriksa",
+    "canViewTooltip": "Boleh melihat"
   },
   "tasks": {
     "title": "Tugas",
@@ -200,7 +213,25 @@
     "createSuccess": "Berjaya!",
     "taskCreated": "Tugas anda telah berjaya dicipta.",
     "createError": "Ralat mencipta tugas.",
-    "pleaseTryAgain": "Sesuatu telah berlaku. Sila cuba lagi."
+    "pleaseTryAgain": "Sesuatu telah berlaku. Sila cuba lagi.",
+    "setStatus": "Tetapkan Status",
+    "editTeamDetails": "Sunting butiran pasukan",
+    "manageTeamPermissions": "Urus kebenaran pasukan",
+    "setColorAndIcon": "Tetapkan warna & ikon",
+    "manageDependencies": "Urus kebergantungan",
+    "copyTeamLink": "Salin pautan pasukan",
+    "archive": "Arkib",
+    "deleteTeam": "Padam pasukan",
+    "list": "Senarai",
+    "dashboard": "Papan Pemuka",
+    "board": "Papan",
+    "calendar": "Kalendar",
+    "gantt": "Gantt",
+    "addTask": "Tambah tugas",
+    "filter": "Tapis",
+    "sort": "Susun",
+    "group": "Kumpulan",
+    "options": "Pilihan"
   },
   "ChatDialog":{
     "privateMessages": "Mesej Peribadi",
@@ -223,9 +254,9 @@
     "create": "Cipta",
     "creating": "Mencipta...",
     "close": "Tutup",
-    "teamNameMin": "",
-    "teamNameMax": "",
-    "teamAccessRequired": "",
-    "teamNameRequired": ""
+    "teamNameMin": "Nama Pasukan mestilah sekurang-kurangnya 2 aksara.",
+    "teamNameMax": "Nama Pasukan tidak boleh melebihi 50 aksara.",
+    "teamAccessRequired": "Akses Pasukan diperlukan.",
+    "teamNameRequired": "Sila masukkan nama pasukan"
   }
 } 

@@ -49,7 +49,11 @@
     "security": "安全",
     "preferences": "偏好",
     "darkMode": "黑暗模式",
-    "lightMode": "亮模式"
+    "lightMode": "亮模式",
+    "upgrade": "升级",
+    "refer": "推荐并赚取奖励",
+    "settings": "设置",
+    "signOut": "退出登录"
   },
   "Projects": {
     "create": "创建项目",
@@ -99,7 +103,16 @@
     "notifications": "通知",
     "settings": "设置",
     "archiveProject": "归档项目",
-    "createTeam": "创建团队"
+    "createTeam": "创建团队",
+    "home": "首页",
+    "new_team": "新建团队",
+    "upgrade": "升级",
+    "searchPlaceholder": "搜索...",
+    "unknown": "未知",
+    "inviteOnlyTooltip": "仅您和被邀请的人可见",
+    "canEditTooltip": "可编辑",
+    "canCheckTooltip": "可检查",
+    "canViewTooltip": "可查看"
   },  
   "tasks": {
     "title": "任务",
@@ -200,7 +213,25 @@
     "createSuccess": "成功！",
     "taskCreated": "您的任务已成功创建。",
     "createError": "创建任务时出错。",
-    "pleaseTryAgain": "发生错误，请重试。"
+    "pleaseTryAgain": "发生错误，请重试。",
+    "setStatus": "设置状态",
+    "editTeamDetails": "编辑团队详情",
+    "manageTeamPermissions": "管理团队权限",
+    "setColorAndIcon": "设置颜色和图标",
+    "manageDependencies": "管理依赖关系",
+    "copyTeamLink": "复制团队链接",
+    "archive": "归档",
+    "deleteTeam": "删除团队",
+    "list": "列表",
+    "dashboard": "仪表盘",
+    "board": "看板",
+    "calendar": "日历",
+    "gantt": "甘特图",
+    "addTask": "添加任务",
+    "filter": "筛选",
+    "sort": "排序",
+    "group": "分组",
+    "options": "选项"
   },
   "ChatDialog": {
     "privateMessages": "私人消息",
@@ -223,9 +254,9 @@
     "create": "创建",
     "creating": "创建中...",
     "close": "关闭",
-    "teamNameMin": "",
-    "teamNameMax": "",
-    "teamAccessRequired": "",
-    "teamNameRequired": ""
+    "teamNameMin": "团队名称至少需要2个字符。",
+    "teamNameMax": "团队名称不能超过50个字符。",
+    "teamAccessRequired": "请选择团队访问权限。",
+    "teamNameRequired": "请输入团队名称"
   }
 }

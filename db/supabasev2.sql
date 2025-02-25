@@ -29,7 +29,8 @@ CREATE TABLE "team" (
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "order_index" INT DEFAULT 0,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "star" BOOL DEFAULT FALSE
 );
 
 -- 用户与团队的关系表（多对多）
