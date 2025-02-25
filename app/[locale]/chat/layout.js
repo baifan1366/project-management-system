@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { ChatProvider, useChat } from '@/contexts/ChatContext';
+import NewChatPopover from '@/components/NewChatPopover';
 
 function ChatLayout({ children }) {
   const t = useTranslations('Chat');
@@ -71,10 +72,7 @@ function ChatLayout({ children }) {
 
         {/* 新建聊天按钮 */}
         <div className="p-4 border-t">
-          <button className="flex items-center gap-2 w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-            <Plus className="h-5 w-5" />
-            <span>{t('newChat')}</span>
-          </button>
+          <NewChatPopover />
         </div>
       </div>
 

@@ -307,21 +307,21 @@
   },
   "Chat": {
     "title": "Chat",
-    "searchPlaceholder": "Search chats...",
+    "searchPlaceholder": "Search chats",
     "newChat": "New Chat",
-    "online": "Online",
-    "offline": "Offline",
+    "noMessages": "No messages",
     "inputPlaceholder": "Type a message...",
     "send": "Send",
-    "you": "You",
-    "attachFile": "Attach file",
-    "attachImage": "Attach image",
-    "attachGift": "Send gift",
+    "attachFile": "Attach File",
+    "attachImage": "Image",
+    "attachGift": "Gift",
     "emoji": "Emoji",
-    "minimize": "Minimize",
-    "maximize": "Maximize",
-    "close": "Close",
-    "selectChat":"Choose chat",
-    "noMessages":"No messages"
+    "selectChat": "Select a chat to start",
+    "searchUsers": "Search users",
+    "searching": "Searching",
+    "noResults": "No results found",
+    "recentContacts": "Recent Contacts",
+    "startChat": "Start Chat",
+    "createGroup": "Create Group"
   }
 }
