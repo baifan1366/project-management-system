@@ -37,6 +37,10 @@ export default function LoginPage() {
       if (signInError) throw signInError;
 
       if (data?.user) {
+        // 检查 session 状态
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Current session:', session);
+
         // 同步 email_verified 状态
         const { error: updateError } = await supabase
           .from('user')
@@ -50,7 +54,10 @@ export default function LoginPage() {
           console.error('Failed to update email verification status:', updateError);
         }
 
-        router.push('/dashboard');
+        // 获取当前语言
+        const locale = window.location.pathname.split('/')[1] || 'en';
+        // 重定向到仪表板
+        router.replace(`/${locale}/projects`);
       }
     } catch (err) {
       console.error('Login error:', err);
