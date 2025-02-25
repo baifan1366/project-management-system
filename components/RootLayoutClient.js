@@ -11,15 +11,15 @@ export function RootLayoutClient({ children, locale, messages }) {
   const isPricingPage = pathname.includes('/pricing');
 
   return (
-    <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Shanghai">
-      <Providers>
-        <div className="relative flex min-h-screen flex-col">
-          {isPricingPage ? <PricingHeader /> : <Header />}
-          <main className="flex-1 container py-6">
-            {children}
-          </main>
-        </div>
-      </Providers>
-    </NextIntlClientProvider>
+      <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Shanghai">
+        <Providers>
+          <div className="relative flex min-h-screen flex-col">
+            {isPricingPage ? <PricingHeader /> : <Header />}
+            <main className="flex-1 container py-6">
+              {children}
+            </main>
+          </div>
+        </Providers>
+      </NextIntlClientProvider>
   );
 }
