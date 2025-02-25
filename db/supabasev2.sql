@@ -27,6 +27,7 @@ CREATE TABLE "team" (
   "access" VARCHAR(20) NOT NULL CHECK ("access" IN ('invite_only', 'can_edit', 'can_check', 'can_view')),
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
+  "user_team_id" INT NOT NULL REFERENCES "user_team"("id") ON DELETE CASCADE,
   "order_index" INT DEFAULT 0,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -35,10 +36,10 @@ CREATE TABLE "team" (
 
 -- 用户与团队的关系表（多对多）
 CREATE TABLE "user_team" (
+  "id" SERIAL PRIMARY KEY,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "role" TEXT NOT NULL CHECK ("role" IN ('ADMIN', 'MEMBER')) DEFAULT 'MEMBER',
-  PRIMARY KEY ("user_id", "team_id")
+  "role" TEXT NOT NULL CHECK ("role" IN ('CAN EDIT', 'CAN CHECK', 'CAN VIEW')) DEFAULT 'CAN VIEW'
 );
 
 -- 项目表
@@ -49,7 +50,6 @@ CREATE TABLE "project" (
   "visibility" VARCHAR(20) NOT NULL,
   "theme_color" VARCHAR(20) DEFAULT 'white',
   "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD')) DEFAULT 'PENDING',
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -63,19 +63,27 @@ CREATE TABLE "task" (
   "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
   "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
   "due_date" TIMESTAMP,
+  "section_id" INT REFERENCES "sections"("id") ON DELETE CASCADE,
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
-  "assignee_id" UUID REFERENCES "user"("id") ON DELETE SET NULL,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "assignee_id" INT REFERENCES "task_assignee"("id") ON DELETE SET NULL,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 子任务表
-CREATE TABLE "subtask" (
+-- 任务指派表
+CREATE TABLE "task_assignee" (
   "id" SERIAL PRIMARY KEY,
-  "title" VARCHAR(255) NOT NULL,
-  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'DONE')) DEFAULT 'TODO',
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE "section" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE, 
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -124,6 +132,7 @@ CREATE TABLE "custom_field" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "type" TEXT NOT NULL CHECK ("type" IN ('TEXT', 'NUMBER', 'DATE', 'SELECT')),
+  "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
