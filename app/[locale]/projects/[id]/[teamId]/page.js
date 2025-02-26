@@ -2,13 +2,20 @@
 
 import { useTranslations } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
-import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft } from "lucide-react"
+import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { fetchTeamById, fetchProjectTeams, updateTeamStar } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
+import TaskTab from "@/components/TaskTab"
+import dynamic from 'next/dynamic';
+import InvitationDialog from '@/components/InvitationDialog';
+
+const TaskList = dynamic(() => import('@/components/TaskList'), {
+  loading: () => <div>加载中...</div>
+});
 
 export default function Task() {
   const t = useTranslations('CreateTask');
@@ -27,6 +34,8 @@ export default function Task() {
   const [teams, setTeams] = useState([]);
   const [teamsStatus, setTeamsStatus] = useState('loading');
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [currentView, setCurrentView] = useState('list');
+  const [open, setOpen] = useState(false);
 
   // 处理客户端挂载
   useEffect(() => {
@@ -36,12 +45,13 @@ export default function Task() {
   // 处理 Redux 状态更新
   useEffect(() => {
     if (mounted) {
+      const team = reduxTeams.find(team => String(team.id) === String(teamId));
       setTeams(reduxTeams);
       setTeamsStatus(reduxTeamsStatus);
-      const team = reduxTeams.find(team => String(team.id) === String(teamId));
       setSelectedTeam(team);
       if (team) {
         setIsStarred(team.star || false);
+        setIsLoading(false);
       }
     }
   }, [mounted, reduxTeams, reduxTeamsStatus, teamId]);
@@ -49,19 +59,33 @@ export default function Task() {
   // 处理数据加载
   useEffect(() => {
     const loadData = async () => {
-      if (projectId && teamId && mounted) {
+      if (projectId && teamId && mounted && teamsStatus !== 'loading') {
+        const team = reduxTeams.find(team => String(team.id) === String(teamId));
+        const hasProjectTeams = reduxTeams.some(t => String(t.project_id) === String(projectId));
+        
         try {
-          await Promise.all([
-            dispatch(fetchProjectTeams(projectId)),
-            dispatch(fetchTeamById(teamId))
-          ]);
-        } finally {
+          // 只在必要时加载数据
+          const promises = [];
+          if (!hasProjectTeams) {
+            promises.push(dispatch(fetchProjectTeams(projectId)));
+          }
+          if (!team) {
+            promises.push(dispatch(fetchTeamById(teamId)));
+          }
+          
+          if (promises.length > 0) {
+            await Promise.all(promises);
+          } else {
+            setIsLoading(false);
+          }
+        } catch (error) {
+          console.error('Error loading data:', error);
           setIsLoading(false);
         }
       }
     };
     loadData();
-  }, [dispatch, projectId, teamId, mounted]);
+  }, [dispatch, projectId, teamId, mounted, reduxTeams, teamsStatus]);
 
   // 在客户端渲染之前返回加载状态
   if (!mounted) {
@@ -98,6 +122,43 @@ export default function Task() {
     }
   };
 
+  const renderContent = () => {
+    switch (currentView) {
+      case 'list':
+        return (
+          <Suspense fallback={<div>加载中...</div>}>
+            <TaskList projectId={projectId} teamId={teamId} />
+          </Suspense>
+        );
+      case 'dashboard':
+        return (
+          <div className="p-4">
+            <div className="text-sm text-muted-foreground">仪表板视图开发中...</div>
+          </div>
+        );
+      case 'board':
+        return (
+          <div className="p-4">
+            <div className="text-sm text-muted-foreground">看板视图开发中...</div>
+          </div>
+        );
+      case 'calendar':
+        return (
+          <div className="p-4">
+            <div className="text-sm text-muted-foreground">日历视图开发中...</div>
+          </div>
+        );
+      case 'gantt':
+        return (
+          <div className="p-4">
+            <div className="text-sm text-muted-foreground">甘特图视图开发中...</div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-2" suppressHydrationWarning>
       <div className="border-0 bg-background text-foreground">
@@ -124,27 +185,31 @@ export default function Task() {
                     {t('editTeamDetails')}
                   </DropdownMenuItem>
                   <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
-                    <Settings2 className="h-4 w-4 mr-2" />
-                    {t('manageTeamPermissions')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
                     <Palette className="h-4 w-4 mr-2" />
                     {t('setColorAndIcon')}
-                  </DropdownMenuItem>
-                  <hr className="my-1" />
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
-                    <Grid className="h-4 w-4 mr-2" />
-                    {t('manageDependencies')}
                   </DropdownMenuItem>
                   <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
                     <Link className="h-4 w-4 mr-2" />
                     {t('copyTeamLink')}
                   </DropdownMenuItem>
+                  <hr className="my-1" />
                   <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
-                    <Archive className="h-4 w-4 mr-2" />
-                    {t('archive')}
+                    <Users className="h-4 w-4 mr-2" />
+                    {t('manageMembers')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    {t('manageTeamPermissions')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
+                    <Grid className="h-4 w-4 mr-2" />
+                    {t('manageDependencies')}
                   </DropdownMenuItem>
                   <hr className="my-1" />
+                  <DropdownMenuItem className="text-red-500 flex items-center px-3 py-2 text-sm">
+                    <Archive className="h-4 w-4 mr-2" />
+                    {t('archiveTeam')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem className="text-red-500 flex items-center px-3 py-2 text-sm">
                     <Trash className="h-4 w-4 mr-2" />
                     {t('deleteTeam')}
@@ -160,41 +225,19 @@ export default function Task() {
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
                 <Share2 className="h-4 w-4" />
               </Button>
+              <InvitationDialog
+                open={open}
+                onClose={() => setOpen(false)}
+              />
               <Button variant="ghost" size="icon">
                 <Palette className="h-4 w-4" />
               </Button>
             </div>
           </div>
-          <Tabs defaultValue="list" className="mt-2">
-            <TabsList className="border-b-0">
-              <TabsTrigger value="list" className="flex items-center gap-1">
-                <List className="h-4 w-4" />
-                {t('list')}
-              </TabsTrigger>
-              <TabsTrigger value="dashboard" className="flex items-center gap-1">
-                <LayoutDashboard className="h-4 w-4" />
-                {t('dashboard')}
-              </TabsTrigger>
-              <TabsTrigger value="board" className="flex items-center gap-1">
-                <LayoutGrid className="h-4 w-4" />
-                {t('board')}
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                {t('calendar')}
-              </TabsTrigger>
-              <TabsTrigger value="gantt" className="flex items-center gap-1">
-                <GanttChart className="h-4 w-4" />
-                {t('gantt')}
-              </TabsTrigger>
-              <Button variant="ghost" size="icon" className="ml-1 hover:bg-accent hover:text-accent-foreground">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </TabsList>
-          </Tabs>
+          <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
         </div>
         <div className="p-0">
           <div className="border-b p-2 flex items-center justify-between">
@@ -230,6 +273,7 @@ export default function Task() {
             </div>
           </div>
         </div>
+        {renderContent()}
       </div>
     </div>
   )

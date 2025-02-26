@@ -262,7 +262,8 @@
     "setColorAndIcon": "Set color & icon",
     "manageDependencies": "Manage dependencies",
     "copyTeamLink": "Copy team link",
-    "archive": "Archive",
+    "manageMembers": "Manage members",
+    "archiveTeam": "Archive Team",
     "deleteTeam": "Delete team",
     "list": "List",
     "dashboard": "Dashboard",
@@ -273,7 +274,9 @@
     "filter": "Filter",
     "sort": "Sort",
     "group": "Group",
-    "options": "Options"
+    "options": "Options",
+    "noTasks": "No Task",
+    "taskList": "Task List"
   },
   "ChatDialog":{
     "privateMessages": "Private Messages",
@@ -323,5 +326,26 @@
     "close": "Close",
     "selectChat":"Choose chat",
     "noMessages":"No messages"
+  },
+  "Invitation": {
+    "inviteToTeam": "Invite to",
+    "shareLink": "Share Link",
+    "email": "Email",
+    "permissions": "Permissions",
+    "copyLink": "Copy Link",
+    "editor": "Editor",
+    "teamMembers": "Team Members",
+    "owner": "Owner",
+    "invitationDescription": "Invite user to this team.",
+    "enterEmail": "Enter email",
+    "selectPermission": "Select permission",
+    "viewer": "Viewer",
+    "sendInvite": "Send Invite",
+    "editorDescription": "Can create and edit tasks. Cannot manage project settings",
+    "checker": "Checker",
+    "checkerDescription": "Can check, uncheck and comment on tasks. Cannot edit task and project.",
+    "viewerDescription": "Can only comment and chat in teams. Cannot create or edit project.",
+    "inviteSent": "Invite sent",
+    "inviteSentDescription": "Invite has been sent to the user."
   }
 }
