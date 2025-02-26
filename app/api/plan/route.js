@@ -1,24 +1,36 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+
+const supabaseUrl = 'https://xvvuzblglnbbsrmzgexp.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2dnV6YmxnbG5iYnNybXpnZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4NjA4NjgsImV4cCI6MjA1NTQzNjg2OH0.S9--0XYykXk_lyTIcaSuF2psp9Zeb69U0orCys8SD7U'
 
 // GET: Fetch all subscription plans
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    console.log('1. Creating Supabase client')
     
-    const { data: plans, error } = await supabase
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    
+    console.log('2. Fetching subscription plans')
+    const { data, error } = await supabase
       .from('subscription_plan')
       .select('*')
-      .where('is_active', 'eq', true)
-      .order('price', { ascending: true })
+      .order('price', { ascending: true }) // First order by price
+      .order('id', { ascending: true })    // Then by ID for same-price plans
 
-    if (error) throw error
+    console.log('3. Query result:', { data, error })
 
-    return NextResponse.json({ plans }, { status: 200 })
+    if (error) {
+      throw error
+    }
+
+    return NextResponse.json({ plans: data || [] })
+    
   } catch (error) {
+    console.error('Error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch subscription plans' },
+      { error: 'Failed to fetch subscription plans', details: error.message },
       { status: 500 }
     )
   }
@@ -27,7 +39,7 @@ export async function GET() {
 // POST: Create a new subscription plan (admin only)
 export async function POST(request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createClient(supabaseUrl, supabaseKey)
     const body = await request.json()
 
     // Verify admin status (you'll need to implement this based on your auth system)
@@ -84,7 +96,7 @@ export async function POST(request) {
 // PATCH: Update an existing subscription plan (admin only)
 export async function PATCH(request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createClient(supabaseUrl, supabaseKey)
     const body = await request.json()
     const { id, ...updates } = body
 
@@ -129,7 +141,7 @@ export async function PATCH(request) {
 // DELETE: Delete a subscription plan (admin only)
 export async function DELETE(request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createClient(supabaseUrl, supabaseKey)
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
