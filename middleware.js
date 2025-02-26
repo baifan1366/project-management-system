@@ -15,10 +15,11 @@ export async function middleware(request) {
   console.log('🚀 Middleware triggered for path:', request.nextUrl.pathname);
   
   const pathname = request.nextUrl.pathname;
+
   
   // 检查是否是公开路径
   const isPublicPath = PUBLIC_PATHS.some(path => 
-    pathname.includes(path) || pathname === '/'
+    pathname.includes(path)
   );
 
   try {
