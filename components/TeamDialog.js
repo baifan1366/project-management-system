@@ -21,8 +21,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { createTeam } from '@/lib/redux/features/teamSlice'
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase'
-import { Lock, Users, Eye, ClipboardCheck, Pencil, Unlock } from 'lucide-react'
-import { buttonVariants } from "@/components/ui/button"
+import { Lock, Eye, Pencil, Unlock } from 'lucide-react'
 
 export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const t = useTranslations('CreateTeam')

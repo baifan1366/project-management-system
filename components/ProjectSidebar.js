@@ -59,11 +59,18 @@ export default function ProjectSidebar({ projectId }) {
   // 加载项目和团队数据
   useEffect(() => {
     if (projectId) {
-      dispatch(fetchProjectById(projectId));
-      // 确保在项目ID变化时重新加载团队
-      dispatch(fetchProjectTeams(projectId));
+      const currentProject = projects.find(p => String(p.id) === String(projectId));
+      const hasTeams = teams.some(team => String(team.project_id) === String(projectId));
+      
+      // 只在没有数据时加载
+      if (!currentProject) {
+        dispatch(fetchProjectById(projectId));
+      }
+      if (!hasTeams) {
+        dispatch(fetchProjectTeams(projectId));
+      }
     }
-  }, [dispatch, projectId]);
+  }, [dispatch, projectId, projects, teams]);
 
   // 检查是否需要初始化顺序
   useEffect(() => {
