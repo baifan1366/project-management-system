@@ -84,10 +84,10 @@ export default function AuthCallbackPage() {
         }
 
         // 4. 重定向到仪表板
-        router.push('/dashboard');
+        router.push('/en/projects');
       } catch (error) {
         console.error('Auth callback error:', error);
-        router.push('/login?error=' + encodeURIComponent(error.message || 'Authentication failed'));
+        router.push('/en/login?error=' + encodeURIComponent(error.message || 'Authentication failed'));
       }
     };
 

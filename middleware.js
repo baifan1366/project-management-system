@@ -18,9 +18,10 @@ export async function middleware(request) {
 
   
   // 检查是否是公开路径
-  const isPublicPath = PUBLIC_PATHS.some(path => 
-    pathname.includes(path)
-  );
+  const isPublicPath = PUBLIC_PATHS.some(path => {
+    const pathWithoutLocale = pathname.split('/').slice(2).join('/');
+    return path === `/${pathWithoutLocale}` || path === pathWithoutLocale;
+  });
 
   try {
     // 创建响应对象
