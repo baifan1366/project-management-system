@@ -17,7 +17,21 @@ export function ProfilePopover({ onClose }) {
     const getUser = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (session?.user) {
-        setUser(session.user);
+        // 处理Google头像URL
+        let avatarUrl = session.user.user_metadata.avatar_url;
+        if (avatarUrl?.includes('googleusercontent.com')) {
+          // 移除URL中的token部分
+          avatarUrl = avatarUrl.split('=')[0];
+          console.log(avatarUrl);
+          
+        }
+        setUser({
+          ...session.user,
+          user_metadata: {
+            ...session.user.user_metadata,
+            avatar_url: avatarUrl
+          }
+        });
       }
     };
 
@@ -53,10 +67,10 @@ export function ProfilePopover({ onClose }) {
         <div className="flex flex-col">
           <div className="px-4 pb-2 border-b">
             <div className="flex items-center gap-3">
-              {user.avatar_url ? (
+              {user.user_metadata.avatar_url ? (
                 <img 
-                  src={user.avatar_url} 
-                  alt={user.name} 
+                  src={user.user_metadata.avatar_url} 
+                  alt={user.user_metadata.name} 
                   className="w-10 h-8 rounded-full"
                 />
               ) : (
