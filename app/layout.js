@@ -1,6 +1,7 @@
 import { geistSans, geistMono } from "@/lib/fonts";
 import "./globals.css";
 import { Providers } from './providers'
+import RouteGuard from "@/components/RouteGuard";
 
 export const metadata = {
   title: "Team Sync",
@@ -14,7 +15,9 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          {children}
+          <RouteGuard>
+            {children}
+          </RouteGuard>
         </Providers>
       </body>
     </html>
