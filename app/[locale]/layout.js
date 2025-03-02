@@ -20,7 +20,7 @@ export default async function LocaleLayout({ children, params }) {
     <main className={`${inter.variable} ${robotoMono.variable} min-h-screen bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 antialiased`}>
       <RootLayoutClient locale={locale} messages={messages}>
         <div className="flex">
-          <div className="flex-1 pl-16">
+          <div className="flex-1">
             <div className="h-full">
               {children}
             </div>
