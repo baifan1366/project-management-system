@@ -4,36 +4,83 @@ import { useTranslations } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
 import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useEffect, useState, Suspense } from 'react';
-import { fetchTeamById, fetchProjectTeams, updateTeamStar } from '@/lib/redux/features/teamSlice';
+import { useEffect, useState, Suspense, useRef } from 'react';
+import { fetchTeamById, fetchProjectTeams, updateTeamStar, fetchTeamUsers } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
+import { createSelector } from '@reduxjs/toolkit';
 import TaskTab from "@/components/TaskTab"
 import dynamic from 'next/dynamic';
 import InvitationDialog from '@/components/InvitationDialog';
 
 const TaskList = dynamic(() => import('@/components/TaskList'), {
-  loading: () => <div>加载中...</div>
+  loading: () => <div>Loading...</div>
 });
+
+// 创建记忆化的选择器
+const selectTeams = state => state.teams.teams;
+const selectTeamsStatus = state => state.teams.status;
+const selectTeamError = state => state.teams.error;
+
+const selectTeamById = createSelector(
+  [selectTeams, (_, teamId) => teamId],
+  (teams, teamId) => {
+    if (!teams || !teamId) return null;
+    return teams.find(team => String(team.id) === String(teamId)) || null;
+  }
+);
+
+// 创建一个统一的数据获取hook
+// 没用到 但是别删！删了就error啦！！
+const useProjectData = (projectId) => {
+  const dispatch = useDispatch();
+  const { projects, teams } = useSelector((state) => ({
+    projects: state.projects.projects,
+    teams: state.teams.teams
+  }));
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!projectId) return;
+      
+      // 只在数据不存在时加载
+      if (!projects.some(p => String(p.id) === String(projectId))) {
+        await dispatch(fetchProjectById(projectId));
+      }
+      
+      if (!teams.some(team => String(team.project_id) === String(projectId))) {
+        await dispatch(fetchProjectTeams(projectId));
+      }
+    };
+    
+    loadData();
+  }, [projectId]); // 只依赖 projectId
+
+  return {
+    project: projects.find(p => String(p.id) === String(projectId)),
+    teams: teams.filter(team => String(team.project_id) === String(projectId))
+  };
+};
 
 export default function Task() {
   const t = useTranslations('CreateTask');
   const router = useRouter();
   const dispatch = useDispatch();
   const params = useParams();
-  const { id: projectId, teamId } = params;
   
-  // 将 Redux 选择器移到组件顶层
-  const reduxTeams = useSelector((state) => state.teams.teams);
-  const reduxTeamsStatus = useSelector((state) => state.teams.status);
+  // 从URL参数中获取projectId和teamId
+  const projectId = params?.id;
+  const teamId = params?.teamId;
+  
+  // 使用记忆化的选择器
+  const teamsState = useSelector(state => state.teams);
+  const teamsStatus = useSelector(selectTeamsStatus);
+  const teamsError = useSelector(selectTeamError);
+  const selectedTeam = useSelector(state => selectTeamById(state, teamId));
   
   const [mounted, setMounted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
-  const [teams, setTeams] = useState([]);
-  const [teamsStatus, setTeamsStatus] = useState('loading');
-  const [selectedTeam, setSelectedTeam] = useState(null);
   const [currentView, setCurrentView] = useState('list');
   const [open, setOpen] = useState(false);
 
@@ -42,57 +89,53 @@ export default function Task() {
     setMounted(true);
   }, []);
 
-  // 处理 Redux 状态更新
-  useEffect(() => {
-    if (mounted) {
-      const team = reduxTeams.find(team => String(team.id) === String(teamId));
-      setTeams(reduxTeams);
-      setTeamsStatus(reduxTeamsStatus);
-      setSelectedTeam(team);
-      if (team) {
-        setIsStarred(team.star || false);
-        setIsLoading(false);
-      }
-    }
-  }, [mounted, reduxTeams, reduxTeamsStatus, teamId]);
-
   // 处理数据加载
   useEffect(() => {
     const loadData = async () => {
-      if (projectId && teamId && mounted && teamsStatus !== 'loading') {
-        const team = reduxTeams.find(team => String(team.id) === String(teamId));
-        const hasProjectTeams = reduxTeams.some(t => String(t.project_id) === String(projectId));
+      if (!projectId || !teamId || !mounted) return;
+
+      try {
+        setIsLoading(true);
         
-        try {
-          // 只在必要时加载数据
-          const promises = [];
-          if (!hasProjectTeams) {
-            promises.push(dispatch(fetchProjectTeams(projectId)));
-          }
-          if (!team) {
-            promises.push(dispatch(fetchTeamById(teamId)));
-          }
-          
-          if (promises.length > 0) {
-            await Promise.all(promises);
-          } else {
-            setIsLoading(false);
-          }
-        } catch (error) {
-          console.error('Error loading data:', error);
-          setIsLoading(false);
+        // 先加载团队数据
+        const teamResult = await dispatch(fetchTeamById(teamId)).unwrap();
+        
+        // 检查团队数据是否有效
+        const hasValidTeam = teamResult && (
+          (Array.isArray(teamResult) && teamResult.length > 0) ||
+          (typeof teamResult === 'object' && teamResult.id)
+        );
+
+        // 如果没有找到有效的团队数据，加载项目团队
+        if (!hasValidTeam) {
+          await dispatch(fetchProjectTeams(projectId)).unwrap();
         }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
-    loadData();
-  }, [dispatch, projectId, teamId, mounted, reduxTeams, teamsStatus]);
+
+    if (!selectedTeam) {
+      loadData();
+    }
+  }, [dispatch, projectId, teamId, mounted, selectedTeam]);
+
+  // 更新星标状态
+  useEffect(() => {
+    if (selectedTeam) {
+      setIsStarred(selectedTeam.star || false);
+    }
+  }, [selectedTeam]);
 
   // 在客户端渲染之前返回加载状态
   if (!mounted) {
     return <div className="h-screen" suppressHydrationWarning />;
   }
 
-  if (isLoading || teamsStatus === 'loading') {
+  // 处理加载状态
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-lg" suppressHydrationWarning>Loading...</div>
@@ -100,7 +143,19 @@ export default function Task() {
     );
   }
 
-  if (!selectedTeam) {
+  // 处理错误状态
+  if (teamsError) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg text-red-500" suppressHydrationWarning>
+          {typeof teamsError === 'string' ? teamsError : 'Failed to load team data'}
+        </div>
+      </div>
+    );
+  }
+
+  // 处理团队不存在的情况
+  if (!selectedTeam && !isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-lg" suppressHydrationWarning>Team not found</div>
@@ -115,10 +170,10 @@ export default function Task() {
       await dispatch(updateTeamStar({ 
         teamId: selectedTeam.id, 
         star: newStarStatus 
-      }));
+      })).unwrap();
     } catch (error) {
-      // 如果失败，恢复原始状态
       setIsStarred(!newStarStatus);
+      console.error('Error updating star status:', error);
     }
   };
 
@@ -220,7 +275,7 @@ export default function Task() {
                 {isStarred ? <Star className="h-4 w-4" /> : <StarOff className="h-4 w-4" />}
               </Button>
               <Button variant="ghost" size="sm">
-                <Circle />
+                <Circle className="h-4 w-4 mr-2" />
                 {t('setStatus')}
               </Button>
             </div>

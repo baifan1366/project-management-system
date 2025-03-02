@@ -33,10 +33,13 @@ export async function GET(request) {
 
     if (error) {
       console.error('Database error:', error)
-      throw error
+      return NextResponse.json(
+        { error: error.message || '获取团队失败' },
+        { status: 500 }
+      )
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data || [])
   } catch (error) {
     console.error('Error fetching teams:', error)
     return NextResponse.json(
@@ -52,9 +55,27 @@ export async function POST(request) {
     const body = await request.json()
     console.log('Received data:', body)
     
-    if (!body || Object.keys(body).length === 0) {
+    // 验证必需字段
+    if (!body.name || !body.access || !body.project_id || !body.created_by) {
       return NextResponse.json(
-        { error: 'Invalid request data' },
+        { error: 'Missing required fields: name, access, project_id, and created_by are required' },
+        { status: 400 }
+      )
+    }
+
+    // 验证字段格式
+    if (typeof body.name !== 'string' || body.name.length < 2 || body.name.length > 50) {
+      return NextResponse.json(
+        { error: 'Team name must be between 2 and 50 characters' },
+        { status: 400 }
+      )
+    }
+
+    // 验证 access 值
+    const validAccessTypes = ['invite_only', 'can_edit', 'can_check', 'can_view'];
+    if (!validAccessTypes.includes(body.access)) {
+      return NextResponse.json(
+        { error: `Invalid access type. Must be one of: ${validAccessTypes.join(', ')}` },
         { status: 400 }
       )
     }
@@ -69,29 +90,42 @@ export async function POST(request) {
 
     if (fetchError) {
       console.error('Error fetching max order_index:', fetchError)
-      throw fetchError
+      return NextResponse.json(
+        { error: 'Failed to process team order: ' + fetchError.message },
+        { status: 500 }
+      )
     }
 
     // 计算新的order_index
     const maxOrderIndex = existingTeams?.[0]?.order_index ?? -1
     const newOrderIndex = maxOrderIndex + 1
 
-    // 创建新团队，使用计算出的order_index
-    const { data, error } = await supabase
+    // 创建新团队
+    const { data: teamData, error: teamError } = await supabase
       .from('team')
       .insert([{ ...body, order_index: newOrderIndex }])
       .select()
 
-    if (error) {
-      console.error('Database error:', error)
-      throw error
+    if (teamError) {
+      console.error('Database error:', teamError)
+      return NextResponse.json(
+        { error: 'Failed to create team: ' + teamError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!teamData || teamData.length === 0) {
+      return NextResponse.json(
+        { error: 'Team was not created successfully' },
+        { status: 500 }
+      )
     }
     
-    return NextResponse.json(data[0], { status: 201 })
+    return NextResponse.json(teamData[0], { status: 201 })
   } catch (error) {
     console.error('Error creating team:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to create team' },
+      { error: 'Failed to create team: ' + (error.message || 'Unknown error') },
       { status: 500 }
     )
   }

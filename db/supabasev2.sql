@@ -27,7 +27,6 @@ CREATE TABLE "team" (
   "access" VARCHAR(20) NOT NULL CHECK ("access" IN ('invite_only', 'can_edit', 'can_check', 'can_view')),
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
-  "user_team_id" INT NOT NULL REFERENCES "user_team"("id") ON DELETE CASCADE,
   "order_index" INT DEFAULT 0,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -39,7 +38,9 @@ CREATE TABLE "user_team" (
   "id" SERIAL PRIMARY KEY,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "role" TEXT NOT NULL CHECK ("role" IN ('CAN EDIT', 'CAN CHECK', 'CAN VIEW')) DEFAULT 'CAN VIEW'
+  "role" TEXT NOT NULL CHECK ("role" IN ('CAN_EDIT', 'CAN_CHECK', 'CAN_VIEW', 'OWNER')) DEFAULT 'CAN_VIEW',
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 项目表

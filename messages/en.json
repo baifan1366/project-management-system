@@ -346,6 +346,12 @@
     "checkerDescription": "Can check, uncheck and comment on tasks. Cannot edit task and project.",
     "viewerDescription": "Can only comment and chat in teams. Cannot create or edit project.",
     "inviteSent": "Invite sent",
-    "inviteSentDescription": "Invite has been sent to the user."
+    "inviteSentDescription": "Invite has been sent to the user.",
+    "CAN_VIEW": "Viewer",
+    "CAN_CHECK": "Checker",
+    "CAN_EDIT": "Editor",
+    "noTeamMembers": "No team members",
+    "loading": "Loading...",
+    "fetchError": "Failed to fetch team members"
   }
 }

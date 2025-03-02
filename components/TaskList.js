@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchTasks } from '@/lib/redux/features/taskSlice';
 import { format } from 'date-fns';
@@ -11,25 +11,42 @@ import { Calendar, Clock } from 'lucide-react';
 export default function TaskList({ projectId, teamId }) {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
-  const { tasks, status, error } = useSelector((state) => state.tasks);
-  const [isLoading, setIsLoading] = useState(true);
+  const { tasks, status, error, lastFetchTime, currentRequest } = useSelector((state) => state.tasks);
+  const [isLoading, setIsLoading] = useState(false);
+  const isMounted = useRef(false);
+
+  const loadTasks = useCallback(async () => {
+    if (!projectId || currentRequest) return;
+    
+    const now = Date.now();
+    const cacheKey = `project_${projectId}`;
+    const lastFetch = lastFetchTime?.[cacheKey];
+    
+    // 检查是否需要重新加载数据
+    if (lastFetch && now - lastFetch < 5 * 60 * 1000) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await dispatch(fetchTasks(projectId)).unwrap();
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [dispatch, projectId, currentRequest, lastFetchTime]);
 
   useEffect(() => {
-    const loadTasks = async () => {
-      setIsLoading(true);
-      try {
-        await dispatch(fetchTasks(projectId));
-      } catch (error) {
-        console.error('Error loading tasks:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (projectId) {
+    if (!isMounted.current) {
+      isMounted.current = true;
       loadTasks();
     }
-  }, [dispatch, projectId]);
+  }, [loadTasks]);
+
+  const filteredTasks = tasks.filter(task => 
+    (!teamId || String(task.team_id) === String(teamId))
+  );
 
   if (isLoading || status === 'loading') {
     return (
@@ -48,20 +65,6 @@ export default function TaskList({ projectId, teamId }) {
       </div>
     );
   }
-
-  if (error) {
-    return (
-      <div className="p-4">
-        <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 p-4">
-          <p>{t('errorLoading')}: {error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const filteredTasks = tasks.filter(task => 
-    (!teamId || task.team_id === teamId)
-  );
 
   return (
     <div className="p-4">
