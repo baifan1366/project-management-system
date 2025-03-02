@@ -18,17 +18,15 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { useDispatch, useSelector } from 'react-redux'
-import { createTeam } from '@/lib/redux/features/teamSlice'
-import { useRouter } from 'next/navigation';
+import { createTeam, createTeamUser, fetchProjectTeams, fetchTeamUsers } from '@/lib/redux/features/teamSlice'
+import { Lock, Eye, Pencil, Unlock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { Lock, Users, Eye, ClipboardCheck, Pencil, Unlock } from 'lucide-react'
-import { buttonVariants } from "@/components/ui/button"
 
 export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const t = useTranslations('CreateTeam')
   const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const dispatch = useDispatch()
-  const router = useRouter()
   const { projects } = useSelector((state) => state.projects)
   const project = projects.find(p => String(p.id) === String(projectId))
   const [themeColor, setThemeColor] = useState('#64748b');
@@ -75,48 +73,80 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
         teamName: "",
         teamAccess: "",
       });
-      form.clearErrors(); // 清除错误状态
+      form.clearErrors();
     }
-  }, [isOpen]); // 监测 isOpen 状态
+  }, [isOpen]);
 
   const onSubmit = async (data) => {
+    if (isSubmitting) return;
     setIsLoading(true);
+    setIsSubmitting(true);
+    
     try {
-      // 解构获取表单数据
-      const { teamName, teamAccess } = data;
-
       // 获取当前用户信息
       const { data: userData, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
-        throw new Error('Failed to get user information');
+        throw new Error('获取用户信息失败');
       }
 
       if (!userData?.user?.id) {
-        throw new Error('User not authenticated');
+        throw new Error('用户未认证');
       }
 
-      // 调用 Redux 的 createTeam 动作
-      const resultAction = await dispatch(createTeam({
-        name: teamName.trim(),
-        access: teamAccess,
-        created_by: userData.user.id,
+      console.log('TeamDialog: 开始创建团队');
+      // 创建团队
+      const team = await dispatch(createTeam({
+        name: data.teamName,
+        access: data.teamAccess,
         project_id: projectId,
-        order_index: 0, // 新创建的团队默认放在最前面
-        star: false
-      }));
+        star: false,
+        order_index: 0,
+        created_by: userData.user.id
+      })).unwrap();
+      console.log('Team created successfully:', team);
 
-      if (createTeam.fulfilled.match(resultAction)) {
-        onClose();
-        router.refresh(); 
-      } else if (createTeam.rejected.match(resultAction)) {
-        throw new Error(resultAction.error?.message || 'Failed to create team');
-      }
-    } catch (error) {
-      console.error('Error creating team:', error);
-      // 这里可以添加错误提示UI
-    } finally {
+      // 创建团队用户关系
+      const teamUser = await dispatch(createTeamUser({
+        team_id: team.id,
+        user_id: userData.user.id,
+        role: 'OWNER'
+      })).unwrap();
+      console.log('Team user relationship created successfully:', teamUser);
+      console.log('Data refreshed successfully');
+
+      // 重置状态并关闭对话框
+      form.reset();
       setIsLoading(false);
+      setIsSubmitting(false);
+      onClose();
+
+      // 在对话框关闭后再刷新数据，避免UI卡顿
+      setTimeout(async () => {
+        try {
+          // 分开执行刷新操作，避免一个失败影响另一个
+          try {
+            await dispatch(fetchTeamUsers(team.id)).unwrap();
+          } catch (error) {
+            console.error(`TeamDialog: 刷新团队用户失败:`, error);
+          }
+
+          try {
+            await dispatch(fetchProjectTeams(projectId)).unwrap();
+          } catch (error) {
+            console.error(`TeamDialog: 刷新项目团队失败:`, error);
+          }
+
+          console.log(`TeamDialog: 刷新数据完成`);
+        } catch (error) {
+          console.error(`TeamDialog: 刷新数据时出错:`, error);
+        }
+      }, 100);
+
+    } catch (error) {
+      console.error(`TeamDialog: 提交表单时出错`, error);
+      setIsLoading(false);
+      setIsSubmitting(false);
     }
   }
 

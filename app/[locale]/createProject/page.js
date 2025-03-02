@@ -26,6 +26,8 @@ import {
 import { useState } from "react";
 import { useDispatch } from 'react-redux';
 import { createProject } from '@/lib/redux/features/projectSlice';
+import { DialogFooter } from "@/components/ui/dialog"
+import { supabase } from '@/lib/supabase';
 
 export default function CreateProjectPage() {
   const t = useTranslations('CreateProject');
@@ -92,7 +94,6 @@ export default function CreateProjectPage() {
         project_name: projectName.trim(),
         visibility,
         theme_color: buttonVariant,
-        team_id: 1,
         created_by: userData.user.id,
         status: "PENDING"
       }));
@@ -221,7 +222,7 @@ export default function CreateProjectPage() {
                 </FormItem>
               )}
             />
-            <div className="flex justify-end gap-3">
+            <DialogFooter className="flex justify-end gap-3">
               <Button
                 type="button"
                 onClick={() => router.back()}
@@ -237,7 +238,7 @@ export default function CreateProjectPage() {
               >
                 {isCreating ? t('creating') : t('create')}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </Form>
       </div>

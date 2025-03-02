@@ -58,12 +58,35 @@ export default function ProjectSidebar({ projectId }) {
 
   // 加载项目和团队数据
   useEffect(() => {
-    if (projectId) {
-      dispatch(fetchProjectById(projectId));
-      // 确保在项目ID变化时重新加载团队
-      dispatch(fetchProjectTeams(projectId));
-    }
-  }, [dispatch, projectId]);
+    const loadData = async () => {
+      if (!projectId) return;
+      
+      const currentProject = projects.find(p => String(p.id) === String(projectId));
+      const hasTeams = teams.some(team => String(team.project_id) === String(projectId));
+      
+      // 使用 Promise.all 同时发起需要的请求
+      const requests = [];
+      if (!currentProject) {
+        requests.push(dispatch(fetchProjectById(projectId)));
+      }
+      if (!hasTeams) {
+        requests.push(dispatch(fetchProjectTeams(projectId)));
+      }
+      
+      if (requests.length > 0) {
+        await Promise.all(requests);
+      }
+    };
+    
+    // 添加防抖处理
+    const debounceTimeout = setTimeout(() => {
+      loadData();
+    }, 300); // 300ms 的防抖时间
+
+    return () => {
+      clearTimeout(debounceTimeout);
+    };
+  }, [projectId, projects, teams]); // 添加必要的依赖
 
   // 检查是否需要初始化顺序
   useEffect(() => {
