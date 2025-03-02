@@ -14,10 +14,6 @@ export default function AuthCallbackPage() {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) throw sessionError;
-        
-        if (!session?.user) {
-          throw new Error('No user found in session');
-        }
 
         const user = session.user;
 
@@ -27,10 +23,6 @@ export default function AuthCallbackPage() {
           .select('*')
           .eq('id', user.id)
           .single();
-
-        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 是"未找到记录"的错误
-          throw profileError;
-        }
 
         if (existingProfile) {
           // 如果用户存在，更新 email_verified 状态
