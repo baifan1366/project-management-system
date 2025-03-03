@@ -64,7 +64,7 @@ CREATE TABLE "task" (
   "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
   "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
   "due_date" TIMESTAMP,
-  "section_id" INT REFERENCES "sections"("id") ON DELETE CASCADE,
+  "section_id" INT REFERENCES "section"("id") ON DELETE CASCADE,
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "assignee_id" INT REFERENCES "task_assignee"("id") ON DELETE SET NULL,
