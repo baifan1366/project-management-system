@@ -100,10 +100,21 @@ export async function POST(request) {
     const maxOrderIndex = existingTeams?.[0]?.order_index ?? -1
     const newOrderIndex = maxOrderIndex + 1
 
+    // 只保留需要的字段，确保移除id
+    const teamData = {
+      name: body.name,
+      access: body.access,
+      project_id: body.project_id,
+      created_by: body.created_by,
+      description: body.description,
+      star: body.star ?? false,
+      order_index: newOrderIndex
+    }
+
     // 创建新团队
-    const { data: teamData, error: teamError } = await supabase
+    const { data: newTeam, error: teamError } = await supabase
       .from('team')
-      .insert([{ ...body, order_index: newOrderIndex }])
+      .insert([teamData])
       .select()
 
     if (teamError) {
@@ -114,14 +125,14 @@ export async function POST(request) {
       )
     }
 
-    if (!teamData || teamData.length === 0) {
+    if (!newTeam || newTeam.length === 0) {
       return NextResponse.json(
         { error: 'Team was not created successfully' },
         { status: 500 }
       )
     }
     
-    return NextResponse.json(teamData[0], { status: 201 })
+    return NextResponse.json(newTeam[0], { status: 201 })
   } catch (error) {
     console.error('Error creating team:', error)
     return NextResponse.json(

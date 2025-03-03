@@ -122,17 +122,24 @@ export async function POST(request) {
       );
     }
 
-    // 检查用户是否已经在团队中
+    // 检查用户是否已在团队中
     console.log('API Route: 检查用户是否已在团队中:', { teamId, user_id });
-    const { data: existingUser, error: checkError } = await supabase
+    const { data: existingUsers, error: checkError } = await supabase
       .from('user_team')
       .select('id')
       .eq('team_id', teamId)
-      .eq('user_id', user_id)
-      .single();
+      .eq('user_id', user_id);
 
-    if (existingUser) {
-      console.log('API Route: 用户已经是团队成员:', existingUser);
+    if (checkError) {
+      console.error('API Route: 检查用户关系时出错:', checkError);
+      return NextResponse.json(
+        { error: '检查用户关系时出错' },
+        { status: 500 }
+      );
+    }
+
+    if (existingUsers && existingUsers.length > 0) {
+      console.log('API Route: 用户已经是团队成员:', existingUsers[0]);
       return NextResponse.json(
         { error: '用户已经是团队成员' },
         { status: 409 }
