@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Send, Paperclip, Smile, Image, Gift } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Send, Paperclip, Smile, Image, Gift, ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { supabase } from '@/lib/supabase';
@@ -12,6 +12,43 @@ export default function ChatPage() {
   const [message, setMessage] = useState('');
   const { currentSession, messages, sendMessage } = useChat();
   const [currentUser, setCurrentUser] = useState(null);
+  const [hasUnreadMessage, setHasUnreadMessage] = useState(false);
+  const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // 监听新消息，自动滚动到底部
+  useEffect(() => {
+    if (messages.length > 0) {
+      const chatContainer = chatContainerRef.current;
+      const isScrolledToBottom = chatContainer && 
+        (chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 100);
+      
+      if (isScrolledToBottom) {
+        scrollToBottom();
+      } else {
+        setHasUnreadMessage(true);
+      }
+    }
+  }, [messages]);
+
+  // 监听滚动事件
+  useEffect(() => {
+    const chatContainer = chatContainerRef.current;
+    if (!chatContainer) return;
+
+    const handleScroll = () => {
+      if (chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 100) {
+        setHasUnreadMessage(false);
+      }
+    };
+
+    chatContainer.addEventListener('scroll', handleScroll);
+    return () => chatContainer.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const getUser = async () => {
@@ -68,8 +105,10 @@ export default function ChatPage() {
       </div>
 
       {/* 聊天内容区域 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 relative" ref={chatContainerRef}>
         {messages.map((msg) => {
+          console.log(msg);
+          
           const isMe = msg.user_id === currentSession.participants[0]?.id;
           return (
             <div
@@ -123,6 +162,18 @@ export default function ChatPage() {
             </div>
           );
         })}
+        <div ref={messagesEndRef} />
+        
+        {/* 未读消息提示 */}
+        {hasUnreadMessage && (
+          <button
+            onClick={scrollToBottom}
+            className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg hover:bg-primary/90 transition-all flex items-center gap-2"
+          >
+            <span>new message</span>
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* 输入区域 */}
@@ -156,6 +207,15 @@ export default function ChatPage() {
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (message.trim() && currentSession) {
+                      sendMessage(currentSession.id, message);
+                      setMessage('');
+                    }
+                  }
+                }}
                 placeholder={t('inputPlaceholder')}
                 className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm py-2 max-h-32"
                 rows={1}

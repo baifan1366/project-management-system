@@ -114,7 +114,14 @@ export function ChatProvider({ children }) {
         table: 'chat_message',
         filter: `session_id=eq.${currentSession.id}`
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new]);
+        setMessages(prev => {
+          // 检查消息是否已经存在
+          const messageExists = prev.some(msg => msg.id === payload.new.id);
+          if (messageExists) {
+            return prev;
+          }
+          return [...prev, payload.new];
+        });
       })
       .subscribe();
 
