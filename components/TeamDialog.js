@@ -18,7 +18,8 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { useDispatch, useSelector } from 'react-redux'
-import { createTeam, createTeamUser, fetchProjectTeams, fetchTeamUsers } from '@/lib/redux/features/teamSlice'
+import { createTeam, fetchProjectTeams } from '@/lib/redux/features/teamSlice'
+import { createTeamUser, fetchTeamUsers } from '@/lib/redux/features/teamUserSlice'
 import { Lock, Eye, Pencil, Unlock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
