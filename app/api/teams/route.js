@@ -197,28 +197,28 @@ export async function PUT(request) {
         return NextResponse.json(data);
       }
 
-      // 正常的顺序更新逻辑
+      // 确保所有必需的字段都存在
+      const teamsToUpdate = body.teams.map(team => ({
+        id: team.id,
+        name: team.name,
+        access: team.access,
+        order_index: team.order_index, // 这里应该已经是正确的索引值（0,1,2,...）
+        project_id: team.project_id,
+        created_by: team.created_by,
+        description: team.description,
+        star: team.star
+      }));
+
+      // 使用事务来确保原子性更新
       const { error: updateError } = await supabase
         .from('team')
-        .upsert(
-          body.teams.map(team => ({
-            id: team.id,
-            name: team.name,
-            access: team.access,
-            order_index: team.order_index,
-            project_id: team.project_id,
-            created_by: team.created_by,
-            description: team.description
-          })),
-          { 
-            onConflict: 'id',
-            ignoreDuplicates: false,
-            returning: true
-          }
-        );
+        .upsert(teamsToUpdate, {
+          onConflict: 'id',
+          ignoreDuplicates: false
+        });
 
       if (updateError) {
-        console.error('Update error:', updateError);
+        console.error('更新顺序失败:', updateError);
         throw updateError;
       }
 
@@ -229,10 +229,7 @@ export async function PUT(request) {
         .eq('project_id', body.teams[0].project_id)
         .order('order_index', { ascending: true });
 
-      if (error) {
-        console.error('Fetch error:', error);
-        throw error;
-      }
+      if (error) throw error;
       return NextResponse.json(data);
     }
 

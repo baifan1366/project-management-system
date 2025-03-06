@@ -12,7 +12,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDispatch } from "react-redux";
-import { fetchTeamUsers, createTeamUser } from "@/lib/redux/features/teamSlice";
+import { fetchTeamUsers, createTeamUser } from "@/lib/redux/features/teamUserSlice";
 import { createSelector } from '@reduxjs/toolkit';
 
 // 创建记忆化的选择器
@@ -22,8 +22,8 @@ const selectTeam = createSelector(
 );
 
 const selectTeamUsers = createSelector(
-  [selectTeam],
-  (team) => team?.users || []
+  [(state) => state.teamUsers.teamUsers, (_, teamId) => teamId],
+  (teamUsers, teamId) => teamUsers[teamId] || []
 );
 
 export default function InvitationDialog({ open, onClose }) {

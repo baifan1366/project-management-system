@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslations } from 'use-intl'
 import CreateTeamDialog from './TeamDialog'
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
@@ -18,7 +18,7 @@ export default function ProjectSidebar({ projectId }) {
   const pathname = usePathname();
   const dispatch = useDispatch();
   const { projects } = useSelector((state) => state.projects);
-  const { teams } = useSelector((state) => state.teams);
+  const { teams, lastFetchTime } = useSelector((state) => state.teams);
   const project = projects.find(p => String(p.id) === String(projectId));
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
@@ -56,7 +56,7 @@ export default function ProjectSidebar({ projectId }) {
     order_index: team.order_index || index
   })).sort((a, b) => a.order_index - b.order_index);
 
-  // 加载项目和团队数据
+  // 加载项目和团队数据 - 添加防重复请求逻辑
   useEffect(() => {
     const loadData = async () => {
       if (!projectId) return;
@@ -64,13 +64,23 @@ export default function ProjectSidebar({ projectId }) {
       const currentProject = projects.find(p => String(p.id) === String(projectId));
       const hasTeams = teams.some(team => String(team.project_id) === String(projectId));
       
+      // 检查是否最近已经获取过数据
+      const lastFetchTimeForProject = lastFetchTime?.[`project_${projectId}`] || 0;
+      const now = Date.now();
+      const isRecentFetch = now - lastFetchTimeForProject < 5000; // 5秒内不重复获取
+      
       // 使用 Promise.all 同时发起需要的请求
       const requests = [];
       if (!currentProject) {
         requests.push(dispatch(fetchProjectById(projectId)));
       }
-      if (!hasTeams) {
+      
+      // 只有在没有最近获取过数据时才发起请求
+      if (!hasTeams && !isRecentFetch) {
+        console.log(`获取项目 ${projectId} 的团队数据`);
         requests.push(dispatch(fetchProjectTeams(projectId)));
+      } else if (isRecentFetch) {
+        console.log(`跳过项目 ${projectId} 的团队数据获取，因为最近已获取过`);
       }
       
       if (requests.length > 0) {
@@ -86,14 +96,45 @@ export default function ProjectSidebar({ projectId }) {
     return () => {
       clearTimeout(debounceTimeout);
     };
-  }, [projectId, projects, teams]); // 添加必要的依赖
+  }, [projectId, projects, teams, lastFetchTime, dispatch]); // 添加 lastFetchTime 作为依赖
 
-  // 检查是否需要初始化顺序
+  // 检查是否需要初始化顺序 - 添加防重复初始化逻辑
   useEffect(() => {
-    if (projectTeams.length > 0 && projectTeams.every(team => !team.order_index || team.order_index === 0)) {
+    const initializeTeamOrderWithCheck = () => {
+      if (!projectId || projectTeams.length === 0) return;
+      
+      // 检查是否需要初始化顺序
+      const needsInitialization = projectTeams.length > 0 && 
+                                 projectTeams.every(team => !team.order_index || team.order_index === 0);
+      
+      if (!needsInitialization) return;
+      
+      // 检查是否正在初始化或最近已初始化
+      const isInitializing = lastFetchTime?.[`initializing_${projectId}`];
+      const lastInitTime = lastFetchTime?.[`init_order_${projectId}`] || 0;
+      const now = Date.now();
+      
+      if (isInitializing) {
+        console.log(`项目 ${projectId} 正在初始化顺序，跳过重复初始化`);
+        return;
+      }
+      
+      if (now - lastInitTime < 30000) { // 30秒内不重复初始化
+        console.log(`项目 ${projectId} 30秒内已初始化过顺序，跳过`);
+        return;
+      }
+      
+      console.log(`初始化项目 ${projectId} 的团队顺序`);
       dispatch(initializeTeamOrder(projectId));
-    }
-  }, [projectTeams, projectId, dispatch]);
+    };
+    
+    // 添加延迟，确保不会在页面加载时立即触发
+    const timeout = setTimeout(() => {
+      initializeTeamOrderWithCheck();
+    }, 500);
+    
+    return () => clearTimeout(timeout);
+  }, [projectTeams, projectId, lastFetchTime, dispatch]);
 
   useEffect(() => {
     if (project) {
@@ -101,12 +142,28 @@ export default function ProjectSidebar({ projectId }) {
     }
   }, [project]);
 
-  const handleDragEnd = (result) => {
+  // 处理拖拽结束 - 添加防重复更新逻辑
+  const handleDragEnd = useCallback((result) => {
     if (!result.destination) return;
 
     const items = Array.from(menuItems);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
+
+    // 检查是否正在更新或最近已更新
+    const isUpdatingOrder = lastFetchTime?.[`updating_order_${projectId}`];
+    const lastOrderTime = lastFetchTime?.[`order_project_${projectId}`] || 0;
+    const now = Date.now();
+    
+    if (isUpdatingOrder) {
+      console.log(`项目 ${projectId} 正在更新顺序，跳过重复更新`);
+      return;
+    }
+    
+    if (now - lastOrderTime < 5000) { // 5秒内不重复更新
+      console.log(`项目 ${projectId} 5秒内已更新过顺序，跳过`);
+      return;
+    }
 
     // 更新每个项目的order值，保留原始团队的所有字段
     const updatedItems = items.map((item, index) => ({
@@ -114,9 +171,10 @@ export default function ProjectSidebar({ projectId }) {
       order_index: index,  // 只更新order_index
     }));
 
+    console.log(`更新项目 ${projectId} 的团队顺序`);
     // 更新Redux状态
     dispatch(updateTeamOrder(updatedItems));
-  };
+  }, [menuItems, projectId, lastFetchTime, dispatch]);
 
   // 获取项目名称的首字母
   const getProjectInitial = (name) => {

@@ -5,8 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useEffect, useState, Suspense, useRef } from 'react';
-import { fetchTeamById, fetchProjectTeams, updateTeamStar, fetchTeamUsers } from '@/lib/redux/features/teamSlice';
+import { useEffect, useState, Suspense} from 'react';
+import { fetchTeamById, fetchProjectTeams, updateTeamStar } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import TaskTab from "@/components/TaskTab"
