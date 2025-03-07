@@ -2,6 +2,7 @@ import { geistSans, geistMono } from "@/lib/fonts";
 import "./globals.css";
 import { Providers } from './providers'
 import RouteGuard from "@/components/RouteGuard";
+import { Toaster } from 'sonner';
 
 export const metadata = {
   title: "Team Sync",
@@ -17,6 +18,7 @@ export default function RootLayout({ children }) {
         <Providers>
           <RouteGuard>
             {children}
+            <Toaster position="top-right" />
           </RouteGuard>
         </Providers>
       </body>

@@ -40,7 +40,7 @@
     "actions": "Actions"
   },
   "profile": {
-    "title": "Profile Settings",
+    "title": "Settings",
     "description": "Manage your account settings and preferences",
     "email": "Email",
     "language": "Language",
@@ -53,7 +53,40 @@
     "upgrade": "Upgrade",
     "refer": "Refer and earn",
     "settings": "Settings",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "profile": "Profile",
+    "name": "Name",
+    "bio": "Bio",
+    "avatar": "Avatar",
+    "changeAvatar": "Change Avatar",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "timezone": "Timezone",
+    "emailNotifications": "Email Notifications",
+    "pushNotifications": "Push Notifications",
+    "weeklyDigest": "Weekly Digest",
+    "mentionNotifications": "Mention Notifications",
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "billing": {
+      "title": "Billing",
+      "description": "Manage your subscription and billing",
+      "currentPlan": "Current Plan",
+      "upgradePlan": "Upgrade Plan",
+      "freePlan": "Free Plan",
+      "proPlan": "Pro Plan",
+      "features": {
+        "basicProjectManagement": "Basic Project Management",
+        "maxProjects": "Up to 3 projects",
+        "basicCollaboration": "Basic Collaboration",
+        "unlimitedProjects": "Unlimited Projects",
+        "advancedCollaboration": "Advanced Collaboration",
+        "prioritySupport": "Priority Support",
+        "customWorkflows": "Custom Workflows"
+      }
+    }
   },
   "Projects": {
     "create": "Create Project",
