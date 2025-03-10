@@ -21,7 +21,10 @@ const nextConfig = {
             key: 'Access-Control-Allow-Headers',
             value: 'Content-Type'
           }
-        ]
+        ],
+        images: {
+          domains: ['api.qrserver.com'],
+        }
       }
     ]
   }
