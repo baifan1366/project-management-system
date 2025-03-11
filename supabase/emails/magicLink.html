@@ -1,6 +1,130 @@
-<h2>Magic Link</h2>
+<div
+  style="
+    background-color: #f5f5f5;
+    padding: 40px 0;
+    font-family: Arial, sans-serif;
+  "
+>
+  <div style="max-width: 480px; margin: 0 auto">
+    <!-- Logo and Brand Name -->
+    <div style="display: flex; align-items: center; margin-bottom: 16px">
+      <img
+        src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/logo.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvbG9nby5wbmciLCJpYXQiOjE3NDE2MDUwMjUsImV4cCI6MTgzNjIxMzAyNX0.IOriHUlZYA8zsub-O1o9a10EowBaZCUHLqs6GfTzOvM"
+        alt="Team Sync"
+        style="height: 30px; width: 30px; margin-right: 8px"
+      />
+      <span style="color: #111827; font-size: 16px; font-weight: 600"
+        >Team Sync</span
+      >
+    </div>
 
-<p>Follow this link to login:</p>
-<p><a href="{{ .ConfirmationURL }}">Log In</a></p>
+    <!-- White Card -->
+    <div
+      style="
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 32px;
+      "
+    >
+      <!-- Magic Wand Icon -->
+      <div style="text-align: center; margin: 20px 0">
+        <img
+          src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/blackMagicWand_noBG.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvYmxhY2tNYWdpY1dhbmRfbm9CRy5wbmciLCJpYXQiOjE3NDE2MDczMzIsImV4cCI6MTgzNjIxNTMzMn0.WaBtyOjuVS3QIgilF6yAMOm-i7DPIKWICacze_CnWm4"
+          alt="Magic Wand Icon"
+          style="height: 100px; width: 100px"
+        />
+      </div>
 
+      <!-- Title with Magic Link Emphasis -->
+      <div style="text-align: center; margin-bottom: 24px">
+        <span
+          style="
+            display: inline-block;
+            background: #000000;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+          "
+        >
+          ✨ Magic Link ✨
+        </span>
+        <h1
+          style="
+            color: #111827;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 8px 0 0 0;
+          "
+        >
+          Your portal is ready
+        </h1>
+      </div>
+
+      <!-- Divider -->
+      <hr
+        style="
+          border: none;
+          height: 1px;
+          background-color: #e5e7eb;
+          margin: 16px 0;
+        "
+      />
+
+      <!-- Message -->
+      <p
+        style="
+          color: #6b7280;
+          font-size: 16px;
+          line-height: 24px;
+          margin: 0 0 24px 0;
+        "
+      >
+        We've created a special magic link just for you! Click the button below
+        to instantly sign in to your Team Sync account. No password needed –
+        it's like magic! ✨
+      </p>
+
+      <!-- Button -->
+      <a
+        href="{{ .ConfirmationURL }}"
+        style="
+          display: block;
+          background: #000000;
+          color: white;
+          text-decoration: none;
+          text-align: center;
+          padding: 12px 24px;
+          border-radius: 6px;
+          font-weight: 500;
+          margin: 32px 0;
+          transition: transform 0.2s;
+        "
+        onmouseover="this.style.transform='scale(1.02)'"
+        onmouseout="this.style.transform='scale(1)'"
+      >
+        Open Sesame
+      </a>
+
+      <!-- Security Note -->
+      <p
+        style="
+          color: #9ca3af;
+          font-size: 14px;
+          text-align: center;
+          margin-top: 24px;
+        "
+      >
+        This magic link will expire in 24 hours. If you didn't request it, you
+        can safely ignore this email.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- 保留 Supabase 变量供参考 -->
 <!-- {{ .ConfirmationURL }}{{ .Token }}{{ .TokenHash }}{{ .SiteURL }}{{ .Email }}{{ .Data }}{{ .RedirectTo }} -->
