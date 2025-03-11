@@ -128,26 +128,47 @@ CREATE TABLE "task_tag" (
   PRIMARY KEY ("task_id", "tag_id")
 );
 
--- 自定义字段表
+-- 自定义字段模板表
 CREATE TABLE "custom_field" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('TEXT', 'NUMBER', 'DATE', 'SELECT')),
-  "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'DASHBOARD', 'NOTE', 'GANTT', 'CALENDAR', 'BOARD', 'FILES')),
+  "description" TEXT,
+  "icon" VARCHAR(255),
+  "default_config" JSONB, -- 存储字段的默认配置
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 任务自定义字段值表
-CREATE TABLE "task_custom_field_value" (
+-- 团队与自定义字段的关联表（多对多）
+CREATE TABLE "team_custom_field" (
   "id" SERIAL PRIMARY KEY,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "field_id" INT NOT NULL REFERENCES "custom_field"("id") ON DELETE CASCADE,
-  "value" TEXT,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "custom_field_id" INT NOT NULL REFERENCES "custom_field"("id") ON DELETE CASCADE,
+  "config" JSONB, -- 存储团队特定的字段配置
+  "order_index" INT DEFAULT 0,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 创建索引
+CREATE INDEX idx_team_custom_field_team ON "team_custom_field"("team_id");
+CREATE INDEX idx_team_custom_field_field ON "team_custom_field"("custom_field_id");
+
+-- 任务自定义字段值表
+CREATE TABLE "team_custom_field_value" (
+  "id" SERIAL PRIMARY KEY,
+  "team_custom_field_id" INT NOT NULL REFERENCES "team_custom_field"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255), -- 团队自定义的字段名称
+  "description" TEXT,  -- 团队自定义的描述
+  "icon" VARCHAR(255), -- 团队自定义的图标
+  "value" JSONB,      -- 存储其他自定义配置
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建索引
+CREATE INDEX idx_team_custom_field_value_field ON "team_custom_field_value"("team_custom_field_id");
 
 -- 任务时间记录表（用于时间跟踪）
 CREATE TABLE "time_entry" (

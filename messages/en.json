@@ -302,6 +302,8 @@
     "dashboard": "Dashboard",
     "board": "Board",
     "calendar": "Calendar",
+    "timeline": "Timeline",
+    "text": "Text",
     "gantt": "Gantt",
     "addTask": "Add task",
     "filter": "Filter",
