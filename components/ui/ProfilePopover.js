@@ -7,11 +7,15 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import LanguageSwitcher from '../LanguageSwitcher';
 import { ThemeToggle } from './ThemeToggle';
+import { useDispatch } from 'react-redux';
+import { clearProjects } from '@/lib/redux/features/projectSlice';
+import { clearTeams } from '@/lib/redux/features/teamSlice';
 
 export function ProfilePopover({ onClose }) {
   const t = useTranslations();
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const dispatch = useDispatch();
 
   useEffect(() => {
     const getUser = async () => {
@@ -39,8 +43,20 @@ export function ProfilePopover({ onClose }) {
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
+    try {
+      // 先清除 Supabase 会话
+      await supabase.auth.signOut();
+      
+      // 然后清除 Redux store 数据
+      dispatch(clearProjects());
+      dispatch(clearTeams());
+
+      // 最后再跳转路由
+      router.push('/login');
+      
+    } catch (error) {
+      console.error('登出错误:', error);
+    }
   };
 
   const menuItems = [

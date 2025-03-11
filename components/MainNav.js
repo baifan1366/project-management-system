@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/tooltip";
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchProjects } from '@/lib/redux/features/projectSlice';
+import { fetchUserProjects, clearProjects } from '@/lib/redux/features/projectSlice';
+import { supabase } from '@/lib/supabase';
 
 export function MainNav() {
   const pathname = usePathname();
@@ -23,11 +24,28 @@ export function MainNav() {
   const dispatch = useDispatch();
   const { projects, status } = useSelector((state) => state.projects);
 
+
   useEffect(() => {
-    if (status === 'idle') {
-      dispatch(fetchProjects());
-    }
-  }, [dispatch, status]);
+    const fetchProjects = async () => {
+      try {
+        // 2. 获取当前用户session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('获取session失败:', error);
+          return;
+        }
+        
+        if (session?.user?.id) {
+          // 3. 获取用户的projects
+          dispatch(fetchUserProjects(session.user.id));
+        }
+      } catch (error) {
+        console.error('获取项目失败:', error);
+      }
+    };
+
+    fetchProjects();
+  }, [dispatch]);
 
   const routes = [
     {
