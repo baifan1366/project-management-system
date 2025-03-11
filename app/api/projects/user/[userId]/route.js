@@ -1,12 +1,9 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server';
 
 export async function GET(request, { params }) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    const userId = params.userId;
+    const { userId } = await params;
 
     // 1. 获取用户所在的所有团队
     const { data: userTeams, error: teamsError } = await supabase

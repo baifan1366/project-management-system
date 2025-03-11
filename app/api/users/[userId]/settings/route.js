@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 export async function PATCH(request, { params }) {
   try {
-    const { userId } = params;
+    const { userId } = await params;
     const data = await request.json();
     const { language, timezone, theme } = data;
 
