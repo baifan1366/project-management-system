@@ -457,3 +457,20 @@ VALUES
     161061273600, -- 150GB in bytes
     TRUE
   );
+
+-- 团队邀请表
+CREATE TABLE "user_team_invitation" (
+  "id" SERIAL PRIMARY KEY,
+  "user_email" VARCHAR(255) NOT NULL,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "role" TEXT NOT NULL CHECK ("role" IN ('CAN_EDIT', 'CAN_CHECK', 'CAN_VIEW')) DEFAULT 'CAN_VIEW',
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED')) DEFAULT 'PENDING',
+  "expires_at" TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '7 days'),
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 为邀请表创建索引
+CREATE INDEX idx_team_invitation_email ON "user_team_invitation"("user_email");
+CREATE INDEX idx_team_invitation_team ON "user_team_invitation"("team_id");
+CREATE INDEX idx_team_invitation_status ON "user_team_invitation"("status");
