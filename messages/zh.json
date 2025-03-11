@@ -198,7 +198,8 @@
     "createError": "创建项目时出错。",
     "pleaseTryAgain": "发生错误，请重试。",
     "error": "发生错误",
-    "themeColorLoadError": "主题颜色加载错误"
+    "themeColorLoadError": "主题颜色加载错误",
+    "title": "创建项目"
   },
   "CreateTask": {
     "createTask": "创建任务",
@@ -231,7 +232,15 @@
     "filter": "筛选",
     "sort": "排序",
     "group": "分组",
-    "options": "选项"
+    "options": "选项",
+    "title": "创建任务",
+    "description": "描述",
+    "status": "状态",
+    "priority": "优先级",
+    "dueDate": "截止日期",
+    "assignee": "负责人",
+    "statusRequired": "请选择状态",
+    "priorityRequired": "请选择优先级"
   },
   "ChatDialog": {
     "privateMessages": "私人消息",
@@ -311,50 +320,20 @@
     "startChat": "开始聊天",
     "createGroup": "创建群聊"
   },
-  "CreateProject": {
-    "title": "创建项目",
-    "projectName": "项目名称",
-    "visibility": "可见性",
-    "themeColor": "主题颜色",
-    "projectNameMin": "项目名称至少需要 2 个字符",
-    "projectNameMax": "项目名称最多 50 个字符",
-    "visibilityRequired": "请选择可见性",
-    "themeColorRequired": "请选择主题颜色",
-    "creating": "正在创建项目",
-    "pleaseWait": "请稍候...",
-    "createSuccess": "创建成功",
-    "projectCreated": "项目已创建",
-    "createError": "创建失败",
-    "pleaseTryAgain": "请重试"
-  },
-  "CreateTask": {
-    "title": "创建任务",
-    "taskName": "任务名称",
-    "description": "描述",
-    "status": "状态",
-    "priority": "优先级",
-    "dueDate": "截止日期",
-    "assignee": "负责人",
-    "taskNameMin": "任务名称至少需要 2 个字符",
-    "taskNameMax": "任务名称最多 50 个字符",
-    "statusRequired": "请选择状态",
-    "priorityRequired": "请选择优先级",
-    "creating": "正在创建任务",
-    "pleaseWait": "请稍候...",
-    "createSuccess": "创建成功",
-    "taskCreated": "任务已创建",
-    "createError": "创建失败",
-    "pleaseTryAgain": "请重试",
-    "list": "列表",
-    "board": "看板",
-    "calendar": "日历",
-    "gantt": "甘特图",
-    "dashboard": "仪表盘",
-    "addTask": "添加任务",
-    "filter": "筛选",
-    "sort": "排序",
-    "group": "分组",
-    "options": "选项",
-    "setStatus": "设置状态"
+  "TeamInvitation": {
+    "teamInvitation": "团队邀请",
+    "teamName": "团队名称",
+    "role": "邀请权限",
+    "invitationDescription": "接受邀请后，您将成为该团队的成员",
+    "acceptInvitation": "接受邀请",
+    "accepting": "接受中...",
+    "decline": "拒绝",
+    "backToHome": "返回首页",
+    "notLoggedIn": "请先登录",
+    "teamNotFound": "团队不存在",
+    "invitationNotFound": "邀请不存在或已过期",
+    "invalidInvitation": "无效的邀请",
+    "invitationAccepted": "已成功接受邀请",
+    "acceptInvitationFailed": "接受邀请失败"
   }
 }

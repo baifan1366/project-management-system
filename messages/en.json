@@ -389,5 +389,26 @@
     "noTeamMembers": "No team members",
     "loading": "Loading...",
     "fetchError": "Failed to fetch team members"
+  },
+  "TeamInvitation": {
+    "teamInvitation": "Team Invitation",
+    "teamName": "Team Name",
+    "role": "Role",
+    "invitationDescription": "After accepting the invitation, you will become a member of the team",
+    "acceptInvitation": "Accept Invitation",
+    "accepting": "Accepting...",
+    "decline": "Decline",
+    "backToHome": "Back to Home",
+    "notLoggedIn": "Please Log In",
+    "teamNotFound": "Team Not Found",
+    "invitationNotFound": "Invitation Not Found",
+    "invalidInvitation": "Invalid Invitation",
+    "invitationAccepted": "Invitation Accepted",
+    "acceptInvitationFailed": "Accept Invitation Failed",
+    "invitationAlreadyAccepted": "Invitation Already Accepted",
+    "invitationAlreadyDeclined": "Invitation Already Declined",
+    "CAN_VIEW": "Viewer",
+    "CAN_CHECK": "Checker",
+    "CAN_EDIT": "Editor"
   }
 }

@@ -12,7 +12,8 @@ import { useEffect, useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDispatch } from "react-redux";
-import { fetchTeamUsers, createTeamUser } from "@/lib/redux/features/teamUserSlice";
+import { fetchTeamUsers } from "@/lib/redux/features/teamUserSlice";
+import { createTeamUserInv } from "@/lib/redux/features/teamUserInvSlice";
 import { createSelector } from '@reduxjs/toolkit';
 
 // 创建记忆化的选择器
@@ -33,7 +34,7 @@ export default function InvitationDialog({ open, onClose }) {
   const [themeColor, setThemeColor] = useState('#64748b')
   const [showEmailForm, setShowEmailForm] = useState(false)
   const [email, setEmail] = useState('')
-  const [permission, setPermission] = useState('editor')
+  const [permission, setPermission] = useState('CAN_EDIT')
   const [linkEnabled, setLinkEnabled] = useState(true)
   const [isLinkLoading, setIsLinkLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -122,23 +123,45 @@ export default function InvitationDialog({ open, onClose }) {
     try {
       setIsLoading(true);
       setError(null);
-      
-      const teamUserData = {
-        team_id: teamId,
-        email,
-        role: permission.toUpperCase()
-      };
-      
-      await dispatch(createTeamUser({ teamUserData })).unwrap();
+
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      const response = await fetch('https://lquqigrpmdfrxrnmknnv.supabase.co/functions/v1/teamInvitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey,
+          'x-client-info': 'supabase-js/2.x'
+        },
+        body: JSON.stringify({
+          email,
+          teamId,
+          permission
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '邀请发送失败');
+      }
+
+      // 2. 邮件发送成功后，创建本地邀请记录
+      await dispatch(createTeamUserInv({
+        teamId: Number(teamId),
+        userEmail: email,
+        role: permission
+      })).unwrap();
+
       setEmail('');
       setShowEmailForm(false);
     } catch (error) {
       console.error('Failed to send invite:', error);
-      setError(error.message || 'Failed to send invitation');
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
-  }, [email, teamId, permission, dispatch]);
+  }, [email, teamId, permission]);
 
   if (!project) {
     return null;
@@ -252,16 +275,16 @@ export default function InvitationDialog({ open, onClose }) {
                   <SelectValue placeholder={t('selectPermission')}>
                     {permission && (
                       <div className="flex items-center mr-2">
-                        {permission === 'editor' && <Pen className="w-4 h-4 mr-2 text-gray-500" />}
-                        {permission === 'checker' && <CheckCircle className="w-4 h-4 mr-2 text-gray-500" />}
-                        {permission === 'viewer' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
+                        {permission === 'CAN_EDIT' && <Pen className="w-4 h-4 mr-2 text-gray-500" />}
+                        {permission === 'CAN_CHECK' && <CheckCircle className="w-4 h-4 mr-2 text-gray-500" />}
+                        {permission === 'CAN_VIEW' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
                         <span>{t(permission)}</span>
                       </div>
                     )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="editor">
+                  <SelectItem value="CAN_EDIT">
                     <div className="flex items-center w-full">
                       <Pen className="w-5 h-5 mr-3 text-gray-500" />
                       <div className="flex-1">
@@ -272,7 +295,7 @@ export default function InvitationDialog({ open, onClose }) {
                       </div>
                     </div>
                   </SelectItem>
-                  <SelectItem value="checker">
+                  <SelectItem value="CAN_CHECK">
                     <div className="flex items-center w-full">
                       <CheckCircle className="w-5 h-5 mr-3 text-gray-500" />
                       <div className="flex-1">
@@ -283,7 +306,7 @@ export default function InvitationDialog({ open, onClose }) {
                       </div>
                     </div>
                   </SelectItem>
-                  <SelectItem value="viewer">
+                  <SelectItem value="CAN_VIEW">
                     <div className="flex items-center w-full">
                       <Eye className="w-5 h-5 mr-3 text-gray-500" />
                       <div className="flex-1">
@@ -345,16 +368,16 @@ export default function InvitationDialog({ open, onClose }) {
                               <SelectValue placeholder={t('selectPermission')}>
                                 {permission && (
                                   <div className="flex items-center mr-2">
-                                    {permission === 'editor' && <Pen className="w-4 h-4 mr-2 text-gray-500" />}
-                                    {permission === 'checker' && <CheckCircle className="w-4 h-4 mr-2 text-gray-500" />}
-                                    {permission === 'viewer' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
+                                    {permission === 'CAN_EDIT' && <Pen className="w-4 h-4 mr-2 text-gray-500" />}
+                                    {permission === 'CAN_CHECK' && <CheckCircle className="w-4 h-4 mr-2 text-gray-500" />}
+                                    {permission === 'CAN_VIEW' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
                                     <span>{t(permission)}</span>
                                   </div>
                                 )}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="editor">
+                              <SelectItem value="CAN_EDIT">
                                 <div className="flex items-center w-full">
                                   <Pen className="w-5 h-5 mr-3 text-gray-500" />
                                   <div className="flex-1">
@@ -365,7 +388,7 @@ export default function InvitationDialog({ open, onClose }) {
                                   </div>
                                 </div>
                               </SelectItem>
-                              <SelectItem value="checker">
+                              <SelectItem value="CAN_CHECK">
                                 <div className="flex items-center w-full">
                                   <CheckCircle className="w-5 h-5 mr-3 text-gray-500" />
                                   <div className="flex-1">
@@ -376,7 +399,7 @@ export default function InvitationDialog({ open, onClose }) {
                                   </div>
                                 </div>
                               </SelectItem>
-                              <SelectItem value="viewer">
+                              <SelectItem value="CAN_VIEW">
                                 <div className="flex items-center w-full">
                                   <Eye className="w-5 h-5 mr-3 text-gray-500" />
                                   <div className="flex-1">

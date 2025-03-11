@@ -4,18 +4,130 @@
 
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { serve } from 'https://deno.land/std@0.131.0/http/server.ts'
+import { SmtpClient } from 'https://deno.land/x/denomailer@0.12.0/mod.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 console.log("Hello from Functions!")
 
 Deno.serve(async (req) => {
-  const { name } = await req.json()
-  const data = {
-    message: `Hello ${name}!`,
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Max-Age': '86400',
+  };
+
+  // 添加对 OPTIONS 请求的处理
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  // 获取请求体中的数据
+  const { email, teamId, permission } = await req.json();
+  
+  // 添加数据验证
+  if (!email || !teamId || !permission) {
+    return new Response(
+      JSON.stringify({ error: '缺少必要参数' }), 
+      { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  const smtp = new SmtpClient()
+
+  console.log(`Function "send-email-smtp" up and running!`)
+
+  try {
+    console.log('正在连接 SMTP 服务器...');
+    await smtp.connect({
+      hostname: Deno.env.get('SMTP_HOSTNAME') || '',
+      port: Number(Deno.env.get('SMTP_PORT')) || 587,
+      username: Deno.env.get('SMTP_USERNAME') || '',
+      password: Deno.env.get('SMTP_PASSWORD') || '',
+      tls: false, // 先尝试不使用 TLS
+    })
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    )
+
+    // 获取团队信息
+    const { data: team, error: teamError } = await supabase
+      .from('team')
+      .select('name')
+      .eq('id', teamId)
+      .single()
+
+    if (teamError) {
+      return new Response(
+        JSON.stringify({ 
+          error: '获取团队信息失败', 
+          details: teamError.message 
+        }), 
+        { 
+          status: 500,
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
+
+    const teamName = team?.name || teamId
+
+    console.log('正在发送邮件...');
+    await smtp.send({
+      from: Deno.env.get('SMTP_FROM') || Deno.env.get('SMTP_USERNAME') || '',
+      to: email,
+      subject: `Team Invitation - ${teamName}`,
+      html: `
+        <p>You are invited to join the ${teamName} team</p>
+        <p>Permission: ${permission}</p>
+        <p>Please click the following link to join the team:</p>
+        <a href="${Deno.env.get('FRONTEND_URL')}/teamInvitation/${teamId}">Join Us</a>
+      `,
+    })
+
+    console.log('邮件发送成功');
+  } catch (error: any) {
+    console.error('发送邮件时出错:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: '发送邮件失败', 
+        details: error.message 
+      }), 
+      { 
+        status: 500,
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+  } finally {
+    try {
+      await smtp.close()
+    } catch (error) {
+      console.error('关闭 SMTP 连接时出错:', error);
+    }
   }
 
   return new Response(
-    JSON.stringify(data),
-    { headers: { "Content-Type": "application/json" } },
+    JSON.stringify({
+      done: true,
+    }),
+    {
+      headers: { 
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    }
   )
 })
 
