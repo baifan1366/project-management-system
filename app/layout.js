@@ -1,6 +1,6 @@
 import { geistSans, geistMono } from "@/lib/fonts";
 import "./globals.css";
-import { Providers } from './providers'
+
 import RouteGuard from "@/components/RouteGuard";
 import { Toaster } from 'sonner';
 
@@ -15,12 +15,10 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>
           <RouteGuard>
             {children}
             <Toaster position="top-right" />
           </RouteGuard>
-        </Providers>
       </body>
     </html>
   );

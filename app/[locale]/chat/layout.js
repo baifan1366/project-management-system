@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { ChatProvider, useChat } from '@/contexts/ChatContext';
+import { useChat } from '@/contexts/ChatContext';
 import NewChatPopover from '@/components/NewChatPopover';
 
 function ChatLayout({ children }) {
@@ -100,8 +100,6 @@ function ChatLayout({ children }) {
 // 包装组件以提供 ChatContext
 export default function WrappedChatLayout({ children }) {
   return (
-    <ChatProvider>
       <ChatLayout>{children}</ChatLayout>
-    </ChatProvider>
   );
 }

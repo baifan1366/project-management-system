@@ -160,7 +160,20 @@ export function ChatProvider({ children }) {
         content,
         reply_to_message_id: replyToMessageId
       })
-      .select()
+      .select(`
+        *,
+        user:user_id (
+          id,
+          name,
+          avatar_url,
+          email
+        ),
+        attachments:chat_attachment (
+          id,
+          file_url,
+          file_name
+        )
+      `)
       .single();
 
     if (error) {
@@ -168,7 +181,7 @@ export function ChatProvider({ children }) {
       return;
     }
 
-    setMessages(prev => [...prev, data]);
+    setMessages(prev => [...prev, { ...data, user: processAvatarUrl(data.user) }]);
   };
 
   // 实时消息订阅
@@ -182,14 +195,39 @@ export function ChatProvider({ children }) {
         schema: 'public',
         table: 'chat_message',
         filter: `session_id=eq.${currentSession.id}`
-      }, (payload) => {
+      }, async (payload) => {
+        // 获取完整的消息信息，包括用户信息
+        const { data: messageData, error } = await supabase
+          .from('chat_message')
+          .select(`
+            *,
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            ),
+            attachments:chat_attachment (
+              id,
+              file_url,
+              file_name
+            )
+          `)
+          .eq('id', payload.new.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching complete message data:', error);
+          return;
+        }
+
         setMessages(prev => {
           // 检查消息是否已经存在
-          const messageExists = prev.some(msg => msg.id === payload.new.id);
+          const messageExists = prev.some(msg => msg.id === messageData.id);
           if (messageExists) {
             return prev;
           }
-          return [...prev, { ...payload.new, user: processAvatarUrl(payload.new.user) }];
+          return [...prev, { ...messageData, user: processAvatarUrl(messageData.user) }];
         });
       })
       .subscribe();

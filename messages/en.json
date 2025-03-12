@@ -366,7 +366,8 @@
     "inviteUsers": "Invite Users",
     "inviteSelected": "Invite Selected Users",
     "invitationSent": "Invitation Sent",
-    "invitationFailed": "Invitation Failed"
+    "invitationFailed": "Invitation Failed",
+    "newMessage":"New message"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
