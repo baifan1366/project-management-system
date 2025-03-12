@@ -10,9 +10,11 @@ function ChatLayout({ children }) {
   const t = useTranslations('Chat');
   const [searchQuery, setSearchQuery] = useState('');
   const { sessions, currentSession, setCurrentSession } = useChat();
+  
+  // 添加日志查看所有sessions
+  console.log('所有聊天会话:', sessions);
 
   const handleChatClick = (session) => {
-    console.log('Selecting session:', session); // 调试日志
     setCurrentSession(session);
   };
 
@@ -37,6 +39,7 @@ function ChatLayout({ children }) {
         {/* 聊天列表 */}
         <div className="flex-1 overflow-y-auto">
           {sessions.map((session) => (
+            
             <div
               key={session.id}
               className={`flex items-center gap-3 p-4 hover:bg-accent/50 cursor-pointer transition-colors ${
@@ -44,10 +47,20 @@ function ChatLayout({ children }) {
               }`}
               onClick={() => handleChatClick(session)}
             >
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium">
-                {session.type === 'PRIVATE' 
-                  ? session.participants[0]?.name?.charAt(0) || '?'
-                  : session.name?.charAt(0) || '?'}
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden">
+                {session.type === 'PRIVATE' ? (
+                  session.participants[0]?.avatar_url && session.participants[0]?.avatar_url !== '' ? (
+                    <img 
+                      src={session.participants[0].avatar_url} 
+                      alt={session.participants[0].name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>{session.participants[0]?.name?.charAt(0) || '?'}</span>
+                  )
+                ) : (
+                  <span>{session.name?.charAt(0) || '?'}</span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline justify-between">

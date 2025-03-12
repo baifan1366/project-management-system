@@ -11,12 +11,24 @@ export function ChatProvider({ children }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // 处理头像URL，移除token
+  const processAvatarUrl = (user) => {
+    if (!user) return user;
+    let avatarUrl = user.avatar_url;
+    if (avatarUrl?.includes('googleusercontent.com')) {
+      avatarUrl = avatarUrl.split('=')[0];
+      return { ...user, avatar_url: avatarUrl };
+    }
+    return user;
+  };
+
   // 获取聊天会话列表
   const fetchChatSessions = async () => {
     const { data: { session: authSession } } = await supabase.auth.getSession();
     if (!authSession) return;
 
-    const { data, error } = await supabase
+    // 首先获取会话列表
+    const { data: sessionsData, error: sessionsError } = await supabase
       .from('chat_participant')
       .select(`
         session_id,
@@ -26,7 +38,15 @@ export function ChatProvider({ children }) {
           name,
           team_id,
           created_at,
-          updated_at
+          updated_at,
+          participants:chat_participant(
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            )
+          )
         ),
         user:user_id (
           id,
@@ -37,15 +57,61 @@ export function ChatProvider({ children }) {
       `)
       .eq('user_id', authSession.user.id);
 
-    if (error) {
-      console.error('Error fetching chat sessions:', error);
+    if (sessionsError) {
+      console.error('Error fetching chat sessions:', sessionsError);
       return;
     }
 
-    setSessions(data.map(item => ({
-      ...item.chat_session,
-      participants: [item.user]
-    })));
+    // 获取每个会话的最后一条消息
+    const sessionIds = sessionsData.map(item => item.chat_session.id);
+    const { data: lastMessages, error: messagesError } = await supabase
+      .from('chat_message')
+      .select(`
+        id,
+        content,
+        created_at,
+        session_id,
+        user:user_id (
+          id,
+          name,
+          avatar_url,
+          email
+        )
+      `)
+      .in('session_id', sessionIds)
+      .order('created_at', { ascending: false });
+
+    if (messagesError) {
+      console.error('Error fetching last messages:', messagesError);
+    }
+
+    // 获取每个会话的最后一条消息
+    const lastMessagesBySession = {};
+    lastMessages?.forEach(msg => {
+      if (!lastMessagesBySession[msg.session_id]) {
+        lastMessagesBySession[msg.session_id] = msg;
+      }
+    });
+
+    // 将最后一条消息添加到会话数据中
+    const sessionsWithMessages = sessionsData.map(item => {
+      const lastMessage = lastMessagesBySession[item.chat_session.id];
+      const otherParticipants = item.chat_session.participants
+        .map(p => processAvatarUrl(p.user))
+        .filter(user => user.id !== authSession.user.id);
+      
+      return {
+        ...item.chat_session,
+        participants: otherParticipants,
+        participantsCount: item.chat_session.participants.length,
+        lastMessage: lastMessage ? {
+          ...lastMessage,
+          user: processAvatarUrl(lastMessage.user)
+        } : null
+      };
+    });
+
+    setSessions(sessionsWithMessages);
     setLoading(false);
   };
 
@@ -75,7 +141,10 @@ export function ChatProvider({ children }) {
       return;
     }
 
-    setMessages(data);
+    setMessages(data.map(msg => ({
+      ...msg,
+      user: processAvatarUrl(msg.user)
+    })));
   };
 
   // 发送消息
@@ -120,7 +189,7 @@ export function ChatProvider({ children }) {
           if (messageExists) {
             return prev;
           }
-          return [...prev, payload.new];
+          return [...prev, { ...payload.new, user: processAvatarUrl(payload.new.user) }];
         });
       })
       .subscribe();
@@ -136,6 +205,23 @@ export function ChatProvider({ children }) {
   // 初始加载
   useEffect(() => {
     fetchChatSessions();
+
+    // 订阅聊天参与者变化
+    const channel = supabase
+      .channel('chat_participants')
+      .on('postgres_changes', {
+        event: '*', // 监听所有事件（INSERT, UPDATE, DELETE）
+        schema: 'public',
+        table: 'chat_participant'
+      }, () => {
+        // 当有变化时，重新获取会话列表
+        fetchChatSessions();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
@@ -145,7 +231,8 @@ export function ChatProvider({ children }) {
       setCurrentSession,
       messages,
       sendMessage,
-      loading
+      loading,
+      fetchChatSessions
     }}>
       {children}
     </ChatContext.Provider>

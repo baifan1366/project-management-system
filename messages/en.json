@@ -361,7 +361,12 @@
     "createGroup": "Create Group",
     "minimize": "Minimize",
     "maximize": "Maximize",
-    "close": "Close"
+    "close": "Close",
+    "members": "Members",
+    "inviteUsers": "Invite Users",
+    "inviteSelected": "Invite Selected Users",
+    "invitationSent": "Invitation Sent",
+    "invitationFailed": "Invitation Failed"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
