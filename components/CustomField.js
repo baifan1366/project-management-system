@@ -9,6 +9,7 @@ import * as Icons from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription } from "@/components/ui/dialog";
 import { fetchTeamCustomField } from '@/lib/redux/features/teamCFSlice';
 import { shallowEqual } from 'react-redux';
+import { supabase } from '@/lib/supabase';
 
 export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   const t = useTranslations('CreateTask');
@@ -33,13 +34,17 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   }, [dispatch]);
 
   // 处理字段点击事件
-  const handleFieldClick = (field) => {
+  const handleFieldClick = async (field) => {
     // 创建团队自定义字段
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
     try {
       dispatch(createTeamCustomField({
         team_id: teamId,
         custom_field_id: field.id,
-        order_index: 100
+        config: {},
+        order_index: 100,
+        created_by: userId
       }))
       .then((result) => {
         console.log('自定义字段创建成功:', result);
