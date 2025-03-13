@@ -18,10 +18,6 @@ export default function ProjectsPage() {
   const [formattedProjects, setFormattedProjects] = useState([]);
 
   useEffect(() => {
-    dispatch(fetchProjects());
-  }, [dispatch]);
-
-  useEffect(() => {
     if (projects.length > 0) {
       const formatted = projects.map(project => ({
         ...project,

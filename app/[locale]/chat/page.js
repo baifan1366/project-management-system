@@ -6,13 +6,13 @@ import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import InviteUserPopover from '@/components/InviteUserPopover';
 
 export default function ChatPage() {
   const t = useTranslations('Chat');
   const [message, setMessage] = useState('');
-  const { currentSession, messages, sendMessage } = useChat();
+  const { currentSession, messages, sendMessage, fetchChatSessions } = useChat();
   const [currentUser, setCurrentUser] = useState(null);
-  const [hasUnreadMessage, setHasUnreadMessage] = useState(false);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
@@ -23,32 +23,9 @@ export default function ChatPage() {
   // 监听新消息，自动滚动到底部
   useEffect(() => {
     if (messages.length > 0) {
-      const chatContainer = chatContainerRef.current;
-      const isScrolledToBottom = chatContainer && 
-        (chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 100);
-      
-      if (isScrolledToBottom) {
-        scrollToBottom();
-      } else {
-        setHasUnreadMessage(true);
-      }
+      scrollToBottom();
     }
   }, [messages]);
-
-  // 监听滚动事件
-  useEffect(() => {
-    const chatContainer = chatContainerRef.current;
-    if (!chatContainer) return;
-
-    const handleScroll = () => {
-      if (chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 100) {
-        setHasUnreadMessage(false);
-      }
-    };
-
-    chatContainer.addEventListener('scroll', handleScroll);
-    return () => chatContainer.removeEventListener('scroll', handleScroll);
-  }, []);
 
   useEffect(() => {
     const getUser = async () => {
@@ -59,9 +36,6 @@ export default function ChatPage() {
     };
     getUser();
   }, []);
-
-  console.log('Current session in page:', currentSession);
-  console.log('Messages in page:', messages);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -79,37 +53,60 @@ export default function ChatPage() {
     );
   }
 
+  // 获取其他参与者信息
+  const otherParticipant = currentSession.participants?.[0];
+  const sessionName = currentSession.type === 'PRIVATE'
+    ? otherParticipant?.name
+    : currentSession.name;
+  const sessionAvatar = currentSession.type === 'PRIVATE'
+    ? otherParticipant?.avatar_url
+    : null;
+  const sessionEmail = currentSession.type === 'PRIVATE'
+    ? otherParticipant?.email
+    : `${currentSession.participantsCount || 0} ${t('members')}`;
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* 聊天头部 */}
-      <div className="flex items-center px-4 py-3 border-b">
+      <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium">
-            {currentSession.type === 'PRIVATE' 
-              ? currentSession.participants[0]?.name?.charAt(0) || '?'
-              : currentSession.name?.charAt(0) || '?'}
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden">
+            {sessionAvatar ? (
+              <img 
+                src={sessionAvatar} 
+                alt={sessionName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span>{sessionName?.charAt(0) || '?'}</span>
+            )}
           </div>
           <div>
             <h2 className="text-base font-medium">
-              {currentSession.type === 'PRIVATE'
-                ? currentSession.participants[0]?.name
-                : currentSession.name}
+              {sessionName || t('unknownChat')}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {currentSession.type === 'PRIVATE'
-                ? currentSession.participants[0]?.email
-                : `${currentSession.participants?.length || 0} members`}
+              {sessionEmail}
             </p>
           </div>
         </div>
+        {currentSession.type !== 'PRIVATE' && (
+          <div className="flex items-center gap-2">
+            <InviteUserPopover 
+              sessionId={currentSession.id} 
+              onInvite={() => {
+                // 重新获取会话信息以更新成员数量
+                fetchChatSessions();
+              }} 
+            />
+          </div>
+        )}
       </div>
 
       {/* 聊天内容区域 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 relative" ref={chatContainerRef}>
-        {messages.map((msg) => {
-          console.log(msg);
-          
-          const isMe = msg.user_id === currentSession.participants[0]?.id;
+        {messages.map((msg) => {    
+          const isMe = msg.user_id === currentUser?.id;
           return (
             <div
               key={msg.id}
@@ -119,10 +116,18 @@ export default function ChatPage() {
               )}
             >
               <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium",
+                "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden",
                 isMe ? "bg-green-600" : "bg-blue-600"
               )}>
-                {msg.user?.name?.charAt(0) || '?'}
+                {msg.user?.avatar_url && msg.user?.avatar_url !== '' ? (
+                  <img 
+                    src={msg.user.avatar_url} 
+                    alt={msg.user.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span>{msg.user?.name?.charAt(0) || '?'}</span>
+                )}
               </div>
               <div>
                 <div className={cn(
@@ -163,17 +168,6 @@ export default function ChatPage() {
           );
         })}
         <div ref={messagesEndRef} />
-        
-        {/* 未读消息提示 */}
-        {hasUnreadMessage && (
-          <button
-            onClick={scrollToBottom}
-            className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg hover:bg-primary/90 transition-all flex items-center gap-2"
-          >
-            <span>new message</span>
-            <ChevronDown className="h-4 w-4" />
-          </button>
-        )}
       </div>
 
       {/* 输入区域 */}
@@ -210,10 +204,7 @@ export default function ChatPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    if (message.trim() && currentSession) {
-                      sendMessage(currentSession.id, message);
-                      setMessage('');
-                    }
+                    handleSendMessage(e);
                   }
                 }}
                 placeholder={t('inputPlaceholder')}

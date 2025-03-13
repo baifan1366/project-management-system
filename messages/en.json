@@ -404,7 +404,13 @@
     "createGroup": "Create Group",
     "minimize": "Minimize",
     "maximize": "Maximize",
-    "close": "Close"
+    "close": "Close",
+    "members": "Members",
+    "inviteUsers": "Invite Users",
+    "inviteSelected": "Invite Selected Users",
+    "invitationSent": "Invitation Sent",
+    "invitationFailed": "Invitation Failed",
+    "newMessage":"New message"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

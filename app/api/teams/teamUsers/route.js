@@ -8,7 +8,41 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const teamId = searchParams.get('id')
+    const userId = searchParams.get('userId')
+    const projectId = searchParams.get('projectId')
     
+    // 如果提供了 userId 和 projectId，获取用户在特定项目中加入的团队
+    if (userId && projectId) {
+      console.log('API Route: 获取用户在项目中的团队，userId:', userId, 'projectId:', projectId);
+      
+      const { data, error } = await supabase
+        .from('team')
+        .select(`
+          *,
+          user_team!inner(user_id)
+        `)
+        .eq('project_id', projectId)
+        .eq('user_team.user_id', userId)
+        .order('order_index', { ascending: true });
+
+      if (error) {
+        console.error('API Route: 获取用户团队失败:', error);
+        return NextResponse.json(
+          { error: error.message },
+          { status: 500 }
+        );
+      }
+
+      // 处理返回的数据，移除 user_team 字段
+      const teams = data?.map(team => {
+        const { user_team, ...rest } = team;
+        return rest;
+      }) || [];
+
+      return NextResponse.json(teams);
+    }
+
+    // 原有的按团队 ID 获取用户的逻辑
     console.log('API Route: 接收到获取团队用户请求，teamId:', teamId);
 
     // 构建基础查询

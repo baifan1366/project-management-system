@@ -12,6 +12,8 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { Home, Search, Lock, Unlock, Eye, Pencil, Plus, Settings, Users, Bell, Archive, Zap, Edit, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/api'
 
 export default function ProjectSidebar({ projectId }) {
   const t = useTranslations('Projects');
@@ -24,7 +26,9 @@ export default function ProjectSidebar({ projectId }) {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const [themeColor, setThemeColor] = useState('');
   const [isMounted, setIsMounted] = useState(false);
+  const [userTeams, setUserTeams] = useState([]);
   const dropdownRef = useRef(null);
+  const prevDialogOpenRef = useRef(isDialogOpen);
 
   // 添加客户端挂载检查
   useEffect(() => {
@@ -44,10 +48,37 @@ export default function ProjectSidebar({ projectId }) {
     };
   }, []);
 
-  // 过滤出当前项目的团队
-  const projectTeams = teams.filter(team => String(team.project_id) === String(projectId));
+  // 获取用户加入的团队
+  const fetchUserTeams = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-  const menuItems = projectTeams.map((team, index) => ({
+      const teams = await api.teams.listUserTeams(user.id, projectId);
+      setUserTeams(teams);
+    } catch (error) {
+      console.error('获取用户团队失败:', error);
+    }
+  }, [projectId]);
+
+  // 监听对话框状态变化
+  useEffect(() => {
+    // 如果对话框从打开状态变为关闭状态，刷新团队列表
+    if (prevDialogOpenRef.current && !isDialogOpen) {
+      fetchUserTeams();
+    }
+    prevDialogOpenRef.current = isDialogOpen;
+  }, [isDialogOpen, fetchUserTeams]);
+
+  // 初始加载用户团队
+  useEffect(() => {
+    if (projectId) {
+      fetchUserTeams();
+    }
+  }, [projectId, fetchUserTeams]);
+
+  // 过滤出当前项目的团队
+  const menuItems = userTeams.map((team, index) => ({
     ...team,
     id: team.id,
     label: team.name,
@@ -56,79 +87,27 @@ export default function ProjectSidebar({ projectId }) {
     order_index: team.order_index || index
   })).sort((a, b) => a.order_index - b.order_index);
 
-  // 加载项目和团队数据 - 添加防重复请求逻辑
+  // 加载项目数据
   useEffect(() => {
     const loadData = async () => {
       if (!projectId) return;
       
       const currentProject = projects.find(p => String(p.id) === String(projectId));
-      const hasTeams = teams.some(team => String(team.project_id) === String(projectId));
       
-      // 检查是否最近已经获取过数据
-      const lastFetchTimeForProject = lastFetchTime?.[`project_${projectId}`] || 0;
-      const now = Date.now();
-      const isRecentFetch = now - lastFetchTimeForProject < 5000; // 5秒内不重复获取
-      
-      // 使用 Promise.all 同时发起需要的请求
-      const requests = [];
       if (!currentProject) {
-        requests.push(dispatch(fetchProjectById(projectId)));
-      }
-      
-      // 只有在没有最近获取过数据时才发起请求
-      if (!hasTeams && !isRecentFetch) {
-        requests.push(dispatch(fetchProjectTeams(projectId)));
-      }
-      
-      if (requests.length > 0) {
-        await Promise.all(requests);
+        await dispatch(fetchProjectById(projectId));
       }
     };
     
     // 添加防抖处理
     const debounceTimeout = setTimeout(() => {
       loadData();
-    }, 300); // 300ms 的防抖时间
+    }, 300);
 
     return () => {
       clearTimeout(debounceTimeout);
     };
-  }, [projectId, projects, teams, lastFetchTime, dispatch]); // 添加 lastFetchTime 作为依赖
-
-  // 检查是否需要初始化顺序 - 添加防重复初始化逻辑
-  useEffect(() => {
-    const initializeTeamOrderWithCheck = () => {
-      if (!projectId || projectTeams.length === 0) return;
-      
-      // 检查是否需要初始化顺序
-      const needsInitialization = projectTeams.length > 0 && 
-                                 projectTeams.every(team => !team.order_index || team.order_index === 0);
-      
-      if (!needsInitialization) return;
-      
-      // 检查是否正在初始化或最近已初始化
-      const isInitializing = lastFetchTime?.[`initializing_${projectId}`];
-      const lastInitTime = lastFetchTime?.[`init_order_${projectId}`] || 0;
-      const now = Date.now();
-      
-      if (isInitializing) {
-        return;
-      }
-      
-      if (now - lastInitTime < 30000) { // 30秒内不重复初始化
-        return;
-      }
-      
-      dispatch(initializeTeamOrder(projectId));
-    };
-    
-    // 添加延迟，确保不会在页面加载时立即触发
-    const timeout = setTimeout(() => {
-      initializeTeamOrderWithCheck();
-    }, 500);
-    
-    return () => clearTimeout(timeout);
-  }, [projectTeams, projectId, lastFetchTime, dispatch]);
+  }, [projectId, projects, dispatch]);
 
   useEffect(() => {
     if (project) {
@@ -136,36 +115,34 @@ export default function ProjectSidebar({ projectId }) {
     }
   }, [project]);
 
-  // 处理拖拽结束 - 添加防重复更新逻辑
-  const handleDragEnd = useCallback((result) => {
+  // 处理拖拽结束
+  const handleDragEnd = useCallback(async (result) => {
     if (!result.destination) return;
 
     const items = Array.from(menuItems);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
 
-    // 检查是否正在更新或最近已更新
-    const isUpdatingOrder = lastFetchTime?.[`updating_order_${projectId}`];
-    const lastOrderTime = lastFetchTime?.[`order_project_${projectId}`] || 0;
-    const now = Date.now();
-    
-    if (isUpdatingOrder) {
-      return;
-    }
-    
-    if (now - lastOrderTime < 5000) { // 5秒内不重复更新
-      return;
-    }
-
     // 更新每个项目的order值，保留原始团队的所有字段
     const updatedItems = items.map((item, index) => ({
-      ...item,  // 保留所有原始字段
-      order_index: index,  // 只更新order_index
+      ...item,
+      order_index: index,
     }));
 
-    // 更新Redux状态
-    dispatch(updateTeamOrder(updatedItems));
-  }, [menuItems, projectId, lastFetchTime, dispatch]);
+    try {
+      // 更新Redux状态
+      await dispatch(updateTeamOrder(updatedItems)).unwrap();
+      
+      // 重新获取用户团队以确保顺序正确
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const teams = await api.teams.listUserTeams(user.id, projectId);
+        setUserTeams(teams);
+      }
+    } catch (error) {
+      console.error('更新团队顺序失败:', error);
+    }
+  }, [menuItems, projectId, dispatch]);
 
   // 获取项目名称的首字母
   const getProjectInitial = (name) => {
@@ -174,7 +151,6 @@ export default function ProjectSidebar({ projectId }) {
 
   // 判断是否使用深色文字
   const shouldUseDarkText = (color) => {
-    // 如果是白色或非常浅的颜色，返回true
     return color === '#FFFFFF' || color === '#FFF' || color === 'white' || 
            color?.toLowerCase().startsWith('#f') || color?.toLowerCase().startsWith('#e');
   };
@@ -193,7 +169,7 @@ export default function ProjectSidebar({ projectId }) {
   );
 
   if (!isMounted) {
-    return null; // 或者返回一个加载状态的占位符
+    return null;
   }
 
   return (
