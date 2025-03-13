@@ -2,12 +2,25 @@ import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
 // GET /api/projects - Get all projects
-export async function GET() {
+export async function GET(request) {
   try {
-    const { data, error } = await supabase
-      .from('project')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get('projectId')
+
+    let data, error
+
+    if (projectId) {
+      // Fetch a specific project by ID
+      ({ data, error } = await supabase
+        .from('project')
+        .select('*')
+        .eq('id', projectId))
+    } else {
+      // Fetch all projects
+      ({ data, error } = await supabase
+        .from('project')
+        .select('*'))
+    }
 
     if (error) {
       console.error('Database error:', error)
@@ -57,37 +70,57 @@ export async function POST(request) {
   }
 }
 
-// PUT /api/projects - Update a project
+// PUT /api/projects - Update a project or project order
 export async function PUT(request) {
   try {
     const body = await request.json()
     console.log('Update data:', body)
     
-    if (!body.id) {
+    if (body.id) {
+      // 更新单个项目
+      const { data, error } = await supabase
+        .from('project')
+        .update(body)
+        .eq('id', body.id)
+        .select()
+
+      if (error) {
+        console.error('Database error:', error)
+        throw error
+      }
+
+      return NextResponse.json(data[0])
+    } else if (body.projects && Array.isArray(body.projects)) {
+      // 更新多个项目的顺序
+      const updates = body.projects.map(project => {
+        return supabase
+          .from('project')
+          .update({ order: project.order }) // 假设您有一个 'order' 字段
+          .eq('id', project.id)
+      });
+
+      const results = await Promise.all(updates);
+
+      // 检查是否有错误
+      const error = results.find(result => result.error);
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
+
+      return NextResponse.json({ message: 'Project order updated successfully' });
+    } else {
       return NextResponse.json(
-        { error: 'Project ID is required' },
+        { error: 'Project ID or projects array is required' },
         { status: 400 }
       )
     }
-
-    const { data, error } = await supabase
-      .from('project')
-      .update(body)
-      .eq('id', body.id)
-      .select()
-
-    if (error) {
-      console.error('Database error:', error)
-      throw error
-    }
-
-    return NextResponse.json(data[0])
   } catch (error) {
-    console.error('Error updating project:', error)
+    console.error('Error updating project:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to update project' },
       { status: 500 }
-    )
+    );
   }
 }
 

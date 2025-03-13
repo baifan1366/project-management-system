@@ -1,7 +1,29 @@
 {
-    "i18n-ally.localesPaths": [
-        "i18n",
-        "messages"
-    ],
-    "i18n-ally.keystyle": "nested"
+  "[typescript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "deno.enablePaths": [
+    "supabase/functions"
+  ],
+  "deno.lint": true,
+  "deno.unstable": [
+    "bare-node-builtins",
+    "byonm",
+    "sloppy-imports",
+    "unsafe-proto",
+    "webgpu",
+    "broadcast-channel",
+    "worker-options",
+    "cron",
+    "kv",
+    "ffi",
+    "fs",
+    "http",
+    "net"
+  ],
+  "i18n-ally.keystyle": "nested",
+  "i18n-ally.localesPaths": [
+    "i18n",
+    "messages"
+  ]
 }

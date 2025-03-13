@@ -23,9 +23,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useDispatch } from 'react-redux';
 import { createProject } from '@/lib/redux/features/projectSlice';
+import { DialogFooter } from "@/components/ui/dialog"
+import { supabase } from '@/lib/supabase';
 
 export default function CreateProjectPage() {
   const t = useTranslations('CreateProject');
@@ -74,6 +76,13 @@ export default function CreateProjectPage() {
     try {
       // 解构获取表单数据
       const { projectName, visibility, buttonVariant } = data;
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        throw new Error('Failed to get user information');
+      }
+      if (!userData?.user?.id) {
+        throw new Error('User not authenticated');
+      }
 
       toast({
         title: t('creating'),
@@ -85,8 +94,8 @@ export default function CreateProjectPage() {
         project_name: projectName.trim(),
         visibility,
         theme_color: buttonVariant,
-        team_id: 16,
-        created_by: 9,
+        created_by: userData.user.id,
+        status: "PENDING"
       }));
 
       if (createProject.fulfilled.match(resultAction)) {
@@ -213,7 +222,7 @@ export default function CreateProjectPage() {
                 </FormItem>
               )}
             />
-            <div className="flex justify-end gap-3">
+            <DialogFooter className="flex justify-end gap-3">
               <Button
                 type="button"
                 onClick={() => router.back()}
@@ -229,7 +238,7 @@ export default function CreateProjectPage() {
               >
                 {isCreating ? t('creating') : t('create')}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </Form>
       </div>

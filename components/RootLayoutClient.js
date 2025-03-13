@@ -9,13 +9,14 @@ import { usePathname } from 'next/navigation';
 export function RootLayoutClient({ children, locale, messages }) {
   const pathname = usePathname();
   const isPricingPage = pathname.includes('/pricing');
+  const isAuthPage = pathname.includes('/login') || pathname.includes('/signup') || pathname.includes('/reset-password') || pathname.includes('/forgot-password');
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Shanghai">
       <Providers>
         <div className="relative flex min-h-screen flex-col">
-          {isPricingPage ? <PricingHeader /> : <Header />}
-          <main className="flex-1 container py-6">
+          {!isAuthPage && (isPricingPage ? <PricingHeader /> : <Header />)}
+          <main className={`flex-1 container ${!isAuthPage ? 'pl-16' : ''}`}>
             {children}
           </main>
         </div>

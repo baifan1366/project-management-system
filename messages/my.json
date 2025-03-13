@@ -18,32 +18,130 @@
     "tasks": "Tugas",
     "settings": "Tetapan",
     "login": "Log Masuk",
-    "signup": "Daftar"
-  },
-  "projects": {
-    "title": "Projek",
-    "create": "Cipta Projek",
-    "status": {
-      "pending": "Menunggu",
-      "inProgress": "Sedang Berlangsung",
-      "completed": "Selesai"
-    }
-  },
-  "tasks": {
-    "title": "Tugas",
-    "create": "Cipta Tugas",
-    "status": {
-      "todo": "Perlu Dilakukan",
-      "inProgress": "Sedang Berlangsung",
-      "completed": "Selesai"
-    }
+    "signup": "Daftar",
+    "search": "Carian",
+    "mytasks": "Tugas Saya",
+    "calendar": "Kalendar",
+    "chat": "Sembang"
   },
   "common": {
     "save": "Simpan",
     "cancel": "Batal",
     "delete": "Padam",
     "edit": "Sunting",
-    "loading": "Memuatkan..."
+    "loading": "Memuatkan...",
+    "error": "Ralat",
+    "create": "Cipta Baru",
+    "notifications": "Notifikasi",
+    "profile": "Profil",
+    "success": "Berjaya",
+    "warning": "Amaran",
+    "confirm": "Sahkan",
+    "actions": "Tindakan"
+  },
+  "profile": {
+    "title": "Tetapan Profil",
+    "description": "Urus tetapan dan pilihan akaun anda",
+    "email": "Emel",
+    "language": "Bahasa",
+    "theme": "Tema",
+    "notifications": "Notifikasi",
+    "security": "Keselamatan",
+    "preferences": "Keutamaan",
+    "darkMode": "Mod Gelap",
+    "lightMode": "Mod Terang",
+    "upgrade": "Naik Taraf",
+    "refer": "Rujuk dan dapat ganjaran",
+    "settings": "Tetapan",
+    "signOut": "Log Keluar"
+  },
+  "Projects": {
+    "create": "Cipta Projek",
+    "statusTitle": "Status",
+    "status": {
+      "pending": "Menunggu",
+      "in_progress": "Sedang Berlangsung",
+      "completed": "Selesai",
+      "cancelled": "Dibatalkan",
+      "on_hold": "Ditangguhkan"
+    },
+    "projects": "Projek",
+    "createProject": "Cipta Projek",
+    "createNewProject": "Cipta Projek Baru",
+    "viewProject": "Lihat Butiran Projek",
+    "all": "Semua Projek",
+    "active": "Aktif",
+    "completed": "Selesai",
+    "team": "Pasukan",
+    "inProgress": "Sedang Berlangsung",
+    "progress": "Kemajuan",
+    "noProjects": "Belum ada projek yang dicipta",
+    "projectName": "Nama Projek",
+    "visibility": "Keterlihatan",
+    "public": "Awam",
+    "private": "Peribadi",
+    "created_at": "Dicipta Pada",
+    "updated_at": "Dikemas Kini Pada",
+    "task": "Tugas",
+    "projectID": "ID",
+    "description": "Penerangan",
+    "dueDate": "Tarikh Akhir",
+    "priority": "Keutamaan",
+    "members": "Ahli",
+    "filters": {
+      "all": "Semua",
+      "recent": "Terkini",
+      "favorite": "Kegemaran"
+    },
+    "sort": {
+      "newest": "Terbaru Dahulu",
+      "oldest": "Terlama Dahulu",
+      "nameAZ": "Nama A-Z",
+      "nameZA": "Nama Z-A"
+    },
+    "edit": "Sunting",
+    "notifications": "Notifikasi",
+    "settings": "Tetapan",
+    "archiveProject": "Arsipkan Projek",
+    "createTeam": "Cipta Pasukan",
+    "home": "Laman Utama",
+    "new_team": "Pasukan Baru",
+    "upgrade": "Naik Taraf",
+    "searchPlaceholder": "Carian...",
+    "unknown": "Tidak Diketahui",
+    "inviteOnlyTooltip": "Hanya boleh dilihat oleh anda dan orang yang anda jemput",
+    "canEditTooltip": "Boleh mengedit",
+    "canCheckTooltip": "Boleh memeriksa",
+    "canViewTooltip": "Boleh melihat"
+  },
+  "tasks": {
+    "title": "Tugas",
+    "create": "Cipta Tugas",
+    "status": {
+      "todo": "Perlu Dilakukan",
+      "in_progress": "Sedang Berlangsung",
+      "done": "Selesai",
+      "in_review": "Dalam Semakan"
+    }
+  },
+  "notifications": {
+    "title": "Notifikasi",
+    "markAllRead": "Tandakan semua sebagai dibaca",
+    "noNotifications": "Tiada notifikasi baru",
+    "types": {
+      "mention": "Menyebut anda",
+      "assignment": "Ditetapkan kepada anda",
+      "update": "Kemas kini projek",
+      "deadline": "Tarikh akhir semakin hampir"
+    }
+  },
+  "errors": {
+    "general": "Sesuatu telah berlaku",
+    "notFound": "Sumber tidak dijumpai",
+    "unauthorized": "Akses tidak dibenarkan",
+    "forbidden": "Akses dilarang",
+    "networkError": "Ralat rangkaian",
+    "serverError": "Ralat pelayan"
   },
   "Pricing": {
     "title": "Pilih Pelan Anda",
@@ -78,23 +176,6 @@
     "activeProjects": "projek aktif",
     "noTeams": "Belum ada pasukan yang dicipta"
   },
-  "Projects": {
-    "projects": "Projek",
-    "createProject": "Cipta Projek",
-    "all": "Semua Projek",
-    "active": "Aktif",
-    "completed": "Selesai",
-    "team": "Pasukan",
-    "inProgress": "Sedang Berlangsung",
-    "progress": "Kemajuan",
-    "noProjects": "Belum ada projek yang dicipta",
-    "projectName": "Nama Projek",
-    "visibility": "Keterlihatan",
-    "created_at": "Dicipta Pada",
-    "updated_at": "Dikemas Kini Pada",
-    "task": "Tugas",
-    "projectID": "ID"
-  },
   "CreateProject": {
     "createProject": "Cipta Projek",
     "projectName": "Nama Projek",
@@ -115,7 +196,9 @@
     "createSuccess": "Berjaya!",
     "projectCreated": "Projek anda telah berjaya dicipta.",
     "createError": "Ralat mencipta projek.",
-    "pleaseTryAgain": "Sesuatu telah berlaku. Sila cuba lagi."
+    "pleaseTryAgain": "Sesuatu telah berlaku. Sila cuba lagi.",
+    "error": "Ralat",
+    "themeColorLoadError": "Ralat memuatkan warna tema"
   },
   "CreateTask": {
     "createTask": "Cipta Tugas",
@@ -130,12 +213,50 @@
     "createSuccess": "Berjaya!",
     "taskCreated": "Tugas anda telah berjaya dicipta.",
     "createError": "Ralat mencipta tugas.",
-    "pleaseTryAgain": "Sesuatu telah berlaku. Sila cuba lagi."
+    "pleaseTryAgain": "Sesuatu telah berlaku. Sila cuba lagi.",
+    "setStatus": "Tetapkan Status",
+    "editTeamDetails": "Sunting butiran pasukan",
+    "manageTeamPermissions": "Urus kebenaran pasukan",
+    "setColorAndIcon": "Tetapkan warna & ikon",
+    "manageDependencies": "Urus kebergantungan",
+    "copyTeamLink": "Salin pautan pasukan",
+    "archive": "Arkib",
+    "deleteTeam": "Padam pasukan",
+    "list": "Senarai",
+    "dashboard": "Papan Pemuka",
+    "board": "Papan",
+    "calendar": "Kalendar",
+    "gantt": "Gantt",
+    "addTask": "Tambah tugas",
+    "filter": "Tapis",
+    "sort": "Susun",
+    "group": "Kumpulan",
+    "options": "Pilihan"
   },
   "ChatDialog":{
     "privateMessages": "Mesej Peribadi",
     "groupChat": "Sembang Kumpulan",
     "privateMessagesContent": "Ini adalah kandungan untuk mesej peribadi.",
     "groupChatContent": "Ini adalah kandungan untuk sembang kumpulan."
+  },
+  "CreateTeam": {
+    "createTeam": "Cipta Pasukan",
+    "createTeamDescription": "Cipta pasukan baru untuk berkolaborasi dengan orang lain.",
+    "teamName": "Nama pasukan",
+    "teamNamePlaceholder": "Masukkan nama pasukan",
+    "teamAccess": "Akses Pasukan",
+    "teamAccessPlaceholder": "Pilih tahap akses",
+    "inviteOnly": "Jemputan sahaja",
+    "everyoneCanEdit": "Semua di Team Sync boleh mengedit",
+    "everyoneCanCheck": "Semua di Team Sync boleh memeriksa",
+    "everyoneCanView": "Semua di Team Sync boleh melihat",
+    "cancel": "Batal",
+    "create": "Cipta",
+    "creating": "Mencipta...",
+    "close": "Tutup",
+    "teamNameMin": "Nama Pasukan mestilah sekurang-kurangnya 2 aksara.",
+    "teamNameMax": "Nama Pasukan tidak boleh melebihi 50 aksara.",
+    "teamAccessRequired": "Akses Pasukan diperlukan.",
+    "teamNameRequired": "Sila masukkan nama pasukan"
   }
 } 

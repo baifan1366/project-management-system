@@ -53,6 +53,64 @@ SUPABASE_KEY=your_supabase_key
 
 ## Supabase Setup
 
+### Supabase CLI Installation and Setup
+
+1. Install Scoop (Windows Package Manager):
+```powershell
+# Run in PowerShell
+Set-ExecutionPolicy RemoveRestricted -Scope CurrentUser -Force
+irm get.scoop.sh | iex
+```
+
+2. Install Docker Desktop:
+- Visit [Docker Desktop](https://www.docker.com/products/docker-desktop/) to download and install
+- Launch Docker Desktop after installation
+
+3. Install Supabase CLI via Scoop:
+```bash
+scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+scoop install supabase
+```
+
+4. Set up Supabase Access Token:
+- Visit [Supabase Dashboard](https://app.supabase.com)
+- Click profile picture in top right -> Account
+- Generate new token in Access Tokens section
+- Set environment variable:
+```bash
+supabase login
+# Enter your access token
+```
+
+5. Initialize Supabase project:
+```bash
+# Run in project root directory
+supabase init
+```
+
+6. Start local development environment:
+```bash
+supabase start
+```
+
+7. Link to remote project:
+```bash
+supabase link --project-ref your-project-ref
+# project-ref can be found in Supabase project settings
+```
+
+8. Database migrations:
+```bash
+# Create new migration
+supabase migration new your_migration_name
+
+# Apply migrations
+supabase db push
+
+# Reset database
+supabase db reset
+```
+
 This project uses Supabase as the backend database and authentication service. To set up Supabase:
 
 1. Install Supabase client:

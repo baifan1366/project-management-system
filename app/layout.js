@@ -1,6 +1,8 @@
 import { geistSans, geistMono } from "@/lib/fonts";
 import "./globals.css";
-import { Providers } from './providers'
+
+import RouteGuard from "@/components/RouteGuard";
+import { Toaster } from 'sonner';
 
 export const metadata = {
   title: "Team Sync",
@@ -13,9 +15,10 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>
-          {children}
-        </Providers>
+          <RouteGuard>
+            {children}
+            <Toaster position="top-right" />
+          </RouteGuard>
       </body>
     </html>
   );

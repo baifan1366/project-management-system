@@ -1,0 +1,101 @@
+<div
+  style="
+    background-color: #f5f5f5;
+    padding: 40px 0;
+    font-family: Arial, sans-serif;
+  "
+>
+  <div style="max-width: 480px; margin: 0 auto">
+    <!-- Logo and Brand Name - At the top left of the white card -->
+    <div style="display: flex; align-items: center; margin-bottom: 16px">
+      <img
+        src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/logo.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvbG9nby5wbmciLCJpYXQiOjE3NDE2MDUwMjUsImV4cCI6MTgzNjIxMzAyNX0.IOriHUlZYA8zsub-O1o9a10EowBaZCUHLqs6GfTzOvM"
+        alt="Team Sync"
+        style="height: 30px; width: 30px; margin-right: 8px"
+      />
+      <span style="color: #111827; font-size: 16px; font-weight: 600"
+        >Team Sync</span
+      >
+    </div>
+
+    <!-- White Card -->
+    <div
+      style="
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 32px;
+      "
+    >
+      <!-- High Five Icon -->
+      <div style="text-align: center; margin: 16px 0">
+        <img
+          src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/blackhighFive_noBG.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvYmxhY2toaWdoRml2ZV9ub0JHLnBuZyIsImlhdCI6MTc0MTYwNjQ0MiwiZXhwIjoxODM2MjE0NDQyfQ.dvaDfnnHvlwNRwndmwbzSPm-fZ6GpR5XssbXi5TkcfA"
+          alt="High Five Icon"
+          style="height: 150px; width: 150px"
+        />
+      </div>
+
+      <!-- Title -->
+      <h1
+        style="
+          color: #111827;
+          font-size: 28px;
+          font-weight: 800;
+          margin: 0 0 16px 0;
+          text-align: left;
+          letter-spacing: -0.02em;
+        "
+      >
+        Join the team
+      </h1>
+
+      <!-- Divider -->
+      <hr
+        style="
+          border: none;
+          height: 1px;
+          background-color: #e5e7eb;
+          margin: 16px 0;
+        "
+      />
+
+      <!-- Message -->
+      <p
+        style="
+          color: #6b7280;
+          font-size: 16px;
+          line-height: 24px;
+          margin: 0 0 24px 0;
+        "
+      >
+        You've been invited to join Team Sync. Click the button below to accept
+        the invitation and create your account.
+      </p>
+
+      <!-- Button -->
+      <a
+        href="{{ .ConfirmationURL }}"
+        style="
+          display: block;
+          background-color: #000000;
+          color: white;
+          text-decoration: none;
+          text-align: center;
+          padding: 12px 24px;
+          border-radius: 6px;
+          font-weight: 500;
+          margin: 32px 0;
+          transition: transform 0.2s;
+        "
+        onmouseover="this.style.transform='scale(1.02)'"
+        onmouseout="this.style.transform='scale(1)'"
+      >
+        Accept invitation
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- 保留 Supabase 变量供参考 -->
+<!-- {{ .ConfirmationURL }}{{ .Token }}{{ .TokenHash }}{{ .SiteURL }}{{ .Email }}{{ .Data }}{{ .RedirectTo }} -->

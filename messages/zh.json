@@ -18,32 +18,130 @@
     "tasks": "任务",
     "settings": "设置",
     "login": "登录",
-    "signup": "注册"
-  },
-  "projects": {
-    "title": "项目",
-    "create": "创建项目",
-    "status": {
-      "pending": "待处理",
-      "inProgress": "进行中",
-      "completed": "已完成"
-    }
-  },
-  "tasks": {
-    "title": "任务",
-    "create": "创建任务",
-    "status": {
-      "todo": "待办",
-      "inProgress": "进行中",
-      "completed": "已完成"
-    }
+    "signup": "注册",
+    "search": "搜索",
+    "mytasks": "我的任务",
+    "calendar": "日历",
+    "chat": "聊天"
   },
   "common": {
     "save": "保存",
     "cancel": "取消",
     "delete": "删除",
     "edit": "编辑",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "error": "发生错误",
+    "create": "创建新",
+    "notifications": "通知",
+    "profile": "个人资料",
+    "success": "成功",
+    "warning": "警告",
+    "confirm": "确认",
+    "actions": "操作"
+  },
+  "profile": {
+    "title": "个人资料设置",
+    "description": "管理您的帐户设置和偏好",
+    "email": "电子邮件",
+    "language": "语言",
+    "theme": "主题",
+    "notifications": "通知",
+    "security": "安全",
+    "preferences": "偏好",
+    "darkMode": "黑暗模式",
+    "lightMode": "亮模式",
+    "upgrade": "升级",
+    "refer": "推荐并赚取奖励",
+    "settings": "设置",
+    "signOut": "退出登录"
+  },
+  "Projects": {
+    "create": "创建项目",
+    "statusTitle": "状态",
+    "status": {
+      "pending": "待处理",
+      "in_progress": "进行中",
+      "completed": "已完成",
+      "cancelled": "已取消",
+      "on_hold": "暂停"
+    },
+    "projects": "项目",
+    "createProject": "创建项目",
+    "createNewProject": "创建新项目",
+    "viewProject": "查看项目详情",
+    "all": "所有项目",
+    "active": "进行中",
+    "completed": "已完成",
+    "team": "团队",
+    "inProgress": "进行中",
+    "progress": "进度",
+    "noProjects": "暂未创建任何项目",
+    "projectName": "项目名称",
+    "visibility": "可见性",
+    "public": "公开",
+    "private": "私密",
+    "created_at": "创建于",
+    "updated_at": "更新于",
+    "task": "任务",
+    "projectID": "序号",
+    "description": "描述",
+    "dueDate": "截止日期",
+    "priority": "优先级",
+    "members": "成员",
+    "filters": {
+      "all": "所有",
+      "recent": "最近",
+      "favorite": "收藏"
+    },
+    "sort": {
+      "newest": "最新优先",
+      "oldest": "最旧优先",
+      "nameAZ": "名称 A-Z",
+      "nameZA": "名称 Z-A"
+    },
+    "edit": "编辑",
+    "notifications": "通知",
+    "settings": "设置",
+    "archiveProject": "归档项目",
+    "createTeam": "创建团队",
+    "home": "首页",
+    "new_team": "新建团队",
+    "upgrade": "升级",
+    "searchPlaceholder": "搜索...",
+    "unknown": "未知",
+    "inviteOnlyTooltip": "仅您和被邀请的人可见",
+    "canEditTooltip": "可编辑",
+    "canCheckTooltip": "可检查",
+    "canViewTooltip": "可查看"
+  },  
+  "tasks": {
+    "title": "任务",
+    "create": "创建任务",
+    "status": {
+      "todo": "待办",
+      "in_progress": "进行中",
+      "done": "已完成",
+      "in_review": "审核中"
+    }
+  },
+  "notifications": {
+    "title": "通知",
+    "markAllRead": "标记全部为已读",
+    "noNotifications": "没有新通知",
+    "types": {
+      "mention": "提到您",
+      "assignment": "分配给您",
+      "update": "项目更新",
+      "deadline": "截止日期临近"
+    }
+  },
+  "errors": {
+    "general": "出现错误",
+    "notFound": "资源未找到",
+    "unauthorized": "未经授权的访问",
+    "forbidden": "访问被禁止",
+    "networkError": "网络错误",
+    "serverError": "服务器错误"
   },
   "Pricing": {
     "title": "选择您的计划",
@@ -78,23 +176,6 @@
     "activeProjects": "个活跃项目",
     "noTeams": "暂未创建任何团队"
   },
-  "Projects": {
-    "projects": "项目",
-    "createProject": "创建项目",
-    "all": "所有项目",
-    "active": "进行中",
-    "completed": "已完成",
-    "team": "团队",
-    "inProgress": "进行中",
-    "progress": "进度",
-    "noProjects": "暂未创建任何项目",
-    "projectName": "项目名称",
-    "visibility": "可见性",
-    "created_at": "创建于",
-    "updated_at": "更新于",
-    "task": "任务",
-    "projectID": "序号"
-  },
   "CreateProject": {
     "createProject": "创建项目",
     "projectName": "项目名称",
@@ -115,7 +196,10 @@
     "createSuccess": "创建成功！",
     "projectCreated": "您的项目已成功创建。",
     "createError": "创建项目时出错。",
-    "pleaseTryAgain": "发生错误，请重试。"
+    "pleaseTryAgain": "发生错误，请重试。",
+    "error": "发生错误",
+    "themeColorLoadError": "主题颜色加载错误",
+    "title": "创建项目"
   },
   "CreateTask": {
     "createTask": "创建任务",
@@ -130,12 +214,126 @@
     "createSuccess": "成功！",
     "taskCreated": "您的任务已成功创建。",
     "createError": "创建任务时出错。",
-    "pleaseTryAgain": "发生错误，请重试。"
+    "pleaseTryAgain": "发生错误，请重试。",
+    "setStatus": "设置状态",
+    "editTeamDetails": "编辑团队详情",
+    "manageTeamPermissions": "管理团队权限",
+    "setColorAndIcon": "设置颜色和图标",
+    "manageDependencies": "管理依赖关系",
+    "copyTeamLink": "复制团队链接",
+    "archive": "归档",
+    "deleteTeam": "删除团队",
+    "list": "列表",
+    "dashboard": "仪表盘",
+    "board": "看板",
+    "calendar": "日历",
+    "gantt": "甘特图",
+    "addTask": "添加任务",
+    "filter": "筛选",
+    "sort": "排序",
+    "group": "分组",
+    "options": "选项",
+    "title": "创建任务",
+    "description": "描述",
+    "status": "状态",
+    "priority": "优先级",
+    "dueDate": "截止日期",
+    "assignee": "负责人",
+    "statusRequired": "请选择状态",
+    "priorityRequired": "请选择优先级"
   },
   "ChatDialog": {
     "privateMessages": "私人消息",
     "groupChat": "群组聊天",
     "privateMessagesContent": "这里是私人消息内容。",
     "groupChatContent": "这里是群组聊天内容。"
+  },
+  "CreateTeam": {
+    "createTeam": "创建团队",
+    "createTeamDescription": "创建一个新团队以与他人协作。",
+    "teamName": "团队名称",
+    "teamNamePlaceholder": "输入团队名称",
+    "teamAccess": "团队访问权限",
+    "teamAccessPlaceholder": "选择访问权限级别",
+    "inviteOnly": "仅限邀请",
+    "everyoneCanEdit": "所有团队成员可编辑",
+    "everyoneCanCheck": "所有团队成员可查看和检查",
+    "everyoneCanView": "所有团队成员可查看",
+    "cancel": "取消",
+    "create": "创建",
+    "creating": "创建中...",
+    "close": "关闭",
+    "teamNameMin": "团队名称至少需要2个字符。",
+    "teamNameMax": "团队名称不能超过50个字符。",
+    "teamAccessRequired": "请选择团队访问权限。",
+    "teamNameRequired": "请输入团队名称"
+  },
+  "Index": {
+    "title": "项目管理系统",
+    "description": "一个现代化的项目管理系统"
+  },
+  "Navigation": {
+    "dashboard": "仪表盘",
+    "projects": "项目",
+    "tasks": "任务",
+    "calendar": "日历",
+    "chat": "聊天",
+    "settings": "设置",
+    "profile": "个人资料",
+    "logout": "退出登录"
+  },
+  "Auth": {
+    "signIn": "登录",
+    "signUp": "注册",
+    "email": "邮箱",
+    "password": "密码",
+    "name": "姓名",
+    "forgotPassword": "忘记密码？",
+    "noAccount": "还没有账号？",
+    "hasAccount": "已有账号？",
+    "signInWith": "使用 {provider} 登录",
+    "or": "或者",
+    "emailRequired": "请输入邮箱",
+    "emailInvalid": "请输入有效的邮箱",
+    "passwordRequired": "请输入密码",
+    "passwordMin": "密码至少需要 8 个字符",
+    "nameRequired": "请输入姓名",
+    "nameMin": "姓名至少需要 2 个字符",
+    "nameMax": "姓名最多 50 个字符"
+  },
+  "Chat": {
+    "title": "聊天",
+    "searchPlaceholder": "搜索聊天",
+    "newChat": "新建聊天",
+    "noMessages": "暂无消息",
+    "inputPlaceholder": "输入消息...",
+    "send": "发送",
+    "attachFile": "附件",
+    "attachImage": "图片",
+    "attachGift": "礼物",
+    "emoji": "表情",
+    "selectChat": "选择一个聊天开始",
+    "searchUsers": "搜索用户",
+    "searching": "搜索中",
+    "noResults": "未找到结果",
+    "recentContacts": "最近联系人",
+    "startChat": "开始聊天",
+    "createGroup": "创建群聊"
+  },
+  "TeamInvitation": {
+    "teamInvitation": "团队邀请",
+    "teamName": "团队名称",
+    "role": "邀请权限",
+    "invitationDescription": "接受邀请后，您将成为该团队的成员",
+    "acceptInvitation": "接受邀请",
+    "accepting": "接受中...",
+    "decline": "拒绝",
+    "backToHome": "返回首页",
+    "notLoggedIn": "请先登录",
+    "teamNotFound": "团队不存在",
+    "invitationNotFound": "邀请不存在或已过期",
+    "invalidInvitation": "无效的邀请",
+    "invitationAccepted": "已成功接受邀请",
+    "acceptInvitationFailed": "接受邀请失败"
   }
 }
