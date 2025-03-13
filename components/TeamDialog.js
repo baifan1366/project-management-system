@@ -20,6 +20,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux'
 import { createTeam, fetchProjectTeams } from '@/lib/redux/features/teamSlice'
 import { createTeamUser, fetchTeamUsers } from '@/lib/redux/features/teamUserSlice'
+import { createTeamCustomField } from '@/lib/redux/features/teamCFSlice'
 import { Lock, Eye, Pencil, Unlock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -86,16 +87,8 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
     try {
       // 获取当前用户信息
       const { data: userData, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        throw new Error('获取用户信息失败');
-      }
-
-      if (!userData?.user?.id) {
-        throw new Error('用户未认证');
-      }
-
-      console.log('TeamDialog: 开始创建团队');
+      const userId = userData?.user?.id;
+      console.log('userId', userId)
       // 创建团队
       const team = await dispatch(createTeam({
         name: data.teamName,
@@ -103,18 +96,33 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
         project_id: projectId,
         star: false,
         order_index: 0,
-        created_by: userData.user.id
+        created_by: userId
       })).unwrap();
-      console.log('Team created successfully:', team);
 
       // 创建团队用户关系
-      const teamUser = await dispatch(createTeamUser({
+      await dispatch(createTeamUser({
         team_id: team.id,
-        user_id: userData.user.id,
-        role: 'OWNER'
+        user_id: userId,
+        role: 'OWNER',
+        created_by: userId
       })).unwrap();
-      console.log('Team user relationship created successfully:', teamUser);
-      console.log('Data refreshed successfully');
+
+      // 创建团队自定义字段
+      await dispatch(createTeamCustomField({
+        team_id: team.id,
+        custom_field_id: 5, //list
+        config: {},
+        order_index: 0,
+        created_by: userId
+      })).unwrap();
+
+      await dispatch(createTeamCustomField({
+        team_id: team.id,
+        custom_field_id: 8, //dashboard
+        config: {},
+        order_index: 1,
+        created_by: userId
+      })).unwrap();
 
       // 重置状态并关闭对话框
       form.reset();
@@ -138,7 +146,6 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
             console.error(`TeamDialog: 刷新项目团队失败:`, error);
           }
 
-          console.log(`TeamDialog: 刷新数据完成`);
         } catch (error) {
           console.error(`TeamDialog: 刷新数据时出错:`, error);
         }

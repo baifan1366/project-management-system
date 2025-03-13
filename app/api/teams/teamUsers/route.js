@@ -109,7 +109,7 @@ export async function POST(request) {
     const body = await request.json();
     console.log('API Route: 接收到创建团队用户请求:', body);
 
-    const { team_id, user_id, role } = body;
+    const { team_id, user_id, role, created_by } = body;
 
     // 验证必需的字段
     if (!team_id || !user_id || !role) {
@@ -164,7 +164,8 @@ export async function POST(request) {
         {
           team_id: teamId,
           user_id,
-          role: normalizedRole
+          role: normalizedRole,
+          created_by: created_by
         }
       ])
       .select(`
@@ -177,7 +178,8 @@ export async function POST(request) {
           id,
           email,
           name
-        )
+        ),
+        created_by
       `)
       .single();
 

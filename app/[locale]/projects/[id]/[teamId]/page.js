@@ -178,20 +178,21 @@ export default function Task() {
   };
 
   const renderContent = () => {
+    // 处理默认视图类型
     switch (currentView) {
-      case 'list':
+      case 'cf-5':
         return (
           <Suspense fallback={<div>加载中...</div>}>
             <TaskList projectId={projectId} teamId={teamId} />
           </Suspense>
         );
-      case 'dashboard':
+      case 'cf-2':
         return (
           <div className="p-4">
-            <div className="text-sm text-muted-foreground">仪表板视图开发中...</div>
+            <div className="text-sm text-muted-foreground">timeline开发中...</div>
           </div>
         );
-      case 'board':
+      case 'cf-1':
         return (
           <div className="p-4">
             <div className="text-sm text-muted-foreground">看板视图开发中...</div>
@@ -292,7 +293,7 @@ export default function Task() {
               </Button>
             </div>
           </div>
-          <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
+          <TaskTab teamId={teamId} onViewChange={setCurrentView} />
         </div>
         <div className="p-0">
           <div className="border-b p-2 flex items-center justify-between">
