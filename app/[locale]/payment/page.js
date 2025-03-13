@@ -8,12 +8,20 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faQrcode } from '@fortawesome/free-solid-svg-icons'
 import { faCashApp } from '@fortawesome/free-brands-svg-icons'
 import CheckoutForm from '@/components/CheckoutForm'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 // Initialize Stripe outside the component
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 export default function PaymentPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // 获取 plan_id 参数
+  const planId = searchParams.get('plan_id')
+
+  const [planDetails, setPlanDetails] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showWarning, setShowWarning] = useState(false)
@@ -29,7 +37,52 @@ export default function PaymentPage() {
   const [handleCardPayment, setHandleCardPayment] = useState(null);
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPlanDetails = async () =>{
+      if (!planId){
+        setError('No plan ID provided');
+        setLoading(false);
+        return;
+      }
+
+      try{
+        // 获取用户信息
+        const{data:{session},error:sessionError} = await supabase.auth.getSession();
+
+        if(sessionError){
+          throw new Error('Failed to get session');
+        }
+
+        if(!session || !session.user){
+          router.push('/login?redirect=payment&plan_id=' + planId);
+          return;
+        }
+
+        const {data, error} = await supabase
+          .from('subscription_plan')
+          .select('*')
+          //eq 表示等于
+          .eq('id',planId)
+          //single 表示只返回一个结果
+          .single();
+
+        if(error){
+          throw new Error('Failed to fetch plan details');
+        }
+        console.log('Plan details:', data);
+        setPlanDetails(data);
+      }catch (err) {
+        console.error('Error fetching plan details:', err);
+        setError('Failed to load plan details: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlanDetails();
+  },[planId, router])
 
   // Stripe appearance configuration
   const appearance = {
@@ -238,8 +291,38 @@ export default function PaymentPage() {
     }
   };
 
+  // 格式化价格
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(price);
+  };
+  
+  const getBillingText = () => {
+    if (!planDetails) return '';
+    
+    const interval = planDetails.billing_interval?.toLowerCase();
+    if (interval === 'monthly') {
+      return '/mo';
+    } else if (interval === 'yearly') {
+      return '/yr';
+    }
+    return '';
+  };
+
   return (
     <div className="min-h-screen flex">
+      {/* 加载状态 */}
+      {loading && (
+        <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-gray-700">Loading plan details...</p>
+          </div>
+        </div>
+      )}
 
     {/*Quantity Modal */}
     {isModalOpen && (
@@ -326,19 +409,29 @@ export default function PaymentPage() {
         </div>
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Subscribe Team Sync for Plan</h1>
-          <div className="text-4xl font-bold mb-2">$1,200.00<span className="text-sm">/yr</span></div>
-          <div className="text-gray-400">US$10.00 per month, billed annually</div>
+          <h1 className="text-3xl font-bold mb-2">
+            {planDetails ? `Subscribe to ${planDetails.name}` : 'Subscribe to Team Sync'}
+          </h1>
+          <div className="text-4xl font-bold mb-2">
+            {planDetails ? formatPrice(planDetails.price) : '$0.00'}
+            <span className="text-sm">
+              {getBillingText()}
+            </span>
+          </div>
+          <div className="text-gray-400">
+            {planDetails ? `US$${planDetails.price.toFixed(2)} per month, billed annually` : 'US$10.00 per month, billed annually'}
+          </div>
         </div>
 
+        {/* 计划详情 */}
         <div className="space-y-6">
           <div className="flex justify-between">
-            <span>Plan Name</span>
-            <span>$120.00</span>
+            <span>{planDetails ? planDetails.name : 'Team Sync'}</span>
+            <span>{planDetails ? formatPrice(planDetails.price) : '$0.00'}</span>
           </div>
 
           <div className="text-sm text-gray-400">
-            Taskade Pro unlocks 10 AI agents, 5,000 monthly AI requests, 1,000 monthly automations, and all premium Pro feature
+            {planDetails ? planDetails.description : 'Team Sync is a team collaboration tool that helps you manage your team and projects.'}
           </div>
 
           <div className="flex justify-between items-center">
