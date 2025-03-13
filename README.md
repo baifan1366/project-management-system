@@ -333,3 +333,51 @@ function ProjectTimeline() {
 
   return <div id="gantt"></div>;
 }
+```
+
+## Edge Functions Setup
+
+After setting up the Supabase CLI, follow these steps to work with Edge Functions:
+
+1. Create a new Edge Function:
+```bash
+supabase functions new my-function-name
+```
+
+2. Set required environment variables:
+```bash
+supabase secrets set SUPABASE_URL="你的supabase项目URL"
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY="你的service_role密钥"
+```
+
+3. Develop your function in `supabase/functions/my-function-name/index.ts`:
+```typescript
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+
+serve(async (req) => {
+  const { name } = await req.json()
+  const data = { message: `Hello ${name}!` }
+  return new Response(JSON.stringify(data), {
+    headers: { 'Content-Type': 'application/json' },
+  })
+})
+```
+
+4. Test locally:
+```bash
+supabase functions serve my-function-name
+```
+
+5. Deploy your function:
+```bash
+supabase functions deploy my-function-name
+```
+
+6. Invoke the function in your code:
+```javascript
+const { data, error } = await supabase.functions.invoke('my-function-name', {
+  body: { name: 'world' }
+})
+```
+
+For more information about Edge Functions, visit the [Supabase Edge Functions documentation](https://supabase.com/docs/guides/functions).
