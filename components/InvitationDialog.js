@@ -15,6 +15,7 @@ import { useDispatch } from "react-redux";
 import { fetchTeamUsers } from "@/lib/redux/features/teamUserSlice";
 import { createTeamUserInv } from "@/lib/redux/features/teamUserInvSlice";
 import { createSelector } from '@reduxjs/toolkit';
+import { supabase } from '@/lib/supabase'
 
 // 创建记忆化的选择器
 const selectTeam = createSelector(
@@ -51,7 +52,6 @@ export default function InvitationDialog({ open, onClose }) {
   );
 
   const [dataLoaded, setDataLoaded] = useState(false);
-
   // 优化数据加载逻辑
   useEffect(() => {
     let isMounted = true;
@@ -124,6 +124,14 @@ export default function InvitationDialog({ open, onClose }) {
       setIsLoading(true);
       setError(null);
 
+      // 1. 先获取当前用户信息
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      
+      // 检查用户是否已登录
+      if (userError || !userData?.user?.id) {
+        throw new Error('未授权的操作，请先登录');
+      }
+      
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
       const response = await fetch('https://lquqigrpmdfrxrnmknnv.supabase.co/functions/v1/teamInvitation', {
@@ -137,7 +145,8 @@ export default function InvitationDialog({ open, onClose }) {
         body: JSON.stringify({
           email,
           teamId,
-          permission
+          permission,
+          created_by: userData.user.id
         })
       });
 
@@ -145,13 +154,14 @@ export default function InvitationDialog({ open, onClose }) {
         const errorData = await response.json();
         throw new Error(errorData.error || '邀请发送失败');
       }
-
+      
       // 2. 邮件发送成功后，创建本地邀请记录
       await dispatch(createTeamUserInv({
         teamId: Number(teamId),
         userEmail: email,
-        role: permission
-      })).unwrap();
+        role: permission,
+        created_by: userData.user.id
+      }));
 
       setEmail('');
       setShowEmailForm(false);
@@ -161,7 +171,7 @@ export default function InvitationDialog({ open, onClose }) {
     } finally {
       setIsLoading(false);
     }
-  }, [email, teamId, permission]);
+  }, [email, teamId, permission, dispatch]);
 
   if (!project) {
     return null;

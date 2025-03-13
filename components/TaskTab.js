@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Plus, List, LayoutDashboard, LayoutGrid, Calendar, GanttChart, Text, FileText, BarChart3, Files } from "lucide-react"
+import * as Icons from 'lucide-react';
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useState, useEffect, useMemo } from 'react';
@@ -11,6 +11,7 @@ import { fetchTeamCustomField, updateTeamCustomFieldOrder } from '@/lib/redux/fe
 import { fetchTeamCustomFieldValue } from '@/lib/redux/features/teamCFValueSlice';
 import { debounce } from 'lodash';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import CustomField from '@/components/CustomField';
 
 // 修复记忆化的 selectors - 确保返回新的引用
 const selectTeamCFItems = state => state?.teamCF?.items ?? [];
@@ -40,6 +41,7 @@ export default function TaskTab({ onViewChange, teamId }) {
   const customFields = useSelector(selectTeamCustomFields);
   const customFieldValues = useSelector(selectTeamCustomFieldValues);
   const [orderedFields, setOrderedFields] = useState([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // 将 fetchData 移到 useEffect 外部，使用 useCallback 来记忆化
   const fetchData = useMemo(
@@ -72,7 +74,6 @@ export default function TaskTab({ onViewChange, teamId }) {
     if (teamId) {
       fetchData(teamId);
     }
-
     return () => {
       fetchData.cancel();
     };
@@ -83,7 +84,7 @@ export default function TaskTab({ onViewChange, teamId }) {
       setOrderedFields([...customFields]);
       
       // 自动选择第一个自定义字段作为默认标签页
-      if (customFields.length > 0 && activeTab === "list") {
+      if (customFields.length > 0) {
         const firstTabValue = `cf-${customFields[0].id}`;
         setActiveTab(firstTabValue);
         onViewChange?.(firstTabValue);
@@ -142,21 +143,17 @@ export default function TaskTab({ onViewChange, teamId }) {
                         {...provided.dragHandleProps}
                         value={`cf-${field.id}`}
                         className="flex items-center gap-1"
-                        title={fieldValue?.value || field.custom_field.default_value}
+                        title={fieldValue?.value || field.custom_field?.default_value || ''}
                       >
-                        {field.custom_field.icon === 'board-icon' && <LayoutDashboard className="h-4 w-4" />}
-                        {field.custom_field.icon === 'timeline-icon' && <GanttChart className="h-4 w-4" />}
-                        {field.custom_field.icon === 'files-icon' && <Files className="h-4 w-4" />}
-                        {field.custom_field.icon === 'gantt-icon' && <GanttChart className="h-4 w-4" />}
-                        {field.custom_field.icon === 'list-icon' && <List className="h-4 w-4" />}
-                        {field.custom_field.icon === 'calendar-icon' && <Calendar className="h-4 w-4" />}
-                        {field.custom_field.icon === 'note-icon' && <Text className="h-4 w-4" />}
-                        {field.custom_field.icon === 'dashboard-icon' && <BarChart3 className="h-4 w-4" />}
-                        {field.custom_field.icon === 'overview-icon' && <LayoutGrid className="h-4 w-4" />}
+                        {(() => {
+                          let iconName = field.custom_field?.icon;
+                          const IconComponent = iconName ? Icons[iconName] : null;
+                          return IconComponent ? <IconComponent className="h-4 w-4" /> : null;
+                        })()}
                         
                         {fieldValue?.name ? 
                           fieldValue.name :
-                          t(field.custom_field.name.toLowerCase())
+                          (field.custom_field ? t(field.custom_field.name.toLowerCase()) : '')
                         }
                       </TabsTrigger>
                     )}
@@ -164,9 +161,15 @@ export default function TaskTab({ onViewChange, teamId }) {
                 );
               })}
               {provided.placeholder}
-              <Button variant="ghost" size="icon" className="ml-1 hover:bg-accent hover:text-accent-foreground">
-                <Plus className="h-4 w-4" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="ml-1 hover:bg-accent hover:text-accent-foreground"
+                onClick={() => setIsDialogOpen(true)}
+              >
+                <Icons.Plus className="h-4 w-4" />
               </Button>
+              <CustomField isDialogOpen={isDialogOpen} setIsDialogOpen={setIsDialogOpen} teamId={teamId} />
             </TabsList>
           )}
         </Droppable>

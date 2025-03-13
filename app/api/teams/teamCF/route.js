@@ -35,25 +35,32 @@ export async function POST(request) {
     const { searchParams } = new URL(request.url)
     const teamId = searchParams.get('teamId')
     const body = await request.json()
-    const { customFieldId, config } = body
+    console.log('接收到的请求体:', body);
+    
+    const { customFieldId, config, order_index, created_by } = body
 
     if (!teamId || !customFieldId) {
+      console.log('缺少必需参数:', { teamId, customFieldId });
       return NextResponse.json({ error: '缺少必需参数' }, { status: 400 })
     }
-
     const { data, error } = await supabase
       .from('team_custom_field')
       .insert({
         team_id: teamId,
         custom_field_id: customFieldId,
-        config,
-        is_enabled: true
+        config: config || {},
+        order_index,
+        created_by: created_by
       })
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('Supabase 错误:', error);
+      throw error;
+    }
 
+    console.log('创建成功，返回数据:', data);
     return NextResponse.json({ data })
   } catch (error) {
     console.error('创建团队自定义字段失败:', error)

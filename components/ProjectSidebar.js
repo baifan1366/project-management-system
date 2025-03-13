@@ -77,10 +77,7 @@ export default function ProjectSidebar({ projectId }) {
       
       // 只有在没有最近获取过数据时才发起请求
       if (!hasTeams && !isRecentFetch) {
-        console.log(`获取项目 ${projectId} 的团队数据`);
         requests.push(dispatch(fetchProjectTeams(projectId)));
-      } else if (isRecentFetch) {
-        console.log(`跳过项目 ${projectId} 的团队数据获取，因为最近已获取过`);
       }
       
       if (requests.length > 0) {
@@ -115,16 +112,13 @@ export default function ProjectSidebar({ projectId }) {
       const now = Date.now();
       
       if (isInitializing) {
-        console.log(`项目 ${projectId} 正在初始化顺序，跳过重复初始化`);
         return;
       }
       
       if (now - lastInitTime < 30000) { // 30秒内不重复初始化
-        console.log(`项目 ${projectId} 30秒内已初始化过顺序，跳过`);
         return;
       }
       
-      console.log(`初始化项目 ${projectId} 的团队顺序`);
       dispatch(initializeTeamOrder(projectId));
     };
     
@@ -156,12 +150,10 @@ export default function ProjectSidebar({ projectId }) {
     const now = Date.now();
     
     if (isUpdatingOrder) {
-      console.log(`项目 ${projectId} 正在更新顺序，跳过重复更新`);
       return;
     }
     
     if (now - lastOrderTime < 5000) { // 5秒内不重复更新
-      console.log(`项目 ${projectId} 5秒内已更新过顺序，跳过`);
       return;
     }
 
@@ -171,7 +163,6 @@ export default function ProjectSidebar({ projectId }) {
       order_index: index,  // 只更新order_index
     }));
 
-    console.log(`更新项目 ${projectId} 的团队顺序`);
     // 更新Redux状态
     dispatch(updateTeamOrder(updatedItems));
   }, [menuItems, projectId, lastFetchTime, dispatch]);

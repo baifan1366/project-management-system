@@ -38,9 +38,9 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { teamId, userEmail, role } = body;
+    const { teamId, userEmail, role, created_by } = body;
 
-    if (!teamId || !userEmail || !role) {
+    if (!teamId || !userEmail || !role || !created_by) {
       return NextResponse.json(
         { error: '缺少必要参数' },
         { status: 400 }
@@ -54,7 +54,8 @@ export async function POST(request) {
         {
           team_id: teamId,
           user_email: userEmail,
-          role: role
+          role: role,
+          created_by: created_by
         }
       ])
       .select()

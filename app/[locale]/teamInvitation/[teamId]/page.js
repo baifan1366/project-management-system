@@ -66,7 +66,8 @@ export default function TeamInvitation() {
 
         setInvitationInfo({
           ...userInvitation,
-          userId: user.id
+          userId: user.id,
+          created_by: userInvitation.created_by
         });
 
       } catch (error) {
@@ -104,7 +105,8 @@ export default function TeamInvitation() {
       await dispatch(createTeamUser({
         team_id: Number(params.teamId),
         user_id: invitationInfo.userId,
-        role: invitationInfo.role
+        role: invitationInfo.role,
+        created_by: invitationInfo.created_by
       })).unwrap();
 
       // 3. 更新邀请状态为已接受
