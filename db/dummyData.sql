@@ -118,11 +118,15 @@ VALUES
 -- Insert custom field data
 INSERT INTO "custom_field" (id, name, type, description, icon, default_config, created_at, updated_at, created_by)
 VALUES 
-  (1, '看板', 'BOARD', '以看板格式显示任务', 'LayoutDashboard', '{"colors":["#E5E5E5","#FFD700","#90EE90"],"columns":["待办","进行中","已完成"]}', '2023-02-02T11:00:00Z', '2023-02-02T11:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, '时间线', 'TIMELINE', '以时间线格式显示任务', 'GanttChart', '{"timeScale":"week","showProgress":true}', '2023-02-02T11:10:00Z', '2023-02-02T11:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (3, '文件', 'FILES', '管理任务相关文件', 'Files', '{"maxSize":10485760,"allowedTypes":["image/*","application/pdf"]}', '2023-02-02T11:20:00Z', '2023-02-02T11:20:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (4, '甘特图', 'GANTT', '甘特图中的项目进度', 'GanttChart', '{"dayHours":8,"workDays":[1,2,3,4,5]}', '2023-02-02T11:30:00Z', '2023-02-02T11:30:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (5, '列表', 'LIST', '任务列表视图', 'List', '{}', '2023-02-02T11:40:00Z', '2023-02-02T11:40:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+  ('1', 'Board', 'BOARD', 'Display tasks in kanban board format', 'LayoutDashboard', '{"colors":["#E5E5E5","#FFD700","#90EE90"],"columns":["To Do","In Progress","Done"]}', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('2', 'Timeline', 'TIMELINE', 'Display tasks in timeline format', 'GanttChart', '{"timeScale":"week","showProgress":true}', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('3', 'File', 'FILES', 'Manage task-related files', 'Files', '{"maxSize":10485760,"allowedTypes":["image/*","application/pdf"]}', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('4', 'Gantt', 'GANTT', 'Project progress in Gantt chart', 'GanttChart', '{"dayHours":8,"workDays":[1,2,3,4,5]}', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('5', 'List', 'LIST', 'a', 'List', null, '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('6', 'Calendar', 'CALENDAR', 'a', 'Calendar', null, '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('7', 'Note', 'NOTE', 'j', 'Text', null, '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('8', 'Dashboard', 'DASHBOARD', 'j', 'BarChart3', null, '2025-03-11 10:25:56.715019', '2025-03-11 10:25:56.715019', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('9', 'Overview', 'OVERVIEW', 'h', 'LayoutGrid', null, '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
 
 -- Insert team custom field association data
 INSERT INTO "team_custom_field" (id, team_id, custom_field_id, config, order_index, created_at, updated_at, created_by)
