@@ -83,14 +83,14 @@ export default function TaskTab({ onViewChange, teamId }) {
     if (Array.isArray(customFields) && customFields.length > 0) {
       setOrderedFields([...customFields]);
       
-      // 自动选择第一个自定义字段作为默认标签页
-      if (customFields.length > 0) {
+      // 只在初始加载或customFields变化时设置默认标签页
+      if (customFields.length > 0 && !activeTab.startsWith('cf-')) {
         const firstTabValue = `cf-${customFields[0].id}`;
         setActiveTab(firstTabValue);
         onViewChange?.(firstTabValue);
       }
     }
-  }, [customFields, activeTab, onViewChange]);
+  }, [customFields, onViewChange]);
 
   const handleTabChange = (value) => {
     setActiveTab(value);

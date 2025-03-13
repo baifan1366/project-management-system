@@ -44,16 +44,16 @@ Deno.serve(async (req) => {
   try {
     console.log('正在连接 SMTP 服务器...');
     await smtp.connect({
-      hostname: Deno.env.get('SMTP_HOSTNAME') || '',
-      port: Number(Deno.env.get('SMTP_PORT')) || 587,
-      username: Deno.env.get('SMTP_USERNAME') || '',
-      password: Deno.env.get('SMTP_PASSWORD') || '',
+      hostname: Deno.env.get('NEXT_PUBLIC_SMTP_HOSTNAME') || '',
+      port: Number(Deno.env.get('NEXT_PUBLIC_SMTP_PORT')) || 587,
+      username: Deno.env.get('NEXT_PUBLIC_SMTP_USERNAME') || '',
+      password: Deno.env.get('NEXT_PUBLIC_SMTP_PASSWORD') || '',
       tls: false, // 先尝试不使用 TLS
     })
 
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+      Deno.env.get('NEXT_PUBLIC_SUPABASE_URL') || '',
+      Deno.env.get('NEXT_PUBLIC_SUPABASE_ANON_KEY') || ''
     )
 
     // 获取团队信息
@@ -83,14 +83,14 @@ Deno.serve(async (req) => {
 
     console.log('正在发送邮件...');
     await smtp.send({
-      from: Deno.env.get('SMTP_FROM') || Deno.env.get('SMTP_USERNAME') || '',
+      from: Deno.env.get('NEXT_PUBLIC_SMTP_FROM') || Deno.env.get('NEXT_PUBLIC_SMTP_USERNAME') || '',
       to: email,
       subject: `Team Invitation - ${teamName}`,
       html: `
         <p>You are invited to join the ${teamName} team</p>
         <p>Permission: ${permission}</p>
         <p>Please click the following link to join the team:</p>
-        <a href="${Deno.env.get('FRONTEND_URL')}/teamInvitation/${teamId}">Join Us</a>
+        <a href="localhost:3000/en/teamInvitation/${teamId}">Join Us</a>
       `,
     })
 

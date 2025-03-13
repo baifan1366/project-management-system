@@ -1,21 +1,27 @@
 'use client'
-import { useEffect, useState} from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchPlans, setSelectedInterval } from '@/lib/redux/features/planSlice'
-// Next.js
-import {useRouter, useSearchParams} from 'next/navigation'   
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import clsx from 'clsx'
 
 export default function PricingPage() {
   const t = useTranslations('Pricing')
   const dispatch = useDispatch()
   const router = useRouter()
-  // Get data from Redux store
-  const { plans, status, error, selectedInterval } = useSelector((state) => {
-    console.log('Redux State:', state.plans) // Debug log
-    return state.plans
-  })
+  const [currentUser, setCurrentUser] = useState(null)
+  const { plans, status, error, selectedInterval } = useSelector((state) => state.plans)
+
+  // Check if user is logged in when component mounts
+  useEffect(() => {
+    async function checkUser() {
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUser(user)
+    }
+    checkUser()
+  }, [])
 
   // Fetch plans when component mounts
   useEffect(() => {
@@ -59,8 +65,14 @@ export default function PricingPage() {
       price: plan.price
     })
 
-    // Redirect to sign-up with parameters
-    router.push(`/auth/sign-up?${queryParams}`)
+    // Check if user is logged in
+    if(currentUser){
+      // If logged in, redirect to payment page and add query params
+      router.push(`/payment?${queryParams}`)
+    }else{
+      // If not logged in, redirect to signup page and add query params
+      router.push(`/signup?${queryParams}`)
+    }
   }
 
   return (

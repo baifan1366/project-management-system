@@ -222,11 +222,7 @@ CREATE TABLE "chat_session" (
   "team_id" INT REFERENCES "team"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "chk_session_team" CHECK (
-    ("type" = 'GROUP' AND "team_id" IS NOT NULL) OR
-    ("type" = 'PRIVATE' AND "team_id" IS NULL)
-  )
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 聊天参与者表
