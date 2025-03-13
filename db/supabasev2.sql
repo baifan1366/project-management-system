@@ -40,7 +40,8 @@ CREATE TABLE "user_team" (
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "role" TEXT NOT NULL CHECK ("role" IN ('CAN_EDIT', 'CAN_CHECK', 'CAN_VIEW', 'OWNER')) DEFAULT 'CAN_VIEW',
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
 );
 
 -- 项目表
@@ -137,7 +138,8 @@ CREATE TABLE "custom_field" (
   "icon" VARCHAR(255),
   "default_config" JSONB, -- 存储字段的默认配置
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
 );
 
 -- 团队与自定义字段的关联表（多对多）
@@ -148,7 +150,8 @@ CREATE TABLE "team_custom_field" (
   "config" JSONB, -- 存储团队特定的字段配置
   "order_index" INT DEFAULT 0,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
 );
 
 -- 创建索引
@@ -164,7 +167,8 @@ CREATE TABLE "team_custom_field_value" (
   "icon" VARCHAR(255), -- 团队自定义的图标
   "value" JSONB,      -- 存储其他自定义配置
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
 );
 
 -- 创建索引
@@ -488,7 +492,8 @@ CREATE TABLE "user_team_invitation" (
   "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED')) DEFAULT 'PENDING',
   "expires_at" TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '7 days'),
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
 );
 
 -- 为邀请表创建索引
