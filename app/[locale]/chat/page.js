@@ -37,6 +37,29 @@ export default function ChatPage() {
     getUser();
   }, []);
 
+  useEffect(() => {
+    console.log('Current Session:', currentSession);
+    console.log('Current User:', currentUser);
+    console.log('Messages:', messages);
+
+    if (currentSession && currentUser && messages.length > 0) {
+      // 标记当前会话的所有消息为已读
+      supabase
+        .from('chat_message_read_status')
+        .update({ read_at: new Date().toISOString() })
+        .is('read_at', null)
+        .eq('user_id', currentUser.id)
+        .in('message_id', messages.map(msg => msg.id))
+        .then(({ error }) => {
+          if (error) {
+            console.error('Error updating read status:', error);
+          } else {
+            console.log('Read status updated successfully');
+          }
+        });
+    }
+  }, [currentSession, messages, currentUser]);
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (message.trim() && currentSession) {

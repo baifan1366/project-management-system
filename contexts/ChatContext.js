@@ -152,6 +152,7 @@ export function ChatProvider({ children }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
+    // 首先插入消息
     const { data, error } = await supabase
       .from('chat_message')
       .insert({
@@ -179,6 +180,36 @@ export function ChatProvider({ children }) {
     if (error) {
       console.error('Error sending message:', error);
       return;
+    }
+
+    // 获取会话的所有参与者
+    const { data: participants, error: participantsError } = await supabase
+      .from('chat_participant')
+      .select('user_id')
+      .eq('session_id', sessionId);
+
+    if (participantsError) {
+      console.error('Error fetching participants:', participantsError);
+      return;
+    }
+
+    // 为每个参与者创建未读记录，除了发送者自己
+    const readStatusRecords = participants
+      .filter(p => p.user_id !== session.user.id)
+      .map(p => ({
+        message_id: data.id,
+        user_id: p.user_id,
+        read_at: null
+      }));
+
+    if (readStatusRecords.length > 0) {
+      const { error: readStatusError } = await supabase
+        .from('chat_message_read_status')
+        .insert(readStatusRecords);
+
+      if (readStatusError) {
+        console.error('Error creating read status records:', readStatusError);
+      }
     }
 
     setMessages(prev => [...prev, { ...data, user: processAvatarUrl(data.user) }]);
@@ -276,7 +307,7 @@ export function ChatProvider({ children }) {
     </ChatContext.Provider>
   );
 }
-
+  
 export function useChat() {
   const context = useContext(ChatContext);
   if (!context) {
