@@ -106,39 +106,61 @@ export default function PaymentPage() {
   // Temporary promo code
   const promoCodeExp = 'PROMOCODE'
   
-    // Add this useEffect to create payment intent when quantity changes
+  // 首先定义计算小计的函数
+  const calculateSubtotal = useCallback(() => {
+    if (!planDetails || !planDetails.price) return 0;
+    return planDetails.price * quantity;
+  }, [planDetails, quantity]);
+
+  // 然后在 useEffect 中使用它
   useEffect(() => {
-    if (selectedPaymentMethod === 'card') {
+    if (selectedPaymentMethod === 'card' && planDetails && planDetails.price) {
       console.log('Creating payment intent...');
+      setPaymentStatus('loading');
+      
+      const subtotal = calculateSubtotal();
+      console.log('Calculated subtotal:', subtotal);
+      
       fetch('/api/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          amount: 1200,
-          quantity: quantity 
+          amount: planDetails.price, // 单价
+          quantity: quantity // 数量
         }),
       })
       .then(async (res) => {
+        // 检查响应
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Failed to create payment intent');
+          const errorText = await res.text();
+          console.error('Server error:', errorText);
+          try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.error || `Server error: ${res.status}`);
+          } catch (e) {
+            throw new Error(`Server error: ${res.status}`);
+          }
         }
+        
         return res.json();
       })
       .then((data) => {
-        if (data.clientSecret) {
-          console.log('Payment intent created');
+        if (data && data.clientSecret) {
+          console.log('Payment intent created successfully');
           setClientSecret(data.clientSecret);
+          setPaymentStatus('ready');
         } else {
+          console.error('Invalid response data:', data);
           throw new Error('No client secret received');
         }
       })
       .catch((err) => {
         console.error('Error creating payment intent:', err);
+        setError(err.message || 'Failed to create payment intent');
         setPaymentStatus('error');
       });
     }
-  }, [selectedPaymentMethod, quantity]);
+  }, [selectedPaymentMethod, quantity, planDetails, calculateSubtotal]);
 
   // Callback function to receive the payment handler from CheckoutForm
   const onPaymentSubmit = useCallback((handler) => {
@@ -199,16 +221,6 @@ export default function PaymentPage() {
     }
   };
 
-  // Handle wheel event
-  const handleWheel = (e) => {
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      setQuantity(prev => prev + 1);
-    } else {
-      setQuantity(prev => Math.max(1, prev - 1));
-    }
-  }
-
   // Handle increment/decrement
   const handleQuantityChange = (action) => {
     if (action === 'increase') {
@@ -224,24 +236,33 @@ export default function PaymentPage() {
     }
   }
 
-  // Add function to handle Cash App QR code generation
-  const handleCashAppQR = async () => {
-    setIsLoadingQR(true);
-    try {
-      const response = await fetch('/api/cash-app-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          amount: 1200 * quantity,
-        }),
-      });
-      const data = await response.json();
-      setQrCodeUrl(data.qrCodeUrl);
-    } catch (error) {
-      console.error('Error generating QR code:', error);
+  // Handle quantity input (direct)
+  const handleQuantityInput = (e) => {
+    const value = parseInt(e.target.value, 10);
+    if (!isNaN(value) && value >= 1) {
+      setQuantity(value);
+      setShowWarning(false);
+    } else if (!isNaN(value) && value < 1) {
+      setQuantity(1);
+      setShowWarning(true);
     }
-    setIsLoadingQR(false);
   };
+
+  // Handle wheel event
+  const handleWheel = (e) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+       setQuantity(prev => prev + 1);
+    } else {
+       setQuantity(prev => Math.max(1, prev - 1));
+    }
+  }
+
+  const calculateSubTotal = () => {
+    if(!planDetails) return 0;
+
+    return planDetails.price * quantity;
+  }
 
   // Add this where your payment button is
   const getPaymentButtonText = () => {
@@ -261,32 +282,48 @@ export default function PaymentPage() {
   };
 
   const handleAlipayPayment = async () => {
+    if (!planDetails || !planDetails.price || !planDetails.name) {
+      setError('Plan details not available');
+      return;
+    }
+    
     setIsProcessing(true);
     try {
       const response = await fetch('/api/create-alipay-session', {
-        method: 'GET',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          planName: planDetails.name,
+          price: planDetails.price,
+          quantity: quantity,
+          email: email
+        }),
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Alipay error:', errorText);
+        try {
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.error || `Server error: ${response.status}`);
+        } catch (e) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+      }
       
       const data = await response.json();
       
-      if (data.error) {
-        throw new Error(data.error);
+      if (data && data.url) {
+        // 重定向到 Alipay 支付页面
+        window.location.href = data.url;
+      } else {
+        throw new Error('Invalid response from server');
       }
-
-      // 使用 Stripe.js 重定向到 Alipay
-      const stripe = await stripePromise;
-      const { error } = await stripe.confirmAlipayPayment(
-        data.clientSecret,
-        {
-          return_url: `${window.location.origin}/payment-success`,
-        }
-      );
-
-      if (error) {
-        throw new Error(error.message);
-      }
-    } catch (err) {
-      setError(err.message);
+    } catch (error) {
+      console.error('Alipay error:', error);
+      setError(error.message || 'Failed to process Alipay payment');
       setIsProcessing(false);
     }
   };
@@ -457,7 +494,7 @@ export default function PaymentPage() {
                     </svg>
                 </div>
             </div>
-            <span>Billed Annually</span>
+            <span>{planDetails ? planDetails.billing_interval : 'Annually'}</span>
           </div>
 
           <div className="border-t border-gray-800 pt-4">
@@ -502,7 +539,7 @@ export default function PaymentPage() {
 
           <div className="flex justify-between border-t border-gray-800 pt-4">
             <span>Today's Subtotal</span>
-            <span>${(1200 * quantity).toFixed(2)}</span>
+            <span>{formatPrice(calculateSubTotal())}</span>
           </div>
         </div>
       </div>
