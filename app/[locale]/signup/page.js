@@ -46,7 +46,7 @@ export default function SignupPage() {
           data: {
             name: formData.name,
           },
-          emailRedirectTo: `${window.location.origin}/${window.location.pathname.split('/')[1]}/auth/callback`,
+          emailRedirectTo: "https://team-sync-pms.vercel.app/en/auth/callback",
         },
       });
 
@@ -85,7 +85,7 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/${window.location.pathname.split('/')[1]}/auth/callback`,
+          redirectTo: "https://team-sync-pms.vercel.app/en/auth/callback",
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -107,7 +107,7 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/${window.location.pathname.split('/')[1]}/auth/callback`,
+          redirectTo: "https://team-sync-pms.vercel.app/en/auth/callback",
           scopes: 'read:user user:email',
         },
       });
