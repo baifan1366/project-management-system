@@ -76,10 +76,12 @@ export default function AuthCallbackPage() {
         }
 
         // 4. 重定向到仪表板
-        router.push(`${window.location.origin}/${window.location.pathname.split('/')[1]}/projects`,);
+        router.push("https://team-sync-pms.vercel.app/en/auth/callback");
+        //router.push(`${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/${window.location.pathname.split('/')[1]}/projects`);
       } catch (error) {
         console.error('Auth callback error:', error);
-        router.push(`${window.location.origin}/${window.location.pathname.split('/')[1]}/login?error='` + encodeURIComponent(error.message || 'Authentication failed'));
+        router.push("https://team-sync-pms.vercel.app/en/login");
+        //router.push(`${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/${window.location.pathname.split('/')[1]}/login?error='` + encodeURIComponent(error.message || 'Authentication failed'));
       }
     };
 
