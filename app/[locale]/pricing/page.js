@@ -1,79 +1,81 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchPlans, setSelectedInterval } from '@/lib/redux/features/planSlice'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { useRouter, useParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase'  // 确保正确导入
 import clsx from 'clsx'
 
 export default function PricingPage() {
   const t = useTranslations('Pricing')
   const dispatch = useDispatch()
   const router = useRouter()
-  const [currentUser, setCurrentUser] = useState(null)
+  const params = useParams()  // 获取路由参数
   const { plans, status, error, selectedInterval } = useSelector((state) => state.plans)
 
-  // Check if user is logged in when component mounts
-  useEffect(() => {
-    async function checkUser() {
-      const { data: { user } } = await supabase.auth.getUser()
-      setCurrentUser(user)
-    }
-    checkUser()
-  }, [])
+  // 获取当前语言
+  const locale = params.locale || 'en'
 
-  // Fetch plans when component mounts
+  // 只获取计划，不检查认证
   useEffect(() => {
     if (status === 'idle') {
       dispatch(fetchPlans())
     }
   }, [status, dispatch])
 
-  // Show loading state
+  // 处理计划选择
+  const handlePlanSelection = async (plan) => {
+    console.log('选择了计划:', plan);
+    
+    // 只创建包含 plan_id 的查询参数
+    const queryParams = new URLSearchParams({
+      plan_id: plan.id.toString(),
+      redirect: 'payment'
+    }).toString();
+
+    try {
+      // 使用 getSession 而不是 getUser 来避免 AuthSessionMissingError
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('获取会话错误:', error);
+        // 会话错误，假设用户未登录
+        router.push(`/${locale}/login?${queryParams}`);
+        return;
+      }
+      
+      // 检查会话是否存在且有用户
+      if (data && data.session && data.session.user) {
+        console.log('用户已登录，重定向到支付页面');
+        router.push(`/${locale}/payment?plan_id=${plan.id}`);
+      } else {
+        console.log('用户未登录，重定向到登录页面');
+        router.push(`/${locale}/login?${queryParams}`);
+      }
+    } catch (err) {
+      console.error('检查认证状态时出错:', err);
+      // 出错时默认跳转到登录页面
+      router.push(`/${locale}/login?${queryParams}`);
+    }
+  }
+
+  // 显示加载状态
   if (status === 'loading') {
     return <div className="flex justify-center items-center min-h-screen">
       <div>Loading...</div>
     </div>
   }
 
-  // Show error state
+  // 显示错误状态
   if (status === 'failed') {
     return <div className="flex justify-center items-center min-h-screen">
       <div>Error: {error}</div>
     </div>
   }
 
-  // Get current plans based on selected interval
+  // 根据选择的时间间隔获取当前计划
   const currentPlans = plans[selectedInterval] || []
-
-  // Handle plan selection and redirect
-  const handlePlanSelection = (plan) => {
-    // Construct query parameters
-    const queryParams = new URLSearchParams({
-      plan_type: plan.type,          // FREE, PRO, ENTERPRISE
-      billing_interval: selectedInterval.toUpperCase(), // MONTHLY, YEARLY
-      plan_id: plan.id.toString(),   // Store the exact plan ID
-      price: plan.price.toString()   // Store the plan price
-    }).toString()
-
-    // Log the selection for debugging
-    console.log('Selected plan:', {
-      type: plan.type,
-      billing: selectedInterval,
-      id: plan.id,
-      price: plan.price
-    })
-
-    // Check if user is logged in
-    if(currentUser){
-      // If logged in, redirect to payment page and add query params
-      router.push(`/payment?${queryParams}`)
-    }else{
-      // If not logged in, redirect to signup page and add query params
-      router.push(`/signup?${queryParams}`)
-    }
-  }
 
   return (
     <div className="container mx-auto px-4 py-16">
@@ -84,10 +86,9 @@ export default function PricingPage() {
         </span>
       </h1>
 
-      {/* Billing Toggle with sliding effect */}
+      {/* 计费周期切换 */}
       <div className="flex justify-center mb-8">
         <div className="relative inline-flex rounded-full p-1 bg-gray-100">
-          {/* Sliding background - adjusted to fill entire width */}
           <div
             className={clsx(
               'absolute inset-0 w-1/2 rounded-full bg-indigo-600 transition-transform duration-200 ease-in-out',
@@ -95,7 +96,6 @@ export default function PricingPage() {
             )}
           />
           
-          {/* Toggle buttons - adjusted padding and width */}
           <button
             onClick={() => dispatch(setSelectedInterval('monthly'))}
             className={clsx(
@@ -121,15 +121,13 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* Plans Grid */}
+      {/* 计划网格 */}
       <div className="grid md:grid-cols-3 gap-8">
         {currentPlans.map((plan) => (
-          // Outer div with hover effect
           <div 
             key={plan.id}
             className="transform transition-all duration-300 hover:scale-105 cursor-pointer"
           >
-            {/* Inner div with animations and content */}
             <div className={clsx(
               'border rounded-lg p-6 shadow-lg',
               'flex flex-col h-full',
@@ -145,25 +143,24 @@ export default function PricingPage() {
                   </span>
                 </div>
                 
-                {/* Features List */}
+                {/* 功能列表 */}
                 <ul className="space-y-3 mb-8">
-                  {plan.features.features.map((feature, index) => (
-                    <li key={index} className="flex items-center">
-                      <span className="text-green-500 mr-2">✓</span>
-                      {feature}
-                    </li>
-                  ))}
+                  {plan.features && plan.features.features && 
+                    plan.features.features.map((feature, index) => (
+                      <li key={index} className="flex items-center">
+                        <span className="text-green-500 mr-2">✓</span>
+                        {feature}
+                      </li>
+                    ))
+                  }
                 </ul>
               </div>
 
               <button
                 onClick={() => handlePlanSelection(plan)}
                 className={clsx(
-                  // Button styles
                   'w-full py-2 px-4 rounded-lg font-medium mt-auto',
-                  // Hover effect
                   'transform transition-all duration-200',
-                  // Active state
                   plan.type === 'PRO'
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200'

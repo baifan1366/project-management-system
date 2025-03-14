@@ -8,12 +8,20 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faQrcode } from '@fortawesome/free-solid-svg-icons'
 import { faCashApp } from '@fortawesome/free-brands-svg-icons'
 import CheckoutForm from '@/components/CheckoutForm'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 // Initialize Stripe outside the component
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 export default function PaymentPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // 获取 plan_id 参数
+  const planId = searchParams.get('plan_id')
+
+  const [planDetails, setPlanDetails] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showWarning, setShowWarning] = useState(false)
@@ -29,7 +37,52 @@ export default function PaymentPage() {
   const [handleCardPayment, setHandleCardPayment] = useState(null);
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPlanDetails = async () =>{
+      if (!planId){
+        setError('No plan ID provided');
+        setLoading(false);
+        return;
+      }
+
+      try{
+        // 获取用户信息
+        const{data:{session},error:sessionError} = await supabase.auth.getSession();
+
+        if(sessionError){
+          throw new Error('Failed to get session');
+        }
+
+        if(!session || !session.user){
+          router.push('/login?redirect=payment&plan_id=' + planId);
+          return;
+        }
+
+        const {data, error} = await supabase
+          .from('subscription_plan')
+          .select('*')
+          //eq 表示等于
+          .eq('id',planId)
+          //single 表示只返回一个结果
+          .single();
+
+        if(error){
+          throw new Error('Failed to fetch plan details');
+        }
+        console.log('Plan details:', data);
+        setPlanDetails(data);
+      }catch (err) {
+        console.error('Error fetching plan details:', err);
+        setError('Failed to load plan details: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlanDetails();
+  },[planId, router])
 
   // Stripe appearance configuration
   const appearance = {
@@ -53,39 +106,61 @@ export default function PaymentPage() {
   // Temporary promo code
   const promoCodeExp = 'PROMOCODE'
   
-    // Add this useEffect to create payment intent when quantity changes
+  // 首先定义计算小计的函数
+  const calculateSubtotal = useCallback(() => {
+    if (!planDetails || !planDetails.price) return 0;
+    return planDetails.price * quantity;
+  }, [planDetails, quantity]);
+
+  // 然后在 useEffect 中使用它
   useEffect(() => {
-    if (selectedPaymentMethod === 'card') {
+    if (selectedPaymentMethod === 'card' && planDetails && planDetails.price) {
       console.log('Creating payment intent...');
+      setPaymentStatus('loading');
+      
+      const subtotal = calculateSubtotal();
+      console.log('Calculated subtotal:', subtotal);
+      
       fetch('/api/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          amount: 1200,
-          quantity: quantity 
+          amount: planDetails.price, // 单价
+          quantity: quantity // 数量
         }),
       })
       .then(async (res) => {
+        // 检查响应
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Failed to create payment intent');
+          const errorText = await res.text();
+          console.error('Server error:', errorText);
+          try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.error || `Server error: ${res.status}`);
+          } catch (e) {
+            throw new Error(`Server error: ${res.status}`);
+          }
         }
+        
         return res.json();
       })
       .then((data) => {
-        if (data.clientSecret) {
-          console.log('Payment intent created');
+        if (data && data.clientSecret) {
+          console.log('Payment intent created successfully');
           setClientSecret(data.clientSecret);
+          setPaymentStatus('ready');
         } else {
+          console.error('Invalid response data:', data);
           throw new Error('No client secret received');
         }
       })
       .catch((err) => {
         console.error('Error creating payment intent:', err);
+        setError(err.message || 'Failed to create payment intent');
         setPaymentStatus('error');
       });
     }
-  }, [selectedPaymentMethod, quantity]);
+  }, [selectedPaymentMethod, quantity, planDetails, calculateSubtotal]);
 
   // Callback function to receive the payment handler from CheckoutForm
   const onPaymentSubmit = useCallback((handler) => {
@@ -146,16 +221,6 @@ export default function PaymentPage() {
     }
   };
 
-  // Handle wheel event
-  const handleWheel = (e) => {
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      setQuantity(prev => prev + 1);
-    } else {
-      setQuantity(prev => Math.max(1, prev - 1));
-    }
-  }
-
   // Handle increment/decrement
   const handleQuantityChange = (action) => {
     if (action === 'increase') {
@@ -171,24 +236,33 @@ export default function PaymentPage() {
     }
   }
 
-  // Add function to handle Cash App QR code generation
-  const handleCashAppQR = async () => {
-    setIsLoadingQR(true);
-    try {
-      const response = await fetch('/api/cash-app-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          amount: 1200 * quantity,
-        }),
-      });
-      const data = await response.json();
-      setQrCodeUrl(data.qrCodeUrl);
-    } catch (error) {
-      console.error('Error generating QR code:', error);
+  // Handle quantity input (direct)
+  const handleQuantityInput = (e) => {
+    const value = parseInt(e.target.value, 10);
+    if (!isNaN(value) && value >= 1) {
+      setQuantity(value);
+      setShowWarning(false);
+    } else if (!isNaN(value) && value < 1) {
+      setQuantity(1);
+      setShowWarning(true);
     }
-    setIsLoadingQR(false);
   };
+
+  // Handle wheel event
+  const handleWheel = (e) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+       setQuantity(prev => prev + 1);
+    } else {
+       setQuantity(prev => Math.max(1, prev - 1));
+    }
+  }
+
+  const calculateSubTotal = () => {
+    if(!planDetails) return 0;
+
+    return planDetails.price * quantity;
+  }
 
   // Add this where your payment button is
   const getPaymentButtonText = () => {
@@ -208,38 +282,84 @@ export default function PaymentPage() {
   };
 
   const handleAlipayPayment = async () => {
+    if (!planDetails || !planDetails.price || !planDetails.name) {
+      setError('Plan details not available');
+      return;
+    }
+    
     setIsProcessing(true);
     try {
       const response = await fetch('/api/create-alipay-session', {
-        method: 'GET',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          planName: planDetails.name,
+          price: planDetails.price,
+          quantity: quantity,
+          email: email
+        }),
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Alipay error:', errorText);
+        try {
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.error || `Server error: ${response.status}`);
+        } catch (e) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+      }
       
       const data = await response.json();
       
-      if (data.error) {
-        throw new Error(data.error);
+      if (data && data.url) {
+        // 重定向到 Alipay 支付页面
+        window.location.href = data.url;
+      } else {
+        throw new Error('Invalid response from server');
       }
-
-      // 使用 Stripe.js 重定向到 Alipay
-      const stripe = await stripePromise;
-      const { error } = await stripe.confirmAlipayPayment(
-        data.clientSecret,
-        {
-          return_url: `${window.location.origin}/payment-success`,
-        }
-      );
-
-      if (error) {
-        throw new Error(error.message);
-      }
-    } catch (err) {
-      setError(err.message);
+    } catch (error) {
+      console.error('Alipay error:', error);
+      setError(error.message || 'Failed to process Alipay payment');
       setIsProcessing(false);
     }
   };
 
+  // 格式化价格
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(price);
+  };
+  
+  const getBillingText = () => {
+    if (!planDetails) return '';
+    
+    const interval = planDetails.billing_interval?.toLowerCase();
+    if (interval === 'monthly') {
+      return '/mo';
+    } else if (interval === 'yearly') {
+      return '/yr';
+    }
+    return '';
+  };
+
   return (
     <div className="min-h-screen flex">
+      {/* 加载状态 */}
+      {loading && (
+        <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-gray-700">Loading plan details...</p>
+          </div>
+        </div>
+      )}
 
     {/*Quantity Modal */}
     {isModalOpen && (
@@ -326,19 +446,29 @@ export default function PaymentPage() {
         </div>
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Subscribe Team Sync for Plan</h1>
-          <div className="text-4xl font-bold mb-2">$1,200.00<span className="text-sm">/yr</span></div>
-          <div className="text-gray-400">US$10.00 per month, billed annually</div>
+          <h1 className="text-3xl font-bold mb-2">
+            {planDetails ? `Subscribe to ${planDetails.name}` : 'Subscribe to Team Sync'}
+          </h1>
+          <div className="text-4xl font-bold mb-2">
+            {planDetails ? formatPrice(planDetails.price) : '$0.00'}
+            <span className="text-sm">
+              {getBillingText()}
+            </span>
+          </div>
+          <div className="text-gray-400">
+            {planDetails ? `US$${planDetails.price.toFixed(2)} per month, billed annually` : 'US$10.00 per month, billed annually'}
+          </div>
         </div>
 
+        {/* 计划详情 */}
         <div className="space-y-6">
           <div className="flex justify-between">
-            <span>Plan Name</span>
-            <span>$120.00</span>
+            <span>{planDetails ? planDetails.name : 'Team Sync'}</span>
+            <span>{planDetails ? formatPrice(planDetails.price) : '$0.00'}</span>
           </div>
 
           <div className="text-sm text-gray-400">
-            Taskade Pro unlocks 10 AI agents, 5,000 monthly AI requests, 1,000 monthly automations, and all premium Pro feature
+            {planDetails ? planDetails.description : 'Team Sync is a team collaboration tool that helps you manage your team and projects.'}
           </div>
 
           <div className="flex justify-between items-center">
@@ -364,7 +494,7 @@ export default function PaymentPage() {
                     </svg>
                 </div>
             </div>
-            <span>Billed Annually</span>
+            <span>{planDetails ? planDetails.billing_interval : 'Annually'}</span>
           </div>
 
           <div className="border-t border-gray-800 pt-4">
@@ -409,7 +539,7 @@ export default function PaymentPage() {
 
           <div className="flex justify-between border-t border-gray-800 pt-4">
             <span>Today's Subtotal</span>
-            <span>${(1200 * quantity).toFixed(2)}</span>
+            <span>{formatPrice(calculateSubTotal())}</span>
           </div>
         </div>
       </div>

@@ -4,28 +4,60 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-
 export default function PaymentSuccess() {
   const [status, setStatus] = useState('loading');
   const [paymentDetails, setPaymentDetails] = useState(null);
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    // 检查是否有支付意向 ID 或会话 ID
     const paymentIntent = searchParams.get('payment_intent');
-    if (paymentIntent) {
-      // Fetch payment intent status from your API
-      fetch(`/api/payment-status?payment_intent=${paymentIntent}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setPaymentDetails(data);
-          setStatus('success');
-        })
-        .catch((err) => {
-          console.error('Error:', err);
-          setStatus('error');
-        });
+    const sessionId = searchParams.get('session_id');
+    
+    if (!paymentIntent && !sessionId) {
+      console.error('No payment identifier found in URL');
+      setStatus('error');
+      return;
     }
+    
+    // 构建 API 请求 URL
+    let apiUrl = '/api/payment-status?';
+    if (paymentIntent) {
+      apiUrl += `payment_intent=${paymentIntent}`;
+    } else if (sessionId) {
+      apiUrl += `session_id=${sessionId}`;
+    }
+    
+    // 获取支付状态
+    fetch(apiUrl)
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('Payment status error:', errorText);
+          throw new Error('Failed to fetch payment status');
+        }
+        return res.json();
+      })
+      .then((data) => {
+        console.log('Payment details:', data);
+        setPaymentDetails(data);
+        setStatus(data.status === 'succeeded' ? 'success' : 'processing');
+      })
+      .catch((err) => {
+        console.error('Error fetching payment status:', err);
+        setStatus('error');
+      });
   }, [searchParams]);
+
+  // 格式化金额显示
+  const formatAmount = (amount) => {
+    if (!amount && amount !== 0) return 'N/A';
+    // 将分转换为元并格式化为货币
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount / 100);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -35,6 +67,23 @@ export default function PaymentSuccess() {
             <>
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
               <h2 className="mt-4 text-xl font-semibold text-gray-900">Processing your payment...</h2>
+              <p className="mt-2 text-gray-600">
+                Please wait while we confirm your payment details.
+              </p>
+            </>
+          )}
+
+          {status === 'processing' && (
+            <>
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
+                <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Processing</h2>
+              <p className="mt-2 text-gray-600">
+                Your payment is being processed. This may take a moment.
+              </p>
             </>
           )}
 
@@ -55,15 +104,27 @@ export default function PaymentSuccess() {
                   <dl className="mt-4 space-y-4">
                     <div className="flex justify-between">
                       <dt className="text-gray-600">Plan</dt>
-                      <dd className="text-gray-900">Team Sync Pro</dd>
+                      <dd className="text-gray-900">{paymentDetails?.planName || 'Subscription Plan'}</dd>
                     </div>
+                    {paymentDetails?.quantity && (
+                      <div className="flex justify-between">
+                        <dt className="text-gray-600">Quantity</dt>
+                        <dd className="text-gray-900">{paymentDetails.quantity}</dd>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <dt className="text-gray-600">Amount</dt>
-                      <dd className="text-gray-900">$1,200.00</dd>
+                      <dd className="text-gray-900">{formatAmount(paymentDetails?.amount)}</dd>
                     </div>
+                    {paymentDetails?.discount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <dt>Discount</dt>
+                        <dd>-{formatAmount(paymentDetails.discount)}</dd>
+                      </div>
+                    )}
                     <div className="flex justify-between border-t border-gray-200 pt-4">
                       <dt className="text-gray-900 font-medium">Total</dt>
-                      <dd className="text-indigo-600 font-medium">$1,200.00</dd>
+                      <dd className="text-indigo-600 font-medium">{formatAmount(paymentDetails?.amount)}</dd>
                     </div>
                   </dl>
                 </div>
@@ -82,6 +143,11 @@ export default function PaymentSuccess() {
               <p className="mt-2 text-gray-600">
                 There was an issue processing your payment. Please try again.
               </p>
+              {paymentDetails?.error && (
+                <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                  {paymentDetails.error}
+                </div>
+              )}
             </>
           )}
 
