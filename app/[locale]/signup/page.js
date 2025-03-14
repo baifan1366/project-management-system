@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { FaGoogle, FaGithub } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
+import LogoImage from '../../../public/logo.png';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -84,7 +85,7 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/${window.location.pathname.split('/')[1]}/auth/callback`,
+          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/${window.location.pathname.split('/')[1]}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -181,7 +182,7 @@ export default function SignupPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="text-center">
             <Image
-              src="/logo.png"
+              src={LogoImage}
               alt="Logo"
               width={64}
               height={64}

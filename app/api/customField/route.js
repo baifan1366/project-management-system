@@ -49,7 +49,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const data = await request.json();
-    const { name, type, description, icon, default_config } = data;
+    const { name, type, description, icon, default_config, created_by } = data;
 
     // 验证必填字段
     if (!name || !type) {
@@ -71,7 +71,8 @@ export async function POST(request) {
           type, 
           description: description || null, 
           icon: icon || null, 
-          default_config: default_config || null 
+          default_config: default_config || null ,
+          created_by: created_by || null
         }
       ])
       .select()

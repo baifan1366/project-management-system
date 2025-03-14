@@ -4,7 +4,16 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password','/auth/callback'];
+const PUBLIC_PATHS = [
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/auth/callback',
+  '/auth/verify',
+  '/pricing', // 添加 pricing 到公共路径
+  '/terms',
+  '/privacy',
+];
 const SPECIAL_PATHS = ['/reset-password']; // 特殊路径，即使用户已登录也允许访问
 
 export default function RouteGuard({ children }) {

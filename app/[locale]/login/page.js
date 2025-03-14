@@ -1,20 +1,75 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FaGoogle, FaGithub } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
+import LogoImage from '../../../public/logo.png';
 
 export default function LoginPage() {
   const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  
+  // 获取当前语言
+  const locale = params.locale || 'en';
+  
+  // 只获取计划ID参数
+  const planId = searchParams.get('plan_id');
+  const redirect = searchParams.get('redirect');
+  
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // 处理重定向逻辑
+  const handleRedirect = (user) => {
+    if (!user) return;
+    
+    // 如果有重定向参数，并且是支付页面，且有计划ID
+    if (redirect === 'payment' && planId) {
+      console.log('重定向到支付页面，计划ID:', planId);
+      
+      // 只传递计划ID
+      router.push(`/${locale}/payment?plan_id=${planId}`);
+    } else {
+      // 默认重定向到项目页面
+      console.log('重定向到项目页面');
+      router.replace(`/${locale}/projects`);
+    }
+  };
+
+  // 检查用户是否已登录
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (!error && data.session && data.session.user) {
+        console.log('用户已登录，处理重定向');
+        handleRedirect(data.session.user);
+      }
+    };
+    
+    checkUser();
+  }, []);
+
+  // 构建重定向 URL，只包含计划ID
+  const buildRedirectUrl = () => {
+    // 基本回调 URL
+    let redirectUrl = `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/${locale}/auth/callback`;
+    
+    // 如果有重定向参数和计划ID，添加到 URL
+    if (redirect === 'payment' && planId) {
+      redirectUrl += `?redirect=payment&plan_id=${planId}`;
+    }
+    
+    return redirectUrl;
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -54,10 +109,8 @@ export default function LoginPage() {
           console.error('Failed to update email verification status:', updateError);
         }
 
-        // 获取当前语言
-        const locale = window.location.pathname.split('/')[1] || 'en';
-        // 重定向到仪表板
-        router.replace(`/${locale}/projects`);
+        // 使用重定向处理函数
+        handleRedirect(data.user);
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -74,7 +127,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/${window.location.pathname.split('/')[1]}/auth/callback`,
+          redirectTo: buildRedirectUrl(),
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -96,7 +149,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/${window.location.pathname.split('/')[1]}/auth/callback`,
+          redirectTo: buildRedirectUrl(),
           scopes: 'read:user user:email',
         },
       });
@@ -114,11 +167,12 @@ export default function LoginPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="text-center">
             <Image
-              src="/logo.png"
+              src={LogoImage}
               alt="Logo"
               width={64}
               height={64}
               className="mx-auto mb-6"
+              priority
             />
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Sign in
