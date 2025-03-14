@@ -1,53 +1,67 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-
-const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password','/auth/callback'];
-const SPECIAL_PATHS = ['/reset-password']; // 特殊路径，即使用户已登录也允许访问
 
 export default function RouteGuard({ children }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [authorized, setAuthorized] = useState(false);
+
+  // 定义公共路径
+  const publicPaths = [
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/auth/callback',
+    '/auth/verify',
+    '/pricing', // 添加 pricing 到公共路径
+    '/terms',
+    '/privacy',
+  ];
 
   useEffect(() => {
-    const checkAuth = async () => {
-      // 获取 session 状态
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // 检查是否是公开路径
-      const isPublicPath = PUBLIC_PATHS.some(path => pathname.includes(path));
-      
-      // 检查是否是特殊路径（如重置密码）
-      const isSpecialPath = SPECIAL_PATHS.some(path => pathname.includes(path));
-      
-      // 获取当前语言
-      const locale = pathname.split('/')[1] || 'en';
+    // 检查当前路径是否是公共路径
+    const isPublicPath = () => {
+      // 移除语言前缀 (例如 /en/login -> /login)
+      const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/');
+      return publicPaths.some(pp => pathWithoutLocale === pp || pathWithoutLocale.startsWith(pp));
+    };
 
-      console.log('🔒 Session check:', { 
-        path: pathname,
-        hasSession: Boolean(session),
-        isPublicPath,
-        isSpecialPath,
-        userId: session?.user?.id
-      });
-
-      // 如果用户未登录且访问的不是公开路径或特殊路径，重定向到登录页面
-      if (!session && !isPublicPath && !isSpecialPath) {
-        router.replace(`/${locale}/login`);
+    // 认证检查
+    const authCheck = async () => {
+      // 如果是公共路径，允许访问
+      if (isPublicPath()) {
+        setAuthorized(true);
         return;
       }
 
-      // 如果用户已登录且访问登录/注册页面（但不是特殊路径），重定向到项目页面
-      if (session && isPublicPath && !isSpecialPath && pathname !== '/') {
-        router.replace(`/${locale}/projects`);
-        return;
+      // 检查用户是否已登录
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // 用户已登录，允许访问
+        setAuthorized(true);
+      } else {
+        // 用户未登录，重定向到登录页面
+        setAuthorized(false);
+        
+        // 获取当前语言
+        const locale = pathname.split('/')[1] || 'en';
+        router.push(`/${locale}/login`);
       }
     };
 
-    checkAuth();
+    authCheck();
+    
+    // 监听路由变化
+    const unsubscribe = supabase.auth.onAuthStateChange((event, session) => {
+      authCheck();
+    });
+
+    return () => unsubscribe.data.subscription.unsubscribe();
   }, [pathname, router]);
 
-  return children;
+  return authorized ? children : null;
 } 
