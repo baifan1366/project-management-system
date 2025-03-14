@@ -61,7 +61,7 @@ export default function LoginPage() {
   // 构建重定向 URL，只包含计划ID
   const buildRedirectUrl = () => {
     // 基本回调 URL
-    let redirectUrl = `${window.location.origin}/${locale}/auth/callback`;
+    let redirectUrl = `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/${locale}/auth/callback`;
     
     // 如果有重定向参数和计划ID，添加到 URL
     if (redirect === 'payment' && planId) {
