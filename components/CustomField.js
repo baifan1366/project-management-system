@@ -70,7 +70,7 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
       return Icons[iconName];
     }    
     // 默认图标
-    return Icons.File;
+    return Icons.Ban;
   };
 
   // 渲染单个字段项
