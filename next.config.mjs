@@ -27,6 +27,7 @@ const nextConfig = {
   },
   images: {
     domains: ['api.qrserver.com'],
+    unoptimized: true
   }
 };
 

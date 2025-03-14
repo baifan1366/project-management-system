@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { FaGoogle, FaGithub } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
+import LogoImage from '../../../public/logo.png';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -114,11 +115,12 @@ export default function LoginPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="text-center">
             <Image
-              src="/logo.png"
+              src={LogoImage}
               alt="Logo"
               width={64}
               height={64}
               className="mx-auto mb-6"
+              priority
             />
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Sign in
