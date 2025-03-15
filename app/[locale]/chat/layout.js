@@ -11,38 +11,6 @@ function ChatLayout({ children }) {
   const t = useTranslations('Chat');
   const [searchQuery, setSearchQuery] = useState('');
   const { sessions, currentSession, setCurrentSession } = useChat();
-  const [unreadCounts, setUnreadCounts] = useState({});
-
-  // 获取未读消息数量
-  useEffect(() => {
-    const fetchUnreadCounts = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data, error } = await supabase
-        .from('chat_message_read_status')
-        .select('message_id, chat_message!inner(session_id)')
-        .is('read_at', null)
-        .eq('user_id', session.user.id);
-
-      if (error) {
-        console.error('Error fetching unread counts:', error);
-        return;
-      }
-
-      const counts = data.reduce((acc, row) => {
-        const sessionId = row.chat_message.session_id;
-        acc[sessionId] = (acc[sessionId] || 0) + 1;
-        return acc;
-      }, {});
-
-      setUnreadCounts(counts);
-    };
-
-    fetchUnreadCounts();
-    const interval = setInterval(fetchUnreadCounts, 10000); // 每10秒刷新一次
-    return () => clearInterval(interval);
-  }, []);
 
   // 添加日志查看所有sessions
   console.log('所有聊天会话:', sessions);
@@ -72,7 +40,6 @@ function ChatLayout({ children }) {
         {/* 聊天列表 */}
         <div className="flex-1 overflow-y-auto">
           {sessions.map((session) => {
-            const unreadCount = unreadCounts[session.id] || 0;
             return (
               <div
                 key={session.id}
@@ -103,9 +70,9 @@ function ChatLayout({ children }) {
                         ? session.participants[0]?.name
                         : session.name}
                     </h3>
-                    {unreadCount > 0 && (
+                    {session.unreadCount > 0 && (
                       <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                        {unreadCount}
+                        {session.unreadCount}
                       </span>
                     )}
                   </div>

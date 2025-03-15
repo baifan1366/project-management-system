@@ -10,6 +10,8 @@ export function ChatProvider({ children }) {
   const [currentSession, setCurrentSession] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  // 添加已发送消息ID集合，用于防止重复
+  const [sentMessageIds] = useState(new Set());
 
   // 处理头像URL，移除token
   const processAvatarUrl = (user) => {
@@ -85,6 +87,26 @@ export function ChatProvider({ children }) {
       console.error('Error fetching last messages:', messagesError);
     }
 
+    // 获取未读消息计数
+    const { data: unreadData, error: unreadError } = await supabase
+      .from('chat_message_read_status')
+      .select('message_id, chat_message!inner(session_id)')
+      .is('read_at', null)
+      .eq('user_id', authSession.user.id);
+
+    if (unreadError) {
+      console.error('Error fetching unread counts:', unreadError);
+    }
+
+    // 计算每个会话的未读消息数
+    const unreadCountsBySession = {};
+    unreadData?.forEach(item => {
+      const sessionId = item.chat_message?.session_id;
+      if (sessionId) {
+        unreadCountsBySession[sessionId] = (unreadCountsBySession[sessionId] || 0) + 1;
+      }
+    });
+
     // 获取每个会话的最后一条消息
     const lastMessagesBySession = {};
     lastMessages?.forEach(msg => {
@@ -100,10 +122,15 @@ export function ChatProvider({ children }) {
         .map(p => processAvatarUrl(p.user))
         .filter(user => user.id !== authSession.user.id);
       
+      const sessionId = item.chat_session.id;
+      // 如果是当前打开的会话，未读计数为0
+      const unreadCount = currentSession?.id === sessionId ? 0 : (unreadCountsBySession[sessionId] || 0);
+      
       return {
         ...item.chat_session,
         participants: otherParticipants,
         participantsCount: item.chat_session.participants.length,
+        unreadCount,
         lastMessage: lastMessage ? {
           ...lastMessage,
           user: processAvatarUrl(lastMessage.user)
@@ -117,6 +144,22 @@ export function ChatProvider({ children }) {
 
   // 获取会话消息
   const fetchMessages = async (sessionId) => {
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (!authSession) return;
+    
+    // 先检查用户是否有权访问此会话
+    const { data: participant, error: participantError } = await supabase
+      .from('chat_participant')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('user_id', authSession.user.id)
+      .single();
+      
+    if (participantError || !participant) {
+      console.error('无权访问此会话的消息', participantError);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('chat_message')
       .select(`
@@ -145,6 +188,84 @@ export function ChatProvider({ children }) {
       ...msg,
       user: processAvatarUrl(msg.user)
     })));
+    
+    // 标记消息为已读
+    markMessagesAsRead(sessionId, authSession.user.id);
+    
+    // 更新未读消息计数
+    updateUnreadCount(sessionId);
+  };
+
+  // 更新特定会话的未读消息计数
+  const updateUnreadCount = async (sessionId) => {
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (!authSession) return;
+    
+    // 获取所有会话的未读消息计数
+    const { data, error } = await supabase
+      .from('chat_message_read_status')
+      .select('message_id, user_id, chat_message!inner(session_id)')
+      .is('read_at', null)
+      .eq('user_id', authSession.user.id);
+
+    if (error) {
+      console.error('获取未读消息计数失败:', error);
+      return;
+    }
+    
+    // 更新会话列表中的未读计数
+    setSessions(prev => {
+      return prev.map(session => {
+        // 计算此会话的未读消息数量
+        const unreadCount = data.filter(row => row.chat_message?.session_id === session.id).length;
+        
+        // 如果是当前打开的会话，强制设置未读计数为0
+        const finalCount = session.id === sessionId ? 0 : unreadCount;
+        
+        return {
+          ...session,
+          unreadCount: finalCount
+        };
+      });
+    });
+  };
+
+  // 标记消息为已读
+  const markMessagesAsRead = async (sessionId, userId) => {
+    const { data: unreadMessages, error: fetchError } = await supabase
+      .from('chat_message_read_status')
+      .select('message_id, user_id, chat_message!inner(session_id)')
+      .eq('chat_message.session_id', sessionId)
+      .eq('user_id', userId)
+      .is('read_at', null);
+      
+    if (fetchError) {
+      console.error('获取未读消息状态失败:', fetchError);
+      return;
+    }
+    
+    console.log(`准备标记 ${unreadMessages?.length || 0} 条未读消息为已读`);
+    
+    if (unreadMessages && unreadMessages.length > 0) {
+      // 使用批量更新，按复合主键更新
+      const updatePromises = unreadMessages.map(status => 
+        supabase
+          .from('chat_message_read_status')
+          .update({ read_at: new Date().toISOString() })
+          .eq('message_id', status.message_id)
+          .eq('user_id', status.user_id)
+      );
+      
+      try {
+        await Promise.all(updatePromises);
+        console.log(`成功将 ${unreadMessages.length} 条消息标记为已读`);
+        
+        // 已经标记为已读，立即更新未读计数
+        updateUnreadCount(sessionId);
+      } catch (error) {
+        console.error('标记消息为已读失败:', error);
+      }
+    }
   };
 
   // 发送消息
@@ -212,6 +333,10 @@ export function ChatProvider({ children }) {
       }
     }
 
+    // 记录已发送的消息ID，用于防止重复添加
+    sentMessageIds.add(data.id);
+    
+    // 将消息添加到本地状态
     setMessages(prev => [...prev, { ...data, user: processAvatarUrl(data.user) }]);
   };
 
@@ -227,6 +352,15 @@ export function ChatProvider({ children }) {
         table: 'chat_message',
         filter: `session_id=eq.${currentSession.id}`
       }, async (payload) => {
+        // 获取当前用户
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (!authSession) return;
+        
+        // 如果消息ID已在sentMessageIds中，说明是自己发的消息，忽略实时更新
+        if (sentMessageIds.has(payload.new.id)) {
+          return;
+        }
+        
         // 获取完整的消息信息，包括用户信息
         const { data: messageData, error } = await supabase
           .from('chat_message')
@@ -260,6 +394,56 @@ export function ChatProvider({ children }) {
           }
           return [...prev, { ...messageData, user: processAvatarUrl(messageData.user) }];
         });
+        
+        // 更新会话列表中的最后一条消息
+        setSessions(prev => {
+          return prev.map(session => {
+            if (session.id === payload.new.session_id) {
+              return {
+                ...session,
+                lastMessage: {
+                  ...messageData,
+                  user: processAvatarUrl(messageData.user)
+                }
+              };
+            }
+            return session;
+          });
+        });
+        
+        // 如果是当前会话，且不是当前用户发送的消息，立即标记为已读
+        if (messageData.user_id !== authSession.user.id) {
+          // 查找此消息的未读状态记录
+          const { data: readStatusList, error: readStatusError } = await supabase
+            .from('chat_message_read_status')
+            .select('message_id, user_id')
+            .eq('message_id', messageData.id)
+            .eq('user_id', authSession.user.id)
+            .is('read_at', null);
+            
+          if (readStatusError) {
+            console.error('Error fetching read status:', readStatusError);
+            return;
+          }
+          
+          if (readStatusList && readStatusList.length > 0) {
+            console.log(`标记当前会话新消息 ${messageData.id} 为已读`);
+            
+            // 使用直接更新，按复合主键更新
+            const { error: updateError } = await supabase
+              .from('chat_message_read_status')
+              .update({ read_at: new Date().toISOString() })
+              .eq('message_id', messageData.id)
+              .eq('user_id', authSession.user.id);
+              
+            if (updateError) {
+              console.error('Error updating read status:', updateError);
+            } else {
+              // 更新未读计数
+              updateUnreadCount(currentSession.id);
+            }
+          }
+        }
       })
       .subscribe();
 
@@ -287,17 +471,189 @@ export function ChatProvider({ children }) {
         fetchChatSessions();
       })
       .subscribe();
+      
+    // 订阅所有聊天消息变化来更新lastMessage
+    const messagesChannel = supabase
+      .channel('chat_messages_updates')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_message'
+      }, async (payload) => {
+        // 获取当前用户
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (!authSession) return;
+        
+        // 如果消息ID已在sentMessageIds中，说明是自己发的消息，直接用现有数据更新
+        if (sentMessageIds.has(payload.new.id)) {
+          return;
+        }
+        
+        // 获取完整的消息信息
+        const { data: messageData, error } = await supabase
+          .from('chat_message')
+          .select(`
+            *,
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            ),
+            attachments:chat_attachment (
+              id,
+              file_url,
+              file_name
+            )
+          `)
+          .eq('id', payload.new.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching complete message data:', error);
+          return;
+        }
+        
+        // 检查消息是否需要标记为未读（如果发送者不是当前用户，且不是当前打开的会话）
+        const isFromOtherUser = messageData.user_id !== authSession.user.id;
+        const isNotCurrentSession = currentSession?.id !== payload.new.session_id;
+        
+        // 更新会话列表中的最后一条消息和未读计数
+        setSessions(prev => {
+          return prev.map(session => {
+            if (session.id === payload.new.session_id) {
+              // 如果是其他用户发送的消息，且不是当前打开的会话，增加未读计数
+              const newUnreadCount = isFromOtherUser && isNotCurrentSession 
+                ? (session.unreadCount || 0) + 1 
+                : session.unreadCount || 0;
+                
+              return {
+                ...session,
+                unreadCount: newUnreadCount,
+                lastMessage: {
+                  ...messageData,
+                  user: processAvatarUrl(messageData.user)
+                }
+              };
+            }
+            return session;
+          });
+        });
+        
+        // 如果是当前会话，且是当前用户打开的，立即标记为已读
+        if (!isNotCurrentSession && isFromOtherUser) {
+          // 查找此消息的未读状态记录
+          const { data: readStatusList, error: readStatusError } = await supabase
+            .from('chat_message_read_status')
+            .select('message_id, user_id')
+            .eq('message_id', messageData.id)
+            .eq('user_id', authSession.user.id)
+            .is('read_at', null);
+            
+          if (readStatusError) {
+            console.error('Error fetching read status:', readStatusError);
+            return;
+          }
+          
+          if (readStatusList && readStatusList.length > 0) {
+            console.log(`标记当前会话新消息 ${messageData.id} 为已读`);
+            
+            // 使用直接更新，按复合主键更新
+            const { error: updateError } = await supabase
+              .from('chat_message_read_status')
+              .update({ read_at: new Date().toISOString() })
+              .eq('message_id', messageData.id)
+              .eq('user_id', authSession.user.id);
+              
+            if (updateError) {
+              console.error('Error updating read status:', updateError);
+            } else {
+              // 更新未读计数
+              updateUnreadCount(currentSession.id);
+            }
+          }
+        }
+      })
+      .subscribe();
+
+    // 订阅消息读取状态变化
+    const readStatusChannel = supabase
+      .channel('read_status_updates')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'chat_message_read_status'
+      }, async (payload) => {
+        // 当有消息标记为已读时，更新未读计数
+        if (payload.new.read_at && !payload.old.read_at) {
+          const { data: { session: authSession } } = await supabase.auth.getSession();
+          if (!authSession) return;
+          
+          // 如果是当前用户的消息读取状态
+          if (payload.new.user_id === authSession.user.id) {
+            // 获取该消息所属的会话ID
+            const { data: messageData } = await supabase
+              .from('chat_message')
+              .select('session_id')
+              .eq('id', payload.new.message_id)
+              .single();
+              
+            if (messageData) {
+              // 更新未读消息计数
+              updateUnreadCount(messageData.session_id);
+            }
+          }
+        }
+      })
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(readStatusChannel);
     };
   }, []);
+
+  // 包装setCurrentSession，添加权限检查
+  const setCurrentSessionWithCheck = (session) => {
+    // 检查session是否在用户的会话列表中
+    const isAuthorized = sessions.some(s => s.id === session?.id);
+    if (session && !isAuthorized) {
+      console.error('无权访问此会话');
+      return;
+    }
+    
+    // 如果切换到了新的会话，更新未读计数
+    if (session && (!currentSession || session.id !== currentSession.id)) {
+      // 立即更新UI显示，将该会话的未读计数设为0
+      setSessions(prev => {
+        return prev.map(s => {
+          if (s.id === session.id) {
+            return { ...s, unreadCount: 0 };
+          }
+          return s;
+        });
+      });
+      
+      // 立即标记该会话所有消息为已读
+      const setMessagesRead = async () => {
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (authSession) {
+          await markMessagesAsRead(session.id, authSession.user.id);
+        }
+      };
+      
+      setMessagesRead();
+    }
+    
+    setCurrentSession(session);
+  };
 
   return (
     <ChatContext.Provider value={{
       sessions,
       currentSession,
-      setCurrentSession,
+      setCurrentSession: setCurrentSessionWithCheck,
       messages,
       sendMessage,
       loading,

@@ -42,22 +42,7 @@ export default function ChatPage() {
     console.log('Current User:', currentUser);
     console.log('Messages:', messages);
 
-    if (currentSession && currentUser && messages.length > 0) {
-      // 标记当前会话的所有消息为已读
-      supabase
-        .from('chat_message_read_status')
-        .update({ read_at: new Date().toISOString() })
-        .is('read_at', null)
-        .eq('user_id', currentUser.id)
-        .in('message_id', messages.map(msg => msg.id))
-        .then(({ error }) => {
-          if (error) {
-            console.error('Error updating read status:', error);
-          } else {
-            console.log('Read status updated successfully');
-          }
-        });
-    }
+    // 无需在这里处理标记为已读，ChatContext中已经实现了这个功能
   }, [currentSession, messages, currentUser]);
 
   const handleSendMessage = (e) => {
@@ -128,68 +113,82 @@ export default function ChatPage() {
 
       {/* 聊天内容区域 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 relative" ref={chatContainerRef}>
-        {messages.map((msg) => {    
-          const isMe = msg.user_id === currentUser?.id;
-          return (
-            <div
-              key={msg.id}
-              className={cn(
-                "flex items-start gap-2 max-w-2xl",
-                isMe ? "ml-auto flex-row-reverse" : ""
-              )}
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden",
-                isMe ? "bg-green-600" : "bg-blue-600"
-              )}>
-                {msg.user?.avatar_url && msg.user?.avatar_url !== '' ? (
-                  <img 
-                    src={msg.user.avatar_url} 
-                    alt={msg.user.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span>{msg.user?.name?.charAt(0) || '?'}</span>
+        {/* 使用 Set 对象和 map 来去重消息 */}
+        {(() => {
+          // 使用消息ID创建一个去重的消息列表
+          const uniqueMessages = [];
+          const messageIds = new Set();
+          
+          for (const msg of messages) {
+            if (!messageIds.has(msg.id)) {
+              messageIds.add(msg.id);
+              uniqueMessages.push(msg);
+            }
+          }
+          
+          return uniqueMessages.map((msg) => {    
+            const isMe = msg.user_id === currentUser?.id;
+            return (
+              <div
+                key={msg.id}
+                className={cn(
+                  "flex items-start gap-2 max-w-2xl",
+                  isMe ? "ml-auto flex-row-reverse" : ""
                 )}
-              </div>
-              <div>
+              >
                 <div className={cn(
-                  "flex items-baseline gap-2",
-                  isMe ? "flex-row-reverse" : ""
+                  "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden",
+                  isMe ? "bg-green-600" : "bg-blue-600"
                 )}>
-                  <span className="font-medium">{msg.user?.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(msg.created_at).toLocaleTimeString()}
-                  </span>
+                  {msg.user?.avatar_url && msg.user?.avatar_url !== '' ? (
+                    <img 
+                      src={msg.user.avatar_url} 
+                      alt={msg.user.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>{msg.user?.name?.charAt(0) || '?'}</span>
+                  )}
                 </div>
-                <div className={cn(
-                  "mt-1 rounded-lg p-3 text-sm",
-                  isMe 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-accent"
-                )}>
-                  {msg.content}
-                </div>
-                {msg.attachments?.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {msg.attachments.map((attachment) => (
-                      <a
-                        key={attachment.id}
-                        href={attachment.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
-                      >
-                        <Paperclip className="h-4 w-4" />
-                        {attachment.file_name}
-                      </a>
-                    ))}
+                <div>
+                  <div className={cn(
+                    "flex items-baseline gap-2",
+                    isMe ? "flex-row-reverse" : ""
+                  )}>
+                    <span className="font-medium">{msg.user?.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(msg.created_at).toLocaleTimeString()}
+                    </span>
                   </div>
-                )}
+                  <div className={cn(
+                    "mt-1 rounded-lg p-3 text-sm",
+                    isMe 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-accent"
+                  )}>
+                    {msg.content}
+                  </div>
+                  {msg.attachments?.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {msg.attachments.map((attachment) => (
+                        <a
+                          key={attachment.id}
+                          href={attachment.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                          {attachment.file_name}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          });
+        })()}
         <div ref={messagesEndRef} />
       </div>
 
