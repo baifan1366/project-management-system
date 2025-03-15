@@ -10,11 +10,10 @@ const PUBLIC_PATHS = [
   '/forgot-password',
   '/auth/callback',
   '/auth/verify',
-  '/pricing', // 添加 pricing 到公共路径
   '/terms',
   '/privacy',
 ];
-const SPECIAL_PATHS = ['/reset-password']; // 特殊路径，即使用户已登录也允许访问
+const SPECIAL_PATHS = ['/reset-password', '/pricing']; // 特殊路径，即使用户已登录也允许访问
 
 export default function RouteGuard({ children }) {
   const router = useRouter();
