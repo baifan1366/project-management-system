@@ -9,7 +9,6 @@ export default function PaymentSuccess() {
   const [paymentDetails, setPaymentDetails] = useState(null);
   const searchParams = useSearchParams();
 
-
   useEffect(() => {
     // 检查是否有支付意向 ID 或会话 ID
     const paymentIntent = searchParams.get('payment_intent');
@@ -74,8 +73,6 @@ export default function PaymentSuccess() {
           }
         }),
       });
-      
-      const data = await response.json();
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to send email');
