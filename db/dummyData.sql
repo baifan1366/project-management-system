@@ -1,3 +1,9 @@
+-- Insert default data
+INSERT INTO "default" (id, name, qty, updated_at, edited_by)
+VALUES
+  (1, 'custom_field', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (2, 'custom_tag', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+
 -- Insert user data
 INSERT INTO "user" (id, name, email, avatar_url, language, theme, provider, email_verified, created_at, updated_at)
 VALUES 

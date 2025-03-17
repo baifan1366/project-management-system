@@ -1,3 +1,12 @@
+-- 默认字段表
+CREATE TABLE "default" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "qty" INT NOT NULL,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "edited_by" UUID NULL REFERENCES "user"("id") ON DELETE CASCADE
+)
+
 -- 用户表
 CREATE TABLE "user" (
   "id" UUID PRIMARY KEY,
