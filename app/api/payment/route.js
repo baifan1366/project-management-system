@@ -6,7 +6,7 @@ const stripe = new Stripe(process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY);
 export async function POST(req) {
   try {
     // 验证 Stripe 密钥
-    if (!process.env.STRIPE_SECRET_KEY) {
+    if (!process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY) {
       throw new Error('Stripe secret key is missing. Check your environment variables.');
     }
     

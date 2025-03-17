@@ -17,7 +17,6 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
 export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   // 获取 plan_id 参数
   const planId = searchParams.get('plan_id')
 
@@ -29,8 +28,6 @@ export default function PaymentPage() {
   const [promoCode, setPromoCode] = useState('')
   const [clientSecret, setClientSecret] = useState('')
   const [paymentStatus, setPaymentStatus] = useState('')
-  const userAccountEmail = "jiaxuanshe@gmail.com"; // Simulated user account email
-  const [email, setEmail] = useState(userAccountEmail);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [isLoadingQR, setIsLoadingQR] = useState(false);
@@ -38,6 +35,8 @@ export default function PaymentPage() {
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [email, setEmail] = useState('');
 
   useEffect(() => {
     const fetchPlanDetails = async () =>{
@@ -51,15 +50,24 @@ export default function PaymentPage() {
         // 获取用户信息
         const{data:{session},error:sessionError} = await supabase.auth.getSession();
 
+        // 如果获取用户会话失败，则抛出错误
         if(sessionError){
           throw new Error('Failed to get session');
         }
 
+        // 如果用户未登录，则重定向到登录页面
         if(!session || !session.user){
           router.push('/login?redirect=payment&plan_id=' + planId);
           return;
         }
 
+        // 设置用户
+        setUser(session.user);
+
+        // 从用户会话中获取邮箱
+        setEmail(session.user.email)
+
+        // 获取计划详情
         const {data, error} = await supabase
           .from('subscription_plan')
           .select('*')
