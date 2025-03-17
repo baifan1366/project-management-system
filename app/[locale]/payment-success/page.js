@@ -9,6 +9,7 @@ export default function PaymentSuccess() {
   const [paymentDetails, setPaymentDetails] = useState(null);
   const searchParams = useSearchParams();
 
+
   useEffect(() => {
     // 检查是否有支付意向 ID 或会话 ID
     const paymentIntent = searchParams.get('payment_intent');
@@ -48,6 +49,50 @@ export default function PaymentSuccess() {
         setStatus('error');
       });
   }, [searchParams]);
+
+  const sendEmail = async (paymentDetails) => {
+    try {
+      const email = localStorage.getItem('userEmail');
+      if (!email) {
+        console.error('No email found in localStorage');
+        return;
+      }
+      
+      console.log('Sending email to:', email);
+      
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: email,
+          orderDetails: {
+            id: paymentDetails?.id || 'N/A',
+            amount: paymentDetails?.amount || 0,
+            planName: paymentDetails?.planName || 'Subscription Plan'
+          }
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send email');
+      }
+      
+      console.log('Email sent successfully');
+    } catch (err) {
+      console.error('Failed to send email:', err);
+    }
+  };
+
+  // 在获取到支付详情后调用
+  useEffect(() => {
+    if (paymentDetails && paymentDetails.status === 'succeeded') {
+      sendEmail(paymentDetails);
+    }
+  }, [paymentDetails]);
 
   // 格式化金额显示
   const formatAmount = (amount) => {
@@ -169,4 +214,4 @@ export default function PaymentSuccess() {
       </div>
     </div>
   );
-} 
+}

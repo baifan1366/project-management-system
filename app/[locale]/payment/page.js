@@ -4,9 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faQrcode } from '@fortawesome/free-solid-svg-icons'
-import { faCashApp } from '@fortawesome/free-brands-svg-icons'
 import CheckoutForm from '@/components/CheckoutForm'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -157,6 +154,13 @@ export default function PaymentPage() {
           console.log('Payment intent created successfully');
           setClientSecret(data.clientSecret);
           setPaymentStatus('ready');
+
+          // 在创建支付意向成功后，保存数量到本地存储
+          localStorage.setItem('paymentMetadata', JSON.stringify({
+            planId: planDetails.id,
+            quantity: quantity,
+            planName: planDetails.name
+          }));
         } else {
           console.error('Invalid response data:', data);
           throw new Error('No client secret received');
