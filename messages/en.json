@@ -566,5 +566,20 @@
     "invalidType": "Invalid type",
     "invalidJSON": "Invalid JSON",
     "jsonFormat": "Invalid JSON format"
-  }   
+  },
+  "Default": {
+    "title": "Default Settings",
+    "id": "ID",
+    "name": "Name",
+    "qty": "Quantity",
+    "updated_at": "Updated At",
+    "edited_by": "Edited By",
+    "actions": "Actions",
+    "custom_field": "Custom Field",
+    "custom_tag": "Custom Tag",
+    "save": "Save",
+    "edit": "Edit",
+    "saving": "Saving...",
+    "loading": "Loading..."
+  }
 }
