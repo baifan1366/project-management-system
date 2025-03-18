@@ -28,7 +28,7 @@ export async function GET(request) {
         status: paymentIntent.status,
         amount: paymentIntent.amount,
         currency: paymentIntent.currency,
-        planName: paymentIntent.metadata?.planName || 'Subscription Plan',
+        planName: paymentIntent.metadata.planName,
         quantity: paymentIntent.metadata?.quantity || 1,
         paymentMethod: paymentIntent.payment_method_types[0],
         created: new Date(paymentIntent.created * 1000).toISOString(),

@@ -138,7 +138,7 @@ export default function PaymentSuccess() {
               </div>
               <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Successful!</h2>
               <p className="mt-2 text-gray-600">
-                Thank you for your purchase. You will receive a confirmation email shortly.
+                Thank you for subscribing to {paymentDetails?.planName}
               </p>
               <div className="mt-6 border-t border-gray-200 pt-6">
                 <div className="text-left">

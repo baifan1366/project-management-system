@@ -130,8 +130,10 @@ export default function PaymentPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          amount: planDetails.price, // 单价
-          quantity: quantity // 数量
+          planId: planDetails.id,
+          amount: planDetails.price,
+          quantity: quantity,
+          planName: planDetails.name,
         }),
       })
       .then(async (res) => {
