@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Bell, Lock, User, Globe, Zap } from 'lucide-react';
+import { Bell, Lock, User, Globe, Zap, CreditCard, BarChart2, History, ArrowUpCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
+// 导入订阅组件
+import { SubscriptionCard, UsageStats, PaymentHistory, UpgradeOptions } from '@/components/subscription';
 
 export default function SettingsPage() {
   const t = useTranslations('profile');
@@ -220,9 +222,9 @@ export default function SettingsPage() {
               <Globe className="h-4 w-4" />
               {t('preferences')}
             </TabsTrigger>
-            <TabsTrigger value="billing" className="flex items-center gap-2">
+            <TabsTrigger value="subscription" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
-              {t('billing.title')}
+              {t('subscription.title')}
             </TabsTrigger>
           </TabsList>
 
@@ -486,44 +488,49 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="billing" className="space-y-4">
+          <TabsContent value="subscription" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>{t('billing.title')}</CardTitle>
-                <CardDescription>{t('billing.description')}</CardDescription>
+                <CardTitle>{t('subscription.title')}</CardTitle>
+                <CardDescription>{t('subscription.description')}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4">
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-medium">{t('billing.freePlan')}</h3>
-                        <p className="text-sm text-muted-foreground">{t('billing.currentPlan')}</p>
-                      </div>
-                      <span className="text-2xl font-bold">¥0</span>
-                    </div>
-                    <ul className="space-y-2 text-sm">
-                      <li>✓ {t('billing.features.basicProjectManagement')}</li>
-                      <li>✓ {t('billing.features.maxProjects')}</li>
-                      <li>✓ {t('billing.features.basicCollaboration')}</li>
-                    </ul>
-                  </div>
-                  <div className="border rounded-lg p-4 bg-primary/5">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-medium">{t('billing.proPlan')}</h3>
-                      </div>
-                      <span className="text-2xl font-bold">¥99/月</span>
-                    </div>
-                    <ul className="space-y-2 text-sm">
-                      <li>✓ {t('billing.features.unlimitedProjects')}</li>
-                      <li>✓ {t('billing.features.advancedCollaboration')}</li>
-                      <li>✓ {t('billing.features.prioritySupport')}</li>
-                      <li>✓ {t('billing.features.customWorkflows')}</li>
-                    </ul>
-                    <Button className="w-full mt-4">{t('billing.upgradePlan')}</Button>
-                  </div>
-                </div>
+              <CardContent>
+                <Tabs defaultValue="current-plan" className="space-y-4">
+                  <TabsList>
+                    <TabsTrigger value="current-plan" className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      {t('subscription.tabs.currentPlan')}
+                    </TabsTrigger>
+                    <TabsTrigger value="usage-stats" className="flex items-center gap-2">
+                      <BarChart2 className="h-4 w-4" />
+                      {t('subscription.tabs.usageStats')}
+                    </TabsTrigger>
+                    <TabsTrigger value="payment-history" className="flex items-center gap-2">
+                      <History className="h-4 w-4" />
+                      {t('subscription.tabs.paymentHistory')}
+                    </TabsTrigger>
+                    <TabsTrigger value="upgrade-options" className="flex items-center gap-2">
+                      <ArrowUpCircle className="h-4 w-4" />
+                      {t('subscription.tabs.upgradeOptions')}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="current-plan">
+                    <SubscriptionCard userId={user?.id} />
+                  </TabsContent>
+
+                  <TabsContent value="usage-stats">
+                    <UsageStats userId={user?.id} />
+                  </TabsContent>
+
+                  <TabsContent value="payment-history">
+                    <PaymentHistory userId={user?.id} />
+                  </TabsContent>
+
+                  <TabsContent value="upgrade-options">
+                    <UpgradeOptions userId={user?.id} />
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </TabsContent>
@@ -531,4 +538,4 @@ export default function SettingsPage() {
       </div>
     </div>
   );
-} 
+}
