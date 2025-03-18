@@ -39,19 +39,21 @@ export function NotificationDialog({ open, onOpenChange }) {
   const [locale, setLocale] = useState('zh');
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        setLocale(session.user.user_metadata?.language || 'zh');
-        dispatch(fetchNotifications(session.user.id));
-      }
-    };
-
     if (open) {
+      const getUser = async () => {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          setLocale(session.user.user_metadata?.language || 'zh');
+          if (notifications.length === 0) {
+            dispatch(fetchNotifications(session.user.id));
+          }
+        }
+      };
+      
       getUser();
     }
-  }, [dispatch, open]);
+  }, [dispatch, open, notifications.length]);
 
   const handleMarkAsRead = (notificationId) => {
     if (user) {

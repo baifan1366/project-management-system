@@ -32,21 +32,21 @@ export function Header() {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
+        // 初始加载通知
         dispatch(fetchNotifications(session.user.id));
+        
+        // 设置定时器，每5分钟刷新一次通知，减少请求频率
+        const interval = setInterval(() => {
+          dispatch(fetchNotifications(session.user.id));
+        }, 300000); // 从60000改为300000 (5分钟)
+        
+        return () => clearInterval(interval);
       }
     };
 
     getUser();
-
-    // 设置定时器，每分钟刷新一次通知
-    const interval = setInterval(() => {
-      if (user) {
-        dispatch(fetchNotifications(user.id));
-      }
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [dispatch, user]);
+    
+  }, [dispatch]); // 只依赖于dispatch，避免重复请求
 
   return (
     <div className="fixed top-0 bottom-0 left-0 z-50 w-16 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex flex-col">

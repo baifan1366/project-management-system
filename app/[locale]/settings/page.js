@@ -597,14 +597,14 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>{t('notifications')}</CardTitle>
-                <CardDescription>{t('profile.notificationsDesc')}</CardDescription>
+                <CardDescription>{t('notificationsDesc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>{t('profile.emailNotifications')}</Label>
+                    <Label>{t('emailNotifications')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      {t('profile.emailNotificationsDesc')}
+                      {t('emailNotificationsDesc')}
                     </p>
                   </div>
                   <Switch
@@ -616,9 +616,9 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>{t('profile.pushNotifications')}</Label>
+                    <Label>{t('pushNotifications')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      {t('profile.pushNotificationsDesc')}
+                      {t('pushNotificationsDesc')}
                     </p>
                   </div>
                   <Switch
@@ -630,9 +630,9 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>{t('profile.weeklyDigest')}</Label>
+                    <Label>{t('weeklyDigest')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      {t('profile.weeklyDigestDesc')}
+                      {t('weeklyDigestDesc')}
                     </p>
                   </div>
                   <Switch
@@ -644,9 +644,9 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>{t('profile.mentionNotifications')}</Label>
+                    <Label>{t('mentionNotifications')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      {t('profile.mentionNotificationsDesc')}
+                      {t('mentionNotificationsDesc')}
                     </p>
                   </div>
                   <Switch
@@ -658,14 +658,14 @@ export default function SettingsPage() {
                 </div>
                 
                 <div className="pt-4 border-t">
-                  <h3 className="text-lg font-medium mb-3">{t('profile.notificationTypes')}</h3>
+                  <h3 className="text-lg font-medium mb-3">{t('notificationTypes')}</h3>
                   
                   <div className="grid gap-4">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>{t('profile.taskAssignments')}</Label>
+                        <Label>{t('taskAssignments')}</Label>
                         <p className="text-sm text-muted-foreground">
-                          {t('profile.taskAssignmentsDesc')}
+                          {t('taskAssignmentsDesc')}
                         </p>
                       </div>
                       <Switch
@@ -678,9 +678,9 @@ export default function SettingsPage() {
                     
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>{t('profile.taskComments')}</Label>
+                        <Label>{t('taskComments')}</Label>
                         <p className="text-sm text-muted-foreground">
-                          {t('profile.taskCommentsDesc')}
+                          {t('taskCommentsDesc')}
                         </p>
                       </div>
                       <Switch
@@ -693,9 +693,9 @@ export default function SettingsPage() {
                     
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>{t('profile.dueDates')}</Label>
+                        <Label>{t('dueDates')}</Label>
                         <p className="text-sm text-muted-foreground">
-                          {t('profile.dueDatesDesc')}
+                          {t('dueDatesDesc')}
                         </p>
                       </div>
                       <Switch
@@ -708,9 +708,9 @@ export default function SettingsPage() {
                     
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>{t('profile.teamInvitations')}</Label>
+                        <Label>{t('teamInvitations')}</Label>
                         <p className="text-sm text-muted-foreground">
-                          {t('profile.teamInvitationsDesc')}
+                          {t('teamInvitationsDesc')}
                         </p>
                       </div>
                       <Switch
