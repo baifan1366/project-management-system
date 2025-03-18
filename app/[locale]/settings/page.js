@@ -35,7 +35,11 @@ export default function SettingsPage() {
     emailNotifications: true,
     pushNotifications: true,
     weeklyDigest: true,
-    mentionNotifications: true
+    mentionNotifications: true,
+    taskAssignments: true,
+    taskComments: true,
+    dueDates: true,
+    teamInvitations: true
   });
   const [passwords, setPasswords] = useState({
     currentPassword: '',
@@ -65,7 +69,11 @@ export default function SettingsPage() {
           emailNotifications: session.user.user_metadata?.emailNotifications ?? true,
           pushNotifications: session.user.user_metadata?.pushNotifications ?? true,
           weeklyDigest: session.user.user_metadata?.weeklyDigest ?? true,
-          mentionNotifications: session.user.user_metadata?.mentionNotifications ?? true
+          mentionNotifications: session.user.user_metadata?.mentionNotifications ?? true,
+          taskAssignments: session.user.user_metadata?.taskAssignments !== false,
+          taskComments: session.user.user_metadata?.taskComments !== false,
+          dueDates: session.user.user_metadata?.dueDates !== false,
+          teamInvitations: session.user.user_metadata?.teamInvitations !== false
         });
         
         // 获取用户的第三方登录提供商信息
@@ -141,7 +149,39 @@ export default function SettingsPage() {
     if (!user) return;
     setLoading(true);
     try {
-      await api.users.updateNotifications(user.id, notifications);
+      // 更新用户的通知首选项
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          emailNotifications: notifications.emailNotifications,
+          pushNotifications: notifications.pushNotifications,
+          weeklyDigest: notifications.weeklyDigest,
+          mentionNotifications: notifications.mentionNotifications,
+          taskAssignments: notifications.taskAssignments,
+          taskComments: notifications.taskComments,
+          dueDates: notifications.dueDates,
+          teamInvitations: notifications.teamInvitations
+        }
+      });
+      
+      if (error) throw error;
+      
+      // 使用Redux更新用户偏好
+      await dispatch(updateUserPreference({ 
+        userId: user.id, 
+        preferenceData: { 
+          notifications: {
+            emailNotifications: notifications.emailNotifications,
+            pushNotifications: notifications.pushNotifications,
+            weeklyDigest: notifications.weeklyDigest,
+            mentionNotifications: notifications.mentionNotifications,
+            taskAssignments: notifications.taskAssignments,
+            taskComments: notifications.taskComments,
+            dueDates: notifications.dueDates,
+            teamInvitations: notifications.teamInvitations
+          }
+        }
+      }));
+      
       toast.success(t('saved'));
     } catch (error) {
       console.error('Error saving notifications:', error);
@@ -557,14 +597,14 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>{t('notifications')}</CardTitle>
-                <CardDescription>{t('notifications')}</CardDescription>
+                <CardDescription>{t('profile.notificationsDesc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>{t('emailNotifications')}</Label>
+                    <Label>{t('profile.emailNotifications')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      {t('emailNotifications')}
+                      {t('profile.emailNotificationsDesc')}
                     </p>
                   </div>
                   <Switch
@@ -576,9 +616,9 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>{t('pushNotifications')}</Label>
+                    <Label>{t('profile.pushNotifications')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      {t('pushNotifications')}
+                      {t('profile.pushNotificationsDesc')}
                     </p>
                   </div>
                   <Switch
@@ -590,9 +630,9 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>{t('weeklyDigest')}</Label>
+                    <Label>{t('profile.weeklyDigest')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      {t('weeklyDigest')}
+                      {t('profile.weeklyDigestDesc')}
                     </p>
                   </div>
                   <Switch
@@ -604,9 +644,9 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>{t('mentionNotifications')}</Label>
+                    <Label>{t('profile.mentionNotifications')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      {t('mentionNotifications')}
+                      {t('profile.mentionNotificationsDesc')}
                     </p>
                   </div>
                   <Switch
@@ -615,6 +655,72 @@ export default function SettingsPage() {
                       setNotifications(prev => ({ ...prev, mentionNotifications: checked }))
                     }
                   />
+                </div>
+                
+                <div className="pt-4 border-t">
+                  <h3 className="text-lg font-medium mb-3">{t('profile.notificationTypes')}</h3>
+                  
+                  <div className="grid gap-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>{t('profile.taskAssignments')}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t('profile.taskAssignmentsDesc')}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications.taskAssignments}
+                        onCheckedChange={(checked) =>
+                          setNotifications(prev => ({ ...prev, taskAssignments: checked }))
+                        }
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>{t('profile.taskComments')}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t('profile.taskCommentsDesc')}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications.taskComments}
+                        onCheckedChange={(checked) =>
+                          setNotifications(prev => ({ ...prev, taskComments: checked }))
+                        }
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>{t('profile.dueDates')}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t('profile.dueDatesDesc')}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications.dueDates}
+                        onCheckedChange={(checked) =>
+                          setNotifications(prev => ({ ...prev, dueDates: checked }))
+                        }
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>{t('profile.teamInvitations')}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t('profile.teamInvitationsDesc')}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications.teamInvitations}
+                        onCheckedChange={(checked) =>
+                          setNotifications(prev => ({ ...prev, teamInvitations: checked }))
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
               </CardContent>
               <CardFooter>
