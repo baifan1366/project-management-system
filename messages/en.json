@@ -43,7 +43,26 @@
     "markAsRead": "Mark as Read",
     "markAllAsRead": "Mark All as Read",
     "noNotifications": "No notifications",
-    "close": "Close"
+    "close": "Close",
+    "confirmDialog": {
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "continue": "Continue",
+      "finish": "Finish",
+      "save": "Save",
+      "discard": "Discard",
+      "confirmAction": "Confirm Action",
+      "confirmActionDesc": "Are you sure you want to perform this action? This cannot be undone.",
+      "deleteConfirm": "Confirm Delete",
+      "deleteConfirmDesc": "Are you sure you want to delete this item? This action cannot be undone and all associated data will be permanently deleted.",
+      "warning": "Warning",
+      "warningDesc": "This action will affect existing data. It's recommended to backup your data before proceeding.",
+      "success": "Success",
+      "successDesc": "Your action was completed successfully. Would you like to continue to the next step?",
+      "question": "Question",
+      "questionDesc": "Do you want to save your current changes?"
+    }
   },
   "profile": {
     "title": "Settings",

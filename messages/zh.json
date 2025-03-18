@@ -43,7 +43,26 @@
     "markAsRead": "标记为已读",
     "markAllAsRead": "全部标记为已读",
     "noNotifications": "暂无通知",
-    "close": "关闭"
+    "close": "关闭",
+    "confirmDialog": {
+      "confirm": "确认",
+      "cancel": "取消",
+      "delete": "删除",
+      "continue": "继续",
+      "finish": "完成",
+      "save": "保存",
+      "discard": "不保存",
+      "confirmAction": "确认操作",
+      "confirmActionDesc": "您确定要执行此操作吗？此操作无法撤销。",
+      "deleteConfirm": "删除确认",
+      "deleteConfirmDesc": "您确定要删除此项目吗？此操作无法撤销，所有相关数据将被永久删除。",
+      "warning": "警告",
+      "warningDesc": "此操作将会影响现有数据，建议您在继续之前备份数据。",
+      "success": "操作成功",
+      "successDesc": "您的操作已成功完成。您想要继续下一步操作吗？",
+      "question": "提示问题",
+      "questionDesc": "您想要保存当前的更改吗？"
+    }
   },
   "profile": {
     "title": "设置",

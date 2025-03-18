@@ -5,6 +5,7 @@ import { store } from '@/lib/redux/store'
 import { ThemeProvider } from 'next-themes'
 import { ChatProvider } from '@/contexts/ChatContext'
 import { ChatDialogProvider } from '@/contexts/ChatDialogContext';
+import { ConfirmProvider } from '@/hooks/use-confirm';
 
 export function Providers({ children }) {
   return (
@@ -12,7 +13,9 @@ export function Providers({ children }) {
       <ThemeProvider attribute="class">
         <ChatProvider>
           <ChatDialogProvider>
-            {children}
+            <ConfirmProvider>
+              {children}
+            </ConfirmProvider>
           </ChatDialogProvider>
         </ChatProvider>
       </ThemeProvider>
