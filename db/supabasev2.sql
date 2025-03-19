@@ -328,6 +328,48 @@ CREATE TABLE "subscription_payment" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 用户订阅计划表
+CREATE TABLE "user_subscription_plan" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
+  "status" TEXT NOT NULL CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED')),
+  "start_date" TIMESTAMP NOT NULL,
+  "end_date" TIMESTAMP NOT NULL,
+  -- 用户限制
+  "max_users" INT NOT NULL,
+  "max_workspaces" INT NOT NULL,
+  -- AI 和自动化使用限制
+  "max_ai_agents" INT NOT NULL,
+  "max_automation_flows" INT NOT NULL,
+  "max_tasks_per_month" INT NOT NULL,
+  -- 使用统计
+  "current_users" INT DEFAULT 0,
+  "current_workspaces" INT DEFAULT 0,
+  "current_ai_agents" INT DEFAULT 0,
+  "current_automation_flows" INT DEFAULT 0,
+  "current_tasks_this_month" INT DEFAULT 0,
+  -- 时间戳
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 促销码表
+CREATE TABLE "promo_code" (
+  "id" SERIAL PRIMARY KEY,
+  "code" VARCHAR(50) UNIQUE NOT NULL,
+  "description" TEXT,
+  "discount_type" TEXT NOT NULL CHECK ("discount_type" IN ('PERCENTAGE', 'FIXED_AMOUNT')),
+  "discount_value" DECIMAL(10, 2) NOT NULL,
+  "max_uses" INT,
+  "current_uses" INT DEFAULT 0,
+  "start_date" TIMESTAMP NOT NULL,
+  "end_date" TIMESTAMP,
+  "is_active" BOOLEAN DEFAULT TRUE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 团队自定义字段值索引
 CREATE INDEX idx_team_custom_field_value_field ON "team_custom_field_value"("team_custom_field_id");
 
@@ -366,3 +408,9 @@ CREATE INDEX idx_subscription_payment_subscription ON "subscription_payment"("te
 CREATE INDEX idx_team_invitation_email ON "user_team_invitation"("user_email");
 CREATE INDEX idx_team_invitation_team ON "user_team_invitation"("team_id");
 CREATE INDEX idx_team_invitation_status ON "user_team_invitation"("status");
+
+-- 索引
+CREATE INDEX idx_user_subscription_user ON "user_subscription_plan"("user_id");
+CREATE INDEX idx_user_subscription_status ON "user_subscription_plan"("status");
+CREATE INDEX idx_promo_code_code ON "promo_code"("code");
+CREATE INDEX idx_promo_code_active ON "promo_code"("is_active");

@@ -133,19 +133,40 @@
     "avatarUpdated": "Avatar updated successfully",
     "billing": {
       "title": "Billing",
+    "subscription": {
+      "title": "Subscription",
       "description": "Manage your subscription and billing",
-      "currentPlan": "Current Plan",
-      "upgradePlan": "Upgrade Plan",
-      "freePlan": "Free Plan",
-      "proPlan": "Pro Plan",
-      "features": {
-        "basicProjectManagement": "Basic Project Management",
-        "maxProjects": "Up to 3 projects",
-        "basicCollaboration": "Basic Collaboration",
-        "unlimitedProjects": "Unlimited Projects",
-        "advancedCollaboration": "Advanced Collaboration",
-        "prioritySupport": "Priority Support",
-        "customWorkflows": "Custom Workflows"
+      "tabs": {
+        "currentPlan": "Current Plan",
+        "usageStats": "Usage Stats",
+        "paymentHistory": "Payment History",
+        "upgradeOptions": "Upgrade Options"
+      },
+      "currentPlan": {
+        "title": "Current Plan",
+        "status": "Status",
+        "validUntil": "Valid Until",
+        "features": "Features",
+        "upgrade": "Upgrade Plan"
+      },
+      "usageStats": {
+        "title": "Usage Statistics",
+        "users": "Users",
+        "workspaces": "Workspaces",
+        "storage": "Storage",
+        "aiCredits": "AI Credits"
+      },
+      "paymentHistory": {
+        "title": "Payment History",
+        "date": "Date",
+        "amount": "Amount",
+        "status": "Status",
+        "invoice": "Invoice"
+      },
+      "upgradeOptions": {
+        "title": "Upgrade Options",
+        "compare": "Compare Plans",
+        "contactSales": "Contact Sales"
       }
     }
   },

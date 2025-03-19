@@ -11,7 +11,7 @@ export async function POST(req) {
     }
     
     // 从请求中获取数据
-    const { amount, quantity } = await req.json();
+    const { amount, quantity, planName, planId } = await req.json();
     
     // 验证必要参数
     if (!amount || amount <= 0) {
@@ -32,6 +32,8 @@ export async function POST(req) {
         enabled: true,
       },
       metadata: {
+        planName: planName,
+        planId: planId,
         quantity: quantity.toString()
       }
     });

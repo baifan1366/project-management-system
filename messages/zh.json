@@ -146,6 +146,40 @@
         "advancedCollaboration": "高级协作",
         "prioritySupport": "优先支持",
         "customWorkflows": "自定义工作流"
+    "subscription": {
+      "title": "订阅",
+      "description": "管理您的订阅和账单",
+      "tabs": {
+        "currentPlan": "当前计划",
+        "usageStats": "使用统计",
+        "paymentHistory": "支付历史",
+        "upgradeOptions": "升级选项"
+      },
+      "currentPlan": {
+        "title": "当前计划",
+        "status": "状态",
+        "validUntil": "有效期至",
+        "features": "功能特性",
+        "upgrade": "升级计划"
+      },
+      "usageStats": {
+        "title": "使用统计",
+        "users": "用户数",
+        "workspaces": "工作区",
+        "storage": "存储空间",
+        "aiCredits": "AI 点数"
+      },
+      "paymentHistory": {
+        "title": "支付历史",
+        "date": "日期",
+        "amount": "金额",
+        "status": "状态",
+        "invoice": "发票"
+      },
+      "upgradeOptions": {
+        "title": "升级选项",
+        "compare": "比较计划",
+        "contactSales": "联系销售"
       }
     }
   },
