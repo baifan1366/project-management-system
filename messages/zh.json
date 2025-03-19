@@ -1,10 +1,10 @@
 {
   "app": {
-    "title": "团队协作",
+    "title": "团队同步",
     "description": "项目管理系统"
   },
   "Header": {
-    "projectName": "团队协作",
+    "projectName": "团队同步",
     "dashboard": "仪表盘",
     "projects": "项目",
     "tasks": "任务",
@@ -42,7 +42,7 @@
     "unread": "未读",
     "markAsRead": "标记为已读",
     "markAllAsRead": "全部标记为已读",
-    "noNotifications": "暂无通知",
+    "noNotifications": "没有通知",
     "close": "关闭",
     "confirmDialog": {
       "confirm": "确认",
@@ -51,17 +51,17 @@
       "continue": "继续",
       "finish": "完成",
       "save": "保存",
-      "discard": "不保存",
+      "discard": "放弃",
       "confirmAction": "确认操作",
       "confirmActionDesc": "您确定要执行此操作吗？此操作无法撤销。",
-      "deleteConfirm": "删除确认",
+      "deleteConfirm": "确认删除",
       "deleteConfirmDesc": "您确定要删除此项目吗？此操作无法撤销，所有相关数据将被永久删除。",
       "warning": "警告",
-      "warningDesc": "此操作将会影响现有数据，建议您在继续之前备份数据。",
-      "success": "操作成功",
-      "successDesc": "您的操作已成功完成。您想要继续下一步操作吗？",
-      "question": "提示问题",
-      "questionDesc": "您想要保存当前的更改吗？"
+      "warningDesc": "此操作将影响现有数据。建议在继续之前备份您的数据。",
+      "success": "成功",
+      "successDesc": "您的操作已成功完成。是否继续下一步？",
+      "question": "问题",
+      "questionDesc": "您想保存当前更改吗？"
     }
   },
   "profile": {
@@ -504,7 +504,19 @@
     "inviteSelected": "邀请选中的用户",
     "invitationSent": "邀请已发送",
     "invitationFailed": "邀请失败",
-    "newMessage": "新消息"
+    "newMessage": "新消息",
+    "switchToAI": "切换到AI聊天",
+    "switchToNormal": "返回普通聊天",
+    "unknownChat": "未知聊天",
+    "aiAssistant": "AI助手",
+    "poweredBy": "由{{model}}提供支持",
+    "welcomeTitle": "欢迎使用AI助手",
+    "welcomeMessage": "您可以询问我任何问题，我会尽力提供帮助。",
+    "user": "用户",
+    "thinking": "正在思考...",
+    "aiResponseError": "AI响应错误:",
+    "aiApiError": "AI API调用错误:",
+    "errorMessage": "抱歉，处理您的请求时出现错误。请稍后再试。"
   },
   "TeamInvitation": {
     "teamInvitation": "团队邀请",
