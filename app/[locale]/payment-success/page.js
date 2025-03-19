@@ -51,9 +51,11 @@ export default function PaymentSuccess() {
 
   const sendEmail = async (paymentDetails) => {
     try {
-      const email = localStorage.getItem('userEmail');
+      // 从 paymentDetails 的 metadata 中获取邮箱
+      const email = paymentDetails.metadata?.userEmail;
+      
       if (!email) {
-        console.error('No email found in localStorage');
+        console.error('No email found in payment details');
         return;
       }
       
@@ -69,13 +71,13 @@ export default function PaymentSuccess() {
           orderDetails: {
             id: paymentDetails?.id || 'N/A',
             amount: paymentDetails?.amount || 0,
-            planName: paymentDetails?.planName || 'Subscription Plan'
+            planName: paymentDetails?.metadata?.planName || 'Subscription Plan'
           }
         }),
       });
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to send email');
+        throw new Error('Failed to send email');
       }
       
       console.log('Email sent successfully');

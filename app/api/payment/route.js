@@ -7,11 +7,11 @@ export async function POST(req) {
   try {
     // 验证 Stripe 密钥
     if (!process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY) {
-      throw new Error('Stripe secret key is missing. Check your environment variables.');
+      throw new Error('Stripe secret key is missing');
     }
     
-    // 从请求中获取数据
-    const { amount, quantity, planName, planId } = await req.json();
+    // 从请求中获取数据，包括邮箱
+    const { amount, quantity, planName, planId, email } = await req.json();
     
     // 验证必要参数
     if (!amount || amount <= 0) {
@@ -21,12 +21,14 @@ export async function POST(req) {
     if (!quantity || quantity < 1) {
       return NextResponse.json({ error: 'Quantity must be at least 1' }, { status: 400 });
     }
+
+    const minAmount = Math.max(amount * 100, 50);
     
-    console.log('Creating payment intent for amount:', amount * quantity);
+    console.log('Creating payment intent for:', { amount: minAmount * quantity, email });
 
     // 创建支付意向
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * quantity * 100), // 转换为分
+      amount: Math.round(minAmount * quantity),
       currency: 'usd',
       automatic_payment_methods: {
         enabled: true,
@@ -34,7 +36,8 @@ export async function POST(req) {
       metadata: {
         planName: planName,
         planId: planId,
-        quantity: quantity.toString()
+        quantity: quantity.toString(),
+        userEmail: email  // 存储邮箱到 metadata
       }
     });
     

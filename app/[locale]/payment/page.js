@@ -26,8 +26,6 @@ export default function PaymentPage() {
   const [clientSecret, setClientSecret] = useState('')
   const [paymentStatus, setPaymentStatus] = useState('')
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const [isLoadingQR, setIsLoadingQR] = useState(false);
   const [handleCardPayment, setHandleCardPayment] = useState(null);
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);

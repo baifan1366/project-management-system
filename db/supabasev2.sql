@@ -1,12 +1,3 @@
--- 默认字段表
-CREATE TABLE "default" (
-  "id" SERIAL PRIMARY KEY,
-  "name" VARCHAR(255) NOT NULL,
-  "qty" INT NOT NULL,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "edited_by" UUID NULL REFERENCES "user"("id") ON DELETE CASCADE
-)
-
 -- 用户表
 CREATE TABLE "user" (
   "id" UUID PRIMARY KEY,
@@ -26,6 +17,15 @@ CREATE TABLE "user" (
   "email_verified" BOOLEAN DEFAULT FALSE,
   "verification_token" VARCHAR(255),
   "verification_token_expires" TIMESTAMP
+);
+
+-- 默认字段表
+CREATE TABLE "default" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "qty" INT NOT NULL,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "edited_by" UUID NULL REFERENCES "user"("id") ON DELETE CASCADE
 );
 
 -- 项目表
