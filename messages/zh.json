@@ -146,6 +146,8 @@
         "advancedCollaboration": "高级协作",
         "prioritySupport": "优先支持",
         "customWorkflows": "自定义工作流"
+      }
+    },
     "subscription": {
       "title": "订阅",
       "description": "管理您的订阅和账单",

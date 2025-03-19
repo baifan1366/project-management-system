@@ -132,7 +132,8 @@
     "setup": "Set Up",
     "avatarUpdated": "Avatar updated successfully",
     "billing": {
-      "title": "Billing",
+      "title": "Billing"
+    },
     "subscription": {
       "title": "Subscription",
       "description": "Manage your subscription and billing",
