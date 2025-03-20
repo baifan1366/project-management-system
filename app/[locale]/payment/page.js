@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -14,24 +14,63 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
 export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // 获取 plan_id 参数
-  const planId = searchParams.get('plan_id')
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // 其他状态
+  const [showWarning, setShowWarning] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
+
+  // 获取 URL 参数
+  const planId = searchParams.get('plan_id');
+  const userId = searchParams.get('user_id');
 
   const [planDetails, setPlanDetails] = useState(null)
   const [quantity, setQuantity] = useState(1)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [showWarning, setShowWarning] = useState(false)
   const [showPromoInput, setShowPromoInput] = useState(false)
   const [promoCode, setPromoCode] = useState('')
   const [clientSecret, setClientSecret] = useState('')
   const [paymentStatus, setPaymentStatus] = useState('')
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [handleCardPayment, setHandleCardPayment] = useState(null);
-  const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
   const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    // 简单验证必要参数
+    if (!planId || !userId) {
+      console.error('Missing required parameters:', { planId, userId });
+      setError('Missing required parameters');
+      router.push('/pricing');
+      return;
+    }
+
+    console.log('Received parameters:', { planId, userId });
+    setLoading(false);
+  }, [planId, userId, router]);
+
+  useEffect(() => {
+    const fetchUserEmail = async () => {
+      if (!userId) return;
+      
+      const { data, error } = await supabase
+        .from('user')
+        .select('email')
+        .eq('id', userId)
+        .single();
+        
+      if (error) {
+        console.error('Error fetching email:', error);
+        return;
+      }
+      
+      if (data?.email) {
+        setEmail(data.email);
+      }
+    };
+
+    fetchUserEmail();
+  }, []);
 
   useEffect(() => {
     const fetchPlanDetails = async () =>{
@@ -55,12 +94,6 @@ export default function PaymentPage() {
           router.push('/login?redirect=payment&plan_id=' + planId);
           return;
         }
-
-        // 设置用户
-        setUser(session.user);
-
-        // 从用户会话中获取邮箱
-        setEmail(session.user.email)
 
         // 获取计划详情
         const {data, error} = await supabase
@@ -121,58 +154,67 @@ export default function PaymentPage() {
       console.log('Creating payment intent...');
       setPaymentStatus('loading');
       
-      const subtotal = calculateSubtotal();
-      console.log('Calculated subtotal:', subtotal);
-      
-      fetch('/api/payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          planId: planDetails.id,
-          amount: planDetails.price,
-          quantity: quantity,
-          planName: planDetails.name,
-        }),
-      })
-      .then(async (res) => {
-        // 检查响应
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error('Server error:', errorText);
-          try {
-            const errorJson = JSON.parse(errorText);
-            throw new Error(errorJson.error || `Server error: ${res.status}`);
-          } catch (e) {
-            throw new Error(`Server error: ${res.status}`);
+      createPaymentIntent()
+        .then((clientSecret) => {
+          if (!clientSecret) {
+            console.error('No client secret received');
+            throw new Error('No client secret received');
           }
-        }
-        
-        return res.json();
-      })
-      .then((data) => {
-        if (data && data.clientSecret) {
-          console.log('Payment intent created successfully');
-          setClientSecret(data.clientSecret);
+
+          console.log('Setting client secret:', clientSecret);
+          setClientSecret(clientSecret);
           setPaymentStatus('ready');
 
-          // 在创建支付意向成功后，保存数量到本地存储
+          // 保存支付元数据到 localStorage
           localStorage.setItem('paymentMetadata', JSON.stringify({
             planId: planDetails.id,
             quantity: quantity,
-            planName: planDetails.name
+            planName: planDetails.name,
+            userId: userId
           }));
-        } else {
-          console.error('Invalid response data:', data);
-          throw new Error('No client secret received');
-        }
-      })
-      .catch((err) => {
-        console.error('Error creating payment intent:', err);
-        setError(err.message || 'Failed to create payment intent');
-        setPaymentStatus('error');
-      });
+        })
+        .catch((err) => {
+          console.error('Error creating payment intent:', err);
+          setError(err.message || 'Failed to create payment intent');
+          setPaymentStatus('error');
+        });
     }
-  }, [selectedPaymentMethod, quantity, planDetails, calculateSubtotal]);
+  }, [selectedPaymentMethod, planDetails, quantity, userId]);
+
+  // 创建支付意向的函数
+  const createPaymentIntent = async () => {
+    try {
+      const response = await fetch('/api/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          planId,
+          amount: planDetails?.price,
+          quantity,
+          userId,
+          planName: planDetails?.name
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Payment intent creation failed:', errorText);
+        throw new Error(`Server error: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Payment intent response:', data);
+
+      if (!data.clientSecret) {
+        throw new Error('No client secret in response');
+      }
+
+      return data.clientSecret;
+    } catch (err) {
+      console.error('Error in createPaymentIntent:', err);
+      throw err;
+    }
+  };
 
   // Callback function to receive the payment handler from CheckoutForm
   const onPaymentSubmit = useCallback((handler) => {
@@ -310,7 +352,7 @@ export default function PaymentPage() {
           planName: planDetails.name,
           price: planDetails.price,
           quantity: quantity,
-          email: email
+          email: data.email
         }),
       });
       
@@ -361,8 +403,17 @@ export default function PaymentPage() {
     return '';
   };
 
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+
   return (
     <div className="min-h-screen flex">
+
       {/* 加载状态 */}
       {loading && (
         <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
@@ -622,77 +673,6 @@ export default function PaymentPage() {
                         <p className="mt-2 text-gray-600">Loading payment form...</p>
                       </div>
                     )}
-                  </div>
-                )}
-              </div>
-
-      
-              {/* Bank Transfer Option */}
-              <div className="border rounded-lg overflow-hidden">
-                <label className="flex items-center justify-between w-full p-4 cursor-pointer hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      name="payment-method"
-                      value="bank"
-                      checked={selectedPaymentMethod === 'bank'}
-                      onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                    />
-                    <div className="ml-3 flex items-center">
-                      <span className="font-medium text-gray-900 mr-2">Bank Transfer</span>
-                      <Image src="/bank.png" alt="Bank" width={24} height={24} className="object-contain" />
-                    </div>
-                  </div>
-                  <span className="text-green-500 text-sm">US$5</span>
-                </label>
-
-                {selectedPaymentMethod === 'bank' && (
-                  <div className="p-4 border-t">
-                    <div className="space-y-4">
-                      <div className="bg-green-50 p-3 rounded-md">
-                        <span className="text-sm text-green-700">
-                          💡 Use bank transfer to save US$5 on your purchase.
-                        </span>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm text-gray-700 mb-2">Select your bank</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="Search your bank"
-                            className="w-full p-3 border rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                          />
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-4">
-                        <button className="p-4 border rounded-lg hover:border-indigo-500 transition-colors">
-                          <Image src="/bank-logos/bofa.png" alt="Bank of America" width={100} height={40} className="object-contain" />
-                        </button>
-                        <button className="p-4 border rounded-lg hover:border-indigo-500 transition-colors">
-                          <Image src="/bank-logos/pnc.png" alt="PNC" width={100} height={40} className="object-contain" />
-                        </button>
-                        <button className="p-4 border rounded-lg hover:border-indigo-500 transition-colors">
-                          <Image src="/bank-logos/wells-fargo.png" alt="Wells Fargo" width={100} height={40} className="object-contain" />
-                        </button>
-                        <button className="p-4 border rounded-lg hover:border-indigo-500 transition-colors">
-                          <Image src="/bank-logos/chase.png" alt="Chase" width={100} height={40} className="object-contain" />
-                        </button>
-                        <button className="p-4 border rounded-lg hover:border-indigo-500 transition-colors">
-                          <Image src="/bank-logos/usaa.png" alt="USAA" width={100} height={40} className="object-contain" />
-                        </button>
-                        <button className="p-4 border rounded-lg hover:border-indigo-500 transition-colors">
-                          <Image src="/bank-logos/navy-federal.png" alt="Navy Federal" width={100} height={40} className="object-contain" />
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>

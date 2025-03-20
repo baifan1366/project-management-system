@@ -3,63 +3,40 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 export default function PaymentSuccess() {
   const [status, setStatus] = useState('loading');
   const [paymentDetails, setPaymentDetails] = useState(null);
   const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [userEmail, setUserEmail] = useState(null);
 
-  useEffect(() => {
-    // 检查是否有支付意向 ID 或会话 ID
-    const paymentIntent = searchParams.get('payment_intent');
-    const sessionId = searchParams.get('session_id');
-    
-    if (!paymentIntent && !sessionId) {
-      console.error('No payment identifier found in URL');
-      setStatus('error');
-      return;
-    }
-    
-    // 构建 API 请求 URL
-    let apiUrl = '/api/payment-status?';
-    if (paymentIntent) {
-      apiUrl += `payment_intent=${paymentIntent}`;
-    } else if (sessionId) {
-      apiUrl += `session_id=${sessionId}`;
-    }
-    
-    // 获取支付状态
-    fetch(apiUrl)
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error('Payment status error:', errorText);
-          throw new Error('Failed to fetch payment status');
-        }
-        return res.json();
-      })
-      .then((data) => {
-        console.log('Payment details:', data);
-        setPaymentDetails(data);
-        setStatus(data.status === 'succeeded' ? 'success' : 'processing');
-      })
-      .catch((err) => {
-        console.error('Error fetching payment status:', err);
-        setStatus('error');
-      });
-  }, [searchParams]);
-
-  const sendEmail = async (paymentDetails) => {
+  // 获取用户邮箱
+  const fetchUserEmail = async (userId) => {
     try {
-      // 从 paymentDetails 的 metadata 中获取邮箱
-      const email = paymentDetails.metadata?.userEmail;
-      
-      if (!email) {
-        console.error('No email found in payment details');
-        return;
-      }
-      
-      console.log('Sending email to:', email);
+      const { data, error } = await supabase
+        .from('user')
+        .select('email')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      console.log('Found user email:', data.email);
+      setUserEmail(data.email);
+      return data.email;
+    } catch (err) {
+      console.error('Error fetching user email:', err);
+      return null;
+    }
+  };
+
+  // 发送邮件
+  const sendEmail = async (email, paymentDetails) => {
+    try {
+      console.log('Sending email to:', email, 'with details:', paymentDetails);
       
       const response = await fetch('/api/send-email', {
         method: 'POST',
@@ -69,29 +46,71 @@ export default function PaymentSuccess() {
         body: JSON.stringify({
           to: email,
           orderDetails: {
-            id: paymentDetails?.id || 'N/A',
-            amount: paymentDetails?.amount || 0,
-            planName: paymentDetails?.metadata?.planName || 'Subscription Plan'
+            id: paymentDetails.id,
+            amount: paymentDetails.amount,
+            planName: paymentDetails.metadata.planName,
+            userId: paymentDetails.metadata.userId
           }
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to send email');
       }
-      
+
       console.log('Email sent successfully');
     } catch (err) {
       console.error('Failed to send email:', err);
     }
   };
 
-  // 在获取到支付详情后调用
   useEffect(() => {
-    if (paymentDetails && paymentDetails.status === 'succeeded') {
-      sendEmail(paymentDetails);
-    }
-  }, [paymentDetails]);
+    const fetchPaymentDetails = async () => {
+      try {
+        const paymentIntent = searchParams.get('payment_intent');
+        
+        if (!paymentIntent) {
+          throw new Error('No payment intent ID found');
+        }
+
+        console.log('Fetching payment details for:', paymentIntent);
+
+        const response = await fetch(`/api/payment-status?payment_intent=${paymentIntent}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch payment status: ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('Payment details received:', data);
+
+        setPaymentDetails(data);
+
+        // 获取用户邮箱并发送邮件
+        if (data.metadata?.userId) {
+          const email = await fetchUserEmail(data.metadata.userId);
+          if (email) {
+            await sendEmail(email, {
+              id: paymentIntent,
+              amount: data.amount,
+              metadata: data.metadata
+            });
+          }
+        }
+
+        setStatus(data.status === 'succeeded' ? 'success' : 'processing');
+      } catch (err) {
+        console.error('Error fetching payment details:', err);
+        setError(err.message);
+        setStatus('error');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPaymentDetails();
+  }, [searchParams]);
 
   // 格式化金额显示
   const formatAmount = (amount) => {
@@ -102,6 +121,61 @@ export default function PaymentSuccess() {
       currency: 'USD',
     }).format(amount / 100);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <h2 className="mt-4 text-xl font-semibold text-gray-900">Processing your payment...</h2>
+            <p className="mt-2 text-gray-600">
+              Please wait while we confirm your payment details.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Failed</h2>
+            <p className="mt-2 text-gray-600">
+              There was an issue processing your payment. Please try again.
+            </p>
+            {paymentDetails?.error && (
+              <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                {paymentDetails.error}
+              </div>
+            )}
+          </div>
+          <div className="mt-8 space-y-3">
+            <Link 
+              href="/dashboard"
+              className="block w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 transition-colors"
+            >
+              Go to Dashboard
+            </Link>
+            <Link 
+              href="/"
+              className="block w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              Return to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -140,7 +214,7 @@ export default function PaymentSuccess() {
               </div>
               <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Successful!</h2>
               <p className="mt-2 text-gray-600">
-                Thank you for subscribing to {paymentDetails?.planName}
+                Thank you for subscribing to {paymentDetails?.metadata?.planName}
               </p>
               <div className="mt-6 border-t border-gray-200 pt-6">
                 <div className="text-left">
@@ -148,7 +222,7 @@ export default function PaymentSuccess() {
                   <dl className="mt-4 space-y-4">
                     <div className="flex justify-between">
                       <dt className="text-gray-600">Plan</dt>
-                      <dd className="text-gray-900">{paymentDetails?.planName || 'Subscription Plan'}</dd>
+                      <dd className="text-gray-900">{paymentDetails?.metadata?.planName || 'Subscription Plan'}</dd>
                     </div>
                     {paymentDetails?.quantity && (
                       <div className="flex justify-between">
@@ -173,25 +247,6 @@ export default function PaymentSuccess() {
                   </dl>
                 </div>
               </div>
-            </>
-          )}
-
-          {status === 'error' && (
-            <>
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Failed</h2>
-              <p className="mt-2 text-gray-600">
-                There was an issue processing your payment. Please try again.
-              </p>
-              {paymentDetails?.error && (
-                <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
-                  {paymentDetails.error}
-                </div>
-              )}
             </>
           )}
 

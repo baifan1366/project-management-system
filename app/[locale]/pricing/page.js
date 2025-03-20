@@ -11,7 +11,7 @@ export default function PricingPage() {
   const t = useTranslations('Pricing')
   const dispatch = useDispatch()
   const router = useRouter()
-  const params = useParams()  // 获取路由参数
+  const params = useParams()  
   const { plans, status, error, selectedInterval } = useSelector((state) => state.plans)
 
   // 获取当前语言
@@ -27,36 +27,47 @@ export default function PricingPage() {
   // 处理计划选择
   const handlePlanSelection = async (plan) => {
     console.log('选择了计划:', plan);
-    
-    // 只创建包含 plan_id 的查询参数
-    const queryParams = new URLSearchParams({
-      plan_id: plan.id.toString(),
-      redirect: 'payment'
-    }).toString();
 
     try {
-      // 使用 getSession 而不是 getUser 来避免 AuthSessionMissingError
+      // 获取会话
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
         console.error('获取会话错误:', error);
-        // 会话错误，假设用户未登录
-        router.push(`/${locale}/login?${queryParams}`);
+        // 创建登录重定向参数
+        const loginParams = new URLSearchParams({
+          plan_id: plan.id.toString(),
+          redirect: 'payment'
+        }).toString();
+        router.push(`/${locale}/login?${loginParams}`);
         return;
       }
       
       // 检查会话是否存在且有用户
       if (data && data.session && data.session.user) {
         console.log('用户已登录，重定向到支付页面');
-        router.push(`/${locale}/payment?plan_id=${plan.id}`);
+        // 只传递必要的参数：plan_id 和 user_id
+        const paymentParams = new URLSearchParams({
+          plan_id: plan.id.toString(),
+          user_id: data.session.user.id
+        }).toString();
+        router.push(`/${locale}/payment?${paymentParams}`);
       } else {
         console.log('用户未登录，重定向到登录页面');
-        router.push(`/${locale}/login?${queryParams}`);
+        const loginParams = new URLSearchParams({
+          plan_id: plan.id.toString(),
+          redirect: 'payment'
+        }).toString();
+        router.push(`/${locale}/login?${loginParams}`);
       }
     } catch (err) {
       console.error('检查认证状态时出错:', err);
       // 出错时默认跳转到登录页面
-      router.push(`/${locale}/login?${queryParams}`);
+      const loginParams = new URLSearchParams({
+        plan_id: plan.id.toString(),
+        redirect: 'payment'
+      }).toString();
+      router.push(`/${locale}/login?${loginParams}`);
     }
   }
 
