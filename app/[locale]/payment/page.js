@@ -7,6 +7,9 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import CheckoutForm from '@/components/CheckoutForm'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+//
+import { useSelector, useDispatch } from 'react-redux'
+import { createPaymentIntent, setPaymentMetadata } from '@/lib/redux/features/paymentSlice'
 
 // Initialize Stripe outside the component
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -35,6 +38,9 @@ export default function PaymentPage() {
   const [handleCardPayment, setHandleCardPayment] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [email, setEmail] = useState('');
+
+  const dispatch = useDispatch()
+  const { status, error: reduxError, metadata } = useSelector(state => state.payment)
 
   useEffect(() => {
     // 简单验证必要参数
@@ -120,6 +126,51 @@ export default function PaymentPage() {
     fetchPlanDetails();
   },[planId, router])
 
+  useEffect(() => {
+    const initializePayment = async () => {
+      try {
+        // 首先验证必需的参数
+        if (!planId || !userId || !planDetails?.price) {
+          console.error('Missing required parameters:', { planId, userId, price: planDetails?.price });
+          return;
+        }
+
+        // 设置支付元数据
+        const paymentMetadata = {
+          planId,
+          userId,
+          planName: planDetails?.name,
+          amount: planDetails?.price,
+          quantity: quantity
+        };
+
+        console.log('Setting payment metadata:', paymentMetadata);
+        dispatch(setPaymentMetadata(paymentMetadata));
+
+        // 创建支付意向
+        const result = await dispatch(createPaymentIntent({
+          ...paymentMetadata,
+          amount: planDetails.price * quantity // 确保金额正确计算
+        })).unwrap();
+
+        console.log('Payment intent created:', result);
+        
+        if (result.clientSecret) {
+          setClientSecret(result.clientSecret);
+          setPaymentStatus('ready');
+        }
+      } catch (err) {
+        console.error('Error creating payment intent:', err);
+        setError(err.message || 'Failed to create payment intent');
+      }
+    };
+
+    // 只有当所有必需的数据都可用时才初始化支付
+    if (planDetails && planId && userId) {
+      initializePayment();
+    }
+  }, [dispatch, planId, userId, planDetails, quantity]);
+
   // Stripe appearance configuration
   const appearance = {
     theme: 'stripe',
@@ -148,74 +199,6 @@ export default function PaymentPage() {
     return planDetails.price * quantity;
   }, [planDetails, quantity]);
 
-  // 然后在 useEffect 中使用它
-  useEffect(() => {
-    if (selectedPaymentMethod === 'card' && planDetails && planDetails.price) {
-      console.log('Creating payment intent...');
-      setPaymentStatus('loading');
-      
-      createPaymentIntent()
-        .then((clientSecret) => {
-          if (!clientSecret) {
-            console.error('No client secret received');
-            throw new Error('No client secret received');
-          }
-
-          console.log('Setting client secret:', clientSecret);
-          setClientSecret(clientSecret);
-          setPaymentStatus('ready');
-
-          // 保存支付元数据到 localStorage
-          localStorage.setItem('paymentMetadata', JSON.stringify({
-            planId: planDetails.id,
-            quantity: quantity,
-            planName: planDetails.name,
-            userId: userId
-          }));
-        })
-        .catch((err) => {
-          console.error('Error creating payment intent:', err);
-          setError(err.message || 'Failed to create payment intent');
-          setPaymentStatus('error');
-        });
-    }
-  }, [selectedPaymentMethod, planDetails, quantity, userId]);
-
-  // 创建支付意向的函数
-  const createPaymentIntent = async () => {
-    try {
-      const response = await fetch('/api/payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          planId,
-          amount: planDetails?.price,
-          quantity,
-          userId,
-          planName: planDetails?.name
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Payment intent creation failed:', errorText);
-        throw new Error(`Server error: ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('Payment intent response:', data);
-
-      if (!data.clientSecret) {
-        throw new Error('No client secret in response');
-      }
-
-      return data.clientSecret;
-    } catch (err) {
-      console.error('Error in createPaymentIntent:', err);
-      throw err;
-    }
-  };
-
   // Callback function to receive the payment handler from CheckoutForm
   const onPaymentSubmit = useCallback((handler) => {
     setHandleCardPayment(handler);
@@ -223,55 +206,20 @@ export default function PaymentPage() {
 
   // Update the handlePayment function
   const handlePayment = async () => {
-    if (!selectedPaymentMethod) {
-      setError('Please select a payment method');
+    if (!metadata.amount || !metadata.userId) {
+      setError('Missing required payment information');
       return;
     }
 
-    setPaymentStatus('processing');
-    
     try {
-      if (selectedPaymentMethod === 'alipay') {
-        // Fetch the payment intent client secret
-        const response = await fetch('/api/create-alipay-session');
-        const data = await response.json();
-        
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        // Initialize Stripe
-        const stripe = await stripePromise;
-        if (!stripe) {
-          throw new Error('Failed to load Stripe');
-        }
-
-        // Redirect to Alipay payment page
-        const { error } = await stripe.confirmAlipayPayment(
-          data.clientSecret,
-          {
-            payment_method: {
-              billing_details: {
-                name: 'Test User',
-              },
-            },
-            return_url: `${window.location.origin}/payment-success`,
-          }
-        );
-
-        if (error) {
-          throw new Error(error.message);
-        }
-      } else if (selectedPaymentMethod === 'card') {
-        // Handle card payment in CardPaymentForm
-      } else if (selectedPaymentMethod === 'bank') {
-        // Show bank transfer information
-        alert('Please complete the bank transfer using the provided details.');
+      const result = await dispatch(createPaymentIntent(metadata)).unwrap();
+      // 处理支付结果
+      if (result.clientSecret) {
+        // 处理成功
       }
     } catch (err) {
-      console.error('Payment error:', err);
-      setError(err.message);
-      setPaymentStatus('');
+      console.error('Payment failed:', err);
+      setError(err.message || 'Payment failed');
     }
   };
 
@@ -415,11 +363,11 @@ export default function PaymentPage() {
     <div className="min-h-screen flex">
 
       {/* 加载状态 */}
-      {loading && (
+      {status === 'loading' && (
         <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-4 text-gray-700">Loading plan details...</p>
+            <p className="mt-4 text-gray-700">Processing payment...</p>
           </div>
         </div>
       )}

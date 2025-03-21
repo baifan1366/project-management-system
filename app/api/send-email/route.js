@@ -56,7 +56,7 @@ export async function POST(request) {
         <!-- Logo and Brand Name - At the top left of the white card -->
         <div style="display: flex; align-items: center; margin-bottom: 16px">
           <img
-            src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/logo.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvbG9nby5wbmciLCJpYXQiOjE3NDE2MDUwMjUsImV4cCI6MTgzNjIxMzAyNX0.IOriHUlZYA8zsub-O1o9a10EowBaZCUHLqs6GfTzOvM"
+            src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/logo.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvbG9nby5wbmciLCJpYXQiOjE3NDI1Mjk1ODIsImV4cCI6MTgzNzEzNzU4Mn0.qDeS69M-0yTevXDoiuDc0rO_v_tsvxs0Z59C_snMRsE"
             alt="Team Sync"
             style="height: 30px; width: 30px; margin-right: 8px"
           />
@@ -77,7 +77,7 @@ export async function POST(request) {
           <!-- High Five Icon -->
           <div style="text-align: center; margin: 16px 0">
             <img
-              src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/blackhighFive_noBG.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvYmxhY2toaWdoRml2ZV9ub0JHLnBuZyIsImlhdCI6MTc0MTYwNjQ0MiwiZXhwIjoxODM2MjE0NDQyfQ.dvaDfnnHvlwNRwndmwbzSPm-fZ6GpR5XssbXi5TkcfA"
+              src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/blackhighFive_noBG.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvYmxhY2toaWdoRml2ZV9ub0JHLnBuZyIsImlhdCI6MTc0MjUyOTU1MCwiZXhwIjoxODM3MTM3NTUwfQ.ax1W0LxDSdZm4xYJXo6Xi9EkPmOKD__-8DE9Yk_kVnQ"
               alt="High Five Icon"
               style="height: 150px; width: 150px"
             />

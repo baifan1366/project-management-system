@@ -2,16 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchPaymentStatus, setPaymentMetadata } from '@/lib/redux/features/paymentSlice';
 import { supabase } from '@/lib/supabase';
+import Link from 'next/link';
 
 export default function PaymentSuccess() {
-  const [status, setStatus] = useState('loading');
-  const [paymentDetails, setPaymentDetails] = useState(null);
+  const dispatch = useDispatch();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
+  
+  const { paymentDetails, metadata, status, error } = useSelector(state => state.payment);
+
+  // Format amount helper
+  const formatAmount = (amount) => {
+    return `$${(amount / 100).toFixed(2)}`;
+  };
 
   // 获取用户邮箱
   const fetchUserEmail = async (userId) => {
@@ -23,8 +30,6 @@ export default function PaymentSuccess() {
         .single();
 
       if (error) throw error;
-
-      console.log('Found user email:', data.email);
       setUserEmail(data.email);
       return data.email;
     } catch (err) {
@@ -33,11 +38,10 @@ export default function PaymentSuccess() {
     }
   };
 
-  // 发送邮件
-  const sendEmail = async (email, paymentDetails) => {
+  // 发送确认邮件
+  const sendEmail = async (email, orderDetails) => {
     try {
-      console.log('Sending email to:', email, 'with details:', paymentDetails);
-      
+      console.log('Sending confirmation email to:', email);
       const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
@@ -46,10 +50,10 @@ export default function PaymentSuccess() {
         body: JSON.stringify({
           to: email,
           orderDetails: {
-            id: paymentDetails.id,
-            amount: paymentDetails.amount,
-            planName: paymentDetails.metadata.planName,
-            userId: paymentDetails.metadata.userId
+            planName: orderDetails.planName,
+            amount: orderDetails.amount,
+            orderId: orderDetails.id,
+            userId: orderDetails.userId
           }
         }),
       });
@@ -60,67 +64,55 @@ export default function PaymentSuccess() {
 
       console.log('Email sent successfully');
     } catch (err) {
-      console.error('Failed to send email:', err);
+      console.error('Error sending confirmation email:', err);
     }
   };
 
   useEffect(() => {
-    const fetchPaymentDetails = async () => {
+    const initializePaymentSuccess = async () => {
       try {
         const paymentIntent = searchParams.get('payment_intent');
-        
         if (!paymentIntent) {
           throw new Error('No payment intent ID found');
         }
 
-        console.log('Fetching payment details for:', paymentIntent);
-
-        const response = await fetch(`/api/payment-status?payment_intent=${paymentIntent}`);
+        const result = await dispatch(fetchPaymentStatus(paymentIntent)).unwrap();
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch payment status: ${errorText}`);
+        if (result.metadata) {
+          dispatch(setPaymentMetadata({
+            ...result.metadata,
+            amount: result.amount
+          }));
         }
 
-        const data = await response.json();
-        console.log('Payment details received:', data);
-
-        setPaymentDetails(data);
-
-        // 获取用户邮箱并发送邮件
-        if (data.metadata?.userId) {
-          const email = await fetchUserEmail(data.metadata.userId);
+        // 获取用户邮箱并发送确认邮件
+        if (result.metadata?.userId) {
+          const email = await fetchUserEmail(result.metadata.userId);
           if (email) {
             await sendEmail(email, {
               id: paymentIntent,
-              amount: data.amount,
-              metadata: data.metadata
+              planName: result.metadata.planName,
+              amount: result.amount,
+              userId: result.metadata.userId
             });
           }
         }
-
-        setStatus(data.status === 'succeeded' ? 'success' : 'processing');
       } catch (err) {
-        console.error('Error fetching payment details:', err);
-        setError(err.message);
-        setStatus('error');
+        console.error('Error initializing payment success:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPaymentDetails();
-  }, [searchParams]);
+    initializePaymentSuccess();
+  }, [dispatch, searchParams]);
 
-  // 格式化金额显示
-  const formatAmount = (amount) => {
-    if (!amount && amount !== 0) return 'N/A';
-    // 将分转换为元并格式化为货币
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount / 100);
-  };
+  console.log('Current payment state:', {
+    status,
+    paymentDetails,
+    metadata,
+    error
+  });
 
   if (loading) {
     return (
@@ -181,75 +173,47 @@ export default function PaymentSuccess() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
         <div className="text-center">
-          {status === 'loading' && (
-            <>
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-              <h2 className="mt-4 text-xl font-semibold text-gray-900">Processing your payment...</h2>
-              <p className="mt-2 text-gray-600">
-                Please wait while we confirm your payment details.
-              </p>
-            </>
-          )}
+          {/* Success Icon */}
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+            <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
 
-          {status === 'processing' && (
-            <>
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
-                <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Processing</h2>
-              <p className="mt-2 text-gray-600">
-                Your payment is being processed. This may take a moment.
-              </p>
-            </>
-          )}
+          {/* Title and Subtitle */}
+          <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Successful!</h2>
+          <p className="mt-2 text-gray-600">
+            Thank you for subscribing to {metadata.planName}
+          </p>
 
-          {status === 'success' && (
-            <>
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Successful!</h2>
-              <p className="mt-2 text-gray-600">
-                Thank you for subscribing to {paymentDetails?.metadata?.planName}
-              </p>
-              <div className="mt-6 border-t border-gray-200 pt-6">
-                <div className="text-left">
-                  <h3 className="font-medium text-gray-900">Order Summary</h3>
-                  <dl className="mt-4 space-y-4">
-                    <div className="flex justify-between">
-                      <dt className="text-gray-600">Plan</dt>
-                      <dd className="text-gray-900">{paymentDetails?.metadata?.planName || 'Subscription Plan'}</dd>
-                    </div>
-                    {paymentDetails?.quantity && (
-                      <div className="flex justify-between">
-                        <dt className="text-gray-600">Quantity</dt>
-                        <dd className="text-gray-900">{paymentDetails.quantity}</dd>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <dt className="text-gray-600">Amount</dt>
-                      <dd className="text-gray-900">{formatAmount(paymentDetails?.amount)}</dd>
-                    </div>
-                    {paymentDetails?.discount > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <dt>Discount</dt>
-                        <dd>-{formatAmount(paymentDetails.discount)}</dd>
-                      </div>
-                    )}
-                    <div className="flex justify-between border-t border-gray-200 pt-4">
-                      <dt className="text-gray-900 font-medium">Total</dt>
-                      <dd className="text-indigo-600 font-medium">{formatAmount(paymentDetails?.amount)}</dd>
-                    </div>
-                  </dl>
+          {/* Order Summary */}
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <div className="text-left">
+              <h3 className="font-medium text-gray-900">Order Summary</h3>
+              <dl className="mt-4 space-y-4">
+                <div className="flex justify-between">
+                  <dt className="text-gray-600">Plan</dt>
+                  <dd className="text-gray-900">{metadata.planName}</dd>
                 </div>
-              </div>
-            </>
-          )}
+                <div className="flex justify-between">
+                  <dt className="text-gray-600">Amount</dt>
+                  <dd className="text-gray-900">{formatAmount(metadata.amount)}</dd>
+                </div>
+                {userEmail && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">Email</dt>
+                    <dd className="text-gray-900">{userEmail}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-gray-200 pt-4">
+                  <dt className="text-gray-900 font-medium">Total</dt>
+                  <dd className="text-indigo-600 font-medium">{formatAmount(metadata.amount)}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
 
+          {/* Action Buttons */}
           <div className="mt-8 space-y-3">
             <Link 
               href="/dashboard"
