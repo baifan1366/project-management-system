@@ -68,6 +68,82 @@ export default function PaymentSuccess() {
     }
   };
 
+  // 更新用户订阅计划
+  const updateUserSubscription = async (userId, planId) => {
+    try {
+      console.log('Updating user subscription:', { userId, planId });
+      
+      // Get current date for start_date
+      const startDate = new Date();
+      
+      // Calculate end_date based on plan details
+      const { data: planData, error: planError } = await supabase
+        .from('subscription_plan')
+        .select('billing_interval')
+        .eq('id', planId)
+        .single();
+      
+      if (planError) throw planError;
+      
+      // Calculate end date based on billing interval
+      const endDate = new Date(startDate);
+      if (planData.billing_interval === 'MONTHLY') {
+        endDate.setMonth(endDate.getMonth() + 1);
+      } else if (planData.billing_interval === 'YEARLY') {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      }
+      
+      // First, check if a record already exists
+      const { data: existingData, error: checkError } = await supabase
+        .from('user_subscription_plan')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (checkError) throw checkError;
+      
+      let result;
+      
+      if (existingData) {
+        // Update existing record
+        result = await supabase
+          .from('user_subscription_plan')
+          .update({ 
+            plan_id: planId, 
+            start_date: startDate,
+            end_date: endDate,
+            updated_at: new Date()
+          })
+          .eq('user_id', userId);
+      } else {
+        // Insert new record
+        result = await supabase
+          .from('user_subscription_plan')
+          .insert({ 
+            user_id: userId, 
+            plan_id: planId,
+            start_date: startDate,
+            end_date: endDate,
+            current_users: 0,
+            current_workspaces: 0,
+            current_ai_agents: 0,
+            current_automation_flows: 0,
+            current_tasks_this_month: 0,
+            created_at: new Date(),
+            updated_at: new Date()
+          });
+      }
+      
+      if (result.error) throw result.error;
+      
+      console.log('User subscription updated successfully');
+      return true;
+    } catch (err) {
+      console.error('Error updating user subscription:', err);
+      return false;
+    }
+  };
+
   useEffect(() => {
     const initializePaymentSuccess = async () => {
       try {
@@ -88,6 +164,12 @@ export default function PaymentSuccess() {
         // 获取用户邮箱并发送确认邮件
         if (result.metadata?.userId) {
           const email = await fetchUserEmail(result.metadata.userId);
+          
+          // 更新用户的订阅计划
+          if (result.metadata?.planId) {
+            await updateUserSubscription(result.metadata.userId, result.metadata.planId);
+          }
+          
           if (email) {
             await sendEmail(email, {
               id: paymentIntent,

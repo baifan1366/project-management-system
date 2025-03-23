@@ -333,16 +333,9 @@ CREATE TABLE "user_subscription_plan" (
   "id" SERIAL PRIMARY KEY,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
-  "status" TEXT NOT NULL CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED')),
+  "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
   "start_date" TIMESTAMP NOT NULL,
   "end_date" TIMESTAMP NOT NULL,
-  -- 用户限制
-  "max_users" INT NOT NULL,
-  "max_workspaces" INT NOT NULL,
-  -- AI 和自动化使用限制
-  "max_ai_agents" INT NOT NULL,
-  "max_automation_flows" INT NOT NULL,
-  "max_tasks_per_month" INT NOT NULL,
   -- 使用统计
   "current_users" INT DEFAULT 0,
   "current_workspaces" INT DEFAULT 0,

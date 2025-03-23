@@ -73,9 +73,66 @@ export default function AuthCallbackPage() {
             .insert([userData]);
 
           if (insertError) throw insertError;
+          
+          // 4. 为新用户创建免费订阅计划
+          const now = new Date();
+          const oneYearFromNow = new Date(now);
+          oneYearFromNow.setFullYear(now.getFullYear() + 1);
+          
+          const { error: subscriptionError } = await supabase
+            .from('user_subscription_plan')
+            .insert([
+              {
+                user_id: user.id,
+                plan_id: 1, // 免费计划ID
+                status: 'active',
+                start_date: now.toISOString(),
+                end_date: oneYearFromNow.toISOString()
+              },
+            ]);
+
+          if (subscriptionError) {
+            console.error('Failed to create subscription:', subscriptionError);
+            // 继续处理，即使订阅创建失败
+          } else {
+            console.log('Free subscription created for user:', user.id);
+          }
         }
 
-        // 4. 重定向到仪表板
+        // 5. 检查用户是否已有订阅计划
+        const { data: existingSubscription, error: subscriptionCheckError } = await supabase
+          .from('user_subscription_plan')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        // 如果没有订阅，创建一个免费订阅
+        if ((!existingSubscription || existingSubscription.length === 0) && !subscriptionCheckError) {
+          const now = new Date();
+          const oneYearFromNow = new Date(now);
+          oneYearFromNow.setFullYear(now.getFullYear() + 1);
+          
+          const { error: createSubscriptionError } = await supabase
+            .from('user_subscription_plan')
+            .insert([
+              {
+                user_id: user.id,
+                plan_id: 1, // 免费计划ID
+                status: 'active',
+                start_date: now.toISOString(),
+                end_date: oneYearFromNow.toISOString()
+              },
+            ]);
+
+          if (createSubscriptionError) {
+            console.error('Failed to create subscription for existing user:', createSubscriptionError);
+          } else {
+            console.log('Free subscription created for existing user:', user.id);
+          }
+        }
+
+        // 6. 重定向到仪表板
         router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/projects`);
       } catch (error) {
         console.error('Auth callback error:', error);
