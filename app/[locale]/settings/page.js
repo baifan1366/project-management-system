@@ -16,7 +16,7 @@ import { useTheme } from 'next-themes';
 import { useDispatch } from 'react-redux';
 import { updateUserProfile, connectProvider, disconnectProvider, updateUserPreference } from '@/lib/redux/features/usersSlice';
 // 导入订阅组件
-import { SubscriptionCard, UsageStats, PaymentHistory, UpgradeOptions } from '@/components/subscription';
+// import { SubscriptionCard, UsageStats, PaymentHistory, UpgradeOptions } from '@/components/subscription';
 
 export default function SettingsPage() {
   const t = useTranslations('profile');
