@@ -86,6 +86,7 @@ CREATE TABLE "section" (
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE, 
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "task_ids" INT[] DEFAULT '{}', -- 存储关联的任务ID数组
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -101,16 +102,51 @@ CREATE TABLE "task" (
   "section_id" INT REFERENCES "section"("id") ON DELETE CASCADE,
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "assignee_ids" UUID[] DEFAULT '{}', -- 存储指派的用户ID数组
+  "tag_ids" INT[] DEFAULT '{}', -- 存储标签ID数组
+  "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
+  "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 任务指派表
-CREATE TABLE "task_assignee" (
+-- 标签表
+CREATE TABLE "tag" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "color" VARCHAR(50),
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 任务时间记录表（用于时间跟踪）
+CREATE TABLE "time_entry" (
   "id" SERIAL PRIMARY KEY,
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "start_time" TIMESTAMP NOT NULL,
+  "end_time" TIMESTAMP,
+  "duration" INT, -- 以秒为单位
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 任务模板表（用于创建任务模板）
+CREATE TABLE "task_template" (
+  "id" SERIAL PRIMARY KEY,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
+  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "assignee_ids" UUID[] DEFAULT '{}', -- 存储指派的用户ID数组
+  "tag_ids" INT[] DEFAULT '{}', -- 存储标签ID数组
+  "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
+  "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 自定义字段模板表
@@ -168,57 +204,6 @@ CREATE TABLE "attachment" (
   "file_name" VARCHAR(255) NOT NULL,
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
   "uploaded_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 标签表
-CREATE TABLE "tag" (
-  "id" SERIAL PRIMARY KEY,
-  "name" VARCHAR(255) NOT NULL,
-  "color" VARCHAR(50),
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 任务与标签的关系表（多对多）
-CREATE TABLE "task_tag" (
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "tag_id" INT NOT NULL REFERENCES "tag"("id") ON DELETE CASCADE,
-  PRIMARY KEY ("task_id", "tag_id")
-);
-
--- 任务时间记录表（用于时间跟踪）
-CREATE TABLE "time_entry" (
-  "id" SERIAL PRIMARY KEY,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "start_time" TIMESTAMP NOT NULL,
-  "end_time" TIMESTAMP,
-  "duration" INT, -- 以秒为单位
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 任务依赖关系表（用于任务之间的依赖）
-CREATE TABLE "task_dependency" (
-  "id" SERIAL PRIMARY KEY,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "depends_on_task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 任务模板表（用于创建任务模板）
-CREATE TABLE "task_template" (
-  "id" SERIAL PRIMARY KEY,
-  "title" VARCHAR(255) NOT NULL,
-  "description" TEXT,
-  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
-  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
