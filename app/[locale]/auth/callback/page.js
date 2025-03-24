@@ -132,8 +132,9 @@ export default function AuthCallbackPage() {
           }
         }
 
-        // 6. 重定向到仪表板
-        router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/projects`);
+        // 6. 重定向到pricing
+        router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/pricing`);
+        console.log('Redirecting to pricing page');
       } catch (error) {
         console.error('Auth callback error:', error);
         router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/login`);

@@ -1,10 +1,10 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchPlans, setSelectedInterval } from '@/lib/redux/features/planSlice'
 import { useRouter, useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'  // 确保正确导入
+import { supabase } from '@/lib/supabase'
 import clsx from 'clsx'
 
 export default function PricingPage() {
@@ -13,6 +13,16 @@ export default function PricingPage() {
   const router = useRouter()
   const params = useParams()  
   const { plans, status, error, selectedInterval } = useSelector((state) => state.plans)
+
+  //cta 按钮更新状态
+  const [isLoggedIn, setIsLoggedIn] =useState(false)
+
+  //cta dummy 文本
+  const CTA_after_login = {
+    free: "Go to Dashboard",
+    pro: "Buy Pro",
+    enterprise: "Contact Sales"  
+  }
 
   // 获取当前语言
   const locale = params.locale || 'en'
@@ -23,6 +33,24 @@ export default function PricingPage() {
       dispatch(fetchPlans())
     }
   }, [status, dispatch])
+
+
+  //渲染登录后的ui变调：按钮CTA 变化
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = session.user;
+
+      if (user) {
+        setIsLoggedIn(true)
+      }else{
+        setIsLoggedIn(false)
+      }
+    };
+
+    checkSession();
+  }, [])
 
   // 处理计划选择
   const handlePlanSelection = async (plan) => {
@@ -176,13 +204,19 @@ export default function PricingPage() {
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                 )}
-              >
-                {plan.price === 0 
+              >{isLoggedIn ? (
+                plan.price === 0
+                ? CTA_after_login.free
+                : plan.type === 'PRO'
+                ? CTA_after_login.pro
+                : CTA_after_login.enterprise
+              ):
+                (plan.price === 0 
                   ? t('cta.free')
                   : plan.type === 'PRO'
                     ? t('cta.pro')
                     : t('cta.enterprise')
-                }
+                )}
               </button>
             </div>
           </div>
