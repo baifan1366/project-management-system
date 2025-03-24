@@ -498,14 +498,16 @@
     "switchToNormal": "Return to normal chat",
     "unknownChat": "Unknown chat",
     "aiAssistant": "Project Manager Penguin",
-    "poweredBy": "Powered by {{model}}",
+    "poweredBy": "Powered by Qwen/QwQ-32B",
     "welcomeTitle": "Welcome to Project Manager Penguin",
     "welcomeMessage": "I'm your professional project management assistant. Ask me anything about project planning, task organization, or team coordination!",
     "user": "User",
     "thinking": "Thinking...",
     "aiResponseError": "AI response error:",
     "aiApiError": "AI API call error:",
-    "errorMessage": "Sorry, an error occurred while processing your request. Please try again later."
+    "errorMessage": "Sorry, an error occurred while processing your request. Please try again later.",
+    "clearChat":"Clear chat",
+    "newAIChat":"New Chat"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

@@ -14,6 +14,7 @@ CREATE TABLE "user" (
   "notifications_enabled" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "email_verified" BOOLEAN DEFAULT FALSE,
   "verification_token" VARCHAR(255),
   "verification_token_expires" TIMESTAMP
 );
@@ -224,7 +225,7 @@ CREATE TABLE "notification" (
 -- 聊天会话表（用于管理私聊和群聊会话）
 CREATE TABLE "chat_session" (
   "id" SERIAL PRIMARY KEY,
-  "type" TEXT NOT NULL CHECK ("type" IN ('PRIVATE', 'GROUP')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('PRIVATE', 'GROUP', 'AI')),
   "name" VARCHAR(255),
   "team_id" INT REFERENCES "team"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -259,6 +260,24 @@ CREATE TABLE "chat_message_read_status" (
   "read_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY ("message_id", "user_id")
 );
+
+-- AI聊天历史表
+CREATE TABLE "ai_chat_message" (
+  "id" SERIAL PRIMARY KEY,
+  "session_id" INT REFERENCES "chat_session"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "role" TEXT NOT NULL CHECK ("role" IN ('user', 'assistant', 'system')),
+  "content" TEXT NOT NULL,
+  "conversation_id" VARCHAR(255) NOT NULL, -- 用于分组同一次对话的消息
+  "timestamp" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "model" VARCHAR(255) DEFAULT 'Qwen/QwQ-32B', -- 使用的AI模型名称
+  "metadata" JSONB -- 存储额外的元数据
+);
+
+-- AI聊天历史索引
+CREATE INDEX idx_ai_chat_message_user ON "ai_chat_message"("user_id");
+CREATE INDEX idx_ai_chat_message_conversation ON "ai_chat_message"("conversation_id");
+CREATE INDEX idx_ai_chat_message_timestamp ON "ai_chat_message"("timestamp");
 
 -- 聊天附件表
 CREATE TABLE "chat_attachment" (

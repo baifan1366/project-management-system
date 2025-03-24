@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useId } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const ChatContext = createContext();
@@ -12,6 +12,11 @@ export function ChatProvider({ children }) {
   const [loading, setLoading] = useState(true);
   // 添加已发送消息ID集合，用于防止重复
   const [sentMessageIds] = useState(new Set());
+  // 生成基础ID
+  const baseId = useId();
+  // 当前AI对话ID
+  const [aiConversationId, setAiConversationId] = useState(null);
+  const [chatMode, setChatMode] = useState('normal');
 
   // 处理头像URL，移除token
   const processAvatarUrl = (user) => {
@@ -22,6 +27,181 @@ export function ChatProvider({ children }) {
       return { ...user, avatar_url: avatarUrl };
     }
     return user;
+  };
+
+  // 每次开始新的AI聊天时生成新的会话ID
+  useEffect(() => {
+    if (!aiConversationId) {
+      // 使用useId生成的基础ID加上时间戳和随机数
+      const newConversationId = `${baseId.replace(/:/g, '')}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+      setAiConversationId(newConversationId);
+    }
+    
+    // 监听重置会话ID事件
+    const handleResetConversation = () => {
+      console.log('重置AI对话ID');
+      const newConversationId = `${baseId.replace(/:/g, '')}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+      setAiConversationId(newConversationId);
+    };
+    
+    window.addEventListener('reset-ai-conversation', handleResetConversation);
+    
+    return () => {
+      window.removeEventListener('reset-ai-conversation', handleResetConversation);
+    };
+  }, [aiConversationId, baseId]);
+
+  // 创建AI聊天会话
+  const createAIChatSession = async (forceCreate = false) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return null;
+
+    // 如果不强制创建新会话，检查是否已经存在AI聊天会话
+    if (!forceCreate) {
+      const { data: existingSessions, error: checkError } = await supabase
+        .from('chat_session')
+        .select('*')
+        .eq('type', 'AI')
+        .eq('created_by', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (checkError) {
+        console.error('检查AI聊天会话失败:', checkError);
+        return null;
+      }
+
+      // 如果已经存在AI聊天会话，返回现有会话
+      if (existingSessions && existingSessions.length > 0) {
+        console.log('发现现有AI会话:', existingSessions[0].id);
+        return existingSessions[0];
+      }
+    }
+
+    // 创建新的AI聊天会话
+    console.log('正在创建全新的AI会话');
+    const { data: newSession, error: createError } = await supabase
+      .from('chat_session')
+      .insert({
+        type: 'AI',
+        name: 'AI Chat Bot',
+        created_by: session.user.id
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('创建AI聊天会话失败:', createError);
+      return null;
+    }
+
+    console.log('新AI会话创建成功:', newSession.id);
+    
+    // 将当前用户添加为会话参与者
+    const { error: participantError } = await supabase
+      .from('chat_participant')
+      .insert({
+        session_id: newSession.id,
+        user_id: session.user.id,
+        role: 'ADMIN'
+      });
+
+    if (participantError) {
+      console.error('添加聊天参与者失败:', participantError);
+    }
+
+    // 重新获取会话列表
+    fetchChatSessions();
+
+    return newSession;
+  };
+
+  // 保存AI聊天消息
+  const saveAIChatMessage = async (message) => {
+    if (!message?.content || !message?.role) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
+    // 确保有有效的会话ID
+    const conversationId = aiConversationId || `${baseId.replace(/:/g, '')}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    if (!aiConversationId) {
+      setAiConversationId(conversationId);
+    }
+
+    // 如果直接提供了session_id，就使用它
+    let aiChatSessionId = message.session_id;
+    
+    // 如果没有提供session_id，查找或创建新的AI聊天会话
+    if (!aiChatSessionId) {
+      // 首先检查是否已经存在AI聊天会话
+      let aiChatSession = null;
+      
+      // 查找现有的AI会话
+      const { data: existingSessions, error: checkError } = await supabase
+        .from('chat_session')
+        .select('*')
+        .eq('type', 'AI')
+        .eq('created_by', session.user.id)
+        .limit(1);
+        
+      if (checkError) {
+        console.error('检查AI聊天会话失败:', checkError);
+      } else if (existingSessions && existingSessions.length > 0) {
+        // 如果已存在AI会话，直接使用
+        aiChatSession = existingSessions[0];
+        console.log('使用现有AI会话:', aiChatSession.id);
+      } else if (message.role === 'user') {
+        // 只有在用户发送消息时才创建新的AI会话
+        console.log('创建新的AI会话');
+        aiChatSession = await createAIChatSession();
+      }
+      
+      if (!aiChatSession) {
+        console.error('无法创建或获取AI聊天会话');
+        return null;
+      }
+      
+      aiChatSessionId = aiChatSession.id;
+    }
+
+    // 保存到ai_chat_message表
+    const { data, error } = await supabase
+      .from('ai_chat_message')
+      .insert({
+        user_id: session.user.id,
+        role: message.role,
+        content: message.content,
+        conversation_id: conversationId,
+        session_id: aiChatSessionId,
+        timestamp: message.timestamp || new Date().toISOString(),
+        metadata: { 
+          saved_from: 'web_client',
+          client_version: '1.0.0'
+        }
+      });
+
+    if (error) {
+      console.error('保存AI聊天消息失败:', error);
+      return null;
+    }
+    
+    // 只有用户发送的消息才保存到chat_message表中
+    if (message.role === 'user') {
+      const { data: chatMsgData, error: chatMsgError } = await supabase
+        .from('chat_message')
+        .insert({
+          session_id: aiChatSessionId,
+          user_id: session.user.id,
+          content: message.content
+        });
+        
+      if (chatMsgError) {
+        console.error('保存消息到常规聊天失败:', chatMsgError);
+      }
+    }
+    
+    return data;
   };
 
   // 获取聊天会话列表
@@ -41,26 +221,24 @@ export function ChatProvider({ children }) {
           team_id,
           created_at,
           updated_at,
-          participants:chat_participant(
-            user:user_id (
-              id,
-              name,
-              avatar_url,
-              email
-            )
-          )
+          participants:chat_participant(user:"user"(*))
         ),
-        user:user_id (
-          id,
-          name,
-          avatar_url,
-          email
-        )
+        "user"(*)
       `)
       .eq('user_id', authSession.user.id);
 
     if (sessionsError) {
       console.error('Error fetching chat sessions:', sessionsError);
+      // 如果是新用户可能没有聊天记录，返回空数组
+      setSessions([]);
+      setLoading(false);
+      return;
+    }
+
+    // 如果没有会话数据，直接返回空数组
+    if (!sessionsData || sessionsData.length === 0) {
+      setSessions([]);
+      setLoading(false);
       return;
     }
 
@@ -73,12 +251,7 @@ export function ChatProvider({ children }) {
         content,
         created_at,
         session_id,
-        user:user_id (
-          id,
-          name,
-          avatar_url,
-          email
-        )
+        "user"(*)
       `)
       .in('session_id', sessionIds)
       .order('created_at', { ascending: false });
@@ -164,12 +337,7 @@ export function ChatProvider({ children }) {
       .from('chat_message')
       .select(`
         *,
-        user:user_id (
-          id,
-          name,
-          avatar_url,
-          email
-        ),
+        "user"(*),
         attachments:chat_attachment (
           id,
           file_url,
@@ -284,12 +452,7 @@ export function ChatProvider({ children }) {
       })
       .select(`
         *,
-        user:user_id (
-          id,
-          name,
-          avatar_url,
-          email
-        ),
+        "user"(*),
         attachments:chat_attachment (
           id,
           file_url,
@@ -366,12 +529,7 @@ export function ChatProvider({ children }) {
           .from('chat_message')
           .select(`
             *,
-            user:user_id (
-              id,
-              name,
-              avatar_url,
-              email
-            ),
+            "user"(*),
             attachments:chat_attachment (
               id,
               file_url,
@@ -494,12 +652,7 @@ export function ChatProvider({ children }) {
           .from('chat_message')
           .select(`
             *,
-            user:user_id (
-              id,
-              name,
-              avatar_url,
-              email
-            ),
+            "user"(*),
             attachments:chat_attachment (
               id,
               file_url,
@@ -657,7 +810,11 @@ export function ChatProvider({ children }) {
       messages,
       sendMessage,
       loading,
-      fetchChatSessions
+      fetchChatSessions,
+      saveAIChatMessage,
+      createAIChatSession,
+      chatMode,
+      setChatMode
     }}>
       {children}
     </ChatContext.Provider>
