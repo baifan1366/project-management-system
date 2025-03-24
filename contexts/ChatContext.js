@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useId } from 'react';
+import { createContext, useContext, useState, useEffect, useId} from 'react';
 import { supabase } from '@/lib/supabase';
 
 const ChatContext = createContext();
@@ -31,6 +31,7 @@ export function ChatProvider({ children }) {
 
   // 每次开始新的AI聊天时生成新的会话ID
   useEffect(() => {
+    if(chatMode == 'normal' ) return;
     if (!aiConversationId) {
       // 使用useId生成的基础ID加上时间戳和随机数
       const newConversationId = `${baseId.replace(/:/g, '')}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
@@ -186,21 +187,6 @@ export function ChatProvider({ children }) {
       return null;
     }
     
-    // 只有用户发送的消息才保存到chat_message表中
-    if (message.role === 'user') {
-      const { data: chatMsgData, error: chatMsgError } = await supabase
-        .from('chat_message')
-        .insert({
-          session_id: aiChatSessionId,
-          user_id: session.user.id,
-          content: message.content
-        });
-        
-      if (chatMsgError) {
-        console.error('保存消息到常规聊天失败:', chatMsgError);
-      }
-    }
-    
     return data;
   };
 
@@ -221,24 +207,26 @@ export function ChatProvider({ children }) {
           team_id,
           created_at,
           updated_at,
-          participants:chat_participant(user:"user"(*))
+          participants:chat_participant(
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            )
+          )
         ),
-        "user"(*)
+        user:user_id (
+          id,
+          name,
+          avatar_url,
+          email
+        )
       `)
       .eq('user_id', authSession.user.id);
 
     if (sessionsError) {
       console.error('Error fetching chat sessions:', sessionsError);
-      // 如果是新用户可能没有聊天记录，返回空数组
-      setSessions([]);
-      setLoading(false);
-      return;
-    }
-
-    // 如果没有会话数据，直接返回空数组
-    if (!sessionsData || sessionsData.length === 0) {
-      setSessions([]);
-      setLoading(false);
       return;
     }
 
@@ -251,7 +239,12 @@ export function ChatProvider({ children }) {
         content,
         created_at,
         session_id,
-        "user"(*)
+        user:user_id (
+          id,
+          name,
+          avatar_url,
+          email
+        )
       `)
       .in('session_id', sessionIds)
       .order('created_at', { ascending: false });
@@ -337,7 +330,12 @@ export function ChatProvider({ children }) {
       .from('chat_message')
       .select(`
         *,
-        "user"(*),
+        user:user_id (
+          id,
+          name,
+          avatar_url,
+          email
+        ),
         attachments:chat_attachment (
           id,
           file_url,
@@ -452,7 +450,12 @@ export function ChatProvider({ children }) {
       })
       .select(`
         *,
-        "user"(*),
+        user:user_id (
+          id,
+          name,
+          avatar_url,
+          email
+        ),
         attachments:chat_attachment (
           id,
           file_url,
@@ -529,7 +532,12 @@ export function ChatProvider({ children }) {
           .from('chat_message')
           .select(`
             *,
-            "user"(*),
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            ),
             attachments:chat_attachment (
               id,
               file_url,
@@ -652,7 +660,12 @@ export function ChatProvider({ children }) {
           .from('chat_message')
           .select(`
             *,
-            "user"(*),
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            ),
             attachments:chat_attachment (
               id,
               file_url,
@@ -771,7 +784,10 @@ export function ChatProvider({ children }) {
   const setCurrentSessionWithCheck = (session) => {
     // 检查session是否在用户的会话列表中
     const isAuthorized = sessions.some(s => s.id === session?.id);
-    if (session && !isAuthorized) {
+    // 如果是AI模式，允许访问AI会话
+    const isAISession = session?.type === 'AI';
+    
+    if (session && !isAuthorized && !isAISession) {
       console.error('无权访问此会话');
       return;
     }
