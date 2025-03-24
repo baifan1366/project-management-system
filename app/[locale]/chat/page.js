@@ -14,11 +14,15 @@ import PengyImage from '../../../public/pengy.webp';
 export default function ChatPage() {
   const t = useTranslations('Chat');
   const [message, setMessage] = useState('');
-  const { currentSession, messages, sendMessage, fetchChatSessions } = useChat();
+  const { 
+    currentSession, 
+    messages, 
+    sendMessage, 
+    chatMode  // 从 context 中获取
+  } = useChat();
   const [currentUser, setCurrentUser] = useState(null);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
-  const [chatMode, setChatMode] = useState('normal'); // 'normal' 或 'ai'
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -41,24 +45,12 @@ export default function ChatPage() {
     getUser();
   }, []);
 
-  useEffect(() => {
-    console.log('Current Session:', currentSession);
-    console.log('Current User:', currentUser);
-    console.log('Messages:', messages);
-
-    // 无需在这里处理标记为已读，ChatContext中已经实现了这个功能
-  }, [currentSession, messages, currentUser]);
-
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (message.trim() && currentSession) {
       sendMessage(currentSession.id, message);
       setMessage('');
     }
-  };
-
-  const toggleChatMode = () => {
-    setChatMode(chatMode === 'normal' ? 'ai' : 'normal');
   };
 
   if (!currentSession && chatMode === 'normal') {
@@ -88,7 +80,7 @@ export default function ChatPage() {
         <div className="flex items-center gap-3">
           {chatMode === 'normal' ? (
             <>
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0">
                 {sessionAvatar ? (
                   <img 
                     src={sessionAvatar} 
@@ -110,13 +102,14 @@ export default function ChatPage() {
             </>
           ) : (
             <>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
                 <div className="relative w-full h-full">
                   <Image 
                     src={PengyImage} 
                     alt="Project Manager Penguin" 
                     fill
                     style={{ objectFit: 'cover' }}
+                    className="rounded-lg"
                     priority
                   />
                 </div>
@@ -129,31 +122,6 @@ export default function ChatPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={toggleChatMode}
-            className="p-2 rounded-lg hover:bg-accent flex items-center gap-1 text-sm"
-            title={chatMode === 'normal' ? t('switchToAI') : t('switchToNormal')}
-          >
-            {chatMode === 'normal' ? (
-              <>
-                <div className="w-5 h-5 relative">
-                  <Image 
-                    src={PengyImage} 
-                    alt="Switch to AI" 
-                    width={20}
-                    height={20}
-                    style={{ objectFit: 'contain' }}
-                  />
-                </div>
-                <span>{t('switchToAI')}</span>
-              </>
-            ) : (
-              <>
-                <MessageSquare size={16} />
-                <span>{t('switchToNormal')}</span>
-              </>
-            )}
-          </button>
           {currentSession?.type !== 'PRIVATE' && chatMode === 'normal' && (
             <InviteUserPopover 
               sessionId={currentSession.id} 
@@ -194,7 +162,7 @@ export default function ChatPage() {
                     )}
                   >
                     <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden",
+                      "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
                       isMe ? "bg-green-600" : "bg-blue-600"
                     )}>
                       {msg.user?.avatar_url && msg.user?.avatar_url !== '' ? (
@@ -207,18 +175,18 @@ export default function ChatPage() {
                         <span>{msg.user?.name?.charAt(0) || '?'}</span>
                       )}
                     </div>
-                    <div>
+                    <div className="min-w-0 max-w-full">
                       <div className={cn(
                         "flex items-baseline gap-2",
                         isMe ? "flex-row-reverse" : ""
                       )}>
-                        <span className="font-medium">{msg.user?.name}</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="font-medium truncate">{msg.user?.name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
                           {new Date(msg.created_at).toLocaleTimeString()}
                         </span>
                       </div>
                       <div className={cn(
-                        "mt-1 rounded-lg p-3 text-sm",
+                        "mt-1 rounded-lg p-3 text-sm break-words",
                         isMe 
                           ? "bg-primary text-primary-foreground" 
                           : "bg-accent"
