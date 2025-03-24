@@ -223,6 +223,20 @@ CREATE TABLE "task_template" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 通知表
+CREATE TABLE "notification" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "title" VARCHAR(255) NOT NULL,
+  "content" TEXT NOT NULL,
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('TASK_ASSIGNED', 'COMMENT_ADDED', 'MENTION', 'DUE_DATE', 'TEAM_INVITATION', 'SYSTEM')),
+  "related_entity_type" VARCHAR(50), -- 例如：'task', 'project', 'team', 'comment'
+  "related_entity_id" VARCHAR(255), -- 相关实体的ID
+  "is_read" BOOLEAN DEFAULT FALSE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 聊天会话表（用于管理私聊和群聊会话）
 CREATE TABLE "chat_session" (
   "id" SERIAL PRIMARY KEY,
@@ -379,6 +393,11 @@ CREATE INDEX idx_task_project_id ON "task"("project_id");
 -- 时间记录索引
 CREATE INDEX idx_time_entry_task_id ON "time_entry"("task_id");
 CREATE INDEX idx_time_entry_user_id ON "time_entry"("user_id");
+
+-- 通知索引
+CREATE INDEX idx_notification_user_id ON "notification"("user_id");
+CREATE INDEX idx_notification_read ON "notification"("is_read");
+CREATE INDEX idx_notification_created_at ON "notification"("created_at"); 
 
 -- 聊天索引
 CREATE INDEX idx_chat_message_session ON "chat_message"("session_id");
