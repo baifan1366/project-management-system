@@ -14,7 +14,6 @@ CREATE TABLE "user" (
   "notifications_enabled" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "email_verified" BOOLEAN DEFAULT FALSE,
   "verification_token" VARCHAR(255),
   "verification_token_expires" TIMESTAMP
 );

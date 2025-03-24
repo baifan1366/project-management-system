@@ -13,35 +13,31 @@ export default function AuthCallbackPage() {
         // 1. 获取当前会话信息
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (sessionError) throw sessionError;
+        if (sessionError) {
+          console.log(" is session get bu dao ");
+          throw sessionError;
+        }
 
         const user = session.user;
 
-        // 2. 检查用户是否已经存在
+        // 2. 检查用户是否已经存在 - 使用 maybeSingle() 而不是 single()
         const { data: existingProfile, error: profileError } = await supabase
           .from('user')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+        
+        if (profileError) {
+          console.error("Error checking for existing profile:", profileError);
+          throw profileError;
+        }
 
-        if (existingProfile) {
-          // 如果用户存在，更新 email_verified 状态
-          const { error: updateError } = await supabase
-            .from('user')
-            .update({
-              email_verified: user.email_verified,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', user.id);
-
-          if (updateError) throw updateError;
-        } else {
+        if (!existingProfile) {
           // 3. 如果用户不存在，创建新用户配置文件
           const provider = user.app_metadata.provider;
           let userData = {
             id: user.id,
             email: user.email,
-            email_verified: user.email_verified,
             provider: provider,
             provider_id: user.identities?.[0]?.identity_data?.sub || user.id,
           };
@@ -72,7 +68,10 @@ export default function AuthCallbackPage() {
             .from('user')
             .insert([userData]);
 
-          if (insertError) throw insertError;
+          if (insertError) {
+            console.log(" is insert bu dao table ");
+            throw insertError;
+          }
           
           // 4. 为新用户创建免费订阅计划
           const now = new Date();
@@ -85,7 +84,7 @@ export default function AuthCallbackPage() {
               {
                 user_id: user.id,
                 plan_id: 1, // 免费计划ID
-                status: 'active',
+                status: 'ACTIVE',
                 start_date: now.toISOString(),
                 end_date: oneYearFromNow.toISOString()
               },
@@ -99,14 +98,19 @@ export default function AuthCallbackPage() {
           }
         }
 
-        // 5. 检查用户是否已有订阅计划
+        // 5. 检查用户是否已有订阅计划 - 避免使用 single() 方法
         const { data: existingSubscription, error: subscriptionCheckError } = await supabase
           .from('user_subscription_plan')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1);
-          
+        
+        if (subscriptionCheckError) {
+          console.error("Error checking subscription:", subscriptionCheckError);
+          // 可以决定是否抛出或继续
+        }
+        
         // 如果没有订阅，创建一个免费订阅
         if ((!existingSubscription || existingSubscription.length === 0) && !subscriptionCheckError) {
           const now = new Date();
@@ -119,7 +123,7 @@ export default function AuthCallbackPage() {
               {
                 user_id: user.id,
                 plan_id: 1, // 免费计划ID
-                status: 'active',
+                status: 'ACTIVE',
                 start_date: now.toISOString(),
                 end_date: oneYearFromNow.toISOString()
               },
