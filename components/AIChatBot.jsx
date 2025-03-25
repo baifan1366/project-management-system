@@ -32,6 +32,17 @@ export default function AIChatBot() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [aiSession, setAiSession] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const chatContainerRef = useRef(null);
+  // 添加展开状态管理
+  const [expandedThoughts, setExpandedThoughts] = useState({});
+
+  // 切换展开状态的函数
+  const toggleThoughtExpansion = (messageIndex) => {
+    setExpandedThoughts(prev => ({
+      ...prev,
+      [messageIndex]: !prev[messageIndex]
+    }));
+  };
 
   // 获取当前用户信息
   useEffect(() => {
@@ -64,7 +75,9 @@ export default function AIChatBot() {
 
   // 自动滚动到底部
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   // 加载AI聊天记录
@@ -278,7 +291,7 @@ export default function AIChatBot() {
     try {
       // 引入动态导入的InferenceClient以避免服务器端渲染问题
       const { InferenceClient } = await import('@huggingface/inference');
-      const client = new InferenceClient("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");
+      const client = new InferenceClient("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");
 
       // 添加系统消息，描述AI是企鹅形象的专业项目经理
       const systemMessage = {
@@ -326,92 +339,139 @@ export default function AIChatBot() {
   return (
     <div className="flex flex-col h-full w-full border rounded-lg overflow-hidden bg-background">
       {/* 聊天内容区域 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-            <div className="relative text-blue-600 mb-2 w-16 h-16">
-              <Image 
-                src={PengyImage} 
-                alt="Project Manager Penguin"
-                width={64}
-                height={64}
-                style={{ objectFit: 'contain' }}
-                className="rounded-lg"
-                priority
-              />
-            </div>
-            <p className="text-lg font-medium mb-2">{t('welcomeTitle')}</p>
-            <p className="text-sm">{t('welcomeMessage')}</p>
-          </div>
-        ) : (
-          messages.map((msg, index) => (
-            <div
-              key={index}
-              className={cn(
-                "flex items-start gap-2 max-w-2xl",
-                msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
-              )}
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
-                msg.role === 'user' ? "bg-primary" : "bg-blue-600"
-              )}>
-                {msg.role === 'user' ? (
-                  msg.user?.avatar_url ? (
-                    <img 
-                      src={msg.user.avatar_url} 
-                      alt={msg.user.name || t('user')}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : currentUser?.avatar_url ? (
-                    <img 
-                      src={currentUser.avatar_url} 
-                      alt={currentUser.name || t('user')}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span>{(msg.user?.name || currentUser?.name || t('user')).charAt(0)}</span>
-                  )
-                ) : (
+      <div className="flex-1 overflow-hidden relative">
+        <div className="absolute inset-0 overflow-y-auto p-4" ref={chatContainerRef}>
+          <div className="flex flex-col space-y-4 min-h-full">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                <div className="relative text-blue-600 mb-2 w-16 h-16">
+                  <Image 
+                    src={PengyImage} 
+                    alt="Project Manager Penguin"
+                    width={64}
+                    height={64}
+                    style={{ objectFit: 'contain' }}
+                    className="rounded-lg"
+                    priority
+                  />
+                </div>
+                <p className="text-lg font-medium mb-2">{t('welcomeTitle')}</p>
+                <p className="text-sm">{t('welcomeMessage')}</p>
+              </div>
+            ) : (
+              messages.map((msg, index) => {
+                // 检查是否是思考过程
+                const isThinking = msg.role === 'assistant' && msg.content.includes('</think>');
+                let displayContent = msg.content;
+                let thinkingContent = '';
+                
+                if (isThinking) {
+                  const parts = msg.content.split('</think>');
+                  thinkingContent = parts[0];
+                  displayContent = parts[1] || '';
+                }
+
+                return (
+                  <div key={index}>
+                    {/* 思考过程显示 */}
+                    {isThinking && thinkingContent && (
+                      <div className="mb-4 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2 text-gray-500 dark:text-gray-400">
+                          <div className="w-3 h-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+                              <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.636 5.636l2.122 2.122m8.484 8.484l2.122 2.122M5.636 18.364l2.122-2.122m8.484-8.484l2.122-2.122"></path>
+                            </svg>
+                          </div>
+                          <span className="text-xs font-medium">{t('thinking')}</span>
+                        </div>
+                        <div className={cn(
+                          "pl-5 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap transition-all duration-200",
+                          !expandedThoughts[index] && "line-clamp-3"
+                        )}>
+                          {thinkingContent}
+                        </div>
+                        {thinkingContent.split('\n').length > 3 && (
+                          <button
+                            onClick={() => toggleThoughtExpansion(index)}
+                            className="mt-1 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium pl-5"
+                          >
+                            {expandedThoughts[index] ? t('showLess') : t('readMore')}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* 消息内容 */}
+                    <div
+                      className={cn(
+                        "flex items-start gap-2 max-w-2xl mb-4",
+                        msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
+                      )}
+                    >
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
+                        msg.role === 'user' ? "bg-primary dark:bg-primary/90" : "bg-blue-600 dark:bg-blue-700"
+                      )}>
+                        {msg.role === 'user' ? (
+                          msg.user?.avatar_url ? (
+                            <img 
+                              src={msg.user.avatar_url} 
+                              alt={msg.user.name || t('user')}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : currentUser?.avatar_url ? (
+                            <img 
+                              src={currentUser.avatar_url} 
+                              alt={currentUser.name || t('user')}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span>{(msg.user?.name || currentUser?.name || t('user')).charAt(0)}</span>
+                          )
+                        ) : (
+                          <PenguinIcon />
+                        )}
+                      </div>
+                      <div className="min-w-0 max-w-full">
+                        <div className={cn(
+                          "flex items-baseline gap-2",
+                          msg.role === 'user' ? "flex-row-reverse" : ""
+                        )}>
+                          <span className="font-medium truncate dark:text-gray-200">
+                            {msg.role === 'user' ? (msg.user?.name || currentUser?.name || t('user')) : t('aiAssistant')}
+                          </span>
+                          <span className="text-xs text-muted-foreground dark:text-gray-400 flex-shrink-0">
+                            {new Date(msg.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <div className={cn(
+                          "mt-1 rounded-lg p-3 text-sm break-words",
+                          msg.role === 'user' 
+                            ? "bg-primary text-primary-foreground dark:bg-primary/90" 
+                            : "bg-accent dark:bg-gray-800 dark:text-gray-200"
+                        )}>
+                          {displayContent}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            {loading && (
+              <div className="flex items-start gap-2 max-w-2xl">
+                <div className="w-8 h-8 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center text-white font-medium flex-shrink-0">
                   <PenguinIcon />
-                )}
-              </div>
-              <div className="min-w-0 max-w-full">
-                <div className={cn(
-                  "flex items-baseline gap-2",
-                  msg.role === 'user' ? "flex-row-reverse" : ""
-                )}>
-                  <span className="font-medium truncate">
-                    {msg.role === 'user' ? (msg.user?.name || currentUser?.name || t('user')) : t('aiAssistant')}
-                  </span>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {new Date(msg.timestamp).toLocaleTimeString()}
-                  </span>
                 </div>
-                <div className={cn(
-                  "mt-1 rounded-lg p-3 text-sm break-words",
-                  msg.role === 'user' 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-accent"
-                )}>
-                  {msg.content}
+                <div className="flex items-center gap-2 mt-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm text-muted-foreground dark:text-gray-400">{t('thinking')}</span>
                 </div>
               </div>
-            </div>
-          ))
-        )}
-        {loading && (
-          <div className="flex items-start gap-2 max-w-2xl">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium flex-shrink-0">
-              <PenguinIcon />
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm text-muted-foreground">{t('thinking')}</span>
-            </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        )}
-        <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* 输入区域 */}

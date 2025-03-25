@@ -506,8 +506,10 @@
     "aiResponseError": "AI response error:",
     "aiApiError": "AI API call error:",
     "errorMessage": "Sorry, an error occurred while processing your request. Please try again later.",
-    "clearChat":"Clear chat",
-    "newAIChat":"New Chat"
+    "clearChat": "Clear chat",
+    "newAIChat": "New Chat",
+    "readMore": "Read more",
+    "showLess": "Show less"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
