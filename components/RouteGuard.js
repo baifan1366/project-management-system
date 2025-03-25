@@ -13,7 +13,7 @@ const PUBLIC_PATHS = [
   '/terms',
   '/privacy',
 ];
-const SPECIAL_PATHS = ['/reset-password', '/pricing']; // 特殊路径，即使用户已登录也允许访问
+const SPECIAL_PATHS = ['/auth', '/reset-password', '/pricing', '/payment']; // 特殊路径，即使用户已登录也允许访问
 
 export default function RouteGuard({ children }) {
   const router = useRouter();

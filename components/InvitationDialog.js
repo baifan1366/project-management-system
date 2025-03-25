@@ -131,25 +131,24 @@ export default function InvitationDialog({ open, onClose }) {
       if (userError || !userData?.user?.id) {
         throw new Error('未授权的操作，请先登录');
       }
-      
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-      const response = await fetch('https://lquqigrpmdfrxrnmknnv.supabase.co/functions/v1/teamInvitation', {
+      // 发送邀请邮件
+      const response = await fetch('/api/send-team-invitation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-          'apikey': supabaseAnonKey,
-          'x-client-info': 'supabase-js/2.x'
         },
         body: JSON.stringify({
-          email,
-          teamId,
-          permission,
-          created_by: userData.user.id
-        })
+          to: email,
+          invitationDetails: {
+            teamId: teamId,
+            permission: permission,
+            created_by: userData.user.id,
+            teamName: team?.name || '',
+          }
+        }),
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || '邀请发送失败');
@@ -171,7 +170,7 @@ export default function InvitationDialog({ open, onClose }) {
     } finally {
       setIsLoading(false);
     }
-  }, [email, teamId, permission, dispatch]);
+  }, [email, teamId, permission, dispatch, team]);
 
   if (!project) {
     return null;

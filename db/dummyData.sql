@@ -1,14 +1,53 @@
--- Insert default data
-INSERT INTO "default" (id, name, qty, updated_at, edited_by)
-VALUES
-  (1, 'custom_field', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 'custom_tag', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
-
 -- Insert user data
-INSERT INTO "user" (id, name, email, avatar_url, language, theme, provider, email_verified, created_at, updated_at)
+INSERT INTO "user" (
+  id, 
+  name, 
+  email, 
+  phone,
+  avatar_url, 
+  language, 
+  theme, 
+  provider,
+  provider_id,
+  mfa_secret,
+  is_mfa_enabled,
+  notifications_enabled,
+  created_at, 
+  updated_at
+)
 VALUES 
-  ('75cb09ec-f11e-4b34-a1e5-327e90026b94', 'weixuan', 'john.doe@example.com', 'https://randomuser.me/api/portraits/men/1.jpg', 'en', 'dark', 'local', TRUE, '2023-01-10T08:30:00Z', '2023-01-10T08:30:00Z'),
-  ('a9d61763-843c-4c7b-894a-fd8d8a5fc254', 'simpo', 'jane.smith@example.com', 'https://randomuser.me/api/portraits/women/2.jpg', 'en', 'light', 'local', TRUE, '2023-01-15T09:45:00Z', '2023-01-15T09:45:00Z');
+  (
+    '75cb09ec-f11e-4b34-a1e5-327e90026b94',
+    'weixuan',
+    'john.doe@example.com',
+    '+8613800138000',
+    'https://randomuser.me/api/portraits/men/1.jpg',
+    'en',
+    'dark',
+    'local',
+    NULL,
+    NULL,
+    FALSE,
+    TRUE,
+    '2023-01-10T08:30:00Z',
+    '2023-01-10T08:30:00Z'
+  ),
+  (
+    'a9d61763-843c-4c7b-894a-fd8d8a5fc254',
+    'simpo',
+    'jane.smith@example.com',
+    '+8613800138001',
+    'https://randomuser.me/api/portraits/women/2.jpg',
+    'en',
+    'system',
+    'google',
+    'google_123456',
+    'MFASECRET123456',
+    TRUE,
+    TRUE,
+    '2023-01-15T09:45:00Z',
+    '2023-01-15T09:45:00Z'
+  );
 
 -- Insert project data
 INSERT INTO "project" (id, project_name, description, visibility, theme_color, status, created_by, created_at, updated_at)
@@ -39,6 +78,12 @@ VALUES
   (1, 'mike.wilson@example.com', 1, 'CAN_EDIT', 'PENDING', '2023-02-09T09:15:00Z', '2023-02-02T09:15:00Z', '2023-02-02T09:15:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
   (2, 'sarah.brown@example.com', 3, 'CAN_VIEW', 'ACCEPTED', '2023-02-13T10:00:00Z', '2023-02-06T10:00:00Z', '2023-02-07T11:00:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254');
 
+-- Insert default data
+INSERT INTO "default" (id, name, qty, updated_at, edited_by)
+VALUES
+  (1, 'custom_field', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (2, 'custom_tag', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+  
 -- Insert section data
 INSERT INTO "section" (id, name, project_id, team_id, created_by, created_at, updated_at)
 VALUES 
@@ -66,42 +111,51 @@ VALUES
   (7, 'Setup React Native Project', 'Initialize and configure React Native', 'TODO', 'MEDIUM', '2023-02-12T17:00:00Z', 6, 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T11:00:00Z', '2023-02-07T11:00:00Z'),
   (8, 'Implement Login Screen', 'Create user login interface', 'TODO', 'MEDIUM', '2023-02-20T17:00:00Z', 6, 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T11:30:00Z', '2023-02-07T11:30:00Z');
 
--- Insert task assignee data (first, to reference in task table)
-INSERT INTO "task_assignee" (id, task_id, user_id)
-VALUES 
-  (1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'),
-  (3, 3, '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (4, 4, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'),
-  (5, 5, '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (6, 6, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'),
-  (7, 7, '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (8, 8, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254');
+-- 移除原有的 task_assignee 插入语句，改为更新 task 表的 assignee_ids
+UPDATE "task" 
+SET assignee_ids = ARRAY[
+  -- Create Wireframes
+  CASE id WHEN 1 THEN '75cb09ec-f11e-4b34-a1e5-327e90026b94'::UUID END,
+  -- Implement Responsive Design
+  CASE id WHEN 2 THEN 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'::UUID END,
+  -- Cross-browser Testing
+  CASE id WHEN 3 THEN '75cb09ec-f11e-4b34-a1e5-327e90026b94'::UUID END,
+  -- Design REST API
+  CASE id WHEN 4 THEN 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'::UUID END,
+  -- Implement Authentication
+  CASE id WHEN 5 THEN '75cb09ec-f11e-4b34-a1e5-327e90026b94'::UUID END,
+  -- Design App Mockups
+  CASE id WHEN 6 THEN 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'::UUID END,
+  -- Setup React Native Project
+  CASE id WHEN 7 THEN '75cb09ec-f11e-4b34-a1e5-327e90026b94'::UUID END,
+  -- Implement Login Screen
+  CASE id WHEN 8 THEN 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'::UUID END
+]
+WHERE id IN (1,2,3,4,5,6,7,8);
 
 -- Insert tag data
-INSERT INTO "tag" (id, name, color, team_id, created_at, updated_at)
+INSERT INTO "tag" (id, name, color, created_at, updated_at)
 VALUES 
-  (1, 'Bug', 'red', 1, '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'),
-  (2, 'Feature', 'blue', 1, '2023-02-02T10:05:00Z', '2023-02-02T10:05:00Z'),
-  (3, 'Enhancement', 'green', 1, '2023-02-02T10:10:00Z', '2023-02-02T10:10:00Z'),
-  (4, 'Documentation', 'purple', 2, '2023-02-02T10:20:00Z', '2023-02-02T10:20:00Z'),
-  (5, 'UI', 'pink', 3, '2023-02-06T11:00:00Z', '2023-02-06T11:00:00Z'),
-  (6, 'Backend', 'orange', 3, '2023-02-06T11:05:00Z', '2023-02-06T11:05:00Z');
+  (1, 'Bug', 'red', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'),
+  (2, 'Feature', 'blue', '2023-02-02T10:05:00Z', '2023-02-02T10:05:00Z'),
+  (3, 'Enhancement', 'green', '2023-02-02T10:10:00Z', '2023-02-02T10:10:00Z'),
+  (4, 'Documentation', 'purple', '2023-02-02T10:20:00Z', '2023-02-02T10:20:00Z'),
+  (5, 'UI', 'pink', '2023-02-06T11:00:00Z', '2023-02-06T11:00:00Z'),
+  (6, 'Backend', 'orange', '2023-02-06T11:05:00Z', '2023-02-06T11:05:00Z');
 
 -- Insert task-tag relationships
-INSERT INTO "task_tag" (task_id, tag_id)
-VALUES 
-  (1, 2), -- Create Wireframes - Feature
-  (1, 5), -- Create Wireframes - UI
-  (2, 3), -- Implement Responsive Design - Enhancement
-  (3, 1), -- Cross-browser Testing - Bug
-  (4, 4), -- Design REST API - Documentation
-  (4, 6), -- Design REST API - Backend
-  (5, 6), -- Implement Authentication - Backend
-  (6, 5), -- Design App Mockups - UI
-  (7, 2), -- Setup React Native Project - Feature
-  (8, 2), -- Implement Login Screen - Feature
-  (8, 5); -- Implement Login Screen - UI
+UPDATE "task"
+SET tag_ids = CASE
+  WHEN id = 1 THEN ARRAY[2, 5]  -- Create Wireframes - Feature, UI
+  WHEN id = 2 THEN ARRAY[3]     -- Implement Responsive Design - Enhancement
+  WHEN id = 3 THEN ARRAY[1]     -- Cross-browser Testing - Bug
+  WHEN id = 4 THEN ARRAY[4, 6]  -- Design REST API - Documentation, Backend
+  WHEN id = 5 THEN ARRAY[6]     -- Implement Authentication - Backend
+  WHEN id = 6 THEN ARRAY[5]     -- Design App Mockups - UI
+  WHEN id = 7 THEN ARRAY[2]     -- Setup React Native Project - Feature
+  WHEN id = 8 THEN ARRAY[2, 5]  -- Implement Login Screen - Feature, UI
+END
+WHERE id IN (1,2,3,4,5,6,7,8);
 
 -- Insert comment data
 INSERT INTO "comment" (id, text, task_id, user_id, created_at, updated_at)
@@ -162,12 +216,14 @@ VALUES
   (5, 6, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T14:00:00Z', '2023-02-07T17:30:00Z', 12600, '2023-02-07T17:30:00Z', '2023-02-07T17:30:00Z');
 
 -- Insert task dependency data
-INSERT INTO "task_dependency" (id, task_id, depends_on_task_id, created_at, updated_at)
-VALUES 
-  (1, 2, 1, '2023-02-03T11:30:00Z', '2023-02-03T11:30:00Z'),
-  (2, 3, 2, '2023-02-04T13:00:00Z', '2023-02-04T13:00:00Z'),
-  (3, 5, 4, '2023-02-03T15:30:00Z', '2023-02-03T15:30:00Z'),
-  (4, 8, 7, '2023-02-07T11:30:00Z', '2023-02-07T11:30:00Z');
+UPDATE "task"
+SET depends_on_task_ids = CASE
+  WHEN id = 2 THEN ARRAY[1]  -- Implement Responsive Design 依赖于 Create Wireframes
+  WHEN id = 3 THEN ARRAY[2]  -- Cross-browser Testing 依赖于 Implement Responsive Design
+  WHEN id = 5 THEN ARRAY[4]  -- Implement Authentication 依赖于 Design REST API
+  WHEN id = 8 THEN ARRAY[7]  -- Implement Login Screen 依赖于 Setup React Native Project
+END
+WHERE id IN (2,3,5,8);
 
 -- Insert task template data
 INSERT INTO "task_template" (id, title, description, status, priority, team_id, created_by, created_at, updated_at)
@@ -399,3 +455,8 @@ VALUES
   (1, 1, 29.00, 'USD', 'credit_card', 'COMPLETED', 'txn_1234567890', '2023-02-01T00:00:00Z'),
   (2, 2, 29.00, 'USD', 'credit_card', 'COMPLETED', 'txn_1234567891', '2023-02-01T00:00:00Z'),
   (3, 3, 290.00, 'USD', 'credit_card', 'COMPLETED', 'txn_1234567892', '2023-02-06T00:00:00Z');
+
+-- Insert promo code data
+INSERT INTO "promo_code" (code, description, discount_type, discount_value, max_uses, start_date, end_date) VALUES
+  ('NEWYEAR2024', '新年促销', 'PERCENTAGE', 20.00, 100, '2024-01-01 00:00:00', '2024-01-31 23:59:59'),
+  ('WELCOME50', '新用户优惠', 'FIXED_AMOUNT', 50.00, 200, '2024-01-01 00:00:00', '2024-12-31 23:59:59');
