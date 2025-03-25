@@ -132,8 +132,18 @@ export default function AuthCallbackPage() {
           }
         }
 
-        // 6. 重定向到仪表板
-        router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/projects`);
+        // 6. 获取URL参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const planId = urlParams.get('plan_id');
+        const redirect = urlParams.get('redirect');
+
+        // 如果URL中有plan_id参数并且redirect=payment，则跳转到payment页面
+        if (planId && redirect === 'payment') {
+          router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/payment?plan_id=${planId}&user_id=${user.id}`);
+        } else {
+          // 否则重定向到仪表板
+          router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/projects`);
+        }
       } catch (error) {
         console.error('Auth callback error:', error);
         router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/login`);
