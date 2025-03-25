@@ -291,7 +291,7 @@ export default function AIChatBot() {
     try {
       // 引入动态导入的InferenceClient以避免服务器端渲染问题
       const { InferenceClient } = await import('@huggingface/inference');
-      const client = new InferenceClient("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");
+      const client = new InferenceClient(process.env.NEXT_PUBLIC_HUGGING_FACE_ACCESS_TOKEN);
 
       // 添加系统消息，描述AI是企鹅形象的专业项目经理
       const systemMessage = {
