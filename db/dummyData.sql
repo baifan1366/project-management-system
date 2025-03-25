@@ -12,6 +12,9 @@ INSERT INTO "user" (
   mfa_secret,
   is_mfa_enabled,
   notifications_enabled,
+  email_verified,
+  verification_token,
+  verification_token_expires,
   created_at, 
   updated_at
 )
@@ -22,13 +25,16 @@ VALUES
     'john.doe@example.com',
     '+8613800138000',
     'https://randomuser.me/api/portraits/men/1.jpg',
-    'en',
+    'zh',
     'dark',
     'local',
     NULL,
     NULL,
     FALSE,
     TRUE,
+    TRUE,
+    NULL,
+    NULL,
     '2023-01-10T08:30:00Z',
     '2023-01-10T08:30:00Z'
   ),
@@ -45,6 +51,9 @@ VALUES
     'MFASECRET123456',
     TRUE,
     TRUE,
+    TRUE,
+    NULL,
+    NULL,
     '2023-01-15T09:45:00Z',
     '2023-01-15T09:45:00Z'
   );
@@ -85,53 +94,33 @@ VALUES
   (2, 'custom_tag', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
   
 -- Insert section data
-INSERT INTO "section" (id, name, project_id, team_id, created_by, created_at, updated_at)
+INSERT INTO "section" (id, name, project_id, team_id, created_by, task_ids, created_at, updated_at)
 VALUES 
-  (1, 'Design', 1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T10:00:00Z', '2023-02-03T10:00:00Z'),
-  (2, 'Development', 1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T10:15:00Z', '2023-02-03T10:15:00Z'),
-  (3, 'Testing', 1, 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T11:00:00Z', '2023-02-04T11:00:00Z'),
-  (4, 'API Development', 1, 2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T14:00:00Z', '2023-02-03T14:00:00Z'),
-  (5, 'UI Design', 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T09:30:00Z', '2023-02-07T09:30:00Z'),
-  (6, 'Mobile Development', 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T09:45:00Z', '2023-02-07T09:45:00Z');
+  (1, '设计', 1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '{1}', '2023-02-03T10:00:00Z', '2023-02-03T10:00:00Z'),
+  (2, '开发', 1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '{2}', '2023-02-03T10:15:00Z', '2023-02-03T10:15:00Z'),
+  (3, '测试', 1, 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '{3}', '2023-02-04T11:00:00Z', '2023-02-04T11:00:00Z'),
+  (4, 'API开发', 1, 2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '{4,5}', '2023-02-03T14:00:00Z', '2023-02-03T14:00:00Z'),
+  (5, 'UI设计', 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '{6}', '2023-02-07T09:30:00Z', '2023-02-07T09:30:00Z'),
+  (6, '移动开发', 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '{7,8}', '2023-02-07T09:45:00Z', '2023-02-07T09:45:00Z');
 
 -- Insert task data
-INSERT INTO "task" (id, title, description, status, priority, due_date, section_id, project_id, team_id, created_by, created_at, updated_at)
+INSERT INTO "task" (
+  id, title, description, status, priority, due_date, 
+  section_id, project_id, team_id, 
+  assignee_ids, tag_ids, depends_on_task_ids,
+  created_by, created_at, updated_at
+)
 VALUES 
-  -- Website Redesign Project - Frontend Team
-  (1, 'Create Wireframes', 'Design initial wireframes for homepage and key pages', 'IN_PROGRESS', 'HIGH', '2023-02-15T17:00:00Z', 1, 1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:00:00Z', '2023-02-03T11:00:00Z'),
-  (2, 'Implement Responsive Design', 'Ensure website works on all devices', 'TODO', 'MEDIUM', '2023-02-20T17:00:00Z', 2, 1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:30:00Z', '2023-02-03T11:30:00Z'),
-  (3, 'Cross-browser Testing', 'Test functionality across major browsers', 'TODO', 'MEDIUM', '2023-02-25T17:00:00Z', 3, 1, 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T13:00:00Z', '2023-02-04T13:00:00Z'),
-  
-  -- Website Redesign Project - Backend Team
-  (4, 'Design REST API', 'Plan and document API endpoints', 'IN_PROGRESS', 'HIGH', '2023-02-18T17:00:00Z', 4, 1, 2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T15:00:00Z', '2023-02-03T15:00:00Z'),
-  (5, 'Implement Authentication', 'Create secure authentication system', 'TODO', 'HIGH', '2023-02-22T17:00:00Z', 4, 1, 2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T15:30:00Z', '2023-02-03T15:30:00Z'),
-  
-  -- Mobile App Project
-  (6, 'Design App Mockups', 'Create visual mockups for mobile app', 'IN_PROGRESS', 'HIGH', '2023-02-15T17:00:00Z', 5, 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T10:30:00Z', '2023-02-07T10:30:00Z'),
-  (7, 'Setup React Native Project', 'Initialize and configure React Native', 'TODO', 'MEDIUM', '2023-02-12T17:00:00Z', 6, 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T11:00:00Z', '2023-02-07T11:00:00Z'),
-  (8, 'Implement Login Screen', 'Create user login interface', 'TODO', 'MEDIUM', '2023-02-20T17:00:00Z', 6, 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T11:30:00Z', '2023-02-07T11:30:00Z');
-
--- 移除原有的 task_assignee 插入语句，改为更新 task 表的 assignee_ids
-UPDATE "task" 
-SET assignee_ids = ARRAY[
-  -- Create Wireframes
-  CASE id WHEN 1 THEN '75cb09ec-f11e-4b34-a1e5-327e90026b94'::UUID END,
-  -- Implement Responsive Design
-  CASE id WHEN 2 THEN 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'::UUID END,
-  -- Cross-browser Testing
-  CASE id WHEN 3 THEN '75cb09ec-f11e-4b34-a1e5-327e90026b94'::UUID END,
-  -- Design REST API
-  CASE id WHEN 4 THEN 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'::UUID END,
-  -- Implement Authentication
-  CASE id WHEN 5 THEN '75cb09ec-f11e-4b34-a1e5-327e90026b94'::UUID END,
-  -- Design App Mockups
-  CASE id WHEN 6 THEN 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'::UUID END,
-  -- Setup React Native Project
-  CASE id WHEN 7 THEN '75cb09ec-f11e-4b34-a1e5-327e90026b94'::UUID END,
-  -- Implement Login Screen
-  CASE id WHEN 8 THEN 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'::UUID END
-]
-WHERE id IN (1,2,3,4,5,6,7,8);
+  -- 网站重设计项目 - 前端团队
+  (1, '创建线框图', '设计首页和关键页面的初始线框图', 'IN_PROGRESS', 'HIGH', '2023-02-15T17:00:00Z', 
+   1, 1, 1, 
+   ARRAY['75cb09ec-f11e-4b34-a1e5-327e90026b94']::UUID[], '{2,5}', '{}',
+   '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:00:00Z', '2023-02-03T11:00:00Z'),
+   
+  (2, '实现响应式设计', '确保网站在所有设备上正常工作', 'TODO', 'MEDIUM', '2023-02-20T17:00:00Z',
+   2, 1, 1,
+   ARRAY['a9d61763-843c-4c7b-894a-fd8d8a5fc254']::UUID[], '{3}', '{1}',
+   '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:30:00Z', '2023-02-03T11:30:00Z');
 
 -- Insert tag data
 INSERT INTO "tag" (id, name, color, created_at, updated_at)
@@ -163,17 +152,17 @@ VALUES
   (1, 'I have started working on the homepage wireframe, should be done by tomorrow.', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-04T09:00:00Z', '2023-02-04T09:00:00Z'),
   (2, 'Looking good! Consider adding a large banner section at the top.', 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T10:30:00Z', '2023-02-04T10:30:00Z'),
   (3, 'I will ensure all pages have tablet and mobile designs.', 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T11:15:00Z', '2023-02-04T11:15:00Z'),
-  (4, 'I have documented all API endpoints in the shared doc.', 4, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T14:00:00Z', '2023-02-04T14:00:00Z'),
-  (5, 'We need to decide on authentication method. JWT or session-based?', 5, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-05T09:00:00Z', '2023-02-05T09:00:00Z'),
-  (6, 'I think JWT would be better for this project.', 5, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-05T09:30:00Z', '2023-02-05T09:30:00Z');
+  (4, 'I have documented all API endpoints in the shared doc.', 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T14:00:00Z', '2023-02-04T14:00:00Z'),
+  (5, 'We need to decide on authentication method. JWT or session-based?', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-05T09:00:00Z', '2023-02-05T09:00:00Z'),
+  (6, 'I think JWT would be better for this project.', 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-05T09:30:00Z', '2023-02-05T09:30:00Z');
 
 -- Insert attachment data
 INSERT INTO "attachment" (id, file_url, file_name, task_id, uploaded_by, created_at, updated_at)
 VALUES 
   (1, 'https://example.com/files/homepage-wireframe.png', 'homepage-wireframe.png', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-04T10:00:00Z', '2023-02-04T10:00:00Z'),
   (2, 'https://example.com/files/responsive-design-spec.pdf', 'responsive-design-spec.pdf', 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T11:30:00Z', '2023-02-04T11:30:00Z'),
-  (3, 'https://example.com/files/api-documentation.pdf', 'api-documentation.pdf', 4, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T14:30:00Z', '2023-02-04T14:30:00Z'),
-  (4, 'https://example.com/files/app-mockup-v1.png', 'app-mockup-v1.png', 6, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T13:00:00Z', '2023-02-07T13:00:00Z');
+  (3, 'https://example.com/files/api-documentation.pdf', 'api-documentation.pdf', 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T14:30:00Z', '2023-02-04T14:30:00Z'),
+  (4, 'https://example.com/files/app-mockup-v1.png', 'app-mockup-v1.png', 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T13:00:00Z', '2023-02-07T13:00:00Z');
 
 -- Insert custom field data
 INSERT INTO "custom_field" (id, name, type, description, icon, default_config, created_at, updated_at, created_by)
@@ -212,8 +201,8 @@ VALUES
   (1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-04T08:00:00Z', '2023-02-04T10:30:00Z', 9000, '2023-02-04T10:30:00Z', '2023-02-04T10:30:00Z'),
   (2, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-05T09:00:00Z', '2023-02-05T11:00:00Z', 7200, '2023-02-05T11:00:00Z', '2023-02-05T11:00:00Z'),
   (3, 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T13:00:00Z', '2023-02-04T15:30:00Z', 9000, '2023-02-04T15:30:00Z', '2023-02-04T15:30:00Z'),
-  (4, 4, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-05T13:00:00Z', '2023-02-05T16:00:00Z', 10800, '2023-02-05T16:00:00Z', '2023-02-05T16:00:00Z'),
-  (5, 6, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T14:00:00Z', '2023-02-07T17:30:00Z', 12600, '2023-02-07T17:30:00Z', '2023-02-07T17:30:00Z');
+  (4, 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-05T13:00:00Z', '2023-02-05T16:00:00Z', 10800, '2023-02-05T16:00:00Z', '2023-02-05T16:00:00Z'),
+  (5, 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T14:00:00Z', '2023-02-07T17:30:00Z', 12600, '2023-02-07T17:30:00Z', '2023-02-07T17:30:00Z');
 
 -- Insert task dependency data
 UPDATE "task"
@@ -235,10 +224,9 @@ VALUES
 -- Insert chat session data
 INSERT INTO "chat_session" (id, type, name, team_id, created_by, created_at, updated_at)
 VALUES 
-  (1, 'GROUP', 'Frontend Team Chat', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'),
-  (2, 'GROUP', 'Backend Team Chat', 2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:15:00Z', '2023-02-02T10:15:00Z'),
-  (3, 'GROUP', 'Mobile Team Chat', 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-06T11:30:00Z', '2023-02-06T11:30:00Z'),
-  (4, 'PRIVATE', 'John and Jane Chat', NULL, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T09:00:00Z', '2023-02-03T09:00:00Z');
+  (1, 'GROUP', '前端团队讨论', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'),
+  (2, 'GROUP', '后端团队讨论', 2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:15:00Z', '2023-02-02T10:15:00Z'),
+  (3, 'PRIVATE', 'weixuan和simpo的对话', NULL, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T09:00:00Z', '2023-02-03T09:00:00Z');
 
 -- Insert chat participant data
 INSERT INTO "chat_participant" (session_id, user_id, joined_at, role)
@@ -247,21 +235,15 @@ VALUES
   (1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T11:00:00Z', 'MEMBER'),
   (2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:15:00Z', 'ADMIN'),
   (2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T11:15:00Z', 'MEMBER'),
-  (3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-06T11:30:00Z', 'ADMIN'),
-  (3, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-07T09:00:00Z', 'MEMBER'),
-  (4, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T09:00:00Z', 'ADMIN'),
-  (4, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T09:00:00Z', 'MEMBER');
+  (3, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T09:00:00Z', 'ADMIN'),
+  (3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T09:00:00Z', 'MEMBER');
 
 -- Insert chat message data
 INSERT INTO "chat_message" (id, session_id, user_id, content, created_at, updated_at)
 VALUES 
-  (1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 'Welcome to the Frontend Team chat!', '2023-02-02T10:05:00Z', '2023-02-02T10:05:00Z'),
-  (2, 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 'Thanks for inviting me to the team!', '2023-02-03T11:05:00Z', '2023-02-03T11:05:00Z'),
-  (3, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 'Let''s discuss the approach for the responsive design task.', '2023-02-03T11:10:00Z', '2023-02-03T11:10:00Z'),
-  (4, 2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 'Welcome to the Backend Team chat!', '2023-02-02T10:20:00Z', '2023-02-02T10:20:00Z'),
-  (5, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 'Welcome to the Mobile Team chat!', '2023-02-06T11:35:00Z', '2023-02-06T11:35:00Z'),
-  (6, 4, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 'Hi Jane, let''s coordinate the project handover.', '2023-02-03T09:05:00Z', '2023-02-03T09:05:00Z'),
-  (7, 4, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 'Sure, I can sync with you tomorrow.', '2023-02-03T09:10:00Z', '2023-02-03T09:10:00Z');
+  (1, 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '欢迎来到前端团队讨论群！', '2023-02-02T10:05:00Z', '2023-02-02T10:05:00Z'),
+  (2, 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '谢谢邀请！', '2023-02-03T11:05:00Z', '2023-02-03T11:05:00Z'),
+  (3, 3, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '关于响应式设计的实现，我们需要讨论一下', '2023-02-03T09:05:00Z', '2023-02-03T09:05:00Z');
 
 -- Insert chat message read status
 INSERT INTO "chat_message_read_status" (message_id, user_id, read_at)
@@ -271,38 +253,18 @@ VALUES
   (2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:07:00Z'),
   (2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T11:05:00Z'),
   (3, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:10:00Z'),
-  (3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T11:12:00Z'),
-  (4, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:20:00Z'),
-  (4, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T11:15:00Z'),
-  (5, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-06T11:35:00Z'),
-  (5, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-07T09:00:00Z'),
-  (6, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T09:05:00Z'),
-  (6, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T09:07:00Z'),
-  (7, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T09:12:00Z'),
-  (7, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T09:10:00Z');
+  (3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-03T11:12:00Z');
 
 -- Insert chat attachment data
 INSERT INTO "chat_attachment" (id, message_id, file_url, file_name, uploaded_by, created_at)
 VALUES 
-  (1, 3, 'https://example.com/files/responsive-design-approach.pdf', '响应式设计方法.pdf', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:10:00Z'),
-  (2, 6, 'https://example.com/files/project-schedule.xlsx', '项目进度表.xlsx', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T09:05:00Z');
-
--- Insert action log data
-INSERT INTO "action_log" (id, user_id, action_type, entity_type, entity_id, old_values, new_values, ip_address, user_agent, created_at)
-VALUES 
-  (1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 'CREATE', 'project', 1, NULL, '{"name":"Website Redesign","description":"Comprehensive improvement of company website for better UX and performance"}', '192.168.1.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', '2023-02-01T10:00:00Z'),
-  (2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 'CREATE', 'team', 1, NULL, '{"name":"Frontend Team","description":"Responsible for UI/UX development"}', '192.168.1.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', '2023-02-02T09:15:00Z'),
-  (3, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 'CREATE', 'team', 2, NULL, '{"name":"Backend Team","description":"Responsible for API and database development"}', '192.168.1.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', '2023-02-02T09:30:00Z'),
-  (4, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 'CREATE', 'project', 2, NULL, '{"name":"Mobile App Development","description":"Create cross-platform mobile app for Android and iOS"}', '192.168.1.2', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', '2023-02-05T14:30:00Z'),
-  (5, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 'CREATE', 'team', 3, NULL, '{"name":"Mobile Team","description":"Responsible for mobile app development and testing"}', '192.168.1.2', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', '2023-02-06T10:00:00Z'),
-  (6, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 'CREATE', 'task', 1, NULL, '{"title":"Create Wireframes","status":"TODO"}', '192.168.1.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', '2023-02-03T11:00:00Z'),
-  (7, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 'UPDATE', 'task', 1, '{"status":"TODO"}', '{"status":"IN_PROGRESS"}', '192.168.1.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', '2023-02-04T08:00:00Z'),
-  (8, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 'CREATE', 'task', 6, NULL, '{"title":"Design App Mockups","status":"TODO"}', '192.168.1.2', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', '2023-02-07T10:30:00Z'),
-  (9, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 'UPDATE', 'task', 6, '{"status":"TODO"}', '{"status":"IN_PROGRESS"}', '192.168.1.2', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', '2023-02-07T14:00:00Z');
+  (1, 3, 'https://example.com/files/responsive-design-approach.pdf', '响应式设计方法.pdf', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:10:00Z');
 
 -- Insert subscription plan data
-INSERT INTO "subscription_plan" 
-  ("name", "type", "price", "billing_interval", "description", "features", "max_members", "max_projects", "storage_limit", "is_active")
+INSERT INTO "subscription_plan" (
+  name, type, price, billing_interval, description, 
+  features, max_members, max_projects, storage_limit, is_active
+)
 VALUES
   -- Free Monthly Plan
   (
@@ -460,3 +422,15 @@ VALUES
 INSERT INTO "promo_code" (code, description, discount_type, discount_value, max_uses, start_date, end_date) VALUES
   ('NEWYEAR2024', '新年促销', 'PERCENTAGE', 20.00, 100, '2024-01-01 00:00:00', '2024-01-31 23:59:59'),
   ('WELCOME50', '新用户优惠', 'FIXED_AMOUNT', 50.00, 200, '2024-01-01 00:00:00', '2024-12-31 23:59:59');
+
+-- Insert notification data
+INSERT INTO "notification" (
+  id, user_id, title, content, type, 
+  related_entity_type, related_entity_id, 
+  is_read, created_at, updated_at
+)
+VALUES 
+  (1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 
+   '任务已分配', '你被分配到了任务"创建线框图"', 
+   'TASK_ASSIGNED', 'task', '1', 
+   FALSE, '2023-02-03T11:00:00Z', '2023-02-03T11:00:00Z');
