@@ -86,6 +86,7 @@ CREATE TABLE "section" (
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE, 
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "task_ids" INT[] DEFAULT '{}', -- 存储关联的任务ID数组
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -101,16 +102,51 @@ CREATE TABLE "task" (
   "section_id" INT REFERENCES "section"("id") ON DELETE CASCADE,
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "assignee_ids" UUID[] DEFAULT '{}', -- 存储指派的用户ID数组
+  "tag_ids" INT[] DEFAULT '{}', -- 存储标签ID数组
+  "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
+  "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 任务指派表
-CREATE TABLE "task_assignee" (
+-- 标签表
+CREATE TABLE "tag" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "color" VARCHAR(50),
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 任务时间记录表（用于时间跟踪）
+CREATE TABLE "time_entry" (
   "id" SERIAL PRIMARY KEY,
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "start_time" TIMESTAMP NOT NULL,
+  "end_time" TIMESTAMP,
+  "duration" INT, -- 以秒为单位
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 任务模板表（用于创建任务模板）
+CREATE TABLE "task_template" (
+  "id" SERIAL PRIMARY KEY,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
+  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "assignee_ids" UUID[] DEFAULT '{}', -- 存储指派的用户ID数组
+  "tag_ids" INT[] DEFAULT '{}', -- 存储标签ID数组
+  "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
+  "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 自定义字段模板表
@@ -172,53 +208,16 @@ CREATE TABLE "attachment" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 标签表
-CREATE TABLE "tag" (
+-- 通知表
+CREATE TABLE "notification" (
   "id" SERIAL PRIMARY KEY,
-  "name" VARCHAR(255) NOT NULL,
-  "color" VARCHAR(50),
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 任务与标签的关系表（多对多）
-CREATE TABLE "task_tag" (
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "tag_id" INT NOT NULL REFERENCES "tag"("id") ON DELETE CASCADE,
-  PRIMARY KEY ("task_id", "tag_id")
-);
-
--- 任务时间记录表（用于时间跟踪）
-CREATE TABLE "time_entry" (
-  "id" SERIAL PRIMARY KEY,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "start_time" TIMESTAMP NOT NULL,
-  "end_time" TIMESTAMP,
-  "duration" INT, -- 以秒为单位
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 任务依赖关系表（用于任务之间的依赖）
-CREATE TABLE "task_dependency" (
-  "id" SERIAL PRIMARY KEY,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "depends_on_task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 任务模板表（用于创建任务模板）
-CREATE TABLE "task_template" (
-  "id" SERIAL PRIMARY KEY,
   "title" VARCHAR(255) NOT NULL,
-  "description" TEXT,
-  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
-  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "content" TEXT NOT NULL,
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('TASK_ASSIGNED', 'COMMENT_ADDED', 'MENTION', 'DUE_DATE', 'TEAM_INVITATION', 'SYSTEM')),
+  "related_entity_type" VARCHAR(50), -- 例如：'task', 'project', 'team', 'comment'
+  "related_entity_id" VARCHAR(255), -- 相关实体的ID
+  "is_read" BOOLEAN DEFAULT FALSE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -226,7 +225,7 @@ CREATE TABLE "task_template" (
 -- 聊天会话表（用于管理私聊和群聊会话）
 CREATE TABLE "chat_session" (
   "id" SERIAL PRIMARY KEY,
-  "type" TEXT NOT NULL CHECK ("type" IN ('PRIVATE', 'GROUP')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('PRIVATE', 'GROUP', 'AI')),
   "name" VARCHAR(255),
   "team_id" INT REFERENCES "team"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -261,6 +260,24 @@ CREATE TABLE "chat_message_read_status" (
   "read_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY ("message_id", "user_id")
 );
+
+-- AI聊天历史表
+CREATE TABLE "ai_chat_message" (
+  "id" SERIAL PRIMARY KEY,
+  "session_id" INT REFERENCES "chat_session"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "role" TEXT NOT NULL CHECK ("role" IN ('user', 'assistant', 'system')),
+  "content" TEXT NOT NULL,
+  "conversation_id" VARCHAR(255) NOT NULL, -- 用于分组同一次对话的消息
+  "timestamp" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "model" VARCHAR(255) DEFAULT 'Qwen/QwQ-32B', -- 使用的AI模型名称
+  "metadata" JSONB -- 存储额外的元数据
+);
+
+-- AI聊天历史索引
+CREATE INDEX idx_ai_chat_message_user ON "ai_chat_message"("user_id");
+CREATE INDEX idx_ai_chat_message_conversation ON "ai_chat_message"("conversation_id");
+CREATE INDEX idx_ai_chat_message_timestamp ON "ai_chat_message"("timestamp");
 
 -- 聊天附件表
 CREATE TABLE "chat_attachment" (
@@ -379,6 +396,11 @@ CREATE INDEX idx_task_project_id ON "task"("project_id");
 -- 时间记录索引
 CREATE INDEX idx_time_entry_task_id ON "time_entry"("task_id");
 CREATE INDEX idx_time_entry_user_id ON "time_entry"("user_id");
+
+-- 通知索引
+CREATE INDEX idx_notification_user_id ON "notification"("user_id");
+CREATE INDEX idx_notification_read ON "notification"("is_read");
+CREATE INDEX idx_notification_created_at ON "notification"("created_at"); 
 
 -- 聊天索引
 CREATE INDEX idx_chat_message_session ON "chat_message"("session_id");
