@@ -42,7 +42,6 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
       dispatch(createTeamCustomField({
         team_id: teamId,
         custom_field_id: field.id,
-        config: {},
         order_index: 100,
         created_by: userId
       }))
@@ -54,7 +53,7 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
         // 触发重新获取团队自定义字段，确保 TaskTab 能够更新
         dispatch(fetchTeamCustomField(teamId));
       })
-      .catch((error) => {
+      .catch((error) => { 
         console.error('创建自定义字段失败:', error);
         // 这里可以添加错误处理逻辑，比如显示错误提示
       });

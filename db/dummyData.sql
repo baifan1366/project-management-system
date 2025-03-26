@@ -91,7 +91,7 @@ VALUES
 INSERT INTO "default" (id, name, qty, updated_at, edited_by)
 VALUES
   (1, 'custom_field', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 'custom_tag', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+  (2, 'tag', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
   
 -- Insert section data
 INSERT INTO "section" (id, name, project_id, team_id, created_by, task_ids, created_at, updated_at)
@@ -103,48 +103,36 @@ VALUES
   (5, 'UI设计', 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '{6}', '2023-02-07T09:30:00Z', '2023-02-07T09:30:00Z'),
   (6, '移动开发', 2, 3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '{7,8}', '2023-02-07T09:45:00Z', '2023-02-07T09:45:00Z');
 
+-- Insert tag data
+INSERT INTO "tag" (id, name, hide, description, created_at, updated_at)
+VALUES 
+  (1, 'Bug', FALSE, '用于标记缺陷', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'),
+  (2, 'Feature', FALSE, '用于标记新功能', '2023-02-02T10:05:00Z', '2023-02-02T10:05:00Z'),
+  (3, 'Enhancement', FALSE, '用于标记增强功能', '2023-02-02T10:10:00Z', '2023-02-02T10:10:00Z'),
+  (4, 'Documentation', FALSE, '用于标记文档', '2023-02-02T10:20:00Z', '2023-02-02T10:20:00Z'),
+  (5, 'UI', FALSE, '用于标记用户界面', '2023-02-06T11:00:00Z', '2023-02-06T11:00:00Z'),
+  (6, 'Backend', FALSE, '用于标记后端', '2023-02-06T11:05:00Z', '2023-02-06T11:05:00Z');
+
 -- Insert task data
 INSERT INTO "task" (
   id, title, description, status, priority, due_date, 
   section_id, project_id, team_id, 
-  assignee_ids, tag_ids, depends_on_task_ids,
+  assignee_ids, tag_values,
   created_by, created_at, updated_at
 )
 VALUES 
   -- 网站重设计项目 - 前端团队
   (1, '创建线框图', '设计首页和关键页面的初始线框图', 'IN_PROGRESS', 'HIGH', '2023-02-15T17:00:00Z', 
    1, 1, 1, 
-   ARRAY['75cb09ec-f11e-4b34-a1e5-327e90026b94']::UUID[], '{2,5}', '{}',
+   ARRAY[('75cb09ec-f11e-4b34-a1e5-327e90026b94')::uuid],
+   jsonb_build_object('2', 'Feature', '5', 'UI'),
    '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:00:00Z', '2023-02-03T11:00:00Z'),
    
   (2, '实现响应式设计', '确保网站在所有设备上正常工作', 'TODO', 'MEDIUM', '2023-02-20T17:00:00Z',
    2, 1, 1,
-   ARRAY['a9d61763-843c-4c7b-894a-fd8d8a5fc254']::UUID[], '{3}', '{1}',
+   ARRAY[('a9d61763-843c-4c7b-894a-fd8d8a5fc254')::uuid],
+   jsonb_build_object('3', 'Enhancement'),
    '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:30:00Z', '2023-02-03T11:30:00Z');
-
--- Insert tag data
-INSERT INTO "tag" (id, name, color, created_at, updated_at)
-VALUES 
-  (1, 'Bug', 'red', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'),
-  (2, 'Feature', 'blue', '2023-02-02T10:05:00Z', '2023-02-02T10:05:00Z'),
-  (3, 'Enhancement', 'green', '2023-02-02T10:10:00Z', '2023-02-02T10:10:00Z'),
-  (4, 'Documentation', 'purple', '2023-02-02T10:20:00Z', '2023-02-02T10:20:00Z'),
-  (5, 'UI', 'pink', '2023-02-06T11:00:00Z', '2023-02-06T11:00:00Z'),
-  (6, 'Backend', 'orange', '2023-02-06T11:05:00Z', '2023-02-06T11:05:00Z');
-
--- Insert task-tag relationships
-UPDATE "task"
-SET tag_ids = CASE
-  WHEN id = 1 THEN ARRAY[2, 5]  -- Create Wireframes - Feature, UI
-  WHEN id = 2 THEN ARRAY[3]     -- Implement Responsive Design - Enhancement
-  WHEN id = 3 THEN ARRAY[1]     -- Cross-browser Testing - Bug
-  WHEN id = 4 THEN ARRAY[4, 6]  -- Design REST API - Documentation, Backend
-  WHEN id = 5 THEN ARRAY[6]     -- Implement Authentication - Backend
-  WHEN id = 6 THEN ARRAY[5]     -- Design App Mockups - UI
-  WHEN id = 7 THEN ARRAY[2]     -- Setup React Native Project - Feature
-  WHEN id = 8 THEN ARRAY[2, 5]  -- Implement Login Screen - Feature, UI
-END
-WHERE id IN (1,2,3,4,5,6,7,8);
 
 -- Insert comment data
 INSERT INTO "comment" (id, text, task_id, user_id, created_at, updated_at)
@@ -165,26 +153,26 @@ VALUES
   (4, 'https://example.com/files/app-mockup-v1.png', 'app-mockup-v1.png', 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T13:00:00Z', '2023-02-07T13:00:00Z');
 
 -- Insert custom field data
-INSERT INTO "custom_field" (id, name, type, description, icon, default_config, created_at, updated_at, created_by)
+INSERT INTO "custom_field" (id, name, type, description, icon, created_at, updated_at, created_by)
 VALUES 
-  ('1', 'Board', 'BOARD', 'Display tasks in kanban board format', 'LayoutDashboard', '{"colors":["#E5E5E5","#FFD700","#90EE90"],"columns":["To Do","In Progress","Done"]}', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('2', 'Timeline', 'TIMELINE', 'Display tasks in timeline format', 'GanttChart', '{"timeScale":"week","showProgress":true}', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('3', 'File', 'FILES', 'Manage task-related files', 'Files', '{"maxSize":10485760,"allowedTypes":["image/*","application/pdf"]}', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('4', 'Gantt', 'GANTT', 'Project progress in Gantt chart', 'GanttChart', '{"dayHours":8,"workDays":[1,2,3,4,5]}', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('5', 'List', 'LIST', 'a', 'List', null, '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('6', 'Calendar', 'CALENDAR', 'a', 'Calendar', null, '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('7', 'Note', 'NOTE', 'j', 'Text', null, '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('8', 'Dashboard', 'DASHBOARD', 'j', 'BarChart3', null, '2025-03-11 10:25:56.715019', '2025-03-11 10:25:56.715019', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('9', 'Overview', 'OVERVIEW', 'h', 'LayoutGrid', null, '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+  ('1', 'Board', 'BOARD', 'Display tasks in kanban board format', 'LayoutDashboard', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('2', 'Timeline', 'TIMELINE', 'Display tasks in timeline format, allowing users to visualize task progress over time', 'GanttChart', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('3', 'File', 'FILES', 'Manage task-related files, enabling users to upload and organize documents associated with tasks', 'Files', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('4', 'Gantt', 'GANTT', 'Project progress in Gantt chart format, providing a visual representation of project timelines and dependencies', 'GanttChart', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('5', 'List', 'LIST', 'A simple list format for displaying tasks', 'List', '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('6', 'Calendar', 'CALENDAR', 'A calendar view for scheduling and tracking tasks', 'Calendar', '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('7', 'Note', 'NOTE', 'A text field for adding notes related to tasks', 'Text', '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('8', 'Dashboard', 'DASHBOARD', 'A visual dashboard for summarizing project metrics and statuses', 'BarChart3', '2025-03-11 10:25:56.715019', '2025-03-11 10:25:56.715019', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('9', 'Overview', 'OVERVIEW', 'A high-level overview of project progress and key metrics', 'LayoutGrid', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
 
 -- Insert team custom field association data
-INSERT INTO "team_custom_field" (id, team_id, custom_field_id, config, order_index, created_at, updated_at, created_by)
+INSERT INTO "team_custom_field" (id, team_id, custom_field_id, order_index, tag_ids, created_at, updated_at, created_by)
 VALUES 
-  (1, 1, 1, '{"columns":["待办","进行中","审核中","已完成"]}', 1, '2023-02-02T12:00:00Z', '2023-02-02T12:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 1, 2, '{"timeScale":"day"}', 2, '2023-02-02T12:10:00Z', '2023-02-02T12:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (3, 2, 1, '{"columns":["待办","开发中","测试中","已完成"]}', 1, '2023-02-02T14:10:00Z', '2023-02-02T14:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (4, 3, 1, '{"columns":["待办","设计中","开发中","测试中","已完成"]}', 1, '2023-02-06T13:10:00Z', '2023-02-06T13:10:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'),
-  (5, 3, 4, '{"workDays":[1,2,3,4,5,6]}', 2, '2023-02-06T13:20:00Z', '2023-02-06T13:20:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254');
+  (1, 1, 1, 1, '{1}', '2023-02-02T12:00:00Z', '2023-02-02T12:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (2, 1, 2, 2, '{2}', '2023-02-02T12:10:00Z', '2023-02-02T12:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (3, 2, 1, 1, '{1,2}', '2023-02-02T14:10:00Z', '2023-02-02T14:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (4, 3, 1, 1, '{1}', '2023-02-06T13:10:00Z', '2023-02-06T13:10:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'),
+  (5, 3, 4, 2, '{2}', '2023-02-06T13:20:00Z', '2023-02-06T13:20:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254');
 
 -- Insert team custom field value data
 INSERT INTO "team_custom_field_value" (id, team_custom_field_id, name, description, icon, value, created_at, updated_at, created_by)

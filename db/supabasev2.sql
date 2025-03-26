@@ -102,8 +102,8 @@ CREATE TABLE "task" (
   "section_id" INT REFERENCES "section"("id") ON DELETE CASCADE,
   "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "assignee_ids" UUID[] DEFAULT '{}', -- 存储指派的用户ID数组
-  "tag_ids" INT[] DEFAULT '{}', -- 存储标签ID数组
+  "assignee_ids" UUID[] DEFAULT '{}',
+  "tag_values" JSONB DEFAULT '{}',
   "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -115,7 +115,8 @@ CREATE TABLE "task" (
 CREATE TABLE "tag" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
-  "color" VARCHAR(50),
+  "hide" BOOLEAN DEFAULT FALSE, -- 默认为False
+  "description" TEXT,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -156,7 +157,6 @@ CREATE TABLE "custom_field" (
   "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'DASHBOARD', 'NOTE', 'GANTT', 'CALENDAR', 'BOARD', 'FILES')),
   "description" TEXT,
   "icon" VARCHAR(255),
-  "default_config" JSONB, -- 存储字段的默认配置
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
@@ -167,8 +167,8 @@ CREATE TABLE "team_custom_field" (
   "id" SERIAL PRIMARY KEY,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "custom_field_id" INT NOT NULL REFERENCES "custom_field"("id") ON DELETE CASCADE,
-  "config" JSONB, -- 存储团队特定的字段配置
-  "order_index" INT DEFAULT 0,
+  "order_index" INT DEFAULT 0,    
+  "tag_ids" INT[] DEFAULT '{}',
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE

@@ -18,7 +18,6 @@ export default function CustomField() {
     type: '',
     description: '',
     icon: '',
-    default_config: {},
   });
 
   useEffect(() => {

@@ -28,14 +28,11 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                 throw new Error('User not authenticated');
             }
             
-            const default_config = JSON.parse(formData.default_config);
-            console.log(userData.user.id)
             const resultAction = await dispatch(createCustomField({
                 name: formData.name,
                 type: formData.type,
                 description: formData.description,
                 icon: formData.icon,
-                default_config,
                 created_by: userData.user.id,
             }));
             
@@ -68,24 +65,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
             message: t('iconRequired'),
         }).max(50, {
             message: t('iconMax'),
-        }),
-        default_config: z.string()
-            .min(1, {
-                message: t('defaultConfigRequired'),
-            })
-            .max(100, {
-                message: t('defaultConfigMax'),
-            })
-            .refine((val) => {
-                try {
-                    JSON.parse(val);
-                    return true;
-                } catch (e) {
-                    return false;
-                }
-            }, {
-                message: t('invalidJSON'),
-            })
+        })
     });
 
     const form = useForm({
@@ -95,7 +75,6 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
             type: '',
             description: '',
             icon: '',
-            default_config: '',
         },
     });
     
@@ -234,34 +213,6 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                                                     <FormMessage className="text-xs" />
                                                 </div>
                                                 <span className="text-xs text-gray-500 ml-2">{field.value.trim().length}/100</span>
-                                            </div>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="default_config"    
-                                    render={({ field, fieldState }) => (
-                                        <FormItem>
-                                            <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
-                                                {t('Default_config')}
-                                                <span className="text-red-500">*</span>
-                                            </FormLabel>
-                                            <FormControl>
-                                                <Textarea 
-                                                    className={`w-full px-3 py-2 border rounded-md ${
-                                                        fieldState.invalid ? 'border-red-500' : 'border-gray-300'
-                                                    }`}
-                                                    placeholder='{"key": "value"}'
-                                                    {...field} 
-                                                />
-                                            </FormControl>
-                                            <div className="flex justify-between mt-1 min-h-[20px]">
-                                                <div className="flex-1">
-                                                    <FormMessage className="text-xs" />
-                                                </div>
-                                                <span className="text-xs text-gray-500">
-                                                </span>
                                             </div>
                                         </FormItem>
                                     )}
