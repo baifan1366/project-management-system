@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { Readable } from 'stream';
 
 // 初始化OpenAI客户端，但配置为OpenRouter API
 const openai = new OpenAI({
@@ -38,18 +39,62 @@ export async function POST(request) {
       });
     }
     
-    // 调用OpenRouter API (通过OpenAI客户端)
-    const completion = await openai.chat.completions.create({
-      model: "qwen/qwen2.5-vl-32b-instruct:free", // OpenRouter上的模型ID
-      messages: formattedMessages,
-      temperature: 0.7,
-      max_tokens: 1000
+    // 创建流式响应
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        // 流式调用OpenRouter API
+        const completion = await openai.chat.completions.create({
+          model: "qwen/qwen2.5-vl-32b-instruct:free", // OpenRouter上的模型ID
+          messages: formattedMessages,
+          temperature: 0.2, // 降低温度，使输出更可控
+          max_tokens: 1000,
+          stream: true, // 启用流式输出
+        });
+
+        let fullContent = "";
+        
+        try {
+          // 处理流数据
+          for await (const chunk of completion) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            
+            if (content) {
+              // 将内容添加到累积字符串
+              fullContent += content;
+              
+              // 发送数据块
+              const data = encoder.encode(`data: ${JSON.stringify({ content })}\n\n`);
+              controller.enqueue(data);
+            }
+          }
+          
+          // 流结束，发送完整内容
+          const finalMessage = encoder.encode(`data: ${JSON.stringify({ 
+            content: "[DONE]", 
+            fullContent 
+          })}\n\n`);
+          controller.enqueue(finalMessage);
+          controller.close();
+        } catch (error) {
+          console.error('流处理错误:', error);
+          const errorMessage = encoder.encode(`data: ${JSON.stringify({ 
+            error: '流处理错误',
+            message: error.message
+          })}\n\n`);
+          controller.enqueue(errorMessage);
+          controller.close();
+        }
+      }
     });
-    
-    // 提取AI回复并返回
-    const aiMessage = completion.choices[0].message;
-    
-    return NextResponse.json({ content: aiMessage.content });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
   } catch (error) {
     console.error('AI API请求失败:', error);
     

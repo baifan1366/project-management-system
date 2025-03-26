@@ -193,9 +193,16 @@ export default function AIChatBot() {
       user: currentUser || { name: t('user') } // 确保即使没有currentUser也有默认值
     };
     
+    // 立即显示用户消息
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
+    
+    // 确保消息显示后再执行下一步操作
+    // 强制React渲染更新
+    await new Promise(resolve => setTimeout(resolve, 0));
+    // 滚动到底部
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     
     try {
       // 首先检查是否需要创建新的AI会话
@@ -234,22 +241,22 @@ export default function AIChatBot() {
         currentSessionId = aiSession.id;
       }
       
-      // 发送消息到AI获取响应
+      // 发送消息到AI获取响应 - 现在用流式方式处理
       const response = await sendMessageToAI(input.trim(), messages);
       
-      // 添加AI回复
+      // 不需要再添加AI回复，因为在流式处理中已经添加了
+      // 但我们需要保存到数据库
       const aiMessage = {
         role: 'assistant',
         content: response.content,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        session_id: currentSessionId
       };
-
-      setMessages(prev => [...prev, aiMessage]);
       
-      // 保存消息到数据库 - 确保使用正确的会话ID
+      // 保存消息到数据库
       console.log('保存消息到会话:', currentSessionId);
       await saveAIChatMessage({...userMessage, session_id: currentSessionId});
-      await saveAIChatMessage({...aiMessage, session_id: currentSessionId});
+      await saveAIChatMessage(aiMessage);
     } catch (error) {
       console.error(t('aiResponseError'), error);
       // 添加错误消息
@@ -287,7 +294,18 @@ export default function AIChatBot() {
         content: userInput
       });
 
-      // 调用我们的OpenAI API端点
+      // 创建一个临时的AI消息对象，用于流式更新
+      const tempAiMessage = {
+        role: 'assistant',
+        content: '',
+        timestamp: new Date().toISOString(),
+        isStreaming: true // 添加流式标记
+      };
+      
+      // 先添加一个空消息，后续会更新它
+      setMessages(prev => [...prev, tempAiMessage]);
+
+      // 调用流式API端点
       const response = await fetch('/api/ai-proxy', {
         method: 'POST',
         headers: {
@@ -297,15 +315,65 @@ export default function AIChatBot() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '请求AI服务失败');
+        throw new Error('请求AI服务失败');
       }
 
-      const data = await response.json();
+      // 处理流式响应
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          break;
+        }
+        
+        // 解码收到的数据
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+              
+              // 检查是否为最终消息
+              if (data.content === "[DONE]") {
+                // 使用完整内容更新消息，并移除流式标记
+                if (data.fullContent) {
+                  setMessages(prev => prev.map((msg, idx) => 
+                    idx === prev.length - 1 ? { ...msg, content: data.fullContent, isStreaming: false } : msg
+                  ));
+                  accumulatedContent = data.fullContent;
+                }
+                break;
+              }
+              
+              // 累加内容并更新消息
+              if (data.content) {
+                accumulatedContent += data.content;
+                
+                // 更新消息数组中的最后一条消息
+                setMessages(prev => prev.map((msg, idx) => 
+                  idx === prev.length - 1 ? { ...msg, content: accumulatedContent } : msg
+                ));
+                
+                // 滚动到底部以跟随新内容
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }
+            } catch (e) {
+              console.error('解析流数据出错:', e);
+            }
+          }
+        }
+      }
       
+      // 返回累积的完整内容
       return {
         role: 'assistant',
-        content: data.content
+        content: accumulatedContent
       };
     } catch (error) {
       console.error(t('aiApiError'), error);
@@ -442,12 +510,22 @@ export default function AIChatBot() {
                           )}>
                             {displayContent}
                           </div>
+                          
+                          {/* 对于流式显示的消息，在消息底部显示thinking指示器 */}
+                          {msg.isStreaming && (
+                            <div className="flex items-center gap-2 mt-2 text-gray-500 dark:text-gray-400">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span className="text-xs">{t('thinking')}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
                   );
                 })}
-                {loading && (
+                
+                {/* 将loading状态指示器移除，因为现在使用isStreaming标记在每条消息内部显示 */}
+                {loading && !messages.some(msg => msg.isStreaming) && (
                   <div className="flex items-start gap-2 max-w-2xl">
                     <div className="w-8 h-8 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center text-white font-medium flex-shrink-0">
                       <PenguinIcon />
