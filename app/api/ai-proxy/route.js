@@ -48,7 +48,7 @@ export async function POST(request) {
           model: "qwen/qwen2.5-vl-32b-instruct:free", // OpenRouter上的模型ID
           messages: formattedMessages,
           temperature: 0.2, // 降低温度，使输出更可控
-          max_tokens: 1000,
+          max_tokens: 3000,
           stream: true, // 启用流式输出
         });
 

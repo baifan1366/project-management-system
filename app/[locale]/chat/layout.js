@@ -37,6 +37,7 @@ function ChatLayout({ children }) {
     const newMode = chatMode === 'normal' ? 'ai' : 'normal';
     console.log('切换到新模式:', newMode);
     setChatMode(newMode);
+    setCurrentSession(null);
   };
 
   return (
