@@ -94,16 +94,6 @@ export default function AIChatBot() {
         return;
       }
       
-      setMessages([]); // 先清空消息，防止显示上一个会话的内容
-      
-      // 从数据库获取AI会话消息记录
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      if (!authSession) {
-        console.log('当前用户未登录，无法加载消息');
-        setIsInitialLoad(false);
-        return;
-      }
-
       // 确定要使用的AI会话 - 优先使用当前选择的会话
       let sessionToUse = null;
       
@@ -148,10 +138,6 @@ export default function AIChatBot() {
             timestamp: msg.timestamp,
             user: msg.user // 包含用户信息
           })));
-        } else {
-          console.log('该会话没有消息记录');
-          // 没有消息或发生错误，显示空白对话
-          setMessages([]);
         }
       } else {
         // 没有选中的AI会话，显示空白对话
@@ -204,7 +190,7 @@ export default function AIChatBot() {
       role: 'user',
       content: input.trim(),
       timestamp: new Date().toISOString(),
-      user: currentUser // 添加用户信息
+      user: currentUser || { name: t('user') } // 确保即使没有currentUser也有默认值
     };
     
     setMessages(prev => [...prev, userMessage]);
@@ -289,20 +275,11 @@ export default function AIChatBot() {
   // 发送消息到AI
   const sendMessageToAI = async (userInput, messageHistory) => {
     try {
-      // 引入动态导入的InferenceClient以避免服务器端渲染问题
-      const { InferenceClient } = await import('@huggingface/inference');
-      const client = new InferenceClient(process.env.NEXT_PUBLIC_HUGGING_FACE_ACCESS_TOKEN);
-
-      // 添加系统消息，描述AI是企鹅形象的专业项目经理
-      const systemMessage = {
-        role: 'system',
-        content: "You are 'Project Manager Penguin', a professional project management assistant with a penguin persona. You specialize in project planning, task organization, team coordination, and agile methodologies. Your tone is friendly but professional, and you provide concise, practical advice. When discussing project management, use industry standard terminology and best practices. You occasionally use penguin-related metaphors and references to add personality to your responses."
-      };
-
-      const formattedMessages = [systemMessage, ...messageHistory.map(msg => ({
+      // 格式化消息历史
+      const formattedMessages = messageHistory.map(msg => ({
         role: msg.role,
         content: msg.content
-      }))];
+      }));
 
       // 添加当前的用户消息
       formattedMessages.push({
@@ -310,14 +287,26 @@ export default function AIChatBot() {
         content: userInput
       });
 
-      const chatCompletion = await client.chatCompletion({
-        model: "Qwen/QwQ-32B",
-        messages: formattedMessages,
-        provider: "hf-inference",
-        max_tokens: 500,
+      // 调用我们的OpenAI API端点
+      const response = await fetch('/api/ai-proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: formattedMessages }),
       });
 
-      return chatCompletion.choices[0].message;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '请求AI服务失败');
+      }
+
+      const data = await response.json();
+      
+      return {
+        role: 'assistant',
+        content: data.content
+      };
     } catch (error) {
       console.error(t('aiApiError'), error);
       throw error;
@@ -342,7 +331,7 @@ export default function AIChatBot() {
       <div className="flex-1 overflow-hidden relative">
         <div className="absolute inset-0 overflow-y-auto p-4" ref={chatContainerRef}>
           <div className="flex flex-col space-y-4 min-h-full">
-            {messages.length === 0 ? (
+            {messages.length === 0 && !loading ? (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
                 <div className="relative text-blue-600 mb-2 w-16 h-16">
                   <Image 
@@ -359,114 +348,116 @@ export default function AIChatBot() {
                 <p className="text-sm">{t('welcomeMessage')}</p>
               </div>
             ) : (
-              messages.map((msg, index) => {
-                // 检查是否是思考过程
-                const isThinking = msg.role === 'assistant' && msg.content.includes('</think>');
-                let displayContent = msg.content;
-                let thinkingContent = '';
-                
-                if (isThinking) {
-                  const parts = msg.content.split('</think>');
-                  thinkingContent = parts[0];
-                  displayContent = parts[1] || '';
-                }
+              <div className="flex flex-col space-y-4">
+                {messages.map((msg, index) => {
+                  // 检查是否是思考过程
+                  const isThinking = msg.role === 'assistant' && msg.content.includes('</think>');
+                  let displayContent = msg.content;
+                  let thinkingContent = '';
+                  
+                  if (isThinking) {
+                    const parts = msg.content.split('</think>');
+                    thinkingContent = parts[0];
+                    displayContent = parts[1] || '';
+                  }
 
-                return (
-                  <div key={index}>
-                    {/* 思考过程显示 */}
-                    {isThinking && thinkingContent && (
-                      <div className="mb-4 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2 text-gray-500 dark:text-gray-400">
-                          <div className="w-3 h-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                              <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.636 5.636l2.122 2.122m8.484 8.484l2.122 2.122M5.636 18.364l2.122-2.122m8.484-8.484l2.122-2.122"></path>
-                            </svg>
+                  return (
+                    <div key={index}>
+                      {/* 思考过程显示 */}
+                      {isThinking && thinkingContent && (
+                        <div className="mb-4 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2 text-gray-500 dark:text-gray-400">
+                            <div className="w-3 h-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+                                <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.636 5.636l2.122 2.122m8.484 8.484l2.122 2.122M5.636 18.364l2.122-2.122m8.484-8.484l2.122-2.122"></path>
+                              </svg>
+                            </div>
+                            <span className="text-xs font-medium">{t('thinking')}</span>
                           </div>
-                          <span className="text-xs font-medium">{t('thinking')}</span>
+                          <div className={cn(
+                            "pl-5 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap transition-all duration-200",
+                            !expandedThoughts[index] && "line-clamp-3"
+                          )}>
+                            {thinkingContent}
+                          </div>
+                          {thinkingContent.split('\n').length > 3 && (
+                            <button
+                              onClick={() => toggleThoughtExpansion(index)}
+                              className="mt-1 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium pl-5"
+                            >
+                              {expandedThoughts[index] ? t('showLess') : t('readMore')}
+                            </button>
+                          )}
                         </div>
-                        <div className={cn(
-                          "pl-5 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap transition-all duration-200",
-                          !expandedThoughts[index] && "line-clamp-3"
-                        )}>
-                          {thinkingContent}
-                        </div>
-                        {thinkingContent.split('\n').length > 3 && (
-                          <button
-                            onClick={() => toggleThoughtExpansion(index)}
-                            className="mt-1 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium pl-5"
-                          >
-                            {expandedThoughts[index] ? t('showLess') : t('readMore')}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* 消息内容 */}
-                    <div
-                      className={cn(
-                        "flex items-start gap-2 max-w-2xl mb-4",
-                        msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
                       )}
-                    >
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
-                        msg.role === 'user' ? "bg-primary dark:bg-primary/90" : "bg-blue-600 dark:bg-blue-700"
-                      )}>
-                        {msg.role === 'user' ? (
-                          msg.user?.avatar_url ? (
-                            <img 
-                              src={msg.user.avatar_url} 
-                              alt={msg.user.name || t('user')}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : currentUser?.avatar_url ? (
-                            <img 
-                              src={currentUser.avatar_url} 
-                              alt={currentUser.name || t('user')}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span>{(msg.user?.name || currentUser?.name || t('user')).charAt(0)}</span>
-                          )
-                        ) : (
-                          <PenguinIcon />
+                      
+                      {/* 消息内容 */}
+                      <div
+                        className={cn(
+                          "flex items-start gap-2 max-w-2xl mb-4",
+                          msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
                         )}
-                      </div>
-                      <div className="min-w-0 max-w-full">
+                      >
                         <div className={cn(
-                          "flex items-baseline gap-2",
-                          msg.role === 'user' ? "flex-row-reverse" : ""
+                          "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
+                          msg.role === 'user' ? "bg-primary dark:bg-primary/90" : "bg-blue-600 dark:bg-blue-700"
                         )}>
-                          <span className="font-medium truncate dark:text-gray-200">
-                            {msg.role === 'user' ? (msg.user?.name || currentUser?.name || t('user')) : t('aiAssistant')}
-                          </span>
-                          <span className="text-xs text-muted-foreground dark:text-gray-400 flex-shrink-0">
-                            {new Date(msg.timestamp).toLocaleTimeString()}
-                          </span>
+                          {msg.role === 'user' ? (
+                            msg.user?.avatar_url ? (
+                              <img 
+                                src={msg.user.avatar_url} 
+                                alt={msg.user.name || t('user')}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : currentUser?.avatar_url ? (
+                              <img 
+                                src={currentUser.avatar_url} 
+                                alt={currentUser.name || t('user')}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span>{(msg.user?.name || currentUser?.name || t('user')).charAt(0)}</span>
+                            )
+                          ) : (
+                            <PenguinIcon />
+                          )}
                         </div>
-                        <div className={cn(
-                          "mt-1 rounded-lg p-3 text-sm break-words",
-                          msg.role === 'user' 
-                            ? "bg-primary text-primary-foreground dark:bg-primary/90" 
-                            : "bg-accent dark:bg-gray-800 dark:text-gray-200"
-                        )}>
-                          {displayContent}
+                        <div className="min-w-0 max-w-full">
+                          <div className={cn(
+                            "flex items-baseline gap-2",
+                            msg.role === 'user' ? "flex-row-reverse" : ""
+                          )}>
+                            <span className="font-medium truncate dark:text-gray-200">
+                              {msg.role === 'user' ? (msg.user?.name || currentUser?.name || t('user')) : t('aiAssistant')}
+                            </span>
+                            <span className="text-xs text-muted-foreground dark:text-gray-400 flex-shrink-0">
+                              {new Date(msg.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <div className={cn(
+                            "mt-1 rounded-lg p-3 text-sm break-words",
+                            msg.role === 'user' 
+                              ? "bg-primary text-primary-foreground dark:bg-primary/90" 
+                              : "bg-accent dark:bg-gray-800 dark:text-gray-200"
+                          )}>
+                            {displayContent}
+                          </div>
                         </div>
                       </div>
                     </div>
+                  );
+                })}
+                {loading && (
+                  <div className="flex items-start gap-2 max-w-2xl">
+                    <div className="w-8 h-8 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center text-white font-medium flex-shrink-0">
+                      <PenguinIcon />
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />
+                      <span className="text-sm text-muted-foreground dark:text-gray-400">{t('thinking')}</span>
+                    </div>
                   </div>
-                );
-              })
-            )}
-            {loading && (
-              <div className="flex items-start gap-2 max-w-2xl">
-                <div className="w-8 h-8 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center text-white font-medium flex-shrink-0">
-                  <PenguinIcon />
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />
-                  <span className="text-sm text-muted-foreground dark:text-gray-400">{t('thinking')}</span>
-                </div>
+                )}
               </div>
             )}
             <div ref={messagesEndRef} />
