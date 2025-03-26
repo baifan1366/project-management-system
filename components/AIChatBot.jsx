@@ -94,16 +94,6 @@ export default function AIChatBot() {
         return;
       }
       
-      setMessages([]); // 先清空消息，防止显示上一个会话的内容
-      
-      // 从数据库获取AI会话消息记录
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      if (!authSession) {
-        console.log('当前用户未登录，无法加载消息');
-        setIsInitialLoad(false);
-        return;
-      }
-
       // 确定要使用的AI会话 - 优先使用当前选择的会话
       let sessionToUse = null;
       
@@ -148,10 +138,6 @@ export default function AIChatBot() {
             timestamp: msg.timestamp,
             user: msg.user // 包含用户信息
           })));
-        } else {
-          console.log('该会话没有消息记录');
-          // 没有消息或发生错误，显示空白对话
-          setMessages([]);
         }
       } else {
         // 没有选中的AI会话，显示空白对话
@@ -204,12 +190,19 @@ export default function AIChatBot() {
       role: 'user',
       content: input.trim(),
       timestamp: new Date().toISOString(),
-      user: currentUser // 添加用户信息
+      user: currentUser || { name: t('user') } // 确保即使没有currentUser也有默认值
     };
     
+    // 立即显示用户消息
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
+    
+    // 确保消息显示后再执行下一步操作
+    // 强制React渲染更新
+    await new Promise(resolve => setTimeout(resolve, 0));
+    // 滚动到底部
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     
     try {
       // 首先检查是否需要创建新的AI会话
@@ -248,22 +241,22 @@ export default function AIChatBot() {
         currentSessionId = aiSession.id;
       }
       
-      // 发送消息到AI获取响应
+      // 发送消息到AI获取响应 - 现在用流式方式处理
       const response = await sendMessageToAI(input.trim(), messages);
       
-      // 添加AI回复
+      // 不需要再添加AI回复，因为在流式处理中已经添加了
+      // 但我们需要保存到数据库
       const aiMessage = {
         role: 'assistant',
         content: response.content,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        session_id: currentSessionId
       };
-
-      setMessages(prev => [...prev, aiMessage]);
       
-      // 保存消息到数据库 - 确保使用正确的会话ID
+      // 保存消息到数据库
       console.log('保存消息到会话:', currentSessionId);
       await saveAIChatMessage({...userMessage, session_id: currentSessionId});
-      await saveAIChatMessage({...aiMessage, session_id: currentSessionId});
+      await saveAIChatMessage(aiMessage);
     } catch (error) {
       console.error(t('aiResponseError'), error);
       // 添加错误消息
@@ -289,20 +282,11 @@ export default function AIChatBot() {
   // 发送消息到AI
   const sendMessageToAI = async (userInput, messageHistory) => {
     try {
-      // 引入动态导入的InferenceClient以避免服务器端渲染问题
-      const { InferenceClient } = await import('@huggingface/inference');
-      const client = new InferenceClient(process.env.NEXT_PUBLIC_HUGGING_FACE_ACCESS_TOKEN);
-
-      // 添加系统消息，描述AI是企鹅形象的专业项目经理
-      const systemMessage = {
-        role: 'system',
-        content: "You are 'Project Manager Penguin', a professional project management assistant with a penguin persona. You specialize in project planning, task organization, team coordination, and agile methodologies. Your tone is friendly but professional, and you provide concise, practical advice. When discussing project management, use industry standard terminology and best practices. You occasionally use penguin-related metaphors and references to add personality to your responses."
-      };
-
-      const formattedMessages = [systemMessage, ...messageHistory.map(msg => ({
+      // 格式化消息历史
+      const formattedMessages = messageHistory.map(msg => ({
         role: msg.role,
         content: msg.content
-      }))];
+      }));
 
       // 添加当前的用户消息
       formattedMessages.push({
@@ -310,14 +294,87 @@ export default function AIChatBot() {
         content: userInput
       });
 
-      const chatCompletion = await client.chatCompletion({
-        model: "Qwen/QwQ-32B",
-        messages: formattedMessages,
-        provider: "hf-inference",
-        max_tokens: 500,
+      // 创建一个临时的AI消息对象，用于流式更新
+      const tempAiMessage = {
+        role: 'assistant',
+        content: '',
+        timestamp: new Date().toISOString(),
+        isStreaming: true // 添加流式标记
+      };
+      
+      // 先添加一个空消息，后续会更新它
+      setMessages(prev => [...prev, tempAiMessage]);
+
+      // 调用流式API端点
+      const response = await fetch('/api/ai-proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: formattedMessages }),
       });
 
-      return chatCompletion.choices[0].message;
+      if (!response.ok) {
+        throw new Error('请求AI服务失败');
+      }
+
+      // 处理流式响应
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          break;
+        }
+        
+        // 解码收到的数据
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+              
+              // 检查是否为最终消息
+              if (data.content === "[DONE]") {
+                // 使用完整内容更新消息，并移除流式标记
+                if (data.fullContent) {
+                  setMessages(prev => prev.map((msg, idx) => 
+                    idx === prev.length - 1 ? { ...msg, content: data.fullContent, isStreaming: false } : msg
+                  ));
+                  accumulatedContent = data.fullContent;
+                }
+                break;
+              }
+              
+              // 累加内容并更新消息
+              if (data.content) {
+                accumulatedContent += data.content;
+                
+                // 更新消息数组中的最后一条消息
+                setMessages(prev => prev.map((msg, idx) => 
+                  idx === prev.length - 1 ? { ...msg, content: accumulatedContent } : msg
+                ));
+                
+                // 滚动到底部以跟随新内容
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }
+            } catch (e) {
+              console.error('解析流数据出错:', e);
+            }
+          }
+        }
+      }
+      
+      // 返回累积的完整内容
+      return {
+        role: 'assistant',
+        content: accumulatedContent
+      };
     } catch (error) {
       console.error(t('aiApiError'), error);
       throw error;
@@ -342,7 +399,7 @@ export default function AIChatBot() {
       <div className="flex-1 overflow-hidden relative">
         <div className="absolute inset-0 overflow-y-auto p-4" ref={chatContainerRef}>
           <div className="flex flex-col space-y-4 min-h-full">
-            {messages.length === 0 ? (
+            {messages.length === 0 && !loading ? (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
                 <div className="relative text-blue-600 mb-2 w-16 h-16">
                   <Image 
@@ -359,114 +416,126 @@ export default function AIChatBot() {
                 <p className="text-sm">{t('welcomeMessage')}</p>
               </div>
             ) : (
-              messages.map((msg, index) => {
-                // 检查是否是思考过程
-                const isThinking = msg.role === 'assistant' && msg.content.includes('</think>');
-                let displayContent = msg.content;
-                let thinkingContent = '';
-                
-                if (isThinking) {
-                  const parts = msg.content.split('</think>');
-                  thinkingContent = parts[0];
-                  displayContent = parts[1] || '';
-                }
+              <div className="flex flex-col space-y-4">
+                {messages.map((msg, index) => {
+                  // 检查是否是思考过程
+                  const isThinking = msg.role === 'assistant' && msg.content.includes('</think>');
+                  let displayContent = msg.content;
+                  let thinkingContent = '';
+                  
+                  if (isThinking) {
+                    const parts = msg.content.split('</think>');
+                    thinkingContent = parts[0];
+                    displayContent = parts[1] || '';
+                  }
 
-                return (
-                  <div key={index}>
-                    {/* 思考过程显示 */}
-                    {isThinking && thinkingContent && (
-                      <div className="mb-4 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2 text-gray-500 dark:text-gray-400">
-                          <div className="w-3 h-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                              <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.636 5.636l2.122 2.122m8.484 8.484l2.122 2.122M5.636 18.364l2.122-2.122m8.484-8.484l2.122-2.122"></path>
-                            </svg>
+                  return (
+                    <div key={index}>
+                      {/* 思考过程显示 */}
+                      {isThinking && thinkingContent && (
+                        <div className="mb-4 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2 text-gray-500 dark:text-gray-400">
+                            <div className="w-3 h-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+                                <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.636 5.636l2.122 2.122m8.484 8.484l2.122 2.122M5.636 18.364l2.122-2.122m8.484-8.484l2.122-2.122"></path>
+                              </svg>
+                            </div>
+                            <span className="text-xs font-medium">{t('thinking')}</span>
                           </div>
-                          <span className="text-xs font-medium">{t('thinking')}</span>
+                          <div className={cn(
+                            "pl-5 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap transition-all duration-200",
+                            !expandedThoughts[index] && "line-clamp-3"
+                          )}>
+                            {thinkingContent}
+                          </div>
+                          {thinkingContent.split('\n').length > 3 && (
+                            <button
+                              onClick={() => toggleThoughtExpansion(index)}
+                              className="mt-1 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium pl-5"
+                            >
+                              {expandedThoughts[index] ? t('showLess') : t('readMore')}
+                            </button>
+                          )}
                         </div>
-                        <div className={cn(
-                          "pl-5 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap transition-all duration-200",
-                          !expandedThoughts[index] && "line-clamp-3"
-                        )}>
-                          {thinkingContent}
-                        </div>
-                        {thinkingContent.split('\n').length > 3 && (
-                          <button
-                            onClick={() => toggleThoughtExpansion(index)}
-                            className="mt-1 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium pl-5"
-                          >
-                            {expandedThoughts[index] ? t('showLess') : t('readMore')}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* 消息内容 */}
-                    <div
-                      className={cn(
-                        "flex items-start gap-2 max-w-2xl mb-4",
-                        msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
                       )}
-                    >
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
-                        msg.role === 'user' ? "bg-primary dark:bg-primary/90" : "bg-blue-600 dark:bg-blue-700"
-                      )}>
-                        {msg.role === 'user' ? (
-                          msg.user?.avatar_url ? (
-                            <img 
-                              src={msg.user.avatar_url} 
-                              alt={msg.user.name || t('user')}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : currentUser?.avatar_url ? (
-                            <img 
-                              src={currentUser.avatar_url} 
-                              alt={currentUser.name || t('user')}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span>{(msg.user?.name || currentUser?.name || t('user')).charAt(0)}</span>
-                          )
-                        ) : (
-                          <PenguinIcon />
+                      
+                      {/* 消息内容 */}
+                      <div
+                        className={cn(
+                          "flex items-start gap-2 max-w-2xl mb-4",
+                          msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
                         )}
-                      </div>
-                      <div className="min-w-0 max-w-full">
+                      >
                         <div className={cn(
-                          "flex items-baseline gap-2",
-                          msg.role === 'user' ? "flex-row-reverse" : ""
+                          "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
+                          msg.role === 'user' ? "bg-primary dark:bg-primary/90" : "bg-blue-600 dark:bg-blue-700"
                         )}>
-                          <span className="font-medium truncate dark:text-gray-200">
-                            {msg.role === 'user' ? (msg.user?.name || currentUser?.name || t('user')) : t('aiAssistant')}
-                          </span>
-                          <span className="text-xs text-muted-foreground dark:text-gray-400 flex-shrink-0">
-                            {new Date(msg.timestamp).toLocaleTimeString()}
-                          </span>
+                          {msg.role === 'user' ? (
+                            msg.user?.avatar_url ? (
+                              <img 
+                                src={msg.user.avatar_url} 
+                                alt={msg.user.name || t('user')}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : currentUser?.avatar_url ? (
+                              <img 
+                                src={currentUser.avatar_url} 
+                                alt={currentUser.name || t('user')}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span>{(msg.user?.name || currentUser?.name || t('user')).charAt(0)}</span>
+                            )
+                          ) : (
+                            <PenguinIcon />
+                          )}
                         </div>
-                        <div className={cn(
-                          "mt-1 rounded-lg p-3 text-sm break-words",
-                          msg.role === 'user' 
-                            ? "bg-primary text-primary-foreground dark:bg-primary/90" 
-                            : "bg-accent dark:bg-gray-800 dark:text-gray-200"
-                        )}>
-                          {displayContent}
+                        <div className="min-w-0 max-w-full">
+                          <div className={cn(
+                            "flex items-baseline gap-2",
+                            msg.role === 'user' ? "flex-row-reverse" : ""
+                          )}>
+                            <span className="font-medium truncate dark:text-gray-200">
+                              {msg.role === 'user' ? (msg.user?.name || currentUser?.name || t('user')) : t('aiAssistant')}
+                            </span>
+                            <span className="text-xs text-muted-foreground dark:text-gray-400 flex-shrink-0">
+                              {new Date(msg.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <div className={cn(
+                            "mt-1 rounded-lg p-3 text-sm break-words",
+                            msg.role === 'user' 
+                              ? "bg-primary text-primary-foreground dark:bg-primary/90" 
+                              : "bg-accent dark:bg-gray-800 dark:text-gray-200"
+                          )}>
+                            {displayContent}
+                          </div>
+                          
+                          {/* 对于流式显示的消息，在消息底部显示thinking指示器 */}
+                          {msg.isStreaming && (
+                            <div className="flex items-center gap-2 mt-2 text-gray-500 dark:text-gray-400">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span className="text-xs">{t('thinking')}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
+                  );
+                })}
+                
+                {/* 将loading状态指示器移除，因为现在使用isStreaming标记在每条消息内部显示 */}
+                {loading && !messages.some(msg => msg.isStreaming) && (
+                  <div className="flex items-start gap-2 max-w-2xl">
+                    <div className="w-8 h-8 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center text-white font-medium flex-shrink-0">
+                      <PenguinIcon />
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />
+                      <span className="text-sm text-muted-foreground dark:text-gray-400">{t('thinking')}</span>
+                    </div>
                   </div>
-                );
-              })
-            )}
-            {loading && (
-              <div className="flex items-start gap-2 max-w-2xl">
-                <div className="w-8 h-8 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center text-white font-medium flex-shrink-0">
-                  <PenguinIcon />
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />
-                  <span className="text-sm text-muted-foreground dark:text-gray-400">{t('thinking')}</span>
-                </div>
+                )}
               </div>
             )}
             <div ref={messagesEndRef} />

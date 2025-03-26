@@ -187,7 +187,121 @@ export function ChatProvider({ children }) {
       return null;
     }
     
+    // 如果是AI回复，并且是对话中的第一次AI回复，则生成聊天标题
+    if (message.role === 'assistant') {
+      // 查询此会话下有多少AI消息
+      const { data: messageCount, error: countError } = await supabase
+        .from('ai_chat_message')
+        .select('id', { count: 'exact' })
+        .eq('session_id', aiChatSessionId)
+        .eq('role', 'assistant');
+      
+      if (!countError && messageCount !== null) {
+        // 如果这是第一条或第二条AI消息（算上当前的），则生成会话名
+        if (messageCount.length <= 2) {
+          try {
+            // 获取最近的对话内容来帮助生成标题
+            const { data: recentMessages, error: recentError } = await supabase
+              .from('ai_chat_message')
+              .select('content, role')
+              .eq('session_id', aiChatSessionId)
+              .order('timestamp', { ascending: true })
+              .limit(4); // 获取最近的几条消息
+            
+            if (recentError) {
+              console.error('获取最近消息失败:', recentError);
+            } else if (recentMessages && recentMessages.length > 0) {
+              // 提取对话内容
+              const conversation = recentMessages.map(msg => 
+                `${msg.role === 'user' ? '用户' : 'AI'}: ${msg.content.substring(0, 100)}`
+              ).join('\n');
+              
+              // 使用AI生成标题
+              console.log('正在为对话生成标题...');
+              
+              // 构建请求，使用简化版的请求直接调用AI API，而不是标准的聊天流程
+              const titleResponse = await fetch('/api/ai/generate-title', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  conversation,
+                  sessionId: aiChatSessionId
+                }),
+              });
+              
+              if (titleResponse.ok) {
+                const { title } = await titleResponse.json();
+                
+                if (title) {
+                  console.log(`AI生成的聊天标题: ${title}`);
+                  
+                  // 更新会话名称
+                  const { error: updateError } = await supabase
+                    .from('chat_session')
+                    .update({ name: title })
+                    .eq('id', aiChatSessionId);
+                    
+                  if (updateError) {
+                    console.error('更新AI会话标题失败:', updateError);
+                  } else {
+                    // 更新成功后，重新获取会话列表以刷新UI
+                    fetchChatSessions();
+                  }
+                }
+              } else {
+                console.error('生成标题请求失败:', titleResponse.statusText);
+                // 如果生成标题失败，回退到使用消息内容截取的方式
+                fallbackTitleGeneration(message, aiChatSessionId);
+              }
+            }
+          } catch (e) {
+            console.error('生成标题过程出错:', e);
+            // 出错时回退到简单方式
+            fallbackTitleGeneration(message, aiChatSessionId);
+          }
+        }
+      }
+    }
+    
     return data;
+  };
+
+  // 回退到简单的标题生成方法
+  const fallbackTitleGeneration = async (message, sessionId) => {
+    // 从消息内容中提取标题（取前20-30个字符，避免过长）
+    let title = message.content.trim();
+    
+    // 移除Markdown格式
+    title = title.replace(/#{1,6}\s+/g, ''); // 移除标题标记
+    title = title.replace(/\*\*(.+?)\*\*/g, '$1'); // 移除粗体
+    title = title.replace(/\*(.+?)\*/g, '$1'); // 移除斜体
+    title = title.replace(/`(.+?)`/g, '$1'); // 移除代码
+    
+    // 提取第一行或一个合理的片段
+    const firstLine = title.split(/\n/)[0].trim();
+    title = firstLine.length > 0 ? firstLine : title;
+    
+    // 限制长度，避免过长
+    const maxLength = 30;
+    if (title.length > maxLength) {
+      title = title.substring(0, maxLength) + '...';
+    }
+    
+    // 更新会话名称
+    console.log(`使用简单标题: ${title}`);
+    const { error: updateError } = await supabase
+      .from('chat_session')
+      .update({ name: title })
+      .eq('id', sessionId);
+      
+    if (updateError) {
+      console.error('更新AI会话标题失败:', updateError);
+    } else {
+      // 更新成功后，重新获取会话列表以刷新UI
+      fetchChatSessions();
+    }
   };
 
   // 获取聊天会话列表
@@ -253,6 +367,44 @@ export function ChatProvider({ children }) {
       console.error('Error fetching last messages:', messagesError);
     }
 
+    // 获取AI会话的最后一条消息
+    // 区分出AI类型的会话ID
+    const aiSessionIds = sessionsData
+      .filter(item => item.chat_session.type === 'AI')
+      .map(item => item.chat_session.id);
+    
+    // 如果有AI会话，获取AI会话的最后一条消息
+    let aiLastMessages = [];
+    if (aiSessionIds.length > 0) {
+      const { data: aiMessages, error: aiMessagesError } = await supabase
+        .from('ai_chat_message')
+        .select(`
+          id,
+          content,
+          timestamp,
+          session_id,
+          role,
+          user:user_id (
+            id,
+            name,
+            avatar_url,
+            email
+          )
+        `)
+        .in('session_id', aiSessionIds)
+        .order('timestamp', { ascending: false });
+      
+      if (aiMessagesError) {
+        console.error('Error fetching AI last messages:', aiMessagesError);
+      } else if (aiMessages) {
+        // 转换字段名称以匹配普通消息格式
+        aiLastMessages = aiMessages.map(msg => ({
+          ...msg,
+          created_at: msg.timestamp
+        }));
+      }
+    }
+
     // 获取未读消息计数
     const { data: unreadData, error: unreadError } = await supabase
       .from('chat_message_read_status')
@@ -275,9 +427,40 @@ export function ChatProvider({ children }) {
 
     // 获取每个会话的最后一条消息
     const lastMessagesBySession = {};
+    
+    // 处理普通聊天消息
     lastMessages?.forEach(msg => {
       if (!lastMessagesBySession[msg.session_id]) {
         lastMessagesBySession[msg.session_id] = msg;
+      }
+    });
+    
+    // 处理AI聊天消息
+    aiLastMessages.forEach(msg => {
+      // 确保字段统一
+      const aiMsg = {
+        ...msg,
+        created_at: msg.timestamp // 确保AI消息使用timestamp作为created_at
+      };
+      
+      console.log(`AI消息: ${aiMsg.session_id}, 内容: ${aiMsg.content.substring(0, 20)}..., 时间: ${aiMsg.created_at}`);
+      
+      if (!lastMessagesBySession[aiMsg.session_id]) {
+        // 如果没有该会话的消息，直接使用此AI消息
+        lastMessagesBySession[aiMsg.session_id] = aiMsg;
+        console.log(`为会话 ${aiMsg.session_id} 添加首条AI消息`);
+      } else {
+        // 如果已有消息，比较时间戳并取最新的
+        const existingMsg = lastMessagesBySession[aiMsg.session_id];
+        const aiMsgTime = new Date(aiMsg.created_at).getTime();
+        const existingMsgTime = new Date(existingMsg.created_at).getTime();
+        
+        console.log(`比较时间戳 - AI消息: ${aiMsgTime}, 现有消息: ${existingMsgTime}`);
+        
+        if (aiMsgTime > existingMsgTime) {
+          lastMessagesBySession[aiMsg.session_id] = aiMsg;
+          console.log(`会话 ${aiMsg.session_id} 的消息已更新为更新的AI消息`);
+        }
       }
     });
 
@@ -741,6 +924,64 @@ export function ChatProvider({ children }) {
         }
       })
       .subscribe();
+      
+    // 订阅AI聊天消息变化
+    const aiMessagesChannel = supabase
+      .channel('ai_chat_messages_updates')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'ai_chat_message'
+      }, async (payload) => {
+        // 获取当前用户
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (!authSession) return;
+        
+        // 获取完整的AI消息信息
+        const { data: messageData, error } = await supabase
+          .from('ai_chat_message')
+          .select(`
+            *,
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            )
+          `)
+          .eq('id', payload.new.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching complete AI message data:', error);
+          return;
+        }
+        
+        // 更新会话列表中的最后一条消息
+        setSessions(prev => {
+          return prev.map(session => {
+            if (session.id === payload.new.session_id) {
+              // 转换timestamp字段为created_at以保持格式一致
+              const formattedMessage = {
+                ...messageData,
+                created_at: messageData.timestamp,
+                user: processAvatarUrl(messageData.user)
+              };
+              
+              // 检查是否应该更新lastMessage（如果现有的lastMessage较旧或不存在）
+              if (!session.lastMessage || 
+                  new Date(formattedMessage.created_at) > new Date(session.lastMessage.created_at)) {
+                return {
+                  ...session,
+                  lastMessage: formattedMessage
+                };
+              }
+            }
+            return session;
+          });
+        });
+      })
+      .subscribe();
 
     // 订阅消息读取状态变化
     const readStatusChannel = supabase
@@ -776,6 +1017,7 @@ export function ChatProvider({ children }) {
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(aiMessagesChannel);
       supabase.removeChannel(readStatusChannel);
     };
   }, []);
