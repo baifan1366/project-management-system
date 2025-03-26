@@ -12,6 +12,7 @@ import { fetchTeamCustomFieldValue } from '@/lib/redux/features/teamCFValueSlice
 import { debounce } from 'lodash';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import CustomField from '@/components/CustomField';
+import { useRouter, useParams } from 'next/navigation';
 
 // 修复记忆化的 selectors - 确保返回新的引用
 const selectTeamCFItems = state => state?.teamCF?.items ?? [];
@@ -33,9 +34,16 @@ const selectTeamCustomFieldValues = createSelector(
   }
 );
 
-export default function TaskTab({ onViewChange, teamId }) {
+export default function TaskTab({ onViewChange, teamId, projectId }) {
   const t = useTranslations('CreateTask');
-  const [activeTab, setActiveTab] = useState("list");
+  const router = useRouter();
+  const params = useParams();
+  
+  // 从 URL 参数中获取当前的 teamCFId
+  const currentTeamCFId = params?.teamCFId;
+  
+  // 修改初始状态，如果 URL 中有 teamCFId 就使用它
+  const [activeTab, setActiveTab] = useState(currentTeamCFId || "list");
   const dispatch = useDispatch();
   
   const customFields = useSelector(selectTeamCustomFields);
@@ -83,18 +91,30 @@ export default function TaskTab({ onViewChange, teamId }) {
     if (Array.isArray(customFields) && customFields.length > 0) {
       setOrderedFields([...customFields]);
       
-      // 只在初始加载或customFields变化时设置默认标签页
-      if (customFields.length > 0 && !activeTab.startsWith('cf-')) {
-        const firstTabValue = `cf-${customFields[0].id}`;
+      // 只在没有当前 teamCFId 时设置默认标签页
+      if (!currentTeamCFId) {
+        const firstTabValue = `${customFields[0].id}`;
         setActiveTab(firstTabValue);
         onViewChange?.(firstTabValue);
+        // 自动导航到默认标签页
+        router.push(`/projects/${projectId}/${teamId}/${firstTabValue}`);
       }
     }
-  }, [customFields, onViewChange]);
+  }, [customFields, onViewChange, currentTeamCFId, projectId, teamId, router]);
+
+  // 添加一个新的 useEffect 来处理 URL 参数变化
+  useEffect(() => {
+    if (currentTeamCFId && currentTeamCFId !== activeTab) {
+      setActiveTab(currentTeamCFId);
+      onViewChange?.(currentTeamCFId);
+    }
+  }, [currentTeamCFId, activeTab, onViewChange]);
 
   const handleTabChange = (value) => {
     setActiveTab(value);
     onViewChange?.(value);
+    // 使用 replace 而不是 push 来避免在历史记录中创建过多条目
+    router.replace(`/projects/${projectId}/${teamId}/${value}`);
   };
 
   const onDragEnd = (result) => {
@@ -141,7 +161,7 @@ export default function TaskTab({ onViewChange, teamId }) {
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
-                        value={`cf-${field.id}`}
+                        value={`${field.id}`}
                         className="flex items-center gap-1"
                         title={fieldValue?.value || field.custom_field?.default_value || ''}
                       >
@@ -177,4 +197,5 @@ export default function TaskTab({ onViewChange, teamId }) {
     </Tabs>
   );
 }
+
 

@@ -6,19 +6,29 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const teamId = searchParams.get('teamId')
+    const teamCFId = searchParams.get('teamCFId')
 
     if (!teamId) {
       return NextResponse.json({ error: '需要团队ID' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('team_custom_field')
       .select(`
         *,
         custom_field (*)
       `)
       .eq('team_id', teamId)
-      .order('order_index')
+
+    // 如果提供了 teamCFId，则获取单个记录
+    if (teamCFId) {
+      query = query.eq('id', teamCFId).single()
+    } else {
+      // 否则获取列表并按顺序排序
+      query = query.order('order_index')
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 
