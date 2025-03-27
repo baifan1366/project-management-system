@@ -14,6 +14,16 @@ import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { supabase } from '@/lib/supabase'
 import { api } from '@/lib/api'
+import { createSelector } from '@reduxjs/toolkit';
+
+const selectTeamCFItems = state => state?.teamCF?.items ?? [];
+const selectTeamCustomFields = createSelector(
+  [selectTeamCFItems],
+  (items) => {
+    // 返回一个新的数组，而不是直接返回输入
+    return [...items];
+  }
+);
 
 export default function ProjectSidebar({ projectId }) {
   const t = useTranslations('Projects');
@@ -77,12 +87,14 @@ export default function ProjectSidebar({ projectId }) {
     }
   }, [projectId, fetchUserTeams]);
 
+  const customFields = useSelector(selectTeamCustomFields);
+
   // 过滤出当前项目的团队
   const menuItems = userTeams.map((team, index) => ({
     ...team,
     id: team.id,
     label: team.name,
-    href: `/projects/${projectId}/${team.id}`,
+    href: `/projects/${projectId}/${team.id}/${customFields[0].id}`, 
     access: team.access,
     order_index: team.order_index || index
   })).sort((a, b) => a.order_index - b.order_index);
