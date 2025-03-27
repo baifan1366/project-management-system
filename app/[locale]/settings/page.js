@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Bell, Lock, User, Globe, Zap, Github, Mail, Phone, Shield, Pencil, CreditCard, BarChart2, History, ArrowUpCircle } from 'lucide-react';
+import { Bell, Lock, User, Globe, Zap, Github, Mail, Phone, Shield, Pencil, CreditCard, BarChart2, History, ArrowUpCircle, CalendarIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -57,37 +57,53 @@ export default function SettingsPage() {
     const getUser = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (session?.user) {
-        setUser(session.user);
-        setFormData({
-          name: session.user.user_metadata?.name || '',
-          bio: session.user.user_metadata?.bio || '',
-          phone: session.user.user_metadata?.phone || '',
-          language: session.user.user_metadata?.language || 'zh',
-          timezone: session.user.user_metadata?.timezone || 'UTC+8',
-          email: session.user.email || '',
-          theme: session.user.user_metadata?.theme || 'light'
-        });
-        setNotifications({
-          emailNotifications: session.user.user_metadata?.emailNotifications ?? true,
-          pushNotifications: session.user.user_metadata?.pushNotifications ?? true,
-          weeklyDigest: session.user.user_metadata?.weeklyDigest ?? true,
-          mentionNotifications: session.user.user_metadata?.mentionNotifications ?? true,
-          taskAssignments: session.user.user_metadata?.taskAssignments !== false,
-          taskComments: session.user.user_metadata?.taskComments !== false,
-          dueDates: session.user.user_metadata?.dueDates !== false,
-          teamInvitations: session.user.user_metadata?.teamInvitations !== false
-        });
-        
-        // 获取用户的第三方登录提供商信息
-        setProviderData({
-          provider: session.user.user_metadata?.provider || 'local',
-          providerId: session.user.user_metadata?.provider_id || ''
-        });
+        updateUserData(session);
       }
     };
 
     getUser();
+    
+    // 清理函数
+    // return () => {
+    //   subscription.unsubscribe();
+    // };
   }, []);
+  
+  // 更新用户数据的函数
+  const updateUserData = async (session) => {
+    if (!session?.user) return;
+    
+    setUser(session.user);
+    setFormData({
+      name: session.user.user_metadata?.name || '',
+      bio: session.user.user_metadata?.bio || '',
+      phone: session.user.user_metadata?.phone || '',
+      language: session.user.user_metadata?.language || 'zh',
+      timezone: session.user.user_metadata?.timezone || 'UTC+8',
+      email: session.user.email || '',
+      theme: session.user.user_metadata?.theme || 'light'
+    });
+    setNotifications({
+      emailNotifications: session.user.user_metadata?.emailNotifications ?? true,
+      pushNotifications: session.user.user_metadata?.pushNotifications ?? true,
+      weeklyDigest: session.user.user_metadata?.weeklyDigest ?? true,
+      mentionNotifications: session.user.user_metadata?.mentionNotifications ?? true,
+      taskAssignments: session.user.user_metadata?.taskAssignments !== false,
+      taskComments: session.user.user_metadata?.taskComments !== false,
+      dueDates: session.user.user_metadata?.dueDates !== false,
+      teamInvitations: session.user.user_metadata?.teamInvitations !== false
+    });
+    
+    // 获取用户的第三方登录提供商信息
+    const provider = session.user.app_metadata?.provider || '';
+    
+    setProviderData({
+      provider: provider || session.user.user_metadata?.provider || 'local',
+      providerId: session.user.app_metadata?.provider_id || session.user.user_metadata?.provider_id || ''
+    });
+    
+    // 不再需要检查和更新日历权限
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -316,10 +332,38 @@ export default function SettingsPage() {
     }
   };
 
-  const handleConnectProvider = async (provider) => {
+  const handleConnectProvider = async (provider, withCalendarScope = false) => {
     if (!user) return;
     
-    // 此处应该实现OAuth登录流程，获取providerId
+    if (provider === 'google') {
+      try {
+        // 总是请求日历权限
+        const scopes = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
+        
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/${window.location.pathname.split('/')[1]}/settings`,
+            scopes: scopes,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'consent',
+            },
+          },
+        });
+        
+        if (error) {
+          console.error('谷歌授权错误:', error);
+          throw error;
+        }
+      } catch (err) {
+        console.error('Google sign in error:', err);
+        toast.error(t('common.error'));
+      }
+      return;
+    }
+    
+    // 此处应该实现其他OAuth登录流程，获取providerId
     // 这里仅为示例，实际应该跳转到对应的OAuth授权页面
     const providerId = `sample-${provider}-id`;
     
@@ -591,6 +635,56 @@ export default function SettingsPage() {
                     </Button>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('authorizations')}</CardTitle>
+                <CardDescription>{t('authorizationsDesc')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {(providerData.provider === 'google') && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <CalendarIcon className="w-6 h-6 text-red-500" />
+                      <div>
+                        <p className="font-medium">{t('googleCalendar')}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {providerData.provider === 'google' ? t('calendarConnected') : t('calendarNotConnected')}
+                        </p>
+                      </div>
+                    </div>
+                    {providerData.provider === 'google' ? (
+                      <Button 
+                        variant="outline"
+                        disabled
+                      >
+                        {t('connected')}
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline"
+                        onClick={() => handleConnectProvider('google', true)}
+                      >
+                        {t('authorizeCalendar')}
+                      </Button>
+                    )}
+                  </div>
+                )}
+                
+                {providerData.provider !== 'google' && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <p>{t('connectGoogleFirst')}</p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-2" 
+                      onClick={() => handleConnectProvider('google')}
+                    >
+                      {t('connectGoogle')}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -904,19 +998,19 @@ export default function SettingsPage() {
                   </TabsList>
 
                   <TabsContent value="current-plan">
-                    <SubscriptionCard userId={user?.id} />
+                    {/* <SubscriptionCard userId={user?.id} /> */}
                   </TabsContent>
 
                   <TabsContent value="usage-stats">
-                    <UsageStats userId={user?.id} />
+                    {/* <UsageStats userId={user?.id} /> */}
                   </TabsContent>
 
                   <TabsContent value="payment-history">
-                    <PaymentHistory userId={user?.id} />
+                    {/* <PaymentHistory userId={user?.id} /> */}
                   </TabsContent>
 
                   <TabsContent value="upgrade-options">
-                    <UpgradeOptions userId={user?.id} />
+                    {/* <UpgradeOptions userId={user?.id} /> */}
                   </TabsContent>
                 </Tabs>
               </CardContent>
