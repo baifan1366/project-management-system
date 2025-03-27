@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslations } from 'use-intl'
 import CreateTeamDialog from './TeamDialog'
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
@@ -15,6 +15,7 @@ import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/comp
 import { supabase } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { createSelector } from '@reduxjs/toolkit';
+import { fetchTeamCustomField } from '@/lib/redux/features/teamCFSlice'
 
 const selectTeamCFItems = state => state?.teamCF?.items ?? [];
 const selectTeamCustomFields = createSelector(
@@ -87,17 +88,38 @@ export default function ProjectSidebar({ projectId }) {
     }
   }, [projectId, fetchUserTeams]);
 
-  const customFields = useSelector(selectTeamCustomFields);
+  // 添加缺失的团队自定义字段获取逻辑
+  useEffect(() => {
+    const fetchCustomFields = async () => {
+      if (userTeams.length > 0) {
+        try {
+          // 获取第一个团队的自定义字段
+          const firstTeamId = userTeams[0].id;
+          await dispatch(fetchTeamCustomField(firstTeamId)).unwrap();
+        } catch (error) {
+          console.error('获取自定义字段失败:', error);
+        }
+      }
+    };
+    
+    fetchCustomFields();
+  }, [userTeams, dispatch]);
 
-  // 过滤出当前项目的团队
-  const menuItems = userTeams.map((team, index) => ({
-    ...team,
-    id: team.id,
-    label: team.name,
-    href: `/projects/${projectId}/${team.id}/${customFields[0].id}`, 
-    access: team.access,
-    order_index: team.order_index || index
-  })).sort((a, b) => a.order_index - b.order_index);
+  const customFields = useSelector(selectTeamCustomFields);
+  
+  // 确保有自定义字段数据后再生成菜单项
+  const menuItems = useMemo(() => {
+    if (!customFields || customFields.length === 0) return [];
+    
+    return userTeams.map((team, index) => ({
+      ...team,
+      id: team.id,
+      label: team.name,
+      href: `/projects/${projectId}/${team.id}/${customFields[0]?.id || ''}`, 
+      access: team.access,
+      order_index: team.order_index || index
+    })).sort((a, b) => a.order_index - b.order_index);
+  }, [userTeams, projectId, customFields]);
 
   // 加载项目数据
   useEffect(() => {
