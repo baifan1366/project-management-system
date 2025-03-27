@@ -49,6 +49,20 @@ export default function PricingPage() {
       
       // 检查会话是否存在且有用户
       if (data && data.session && data.session.user) {
+        // 检查是否是当前计划
+        if (currentUserPlan && currentUserPlan.plan_id === plan.id) {
+          console.log('用户点击了当前计划，重定向到仪表盘');
+          router.push(`/${locale}/dashboard`);
+          return;
+        }
+
+        // 检查是否是降级操作
+        if (currentUserPlan && currentUserPlan.plan_id > plan.id) {
+          console.log('用户尝试降级，重定向到联系我们页面');
+          router.push(`/${locale}/contact-us?reason=downgrade&from=${currentUserPlan.plan_id}&to=${plan.id}`);
+          return;
+        }
+        
         console.log('用户已登录，重定向到支付页面');
         // 只传递必要的参数：plan_id 和 user_id
         const paymentParams = new URLSearchParams({
@@ -125,8 +139,18 @@ export default function PricingPage() {
       return 'Current Active: Go to Dashboard';
     }
     
-    // 如果用户有计划但不是当前这个
-    return 'Upgrade';
+    // 判断是升级还是降级
+    const isDowngrade = currentUserPlan.plan_id > plan.id;
+    const isUpgrade = currentUserPlan.plan_id < plan.id;
+    
+    if (isUpgrade) {
+      return 'Upgrade';
+    } else if (isDowngrade) {
+      return 'Downgrade';
+    }
+    
+    // 默认情况
+    return 'Change Plan';
   };
 
   // 显示加载状态
