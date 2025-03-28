@@ -12,3 +12,16 @@ export async function GET(request) {
     }
     return NextResponse.json(data)
 }
+
+export async function POST(request) {
+    const body = await request.json()
+    const { data, error } = await supabase
+    .from('tag')
+    .insert([body])
+    .select()
+    
+    if(error) {
+        console.error(error)
+    }
+    return NextResponse.json(data)
+}

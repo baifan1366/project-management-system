@@ -675,5 +675,27 @@
     "thu": "Thu",
     "fri": "Fri",
     "sat": "Sat"
+  },
+  "CreateTag": {
+    "createTag": "Create new field",
+    "createTagDescription": "You may create your own field.",
+    "tagName": "Field title",
+    "tagPlaceholder": "Name, Asignee, Status...",
+    "tagType": "Field type",
+    "typePlaceholder": "Select type",
+    "TEXT": "Text",
+    "NUMBER": "Number",
+    "ID": "ID",
+    "description": "Description",
+    "descriptionPlaceholder": "Enter description",
+    "cancel":"Cancel",
+    "adding":"Adding...",
+    "addTag": "Create tag",
+    "nameMin":"Field title must be at least 2 characters.",
+    "nameMax":"Field title cannot exceed 50 characters.",
+    "typeRequired":"Field type is required.",
+    "descriptionMax":"Description cannot exceed 100 characters.",
+    "descriptionMin": "Description must be at least 10 characters.",
+    "addDescription": "Add description"
   }
 }

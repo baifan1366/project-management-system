@@ -160,7 +160,11 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] w-full">
+      <DialogContent 
+        className="sm:max-w-[600px] w-full"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-gray-800 dark:text-gray-200">
             {t('createTeam')}

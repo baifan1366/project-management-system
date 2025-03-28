@@ -6,14 +6,16 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchTasks } from '@/lib/redux/features/taskSlice';
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, Plus } from 'lucide-react';
+import CreateTagDialog from './TagDialog';
 
-export default function TaskList({ projectId, teamId }) {
+export default function TaskList({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const { tasks, status, error, lastFetchTime, currentRequest } = useSelector((state) => state.tasks);
   const [isLoading, setIsLoading] = useState(false);
   const isMounted = useRef(false);
+  const [isDialogOpen, setDialogOpen] = useState(false);
 
   const loadTasks = useCallback(async () => {
     if (!projectId || currentRequest) return;
@@ -69,58 +71,68 @@ export default function TaskList({ projectId, teamId }) {
   return (
     <div className="p-4">
       <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
-        <div className="p-6">
-          <h3 className="text-lg font-medium mb-4">{t('taskList')}</h3>
-          <div className="mt-4">
-            {filteredTasks.length > 0 ? (
-              <div className="space-y-3">
-                {filteredTasks.map((task) => (
-                  <div 
-                    key={task.id} 
-                    className="p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-base mb-1">{task.title}</h4>
-                        {task.description && (
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {task.description}
-                          </p>
+        <button 
+          onClick={() => setDialogOpen(true)} 
+          className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors mt-2"
+        >
+          <Plus size={16} className="text-muted-foreground" />
+        </button>
+        <div className="mt-4">
+          {filteredTasks.length > 0 ? (
+            <div className="space-y-3">
+              {filteredTasks.map((task) => (
+                <div 
+                  key={task.id} 
+                  className="p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-base mb-1">{task.title}</h4>
+                      {task.description && (
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {task.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        {task.due_date && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>{format(new Date(task.due_date), 'yyyy-MM-dd')}</span>
+                          </div>
                         )}
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          {task.due_date && (
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>{format(new Date(task.due_date), 'yyyy-MM-dd')}</span>
-                            </div>
-                          )}
-                          {task.estimated_time && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              <span>{task.estimated_time}h</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={task.priority === 'high' ? 'destructive' : task.priority === 'medium' ? 'warning' : 'secondary'}>
-                          {task.priority}
-                        </Badge>
-                        <Badge variant={task.status === 'completed' ? 'success' : 'default'}>
-                          {task.status}
-                        </Badge>
+                        {task.estimated_time && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{task.estimated_time}h</span>
+                          </div>
+                        )}
                       </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={task.priority === 'high' ? 'destructive' : task.priority === 'medium' ? 'warning' : 'secondary'}>
+                        {task.priority}
+                      </Badge>
+                      <Badge variant={task.status === 'completed' ? 'success' : 'default'}>
+                        {task.status}
+                      </Badge>
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                {t('noTasks')}
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground text-center py-8">
+              {t('noTasks')}
+            </div>
+          )}
         </div>
+        <CreateTagDialog 
+          isOpen={isDialogOpen} 
+          onClose={() => setDialogOpen(false)} 
+          projectId={projectId}
+          teamId={teamId}
+          teamCFId={teamCFId}
+        />
       </div>
     </div>
   );
