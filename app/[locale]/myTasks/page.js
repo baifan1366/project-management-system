@@ -24,6 +24,7 @@ export default function MyTasksPage() {
   const t = useTranslations('CreateTask');
   const t_tasks = useTranslations('tasks');
   const t_projects = useTranslations('Projects');
+  const t_common = useTranslations('common');
   const dispatch = useDispatch();
   const { tasks, status, error } = useSelector((state) => state.tasks);
   const [columns, setColumns] = useState({});
@@ -208,7 +209,7 @@ export default function MyTasksPage() {
             <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
             <Input
               className="pl-9 w-64"
-              placeholder="搜索任务..."
+              placeholder={t_tasks('searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -220,10 +221,10 @@ export default function MyTasksPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>所有任务</DropdownMenuItem>
-              <DropdownMenuItem>分配给我的</DropdownMenuItem>
-              <DropdownMenuItem>我创建的</DropdownMenuItem>
-              <DropdownMenuItem>已完成</DropdownMenuItem>
+              <DropdownMenuItem>{t_tasks('filters.all')}</DropdownMenuItem>
+              <DropdownMenuItem>{t_tasks('filters.assignedToMe')}</DropdownMenuItem>
+              <DropdownMenuItem>{t_tasks('filters.createdByMe')}</DropdownMenuItem>
+              <DropdownMenuItem>{t_tasks('filters.completed')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <DropdownMenu>
@@ -233,10 +234,10 @@ export default function MyTasksPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>按截止日期</DropdownMenuItem>
-              <DropdownMenuItem>按优先级</DropdownMenuItem>
-              <DropdownMenuItem>按创建日期</DropdownMenuItem>
-              <DropdownMenuItem>按更新日期</DropdownMenuItem>
+              <DropdownMenuItem>{t_tasks('sort.byDueDate')}</DropdownMenuItem>
+              <DropdownMenuItem>{t_tasks('sort.byPriority')}</DropdownMenuItem>
+              <DropdownMenuItem>{t_tasks('sort.byCreatedDate')}</DropdownMenuItem>
+              <DropdownMenuItem>{t_tasks('sort.byUpdatedDate')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button>
@@ -317,7 +318,7 @@ export default function MyTasksPage() {
                       ))
                     ) : (
                       <div className="flex items-center justify-center h-24 text-xs text-muted-foreground">
-                        没有任务
+                        {t_tasks('noTasks')}
                       </div>
                     )}
                     {provided.placeholder}

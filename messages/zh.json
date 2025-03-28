@@ -252,7 +252,21 @@
       "in_progress": "进行中",
       "done": "已完成",
       "in_review": "审核中"
-    }
+    },
+    "searchPlaceholder": "搜索任务...",
+    "filters": {
+      "all": "所有任务",
+      "assignedToMe": "分配给我",
+      "createdByMe": "我创建的",
+      "completed": "已完成"
+    },
+    "sort": {
+      "byDueDate": "按截止日期",
+      "byPriority": "按优先级",
+      "byCreatedDate": "按创建日期",
+      "byUpdatedDate": "按更新日期"
+    },
+    "noTasks": "没有任务"
   },
   "notifications": {
     "title": "通知",

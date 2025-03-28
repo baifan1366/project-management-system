@@ -245,7 +245,21 @@
       "in_progress": "In Progress",
       "done": "Done",
       "in_review": "In Review"
-    }
+    },
+    "searchPlaceholder": "Search tasks...",
+    "filters": {
+      "all": "All Tasks",
+      "assignedToMe": "Assigned to Me",
+      "createdByMe": "Created by Me",
+      "completed": "Completed"
+    },
+    "sort": {
+      "byDueDate": "By Due Date",
+      "byPriority": "By Priority",
+      "byCreatedDate": "By Created Date",
+      "byUpdatedDate": "By Updated Date"
+    },
+    "noTasks": "No tasks"
   },
   "notifications": {
     "title": "Notifications",
