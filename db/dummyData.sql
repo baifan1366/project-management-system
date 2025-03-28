@@ -106,11 +106,11 @@ VALUES
 -- Insert tag data
 INSERT INTO "tag" (id, name, hide, description, type, created_at, updated_at, created_by)
 VALUES 
-  (1, 'Name', FALSE, '用于标记缺陷', 'NAME', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 'Asignee', FALSE, '用于标记新功能', 'ASIGNEE', '2023-02-02T10:05:00Z', '2023-02-02T10:05:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (3, 'Due Date', FALSE, '用于标记增强功能', 'DUE-DATE', '2023-02-02T10:10:00Z', '2023-02-02T10:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (4, 'Status', FALSE, '用于标记文档', 'STATUS', '2023-02-02T10:20:00Z', '2023-02-02T10:20:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (5, 'Projects', FALSE, '用于标记用户界面', 'PROJECTS', '2023-02-06T11:00:00Z', '2023-02-06T11:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+  (1, 'Name', '用于标记缺陷', 'NAME', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (2, 'Asignee', '用于标记新功能', 'ASIGNEE', '2023-02-02T10:05:00Z', '2023-02-02T10:05:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (3, 'Due Date', '用于标记增强功能', 'DUE-DATE', '2023-02-02T10:10:00Z', '2023-02-02T10:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (4, 'Status', '用于标记文档', 'STATUS', '2023-02-02T10:20:00Z', '2023-02-02T10:20:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (5, 'Projects', '用于标记用户界面', 'PROJECTS', '2023-02-06T11:00:00Z', '2023-02-06T11:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
 
 -- Insert task data
 INSERT INTO "task" (

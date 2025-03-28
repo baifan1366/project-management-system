@@ -196,7 +196,7 @@ export default function TeamCustomFieldPage() {
     }
     const fieldType = currentItem.custom_field?.type;
     if (fieldType === 'LIST') {
-      return <TaskList projectId={projectId} teamId={teamId} />;
+      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} />;
     }
     
     return <div>暂不支持的字段类型: {fieldType}</div>;
