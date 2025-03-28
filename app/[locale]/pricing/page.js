@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useDispatch, useSelector } from 'react-redux'
-import { fetchPlans, setSelectedInterval } from '@/lib/redux/features/planSlice'
+import { fetchPlans, setSelectedInterval, fetchCurrentUserPlan } from '@/lib/redux/features/planSlice'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import clsx from 'clsx'
@@ -15,14 +15,8 @@ export default function PricingPage() {
   const { plans, status, error, selectedInterval } = useSelector((state) => state.plans)
 
   //cta 按钮更新状态
-  const [isLoggedIn, setIsLoggedIn] =useState(false)
-
-  //cta dummy 文本
-  const CTA_after_login = {
-    free: "Go to Dashboard",
-    pro: "Buy Pro",
-    enterprise: "Contact Sales"  
-  }
+  const [currentUserPlan, setCurrentUserPlan] = useState(null)
+  const [ctaText, setCtaText] = useState("Subscribe")
 
   // 获取当前语言
   const locale = params.locale || 'en'
@@ -33,24 +27,6 @@ export default function PricingPage() {
       dispatch(fetchPlans())
     }
   }, [status, dispatch])
-
-
-  //渲染登录后的ui变调：按钮CTA 变化
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      const user = session.user;
-
-      if (user) {
-        setIsLoggedIn(true)
-      }else{
-        setIsLoggedIn(false)
-      }
-    };
-
-    checkSession();
-  }, [])
 
   // 处理计划选择
   const handlePlanSelection = async (plan) => {
@@ -73,6 +49,20 @@ export default function PricingPage() {
       
       // 检查会话是否存在且有用户
       if (data && data.session && data.session.user) {
+        // 检查是否是当前计划
+        if (currentUserPlan && currentUserPlan.plan_id === plan.id) {
+          console.log('用户点击了当前计划，重定向到仪表盘');
+          router.push(`/${locale}/dashboard`);
+          return;
+        }
+
+        // 检查是否是降级操作
+        if (currentUserPlan && currentUserPlan.plan_id > plan.id) {
+          console.log('用户尝试降级，重定向到联系我们页面');
+          router.push(`/${locale}/contact-us?reason=downgrade&from=${currentUserPlan.plan_id}&to=${plan.id}`);
+          return;
+        }
+        
         console.log('用户已登录，重定向到支付页面');
         // 只传递必要的参数：plan_id 和 user_id
         const paymentParams = new URLSearchParams({
@@ -98,6 +88,70 @@ export default function PricingPage() {
       router.push(`/${locale}/login?${loginParams}`);
     }
   }
+
+  // 渲染登录后的ui变调：按钮CTA 变化
+  useEffect(() => {
+    const updateCtaText = async () => {
+      try {
+        const result = await dispatch(fetchCurrentUserPlan());
+        const userData = result.payload;
+        console.log('User data:', userData);
+        
+        if (!userData) {
+          console.log('No user data available');
+          setCtaText('Subscribe');
+          return;
+        }
+        
+        const { isLoggedIn, plan } = userData;
+        
+        if (isLoggedIn && plan) {
+          // User is logged in and has a plan
+          console.log('User plan:', plan);
+          setCurrentUserPlan(plan);
+        } else {
+          // User is not logged in or has no plan
+          setCtaText('Subscribe');
+        }
+      } catch (err) {
+        console.error('Error updating CTA text:', err);
+        setCtaText('Subscribe');
+      }
+    };
+
+    updateCtaText();
+  }, [dispatch]);
+
+  // 获取每个计划的CTA文本
+  const getPlanCtaText = (plan) => {
+    // 如果用户未登录或没有计划数据
+    if (!currentUserPlan) {
+      if(plan.id === 1){
+        return 'Get Started for Free';
+      }else if(plan.id === 2 || plan.id === 3){
+        return 'Buy '+ plan.name;
+      }
+      return 'Subscribe';
+    }
+    
+    // 检查当前计划是否与此计划匹配
+    if (currentUserPlan.plan_id === plan.id) {
+      return 'Current Active: Go to Dashboard';
+    }
+    
+    // 判断是升级还是降级
+    const isDowngrade = currentUserPlan.plan_id > plan.id;
+    const isUpgrade = currentUserPlan.plan_id < plan.id;
+    
+    if (isUpgrade) {
+      return 'Upgrade';
+    } else if (isDowngrade) {
+      return 'Downgrade';
+    }
+    
+    // 默认情况
+    return 'Change Plan';
+  };
 
   // 显示加载状态
   if (status === 'loading') {
@@ -204,19 +258,8 @@ export default function PricingPage() {
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                 )}
-              >{isLoggedIn ? (
-                plan.price === 0
-                ? CTA_after_login.free
-                : plan.type === 'PRO'
-                ? CTA_after_login.pro
-                : CTA_after_login.enterprise
-              ):
-                (plan.price === 0 
-                  ? t('cta.free')
-                  : plan.type === 'PRO'
-                    ? t('cta.pro')
-                    : t('cta.enterprise')
-                )}
+              >
+                {getPlanCtaText(plan)}
               </button>
             </div>
           </div>
