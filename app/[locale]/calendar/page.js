@@ -278,7 +278,7 @@ export default function CalendarPage() {
     const calendarHeader = (
       <div className="grid grid-cols-7 gap-px">
         {daysOfWeek.map(day => (
-          <div key={day} className="h-10 flex items-center justify-center font-medium text-sm">
+          <div key={day} className="h-8 flex items-center justify-center font-medium text-sm">
             {t(day.toLowerCase())}
           </div>
         ))}
@@ -308,7 +308,7 @@ export default function CalendarPage() {
         <div 
           key={formattedDate}
           className={cn(
-            "min-h-[120px] p-2 border border-border/50 cursor-pointer transition-colors",
+            "min-h-[90px] p-1.5 border border-border/50 cursor-pointer transition-colors",
             !isCurrentMonth && "bg-muted/30 text-muted-foreground",
             isToday && "bg-accent/10",
             "hover:bg-accent/5"
@@ -317,7 +317,7 @@ export default function CalendarPage() {
         >
           <div className="flex justify-between items-start">
             <span className={cn(
-              "inline-flex h-6 w-6 items-center justify-center rounded-full text-sm",
+              "inline-flex h-5 w-5 items-center justify-center rounded-full text-xs",
               isToday && "bg-primary text-primary-foreground font-medium"
             )}>
               {format(day, 'd')}
@@ -325,8 +325,8 @@ export default function CalendarPage() {
             {(isCurrentMonth && (dayTasks.length > 0 || dayEvents.length > 0)) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <MoreHorizontal className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-5 w-5">
+                    <MoreHorizontal className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -342,11 +342,11 @@ export default function CalendarPage() {
             )}
           </div>
 
-          <div className="mt-1 space-y-1 max-h-[80px] overflow-y-auto">
+          <div className="mt-0.5 space-y-0.5 max-h-[60px] overflow-y-auto">
             {dayTasks.map((task) => (
               <div 
                 key={`task-${task.id}`} 
-                className="text-xs p-1 bg-blue-100 dark:bg-blue-900/30 rounded truncate"
+                className="text-xs py-0.5 px-1 bg-blue-100 dark:bg-blue-900/30 rounded truncate"
                 title={task.title}
               >
                 {task.title}
@@ -356,7 +356,7 @@ export default function CalendarPage() {
             {dayEvents.map((event) => (
               <div 
                 key={`event-${event.id}`} 
-                className="text-xs p-1 bg-green-100 dark:bg-green-900/30 rounded truncate"
+                className="text-xs py-0.5 px-1 bg-green-100 dark:bg-green-900/30 rounded truncate"
                 title={event.summary}
               >
                 {event.summary}
@@ -370,7 +370,7 @@ export default function CalendarPage() {
     }
 
     return (
-      <Card className="p-3">
+      <Card className="p-2">
         {calendarHeader}
         <div className="grid grid-cols-7 gap-px mt-px">
           {days}
@@ -461,60 +461,66 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="container py-6" ref={calendarRef}>
-      {renderCalendarHeader()}
+    <div className="h-screen flex flex-col">
+      <div className="flex-none py-6">
+        {renderCalendarHeader()}
+      </div>
       
-      <div className="mt-4 grid grid-cols-12 gap-4">
-        <div className="col-span-2">
-          <Card className="p-4">
-            <h3 className="font-medium mb-3">{t('calendars')}</h3>
-            
-            {!isGoogleConnected ? (
-              <Button 
-                variant="outline" 
-                className="w-full justify-start" 
-                onClick={handleConnectGoogle}
-              >
-                <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" 
-                  alt="Google" 
-                  className="h-5 w-5 mr-2" 
-                />
-                {t('connectGoogle')}
-              </Button>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-                  <span>{t('myCalendar')}</span>
+      <div className="flex-1 overflow-hidden">
+        <div className="h-[calc(100vh-120px)] grid grid-cols-12 gap-4">
+          <div className="col-span-2">
+            <Card className="h-full p-4 overflow-y-auto">
+              <h3 className="font-medium mb-3">{t('calendars')}</h3>
+              
+              {!isGoogleConnected ? (
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={handleConnectGoogle}
+                >
+                  <img 
+                    src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" 
+                    alt="Google" 
+                    className="h-5 w-5 mr-2" 
+                  />
+                  {t('connectGoogle')}
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                    <span>{t('myCalendar')}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                    <span>Google</span>
+                  </div>
                 </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-                  <span>Google</span>
+              )}
+              
+              <div className="mt-6">
+                <h3 className="font-medium mb-3">{t('myTasks')}</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                    <span>{t('allTasks')}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                    <span>{t('upcomingTasks')}</span>
+                  </div>
                 </div>
               </div>
-            )}
-            
-            <div className="mt-6">
-              <h3 className="font-medium mb-3">{t('myTasks')}</h3>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
-                  <span>{t('allTasks')}</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
-                  <span>{t('upcomingTasks')}</span>
-                </div>
-              </div>
+            </Card>
+          </div>
+          
+          <div className="col-span-10 overflow-hidden">
+            <div className="h-full overflow-y-auto">
+              {view === 'month' && renderMonthView()}
+              {view === 'week' && renderWeekView()}
+              {view === 'day' && renderDayView()}
             </div>
-          </Card>
-        </div>
-        
-        <div className="col-span-10">
-          {view === 'month' && renderMonthView()}
-          {view === 'week' && renderWeekView()}
-          {view === 'day' && renderDayView()}
+          </div>
         </div>
       </div>
       
