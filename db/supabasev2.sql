@@ -83,10 +83,8 @@ CREATE TABLE "user_team_invitation" (
 CREATE TABLE "section" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
-  "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE, 
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "task_ids" INT[] DEFAULT '{}', -- 存储关联的任务ID数组
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -100,11 +98,8 @@ CREATE TABLE "task" (
   "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
   "due_date" TIMESTAMP,
   "section_id" INT REFERENCES "section"("id") ON DELETE CASCADE,
-  "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "assignee_ids" UUID[] DEFAULT '{}',
   "tag_values" JSONB DEFAULT '{}',
-  "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -141,11 +136,9 @@ CREATE TABLE "task_template" (
   "description" TEXT,
   "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
   "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "assignee_ids" UUID[] DEFAULT '{}', -- 存储指派的用户ID数组
-  "tag_ids" INT[] DEFAULT '{}', -- 存储标签ID数组
+  "team_custom_field_id" INT NOT NULL REFERENCES "team_custom_field"("id") ON DELETE CASCADE,
+  "tag_values" JSONB DEFAULT '{}', 
   "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
-  "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
