@@ -15,9 +15,24 @@ export default function ProjectsPage() {
   const dispatch = useDispatch();
   const router = useRouter();
   const { locale } = useParams();
-  const { projects, status, error } = useSelector((state) => state.projects);
+  const { projects, status, error } = useSelector(( state) => state.projects);
   const t = useTranslations('Projects');
   const [formattedProjects, setFormattedProjects] = useState([]);
+
+  useEffect(() => {
+    async function loadProjects() {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user?.id) {
+          dispatch(fetchProjects(userData.user.id));
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    }
+    
+    loadProjects();
+  }, [dispatch]);
 
   useEffect(() => {
     if (projects.length > 0) {

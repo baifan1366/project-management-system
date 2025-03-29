@@ -338,7 +338,7 @@ CREATE TABLE "user_subscription_plan" (
   "end_date" TIMESTAMP NOT NULL,
   -- 使用统计
   "current_users" INT DEFAULT 0,
-  "current_workspaces" INT DEFAULT 0,
+  "current_projects" INT DEFAULT 0,
   "current_ai_agents" INT DEFAULT 0,
   "current_automation_flows" INT DEFAULT 0,
   "current_tasks_this_month" INT DEFAULT 0,
