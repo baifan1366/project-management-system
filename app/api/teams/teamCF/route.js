@@ -20,10 +20,8 @@ export async function GET(request) {
       `)
       .eq('team_id', teamId)
 
-    // 检查请求的 URL 是否以 /tags 结尾
-    if (request.url.endsWith('/tags')) {
-      query = query.select('tag_ids') // 仅选择 tag_ids
-    } else if (teamCFId) {
+    // 如果提供了teamCFId，则获取单个字段详情
+    if (teamCFId) {
       query = query.eq('id', teamCFId).single()
     } else {
       query = query.order('order_index')

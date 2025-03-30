@@ -19,9 +19,11 @@ import {
 } from "@/components/ui/form"
 import { useDispatch, useSelector } from 'react-redux'
 import { createTag } from '@/lib/redux/features/tagSlice'
+import { updateTagIds } from '@/lib/redux/features/teamCFSlice'
 import { supabase } from '@/lib/supabase'
 import { Lock, Eye, Pencil, Check, Plus } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
+import { api } from '@/lib/api'
 
 export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, teamCFId }) {
     const t = useTranslations('CreateTag')
@@ -77,11 +79,25 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
         try{
             const {data: userData} = await supabase.auth.getUser()
             const userId = userData?.user?.id
-            await dispatch(createTag({
+            const newTag = await dispatch(createTag({
                 name: data.name,
                 type: data.type,
                 description: data.description,
                 created_by: userId
+            })).unwrap()
+            
+            // 先获取现有的标签IDs
+            const existingTagsResponse = await api.teams.teamCustomFields.getTags(teamId, teamCFId);
+            const existingTagIds = existingTagsResponse.tag_ids || [];
+            
+            // 将新标签添加到现有标签列表
+            const updatedTagIds = [...existingTagIds, newTag.id];
+            
+            await dispatch(updateTagIds({
+                teamId: teamId,
+                teamCFId: teamCFId,
+                tagIds: updatedTagIds,
+                userId: userId
             })).unwrap()
             form.reset()
             setIsLoading(false)
@@ -89,6 +105,8 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
             onClose()
         } catch(error) {
             console.error(error)
+            setIsLoading(false)
+            setIsSubmitting(false)
         }
     }
 
