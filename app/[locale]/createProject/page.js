@@ -368,6 +368,7 @@ export default function CreateProjectPage() {
               type="button"
               onClick={() => router.back()}
               variant={form.watch('buttonVariant')}
+              disabled={isCreating}
             >
               {t('cancel')}
             </Button>

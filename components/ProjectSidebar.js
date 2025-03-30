@@ -316,7 +316,10 @@ export default function ProjectSidebar({ projectId }) {
 
           {/* 创建团队按钮 */}
           <button 
-            onClick={() => setDialogOpen(true)} 
+            onClick={() => {
+              setDialogOpen(true);
+              fetchTeams();
+            }} 
             className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors mt-2"
           >
             <Plus size={16} className="text-muted-foreground" />

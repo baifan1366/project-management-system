@@ -302,6 +302,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                 type="button"
                 variant={themeColor}
                 onClick={onClose}
+                disabled={isLoading}
               >
                 {t('cancel')}
               </Button>
