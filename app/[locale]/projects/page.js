@@ -20,21 +20,6 @@ export default function ProjectsPage() {
   const [formattedProjects, setFormattedProjects] = useState([]);
 
   useEffect(() => {
-    async function loadProjects() {
-      try {
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user?.id) {
-          dispatch(fetchProjects(userData.user.id));
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-      }
-    }
-    
-    loadProjects();
-  }, [dispatch]);
-
-  useEffect(() => {
     if (projects.length > 0) {
       const formatted = projects.map(project => ({
         ...project,
