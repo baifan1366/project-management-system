@@ -10,6 +10,9 @@ import InviteUserPopover from '@/components/InviteUserPopover';
 import AIChatBot from '@/components/AIChatBot';
 import Image from 'next/image';
 import PengyImage from '../../../public/pengy.webp';
+import EmojiPicker from '@/components/EmojiPicker';
+import FileUploader from '@/components/FileUploader';
+import DeepLTranslator from '@/components/DeepLTranslator';
 
 export default function ChatPage() {
   const t = useTranslations('Chat');
@@ -23,6 +26,7 @@ export default function ChatPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
+  const [isPending, setIsPending] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -50,6 +54,79 @@ export default function ChatPage() {
     if (message.trim() && currentSession) {
       sendMessage(currentSession.id, message);
       setMessage('');
+    }
+  };
+
+  // 处理emoji选择
+  const handleEmojiSelect = (emojiData) => {
+    const emoji = emojiData.emoji;
+    setMessage(prev => prev + emoji);
+  };
+
+  // 处理文件上传完成
+  const handleFileUploadComplete = async (uploadResults) => {
+    setIsPending(true);
+    try {
+      // 确保用户已登录且会话ID存在
+      if (!currentUser?.id || !currentSession?.id) {
+        throw new Error('用户未登录或会话不存在');
+      }
+
+      // 检查用户是否是会话参与者
+      const { data: participant, error: participantError } = await supabase
+        .from('chat_participant')
+        .select('*')
+        .eq('session_id', currentSession.id)
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (participantError || !participant) {
+        console.error('检查用户权限失败:', participantError);
+        throw new Error('您不是该聊天会话的参与者，无法发送消息');
+      }
+
+      // 先发送消息以获取message_id
+      const { data: messageData, error: messageError } = await supabase
+        .from('chat_message')
+        .insert({
+          session_id: currentSession.id,
+          user_id: currentUser.id,
+          content: message.trim() ? message : '发送了附件'
+        })
+        .select()
+        .single();
+
+      if (messageError) {
+        console.error('发送消息失败:', messageError);
+        throw messageError;
+      }
+
+      // 关联附件到消息
+      const attachmentsToInsert = uploadResults.map(item => ({
+        message_id: messageData.id,
+        file_url: item.file_url,
+        file_name: item.file_name,
+        uploaded_by: currentUser.id
+      }));
+
+      if (attachmentsToInsert.length > 0) {
+        const { error: attachmentError } = await supabase
+          .from('chat_attachment')
+          .insert(attachmentsToInsert);
+
+        if (attachmentError) {
+          console.error('添加附件失败:', attachmentError);
+          throw attachmentError;
+        }
+      }
+
+      // 清空消息输入
+      setMessage('');
+    } catch (error) {
+      console.error('上传附件失败:', error);
+      alert(`上传失败: ${error.message || '未知错误'}`);
+    } finally {
+      setIsPending(false);
     }
   };
 
@@ -107,10 +184,7 @@ export default function ChatPage() {
                   <Image 
                     src={PengyImage} 
                     alt="Project Manager Penguin" 
-                    fill
-                    style={{ objectFit: 'cover' }}
-                    className="rounded-lg"
-                    priority
+                    className="w-full h-full object-cover rounded-lg"
                   />
                 </div>
               </div>
@@ -186,12 +260,17 @@ export default function ChatPage() {
                         </span>
                       </div>
                       <div className={cn(
-                        "mt-1 rounded-lg p-3 text-sm break-words",
+                        "mt-1 rounded-lg p-3 text-sm break-words group relative",
                         isMe 
                           ? "bg-primary text-primary-foreground" 
                           : "bg-accent"
                       )}>
-                        {msg.content}
+                        <DeepLTranslator 
+                          content={msg.content}
+                          targetLang={isMe ? "EN" : "ZH"} // 如果是自己的消息，翻译成英文，否则翻译成中文
+                        >
+                          {msg.content}
+                        </DeepLTranslator>
                       </div>
                       {msg.attachments?.length > 0 && (
                         <div className="mt-2 space-y-1">
@@ -222,13 +301,17 @@ export default function ChatPage() {
             <form onSubmit={handleSendMessage} className="flex items-end gap-2">
               <div className="flex-1 bg-accent rounded-lg">
                 <div className="flex items-center px-3 py-1 gap-1">
-                  <button 
-                    type="button" 
-                    className="p-1 hover:bg-accent/50 rounded"
+                  <FileUploader 
+                    onUploadComplete={handleFileUploadComplete}
+                    sessionId={currentSession.id}
+                    userId={currentUser?.id}
+                    buttonOnly={true}
+                    isPending={isPending}
+                    buttonClassName="p-1 hover:bg-accent/50 rounded"
                     title={t('attachFile')}
                   >
                     <Paperclip className="h-5 w-5 text-muted-foreground" />
-                  </button>
+                  </FileUploader>
                   <button 
                     type="button" 
                     className="p-1 hover:bg-accent/50 rounded"
@@ -236,13 +319,18 @@ export default function ChatPage() {
                   >
                     <Gift className="h-5 w-5 text-muted-foreground" />
                   </button>
-                  <button 
-                    type="button" 
-                    className="p-1 hover:bg-accent/50 rounded"
+                  <FileUploader 
+                    onUploadComplete={handleFileUploadComplete}
+                    sessionId={currentSession.id}
+                    userId={currentUser?.id}
+                    buttonOnly={true}
+                    fileTypes="image/*"
+                    isPending={isPending}
+                    buttonClassName="p-1 hover:bg-accent/50 rounded"
                     title={t('attachImage')}
                   >
                     <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  </button>
+                  </FileUploader>
                 </div>
                 <div className="px-3 pb-2">
                   <textarea
@@ -261,17 +349,17 @@ export default function ChatPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 pb-2">
-                <button 
-                  type="button" 
-                  className="p-2 hover:bg-accent rounded-lg"
-                  title={t('emoji')}
-                >
-                  <Smile className="h-5 w-5 text-muted-foreground" />
-                </button>
+                <EmojiPicker
+                  onEmojiSelect={handleEmojiSelect}
+                  buttonClassName="p-2 hover:bg-accent rounded-lg"
+                  buttonTitle={t('emoji')}
+                  position="top"
+                  isPending={isPending}
+                />
                 <button 
                   type="submit" 
                   className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                  disabled={!message.trim()}
+                  disabled={!message.trim() || isPending}
                   title={t('send')}
                 >
                   <Send className="h-5 w-5" />
