@@ -108,21 +108,42 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
       })).unwrap();
 
       // 创建团队自定义字段
-      await dispatch(createTeamCustomField({
-        team_id: team.id,
-        custom_field_id: 5, //list
-        config: {},
-        order_index: 0,
-        created_by: userId
-      })).unwrap();
+      // 获取所有默认自定义字段
+      const { data: defaultCustomFields, error: cfError } = await supabase
+        .from('custom_field')
+        .select('*')
+        .order('id');
+      
+      if (cfError) {
+        console.error('获取默认自定义字段失败:', cfError);
+        throw cfError;
+      }
 
-      await dispatch(createTeamCustomField({
-        team_id: team.id,
-        custom_field_id: 8, //dashboard
-        config: {},
-        order_index: 1,
-        created_by: userId
-      })).unwrap();
+      // 获取默认字段数量
+      const { data: defaultSettings, error: defaultError } = await supabase
+        .from('default')
+        .select('*')
+        .eq('name', 'custom_field')
+        .single();
+      
+      if (defaultError && defaultError.code !== 'PGRST116') {
+        console.error('获取默认设置失败:', defaultError);
+      }
+
+      // 默认字段数量，如果没有设置则使用 2
+      const defaultCount = defaultSettings?.qty || 2;
+      
+      // 只为默认数量的字段创建团队自定义字段配置
+      for (let i = 0; i < Math.min(defaultCount, defaultCustomFields.length); i++) {
+        const field = defaultCustomFields[i];
+        await dispatch(createTeamCustomField({
+          team_id: team.id,
+          custom_field_id: field.id,
+          config: {},
+          order_index: 100,
+          created_by: userId
+        })).unwrap();
+      }
 
       // 重置状态并关闭对话框
       form.reset();

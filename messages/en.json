@@ -451,7 +451,16 @@
     "field_required_description": "Whether the field is required",
     "field_placeholder_description": "Placeholder of the field",
     "field_description_description": "Description of the field",
-    "field_options_description": "Options of the field"
+    "field_options_description": "Options of the field",
+    "BOARD": "Board",
+    "TIMELINE": "Timeline",
+    "LIST": "List",
+    "OVERVIEW": "Overview",
+    "DASHBOARD": "Dashboard",
+    "NOTE": "Note",
+    "GANTT": "Gantt",
+    "CALENDAR": "Calendar",
+    "FILES": "Files"
   },
   "ChatDialog":{
     "privateMessages": "Private Messages",

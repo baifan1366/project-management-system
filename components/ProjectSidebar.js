@@ -318,7 +318,6 @@ export default function ProjectSidebar({ projectId }) {
           <button 
             onClick={() => {
               setDialogOpen(true);
-              fetchTeams();
             }} 
             className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors mt-2"
           >
@@ -329,7 +328,10 @@ export default function ProjectSidebar({ projectId }) {
 
         <CreateTeamDialog 
           isOpen={isDialogOpen} 
-          onClose={() => setDialogOpen(false)} 
+          onClose={() => {
+            setDialogOpen(false);
+            fetchTeams();
+          }} 
           projectId={projectId}
         />
       </div>

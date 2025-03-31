@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { fetchCustomFields, createCustomField } from '@/lib/redux/features/customFieldSlice';
+import { fetchDefaultByName } from '@/lib/redux/features/defaultSlice';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import * as Icons from 'lucide-react';
@@ -12,6 +13,7 @@ export default function CustomField() {
   const t = useTranslations('CustomField');
   const dispatch = useDispatch();
   const availableFields = useSelector(state => state.customFields?.fields || []);
+  const defaultSettings = useSelector(state => state.defaults?.data || []);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newField, setNewField] = useState({
     name: '',
@@ -20,9 +22,67 @@ export default function CustomField() {
     icon: '',
   });
 
+  // 增加一个状态来跟踪加载状态
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
     dispatch(fetchCustomFields());
+    dispatch(fetchDefaultByName('custom_field'));
   }, [dispatch]);
+
+  useEffect(() => {
+    if (defaultSettings.length > 0) {
+      setIsLoading(false);
+    }
+  }, [defaultSettings]);
+
+  useEffect(() => {
+    console.log('defaultSettings:', defaultSettings);
+    const customField = defaultSettings.find(setting => setting.name === 'custom_field');
+    console.log('customField:', customField);
+  }, [defaultSettings]);
+
+  // 获取默认字段数量
+  const getDefaultFieldCount = () => {
+    if (!defaultSettings || defaultSettings.length === 0) return 2;
+    
+    // 检查数组嵌套结构
+    let customFieldDefault = null;
+    
+    // 尝试在不同层级查找custom_field
+    for (const setting of defaultSettings) {
+      if (setting.name === 'custom_field') {
+        customFieldDefault = setting;
+        break;
+      }
+      
+      // 如果是嵌套数组，尝试在第一层嵌套中查找
+      if (Array.isArray(setting) && setting.length > 0) {
+        const nestedSetting = setting.find(s => s.name === 'custom_field');
+        if (nestedSetting) {
+          customFieldDefault = nestedSetting;
+          break;
+        }
+        
+        // 如果是二层嵌套，尝试在第二层嵌套中查找
+        for (const subSetting of setting) {
+          if (Array.isArray(subSetting) && subSetting.length > 0) {
+            const deepNestedSetting = subSetting.find(s => s.name === 'custom_field');
+            if (deepNestedSetting) {
+              customFieldDefault = deepNestedSetting;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // 检查是否找到了自定义字段设置
+    if (!customFieldDefault) return 2;
+    
+    // 返回数量
+    return customFieldDefault.qty || 2;
+  };
 
   // 简化的图标获取函数
   const getIconComponent = (iconName) => {
@@ -57,7 +117,8 @@ export default function CustomField() {
           {Array.isArray(availableFields) && availableFields.length > 0 ? (
             availableFields.map((field, index) => {
               const IconComponent = getIconComponent(field.icon);
-              const isDefault = index < 2;
+              const defaultCount = getDefaultFieldCount();
+              const isDefault = index < defaultCount;
 
               return (
                 <tr key={field.id || field.type} className="hover:bg-gray-50">
