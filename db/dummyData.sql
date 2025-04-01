@@ -104,13 +104,23 @@ VALUES
   (6, '移动开发', 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T09:45:00Z', '2023-02-07T09:45:00Z');
 
 -- Insert tag data
-INSERT INTO "tag" (id, name, hide, description, type, created_at, updated_at, created_by)
+INSERT INTO "tag" (id, name, description, type, created_by, created_at, updated_at)
 VALUES 
-  (1, 'Name', '用于标记缺陷', 'NAME', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 'Asignee', '用于标记新功能', 'ASIGNEE', '2023-02-02T10:05:00Z', '2023-02-02T10:05:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (3, 'Due Date', '用于标记增强功能', 'DUE-DATE', '2023-02-02T10:10:00Z', '2023-02-02T10:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (4, 'Status', '用于标记文档', 'STATUS', '2023-02-02T10:20:00Z', '2023-02-02T10:20:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (5, 'Projects', '用于标记用户界面', 'PROJECTS', '2023-02-06T11:00:00Z', '2023-02-06T11:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+  ('1', 'Name', '用于标记缺陷', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('2', 'Asignee', '用于标记新功能', 'PEOPLE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('3', 'Due Date', '用于标记增强功能', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('4', 'Status', '用于标记文档', 'SINGLE-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('5', 'Projects', '用于标记用户界面', 'PROJECTS', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('6', 'Priority', '', 'MULTI-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('8', 'aaaaaaaaaaaa', '', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('9', '333333', '', 'FORMULA', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('10', '55555555555', '', 'TIME-TRACKING', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('12', '3333', '', 'TAGS', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('13', '888', '', 'COMPLETED-ON', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('14', '00000', '', 'LAST-MODIFIED-ON', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('15', '6666', '', 'CREATED-ON', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('16', 'added', '', 'CREATED-BY', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z'), 
+  ('17', '++++++++++++++++', '', 'ID', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02T10:00:00Z', '2023-02-02T10:00:00Z');
 
 -- Insert task data
 INSERT INTO "task" (
@@ -154,14 +164,14 @@ VALUES
 -- Insert custom field data
 INSERT INTO "custom_field" (id, name, type, description, icon, created_at, updated_at, created_by)
 VALUES 
-  ('1', 'Board', 'BOARD', 'Display tasks in kanban board format', 'LayoutDashboard', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('2', 'Timeline', 'TIMELINE', 'Display tasks in timeline format, allowing users to visualize task progress over time', 'GanttChart', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('1', 'List', 'LIST', 'A simple list format for displaying tasks', 'List', '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('2', 'Dashboard', 'DASHBOARD', 'A visual dashboard for summarizing project metrics and statuses', 'BarChart3', '2025-03-11 10:25:56.715019', '2025-03-11 10:25:56.715019', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
   ('3', 'File', 'FILES', 'Manage task-related files, enabling users to upload and organize documents associated with tasks', 'Files', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
   ('4', 'Gantt', 'GANTT', 'Project progress in Gantt chart format, providing a visual representation of project timelines and dependencies', 'GanttChart', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('5', 'List', 'LIST', 'A simple list format for displaying tasks', 'List', '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('5', 'Board', 'BOARD', 'Display tasks in kanban board format', 'LayoutDashboard', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
   ('6', 'Calendar', 'CALENDAR', 'A calendar view for scheduling and tracking tasks', 'Calendar', '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
   ('7', 'Note', 'NOTE', 'A text field for adding notes related to tasks', 'Text', '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('8', 'Dashboard', 'DASHBOARD', 'A visual dashboard for summarizing project metrics and statuses', 'BarChart3', '2025-03-11 10:25:56.715019', '2025-03-11 10:25:56.715019', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('8', 'Timeline', 'TIMELINE', 'Display tasks in timeline format, allowing users to visualize task progress over time', 'GanttChart', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
   ('9', 'Overview', 'OVERVIEW', 'A high-level overview of project progress and key metrics', 'LayoutGrid', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
 
 -- Insert team custom field association data
@@ -190,16 +200,6 @@ VALUES
   (3, 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T13:00:00Z', '2023-02-04T15:30:00Z', 9000, '2023-02-04T15:30:00Z', '2023-02-04T15:30:00Z'),
   (4, 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-05T13:00:00Z', '2023-02-05T16:00:00Z', 10800, '2023-02-05T16:00:00Z', '2023-02-05T16:00:00Z'),
   (5, 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T14:00:00Z', '2023-02-07T17:30:00Z', 12600, '2023-02-07T17:30:00Z', '2023-02-07T17:30:00Z');
-
--- Insert task dependency data
-UPDATE "task"
-SET depends_on_task_ids = CASE
-  WHEN id = 2 THEN ARRAY[1]  -- Implement Responsive Design 依赖于 Create Wireframes
-  WHEN id = 3 THEN ARRAY[2]  -- Cross-browser Testing 依赖于 Implement Responsive Design
-  WHEN id = 5 THEN ARRAY[4]  -- Implement Authentication 依赖于 Design REST API
-  WHEN id = 8 THEN ARRAY[7]  -- Implement Login Screen 依赖于 Setup React Native Project
-END
-WHERE id IN (2,3,5,8);
 
 -- Insert task template data
 INSERT INTO "task_template" (id, title, description, status, priority, team_custom_field_id, tag_values, created_by, created_at, updated_at)
@@ -248,155 +248,18 @@ VALUES
   (1, 3, 'https://example.com/files/responsive-design-approach.pdf', '响应式设计方法.pdf', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:10:00Z');
 
 -- Insert subscription plan data
-INSERT INTO "subscription_plan" (
-  name, type, price, billing_interval, description, 
-  features, max_members, max_projects, storage_limit, is_active
-)
-VALUES
-  -- Free Monthly Plan
-  (
-    'Free',
-    'FREE',
-    0,
-    'MONTHLY',
-    'Basic plan for small teams',
-    '{
-      "features": [
-        "Up to 3 team members",
-        "2 projects",
-        "Basic task management",
-        "1GB storage",
-        "Community support"
-      ]
-    }',
-    3,
-    2,
-    1073741824, -- 1GB in bytes
-    TRUE
-  ),
-  -- Pro Monthly Plan
-  (
-    'Pro',
-    'PRO',
-    29,
-    'MONTHLY',
-    'Perfect for growing teams',
-    '{
-      "features": [
-        "Up to 10 team members",
-        "Unlimited projects",
-        "Advanced task management",
-        "10GB storage",
-        "Priority support",
-        "Custom fields",
-        "Time tracking"
-      ]
-    }',
-    10,
-    -1, -- Unlimited
-    10737418240, -- 10GB in bytes
-    TRUE
-  ),
-  -- Enterprise Monthly Plan
-  (
-    'Enterprise',
-    'ENTERPRISE',
-    99,
-    'MONTHLY',
-    'For large organizations',
-    '{
-      "features": [
-        "Unlimited team members",
-        "Unlimited projects",
-        "Enterprise security",
-        "100GB storage",
-        "24/7 dedicated support",
-        "Custom branding",
-        "API access"
-      ]
-    }',
-    -1, -- Unlimited
-    -1, -- Unlimited
-    107374182400, -- 100GB in bytes
-    TRUE
-  ),
-  -- Free Yearly Plan (same as monthly)
-  (
-    'Free',
-    'FREE',
-    0,
-    'YEARLY',
-    'Basic plan for small teams',
-    '{
-      "features": [
-        "Up to 3 team members",
-        "2 projects",
-        "Basic task management",
-        "1GB storage",
-        "Community support"
-      ]
-    }',
-    3,
-    2,
-    1073741824, -- 1GB in bytes
-    TRUE
-  ),
-  -- Pro Yearly Plan
-  (
-    'Pro',
-    'PRO',
-    290,
-    'YEARLY',
-    'Perfect for growing teams with yearly discount',
-    '{
-      "features": [
-        "Up to 10 team members",
-        "Unlimited projects",
-        "Advanced task management",
-        "15GB storage",
-        "Priority support",
-        "Custom fields",
-        "Time tracking",
-        "Advanced analytics"
-      ]
-    }',
-    10,
-    -1, -- Unlimited
-    16106127360, -- 15GB in bytes
-    TRUE
-  ),
-  -- Enterprise Yearly Plan
-  (
-    'Enterprise',
-    'ENTERPRISE',
-    990,
-    'YEARLY',
-    'For large organizations with yearly discount',
-    '{
-      "features": [
-        "Unlimited team members",
-        "Unlimited projects",
-        "Enterprise security",
-        "150GB storage",
-        "24/7 dedicated support",
-        "Custom branding",
-        "API access",
-        "SSO integration",
-        "Audit logs"
-      ]
-    }',
-    -1, -- Unlimited
-    -1, -- Unlimited
-    161061273600, -- 150GB in bytes
-    TRUE
-  );
+INSERT INTO "subscription_plan" ("id", "name", "type", "price", "billing_interval", "description", "features", "max_members", "max_projects", "storage_limit", "is_active", "created_at", "updated_at") 
+VALUES 
+('1', 'Free', 'FREE', '0.00', 'MONTHLY', 'Basic plan for small teams', '{"features": ["Up to 3 team members", "2 projects", "Basic task management", "1GB storage", "Community support"]}', '3', '2', '1073741824', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897'), 
+('2', 'Pro', 'PRO', '29.00', 'MONTHLY', 'Perfect for growing teams', '{"features": ["Up to 10 team members", "Unlimited projects", "Advanced task management", "10GB storage", "Priority support", "Custom fields", "Time tracking"]}', '10', '2', '10737418240', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897'), 
+('3', 'Enterprise', 'ENTERPRISE', '99.00', 'MONTHLY', 'For large organizations', '{"features": ["Unlimited team members", "Unlimited projects", "Enterprise security", "100GB storage", "24/7 dedicated support", "Custom branding", "API access"]}', '-1', '2', '107374182400', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897');  
 
 -- Insert team subscription data
 INSERT INTO "team_subscription" (id, team_id, plan_id, status, start_date, end_date, cancel_at_period_end, created_at, updated_at)
 VALUES
-  (1, 1, 2, 'ACTIVE', '2023-02-01T00:00:00Z', '2023-03-01T00:00:00Z', FALSE, '2023-02-01T00:00:00Z', '2023-02-01T00:00:00Z'),
+  (1, 1, 1, 'ACTIVE', '2023-02-01T00:00:00Z', '2023-03-01T00:00:00Z', FALSE, '2023-02-01T00:00:00Z', '2023-02-01T00:00:00Z'),
   (2, 2, 2, 'ACTIVE', '2023-02-01T00:00:00Z', '2023-03-01T00:00:00Z', FALSE, '2023-02-01T00:00:00Z', '2023-02-01T00:00:00Z'),
-  (3, 3, 5, 'ACTIVE', '2023-02-06T00:00:00Z', '2024-02-06T00:00:00Z', FALSE, '2023-02-06T00:00:00Z', '2023-02-06T00:00:00Z');
+  (3, 3, 3, 'ACTIVE', '2023-02-06T00:00:00Z', '2024-02-06T00:00:00Z', FALSE, '2023-02-06T00:00:00Z', '2023-02-06T00:00:00Z');
 
 -- Insert subscription payment history data
 INSERT INTO "subscription_payment" (id, team_subscription_id, amount, currency, payment_method, status, transaction_id, created_at)
@@ -421,3 +284,9 @@ VALUES
    '任务已分配', '你被分配到了任务"创建线框图"', 
    'TASK_ASSIGNED', 'task', '1', 
    FALSE, '2023-02-03T11:00:00Z', '2023-02-03T11:00:00Z');
+
+INSERT INTO "user_subscription_plan" ("id", "user_id", "plan_id", "status", "start_date", "end_date", "current_users", "current_projects", "current_ai_agents", "current_automation_flows", "current_tasks_this_month", "created_at", "updated_at") 
+VALUES 
+('1', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2', 'ACTIVE', '2025-03-27 12:33:26.192', '2025-04-27 12:33:26.192', '0', '2', '0', '0', '0', '2025-03-27 12:10:53.237582', '2025-03-27 12:33:26.296'),
+('2', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2', 'ACTIVE', '2025-03-27 12:33:26.192', '2025-04-27 12:33:26.192', '0', '2', '0', '0', '0', '2025-03-27 12:10:53.237582', '2025-03-27 12:33:26.296'),
+('3', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2', 'ACTIVE', '2025-03-27 12:33:26.192', '2025-04-27 12:33:26.192', '0', '2', '0', '0', '0', '2025-03-27 12:10:53.237582', '2025-03-27 12:33:26.296');
