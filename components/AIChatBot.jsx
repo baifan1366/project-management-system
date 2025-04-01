@@ -8,6 +8,7 @@ import Image from 'next/image';
 import PengyImage from '../public/pengy.webp';
 import { useChat } from '@/contexts/ChatContext';
 import { supabase } from '@/lib/supabase';
+import ChatMessage from '@/components/ui/chat-message';
 
 // 移除原SVG组件，改用Image组件
 const PenguinIcon = () => (
@@ -33,17 +34,7 @@ export default function AIChatBot() {
   const [aiSession, setAiSession] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const chatContainerRef = useRef(null);
-  // 添加展开状态管理
-  const [expandedThoughts, setExpandedThoughts] = useState({});
-
-  // 切换展开状态的函数
-  const toggleThoughtExpansion = (messageIndex) => {
-    setExpandedThoughts(prev => ({
-      ...prev,
-      [messageIndex]: !prev[messageIndex]
-    }));
-  };
-
+  
   // 获取当前用户信息
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -387,10 +378,6 @@ export default function AIChatBot() {
     setMessages([]);
     setAiSession(null);
     setCurrentSession(null);
-    
-    // 可选：如果你希望此操作也触发自定义事件，可以添加以下代码
-    // const clearEvent = new CustomEvent('ai-chat-clear');
-    // window.dispatchEvent(clearEvent);
   };
 
   return (
@@ -417,112 +404,15 @@ export default function AIChatBot() {
               </div>
             ) : (
               <div className="flex flex-col space-y-4">
-                {messages.map((msg, index) => {
-                  // 检查是否是思考过程
-                  const isThinking = msg.role === 'assistant' && msg.content.includes('</think>');
-                  let displayContent = msg.content;
-                  let thinkingContent = '';
-                  
-                  if (isThinking) {
-                    const parts = msg.content.split('</think>');
-                    thinkingContent = parts[0];
-                    displayContent = parts[1] || '';
-                  }
-
-                  return (
-                    <div key={index}>
-                      {/* 思考过程显示 */}
-                      {isThinking && thinkingContent && (
-                        <div className="mb-4 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
-                          <div className="flex items-center gap-2 mb-2 text-gray-500 dark:text-gray-400">
-                            <div className="w-3 h-3">
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                                <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.636 5.636l2.122 2.122m8.484 8.484l2.122 2.122M5.636 18.364l2.122-2.122m8.484-8.484l2.122-2.122"></path>
-                              </svg>
-                            </div>
-                            <span className="text-xs font-medium">{t('thinking')}</span>
-                          </div>
-                          <div className={cn(
-                            "pl-5 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap transition-all duration-200",
-                            !expandedThoughts[index] && "line-clamp-3"
-                          )}>
-                            {thinkingContent}
-                          </div>
-                          {thinkingContent.split('\n').length > 3 && (
-                            <button
-                              onClick={() => toggleThoughtExpansion(index)}
-                              className="mt-1 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium pl-5"
-                            >
-                              {expandedThoughts[index] ? t('showLess') : t('readMore')}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* 消息内容 */}
-                      <div
-                        className={cn(
-                          "flex items-start gap-2 max-w-2xl mb-4",
-                          msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
-                        )}
-                      >
-                        <div className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
-                          msg.role === 'user' ? "bg-primary dark:bg-primary/90" : "bg-blue-600 dark:bg-blue-700"
-                        )}>
-                          {msg.role === 'user' ? (
-                            msg.user?.avatar_url ? (
-                              <img 
-                                src={msg.user.avatar_url} 
-                                alt={msg.user.name || t('user')}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : currentUser?.avatar_url ? (
-                              <img 
-                                src={currentUser.avatar_url} 
-                                alt={currentUser.name || t('user')}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span>{(msg.user?.name || currentUser?.name || t('user')).charAt(0)}</span>
-                            )
-                          ) : (
-                            <PenguinIcon />
-                          )}
-                        </div>
-                        <div className="min-w-0 max-w-full">
-                          <div className={cn(
-                            "flex items-baseline gap-2",
-                            msg.role === 'user' ? "flex-row-reverse" : ""
-                          )}>
-                            <span className="font-medium truncate dark:text-gray-200">
-                              {msg.role === 'user' ? (msg.user?.name || currentUser?.name || t('user')) : t('aiAssistant')}
-                            </span>
-                            <span className="text-xs text-muted-foreground dark:text-gray-400 flex-shrink-0">
-                              {new Date(msg.timestamp).toLocaleTimeString()}
-                            </span>
-                          </div>
-                          <div className={cn(
-                            "mt-1 rounded-lg p-3 text-sm break-words",
-                            msg.role === 'user' 
-                              ? "bg-primary text-primary-foreground dark:bg-primary/90" 
-                              : "bg-accent dark:bg-gray-800 dark:text-gray-200"
-                          )}>
-                            {displayContent}
-                          </div>
-                          
-                          {/* 对于流式显示的消息，在消息底部显示thinking指示器 */}
-                          {msg.isStreaming && (
-                            <div className="flex items-center gap-2 mt-2 text-gray-500 dark:text-gray-400">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              <span className="text-xs">{t('thinking')}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {messages.map((msg, index) => (
+                  <ChatMessage 
+                    key={index}
+                    message={msg}
+                    currentUser={currentUser}
+                    t={t}
+                    PenguinIcon={PenguinIcon}
+                  />
+                ))}
                 
                 {/* 将loading状态指示器移除，因为现在使用isStreaming标记在每条消息内部显示 */}
                 {loading && !messages.some(msg => msg.isStreaming) && (

@@ -11,7 +11,7 @@ import Image from 'next/image';
 import PengyImage from '../../../public/pengy.webp';;
 
 // 动态修改标题和favicon的组件
-function DynamicMetadata({ unreadCount }) {
+function DynamicMetadata({ unreadCount, currentSession }) {
   // 记录上一次的未读计数，用于检测新消息
   const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
   const [notificationPermission, setNotificationPermission] = useState('default');
@@ -70,10 +70,24 @@ function DynamicMetadata({ unreadCount }) {
     // 只在client端执行
     if (typeof window !== 'undefined') {
       const originalTitle = "Team Sync";
+      let newTitle = originalTitle;
       
+      // 如果有当前会话，显示会话名称
+      const sessionName = currentSession ? (
+        currentSession.type === 'AI' 
+          ? `AI 助手`
+          : currentSession.type === 'PRIVATE'
+            ? (currentSession.participants[0]?.name || '私聊')
+            : (currentSession.name || '群聊')
+      ) : null;
+      
+      if (sessionName) {
+        newTitle = `${sessionName} | ${originalTitle}`;
+      }
+      
+      // 如果有未读消息，在标题前显示未读数
       if (unreadCount > 0) {
-        // 修改标题以显示未读消息数
-        document.title = `(${unreadCount}) ${originalTitle}`;
+        document.title = `(${unreadCount}) ${newTitle}`;
         
         // 寻找现有的favicon链接
         let link = document.querySelector("link[rel~='icon']");
@@ -150,15 +164,15 @@ function DynamicMetadata({ unreadCount }) {
           }
         };
       } else {
-        // 无未读消息时恢复原标题
-        document.title = originalTitle;
+        // 无未读消息时显示会话标题
+        document.title = newTitle;
       }
       
       return () => {
         document.title = originalTitle;
       };
     }
-  }, [unreadCount]);
+  }, [unreadCount, currentSession]);
   
   return null; // 这个组件不渲染任何内容，只修改文档标题
 }
@@ -232,7 +246,7 @@ function ChatLayout({ children }) {
   return (
     <div className="flex h-screen">
       {/* 动态修改标题的组件 */}
-      <DynamicMetadata unreadCount={totalUnreadCount} />
+      <DynamicMetadata unreadCount={totalUnreadCount} currentSession={currentSession} />
       
       {/* 聊天列表侧边栏 */}
       <div className="w-80 border-r flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
