@@ -129,21 +129,6 @@ CREATE TABLE "time_entry" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 任务模板表（用于创建任务模板）
-CREATE TABLE "task_template" (
-  "id" SERIAL PRIMARY KEY,
-  "title" VARCHAR(255) NOT NULL,
-  "description" TEXT,
-  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
-  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
-  "team_custom_field_id" INT NOT NULL REFERENCES "team_custom_field"("id") ON DELETE CASCADE,
-  "tag_values" JSONB DEFAULT '{}', 
-  "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
-  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- 自定义字段模板表
 CREATE TABLE "custom_field" (
   "id" SERIAL PRIMARY KEY,
@@ -179,6 +164,22 @@ CREATE TABLE "team_custom_field_value" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
+);
+
+
+-- 任务模板表（用于创建任务模板）
+CREATE TABLE "task_template" (
+  "id" SERIAL PRIMARY KEY,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
+  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
+  "team_custom_field_id" INT NOT NULL REFERENCES "team_custom_field"("id") ON DELETE CASCADE,
+  "tag_values" JSONB DEFAULT '{}', 
+  "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 任务评论表
@@ -383,9 +384,6 @@ CREATE INDEX idx_team_custom_field_field ON "team_custom_field"("custom_field_id
 
 -- 用户索引
 CREATE INDEX idx_user_email ON "user"("email");
-
--- 任务索引
-CREATE INDEX idx_task_project_id ON "task"("project_id");
 
 -- 时间记录索引
 CREATE INDEX idx_time_entry_task_id ON "time_entry"("task_id");
