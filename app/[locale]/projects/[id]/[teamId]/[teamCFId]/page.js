@@ -1,11 +1,11 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useEffect, useState, Suspense} from 'react';
+import { useEffect, useState} from 'react';
 import { fetchTeamById, fetchProjectTeams, updateTeamStar } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
@@ -16,7 +16,6 @@ import TaskList from '@/components/TaskList';
 
 // 创建记忆化的选择器
 const selectTeams = state => state.teams.teams;
-const selectTeamsStatus = state => state.teams.status;
 const selectTeamError = state => state.teams.error;
 
 const selectTeamById = createSelector(
@@ -61,7 +60,6 @@ const useProjectData = (projectId) => {
 
 export default function TeamCustomFieldPage() {
   const t = useTranslations('CreateTask');
-  const router = useRouter();
   const dispatch = useDispatch();
   const params = useParams();
   
@@ -71,40 +69,31 @@ export default function TeamCustomFieldPage() {
   const teamCFId = params?.teamCFId;
   
   // 使用记忆化的选择器
-  const teamsState = useSelector(state => state.teams);
-  const teamsStatus = useSelector(selectTeamsStatus);
   const teamsError = useSelector(selectTeamError);
   const selectedTeam = useSelector(state => selectTeamById(state, teamId));
   
   const { currentItem, status: cfStatus, error: cfError } = useSelector((state) => state.teamCF);
   
-  const [mounted, setMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isStarred, setIsStarred] = useState(false);
   const [currentView, setCurrentView] = useState('list');
   const [open, setOpen] = useState(false);
 
-  // 处理客户端挂载
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // 处理数据加载
-  useEffect(() => {
+    
     const loadData = async () => {
-      if (!projectId || !teamId || !mounted || !teamCFId) return;
+      if (!projectId || !teamId || !teamCFId) return;
 
       try {
         setIsLoading(true);
         
-        // 加载团队数据
-        const teamResult = await dispatch(fetchTeamById(teamId)).unwrap();
-        
-        // 加载自定义字段数据
-        await dispatch(fetchTeamCustomFieldById({
-          teamId,
-          teamCFId
-        }));
+        // 并行加载团队数据和自定义字段数据
+        const [teamResult] = await Promise.all([
+          dispatch(fetchTeamById(teamId)).unwrap(),
+          dispatch(fetchTeamCustomFieldById({
+            teamId,
+            teamCFId
+          }))
+        ]);
 
         // 检查团队数据是否有效
         const hasValidTeam = teamResult && (
@@ -123,26 +112,16 @@ export default function TeamCustomFieldPage() {
     };
 
     loadData();
-  }, [dispatch, teamId, teamCFId, mounted]); // 移除 selectedTeam 依赖，确保 teamCFId 变化时重新加载
+  }, [dispatch, teamId, teamCFId, projectId]);
 
-
-  // 更新星标状态
-  useEffect(() => {
-    if (selectedTeam) {
-      setIsStarred(selectedTeam.star || false);
-    }
-  }, [selectedTeam]);
-
-  // 在客户端渲染之前返回加载状态
-  if (!mounted) {
-    return <div className="h-screen" suppressHydrationWarning />;
-  }
+  // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
+  const isStarred = selectedTeam?.star || false;
 
   // 处理加载状态
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-lg" suppressHydrationWarning>Loading...</div>
+        <div className="text-lg">Loading...</div>
       </div>
     );
   }
@@ -151,7 +130,7 @@ export default function TeamCustomFieldPage() {
   if (teamsError) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-lg text-red-500" suppressHydrationWarning>
+        <div className="text-lg text-red-500">
           {typeof teamsError === 'string' ? teamsError : 'Failed to load team data'}
         </div>
       </div>
@@ -162,21 +141,19 @@ export default function TeamCustomFieldPage() {
   if (!selectedTeam && !isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-lg" suppressHydrationWarning>Team not found</div>
+        <div className="text-lg">Team not found</div>
       </div>
     );
   }
 
   const handleStarClick = async () => {
-    const newStarStatus = !isStarred;
-    setIsStarred(newStarStatus);
+    const newStarStatus = !selectedTeam.star;
     try {
       await dispatch(updateTeamStar({ 
         teamId: selectedTeam.id, 
         star: newStarStatus 
       })).unwrap();
     } catch (error) {
-      setIsStarred(!newStarStatus);
       console.error('Error updating star status:', error);
     }
   };
@@ -203,19 +180,12 @@ export default function TeamCustomFieldPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-2" suppressHydrationWarning>
+    <div className="container mx-auto px-4 py-2">
       <div className="border-0 bg-background text-foreground">
         <div className="border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => router.back()}
-                className="text-gray-800 mr-4 dark:text-gray-200"
-                suppressHydrationWarning
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <h2 className="text-xl font-semibold" suppressHydrationWarning>{selectedTeam?.name}</h2>
+              <h2 className="text-xl font-semibold">{selectedTeam?.name}</h2>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">

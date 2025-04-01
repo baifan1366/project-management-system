@@ -27,8 +27,30 @@ export async function GET(request) {
     
     const tagIds = fieldData?.tag_ids || []
     
-    // 无论是否有标签，都只返回ID数组
-    return NextResponse.json({ tag_ids: tagIds })
+    // 如果有标签ID，获取标签详细信息
+    if (tagIds.length > 0) {
+      const { data: tagData, error: tagError } = await supabase
+        .from('tag')
+        .select('*')
+        .in('id', tagIds)
+        
+      if (tagError) {
+        console.error('获取标签详情失败:', tagError)
+        return NextResponse.json({ error: tagError.message }, { status: 500 })
+      }
+      
+      // 返回标签ID和详细信息
+      return NextResponse.json({ 
+        tag_ids: tagIds,
+        tags: tagData 
+      })
+    }
+    
+    // 无标签时仅返回空数组
+    return NextResponse.json({ 
+      tag_ids: tagIds,
+      tags: [] 
+    })
   } catch (error) {
     console.error('获取字段关联标签失败:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

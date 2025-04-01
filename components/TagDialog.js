@@ -18,10 +18,10 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { useDispatch, useSelector } from 'react-redux'
-import { createTag } from '@/lib/redux/features/tagSlice'
+import { createTag, fetchAllTags } from '@/lib/redux/features/tagSlice'
 import { updateTagIds } from '@/lib/redux/features/teamCFSlice'
 import { supabase } from '@/lib/supabase'
-import { Lock, Eye, Pencil, Check, Plus } from 'lucide-react'
+import { Plus, Text, Calendar, User, Sigma, Fingerprint, SquareCheck, CircleCheck, Hash, ClipboardList, Clock3, Tag, Pen, Timer } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 
@@ -33,6 +33,7 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
     const [isSubmitting, setIsSubmitting] = useState(false)
     const { projects } = useSelector((state) => state.projects)
     const [showDescription, setShowDescription] = useState(false)
+    const [tagTypes, setTagTypes] = useState(['TEXT', 'NUMBER', 'ID', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'FORMULA', 'TIME-TRACKING', 'PROJECTS', 'TAGS', 'COMPLETED-ON', 'LAST-MODIFIED-ON', 'CREATED-ON', 'CREATED-BY'])
 
     const FormSchema = z.object({
         name: z.string().trim().min(2, {
@@ -71,6 +72,45 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
             form.clearErrors()
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        const fetchTagTypes = async () => {
+            try {
+                const tags = await dispatch(fetchAllTags()).unwrap()
+                const uniqueTypes = [...new Set(tags.map(tag => tag.type))]
+                if(uniqueTypes.length > 0) {
+                    setTagTypes(uniqueTypes)
+                }
+            } catch(error) {
+                console.error('获取标签类型失败:', error)
+            }
+        }
+        
+        if(isOpen) {
+            fetchTagTypes()
+        }
+    }, [isOpen, dispatch])
+
+    const getTypeIcon = (type) => {
+        const iconMap = {
+            'TEXT': <Text className="w-4 h-4 mr-2 text-gray-500" />,
+            'NUMBER': <Hash className="w-4 h-4 mr-2 text-gray-500" />,
+            'ID': <Fingerprint className="w-4 h-4 mr-2 text-gray-500" />,
+            'SINGLE-SELECT': <CircleCheck className="w-4 h-4 mr-2 text-gray-500" />,
+            'MULTI-SELECT': <SquareCheck className="w-4 h-4 mr-2 text-gray-500" />,
+            'DATE': <Calendar className="w-4 h-4 mr-2 text-gray-500" />,
+            'PEOPLE': <User className="w-4 h-4 mr-2 text-gray-500" />,
+            'FORMULA': <Sigma className="w-4 h-4 mr-2 text-gray-500" />,
+            'TIME-TRACKING': <Timer className="w-4 h-4 mr-2 text-gray-500" />,
+            'PROJECTS': <ClipboardList className="w-4 h-4 mr-2 text-gray-500" />,
+            'TAGS': <Tag className="w-4 h-4 mr-2 text-gray-500" />,
+            'COMPLETED-ON': <Clock3 className="w-4 h-4 mr-2 text-gray-500" />,
+            'LAST-MODIFIED-ON': <Pen className="w-4 h-4 mr-2 text-gray-500" />,
+            'CREATED-ON': <Clock3 className="w-4 h-4 mr-2 text-gray-500" />,
+            'CREATED-BY': <User className="w-4 h-4 mr-2 text-gray-500" />
+        }
+        return iconMap[type] || null
+    }
 
     const onSubmit = async (data) => {
         if(isSubmitting) return;
@@ -172,48 +212,30 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
                                                     }`}
                                                 >
                                                     <SelectValue placeholder={t('typePlaceholder')}>
-                                                        {field.value ? (
+                                                        {field.value && (
                                                             <div className="flex items-center justify-between w-full">
-                                                                {field.value === 'TEXT' && <Lock className="w-4 h-4 mr-2 text-gray-500" />}
-                                                                {field.value === 'NUMBER' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
-                                                                {field.value === 'ID' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
-                                                                <span>
-                                                                    {field.value === 'TEXT' && t('TEXT')}
-                                                                    {field.value === 'NUMBER' && t('NUMBER')}
-                                                                    {field.value === 'ID' && t('ID')}
-                                                                </span>
+                                                                {getTypeIcon(field.value)}
+                                                                <span>{t(field.value)}</span>
                                                             </div>
-                                                        ) : (
-                                                            ''
                                                         )}
                                                     </SelectValue>
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
-                                                <SelectItem value="TEXT" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
-                                                    <div className="flex items-center w-full">
-                                                        <Lock className="w-4 h-4 mr-2 text-gray-500" />
-                                                        <div className="flex-1">
-                                                            <div>{t('TEXT')}</div>
+                                                {tagTypes.map(type => (
+                                                    <SelectItem 
+                                                        key={type} 
+                                                        value={type} 
+                                                        className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent"
+                                                    >
+                                                        <div className="flex items-center w-full">
+                                                            {getTypeIcon(type)}
+                                                            <div className="flex-1">
+                                                                <div>{t(type)}</div>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </SelectItem>
-                                                <SelectItem value="NUMBER" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
-                                                    <div className="flex items-center w-full">
-                                                        <Pencil className="w-4 h-4 mr-2 text-gray-500" />
-                                                        <div className="flex-1">
-                                                            <div>{t('NUMBER')}</div>
-                                                        </div>
-                                                    </div>
-                                                </SelectItem>
-                                                <SelectItem value="ID" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
-                                                    <div className="flex items-center w-full">
-                                                        <Eye className="w-4 h-4 mr-2 text-gray-500" />
-                                                        <div className="flex-1">
-                                                            <div>{t('ID')}</div>
-                                                        </div>
-                                                    </div>
-                                                </SelectItem>
+                                                    </SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                     </FormItem>

@@ -87,28 +87,26 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
     };
   }, [teamId, fetchData]);
 
+  // 合并处理 customFields 和 URL 参数的 useEffect
   useEffect(() => {
     if (Array.isArray(customFields) && customFields.length > 0) {
       setOrderedFields([...customFields]);
       
-      // 只在没有当前 teamCFId 时设置默认标签页
-      if (!currentTeamCFId) {
+      if (currentTeamCFId) {
+        // 如果 URL 中有 teamCFId，使用它
+        if (currentTeamCFId !== activeTab) {
+          setActiveTab(currentTeamCFId);
+          onViewChange?.(currentTeamCFId);
+        }
+      } else {
+        // 没有 teamCFId 时设置默认标签页
         const firstTabValue = `${customFields[0].id}`;
         setActiveTab(firstTabValue);
         onViewChange?.(firstTabValue);
-        // 自动导航到默认标签页
         router.push(`/projects/${projectId}/${teamId}/${firstTabValue}`);
       }
     }
-  }, [customFields, onViewChange, currentTeamCFId, projectId, teamId, router]);
-
-  // 添加一个新的 useEffect 来处理 URL 参数变化
-  useEffect(() => {
-    if (currentTeamCFId && currentTeamCFId !== activeTab) {
-      setActiveTab(currentTeamCFId);
-      onViewChange?.(currentTeamCFId);
-    }
-  }, [currentTeamCFId, activeTab, onViewChange]);
+  }, [customFields, currentTeamCFId, activeTab, onViewChange, projectId, teamId, router]);
 
   const handleTabChange = (value) => {
     setActiveTab(value);
