@@ -8,9 +8,17 @@ export default function ContactUs(){
 
     const [selectedOption, setSelectedOption] = useState('general');
     const [email, setEmail] = useState('');
+    const [message, setMessage] = useState('')
+    const [firstName, setFirstName] = useState('')
+    const [lastName, setLastName] = useState('')
+    const [companyName, setCompanyName] = useState('')
     const [selectedRole, setSelectedRole] = useState('')
     const [selectedTimeline, setSelectedTimeline] = useState('')
     const [selectedUserQty, setSelectedUserQty] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [errorMessage, setErrorMessage] = useState('')
+
+    const [messageSent, setMessageSent] = useState(false)
 
     {/* dummy data : roles*/}
     const roles = [
@@ -78,11 +86,76 @@ export default function ContactUs(){
 
     ]
 
-
-    
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => {
         event.preventDefault();
-        console.log('form submitted');
+        setLoading(true);
+        setErrorMessage('');
+
+        try {
+            // Prepare data based on form type
+            const formData = {
+                type: selectedOption,
+                email: email,
+            };
+            
+            if(selectedOption === 'general'){
+                formData.message = message;
+            } else if(selectedOption === 'enterprise'){
+                formData.firstName = firstName;
+                formData.lastName = lastName;
+                formData.companyName = companyName;
+                formData.role = selectedRole;
+                formData.timeline = selectedTimeline;
+                formData.userQty = selectedUserQty;
+            }
+
+            console.log('Sending form data:', formData); // Debug log
+
+            // Call API route - make sure the URL is lowercase to match the API route
+            const response = await fetch('/api/contactUs', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData),
+            });
+
+            // Check if response is JSON
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                // Handle non-JSON response
+                const textResponse = await response.text();
+                console.error('Non-JSON response:', textResponse);
+                throw new Error('Server returned non-JSON response');
+            }
+
+            // Parse JSON response
+            const result = await response.json();
+
+            // Handle response
+            if (!response.ok) {
+                console.error('Error submitting form:', result.error);
+                setErrorMessage(result.error || 'There was an error submitting your form. Please try again.');
+            } else {
+                console.log('Form submitted successfully:', result);
+                setMessageSent(true);
+                
+                // Reset form fields
+                setEmail('');
+                setMessage('');
+                setFirstName('');
+                setLastName('');
+                setCompanyName('');
+                setSelectedRole('');
+                setSelectedTimeline('');
+                setSelectedUserQty('');
+            }
+        } catch (error) {
+            console.error('Unexpected error:', error);
+            setErrorMessage('An unexpected error occurred. Please try again later.');
+        } finally {
+            setLoading(false);
+        }
     };
     
 
@@ -114,11 +187,11 @@ export default function ContactUs(){
                 </p>
         
                 {/* Success message */}
-                {/* {messageSent && (
+                {messageSent && (
                 <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
-                    Your message has been sent!
+                    Your message has been sent! We will reply you within 2 business days.
                 </div>
-                )} */}
+                )}
 
 
                 {/*Enquiry Type Change*/}
@@ -181,6 +254,8 @@ export default function ContactUs(){
                         <label htmlFor="message" className="block mb-2">Message</label>
                         <textarea
                         id="message"
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
                         className="w-full p-3 bg-gray-900 border border-gray-700 rounded h-32"
                         required
                         placeholder="What would you like to discuss?"
@@ -208,6 +283,8 @@ export default function ContactUs(){
                         <input
                         type="text"
                         id="firstName"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
                         className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
                         required
                         />
@@ -217,6 +294,8 @@ export default function ContactUs(){
                         <input
                         type="text"
                         id="lastName"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
                         className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
                         required
                         />
@@ -239,6 +318,8 @@ export default function ContactUs(){
                             <input
                             type="text"
                             id="companyName"
+                            value={companyName}
+                            onChange={(e) => setCompanyName(e.target.value)}
                             className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
                             required
                             />
