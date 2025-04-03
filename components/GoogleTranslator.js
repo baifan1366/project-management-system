@@ -5,14 +5,14 @@ import { Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * DeepLTranslator 组件
+ * GoogleTranslator 组件
  * 包装消息内容，并在右下角显示翻译按钮
- * 当用户点击翻译按钮时，调用DeepL API翻译内容
+ * 当用户点击翻译按钮时，调用Google Translate API翻译内容
  */
-export default function DeepLTranslator({ 
+export default function GoogleTranslator({ 
   children, 
   content,
-  targetLang = 'ZH', // 默认翻译目标语言为中文
+  targetLang = 'en', // 默认翻译目标语言为英文
   className,
   buttonClassName
 }) {
@@ -32,7 +32,7 @@ export default function DeepLTranslator({
     setError(null);
 
     try {
-      const response = await fetch('/api/deepLTranslate', {
+      const response = await fetch('/api/googleTranslate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,7 +72,7 @@ export default function DeepLTranslator({
           isTranslating && "cursor-wait",
           buttonClassName
         )}
-        title={translatedText ? "查看原文" : "翻译"}
+        title={translatedText ? "see original" : "translate"}
       >
         <Languages size={16} />
       </button>

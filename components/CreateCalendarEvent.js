@@ -19,7 +19,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = new Date(), onSuccess }) {
   const t = useTranslations('Calendar');
-  const [eventType, setEventType] = useState('task'); // 'task' or 'google'
+  const [eventType, setEventType] = useState('task'); // 'task', 'google', 'personal'
   const [isLoading, setIsLoading] = useState(false);
   
   // 事件表单数据
@@ -33,6 +33,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     isAllDay: false,
     location: '',
     reminders: false,
+    color: '#4285F4', // 默认颜色
   });
 
   // 处理表单数据变化
@@ -81,7 +82,41 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
           const errorData = await response.json();
           throw new Error(errorData.error || 'Failed to create task');
         }
+      } else if (eventType === 'personal') {
+        // 创建个人日历事件
+        const { data: { session } } = await supabase.auth.getSession();
         
+        if (!session) {
+          throw new Error('未登录状态');
+        }
+
+        const startDateTime = formData.isAllDay 
+          ? `${format(formData.startDate, 'yyyy-MM-dd')}T00:00:00`
+          : `${format(formData.startDate, 'yyyy-MM-dd')}T${formData.startTime}:00`;
+        
+        const endDateTime = formData.isAllDay
+          ? `${format(formData.endDate, 'yyyy-MM-dd')}T23:59:59`
+          : `${format(formData.endDate, 'yyyy-MM-dd')}T${formData.endTime}:00`;
+        
+        const personalEventData = {
+          title: formData.title,
+          description: formData.description,
+          start_time: startDateTime,
+          end_time: endDateTime,
+          is_all_day: formData.isAllDay,
+          location: formData.location,
+          color: formData.color,
+          user_id: session.user.id
+        };
+        
+        const { error } = await supabase
+          .from('personal_calendar_event')
+          .insert(personalEventData);
+        
+        if (error) {
+          console.error('创建个人日历事件失败:', error);
+          throw new Error(error.message || '创建个人日历事件失败');
+        }
       } else {
         // 创建Google日历事件
         const startDateTime = formData.isAllDay 
@@ -155,6 +190,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         isAllDay: false,
         location: '',
         reminders: false,
+        color: '#4285F4', // 默认颜色
       });
       
       setIsOpen(false);
@@ -184,8 +220,9 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         </DialogHeader>
         
         <Tabs defaultValue="task" value={eventType} onValueChange={setEventType} className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="task">{t('task')}</TabsTrigger>
+            <TabsTrigger value="personal">{t('personalCalendar')}</TabsTrigger>
             <TabsTrigger value="google">Google {t('event')}</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -252,59 +289,76 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
               </div>
             )}
           </div>
-
-          {eventType === 'google' && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="endDate">{t('endDate')}</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="endDate"
-                        variant="outline"
-                        className="w-full justify-start text-left font-normal"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.endDate ? format(formData.endDate, 'PPP') : t('pickDate')}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.endDate}
-                        onSelect={(date) => handleDateChange(date, 'endDate')}
-                        disabled={(date) => date < formData.startDate}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                
-                {!formData.isAllDay && (
-                  <div className="space-y-2">
-                    <Label htmlFor="endTime">{t('endTime')}</Label>
-                    <Input 
-                      id="endTime" 
-                      name="endTime" 
-                      type="time" 
-                      value={formData.endTime} 
-                      onChange={handleInputChange} 
-                    />
-                  </div>
-                )}
-              </div>
-                  
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="endDate">{t('endDate')}</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="endDate"
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.endDate ? format(formData.endDate, 'PPP') : t('pickDate')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.endDate}
+                    onSelect={(date) => handleDateChange(date, 'endDate')}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            {!formData.isAllDay && (
               <div className="space-y-2">
-                <Label htmlFor="location">{t('location')}</Label>
+                <Label htmlFor="endTime">{t('endTime')}</Label>
                 <Input 
-                  id="location" 
-                  name="location" 
-                  value={formData.location} 
+                  id="endTime" 
+                  name="endTime" 
+                  type="time" 
+                  value={formData.endTime} 
                   onChange={handleInputChange} 
-                  placeholder={t('locationPlaceholder')} 
                 />
               </div>
-            </>
+            )}
+          </div>
+          
+          {(eventType === 'google' || eventType === 'personal') && (
+            <div className="space-y-2">
+              <Label htmlFor="location">{t('location')}</Label>
+              <Input 
+                id="location" 
+                name="location" 
+                value={formData.location} 
+                onChange={handleInputChange} 
+                placeholder={t('locationPlaceholder')} 
+              />
+            </div>
+          )}
+          
+          {eventType === 'personal' && (
+            <div className="space-y-2">
+              <Label htmlFor="color">{t('color')}</Label>
+              <div className="flex items-center space-x-2">
+                <Input 
+                  id="color" 
+                  name="color" 
+                  type="color" 
+                  value={formData.color} 
+                  onChange={handleInputChange} 
+                  className="w-12 h-8 p-1" 
+                />
+                <div 
+                  className="h-8 w-8 rounded-md" 
+                  style={{ backgroundColor: formData.color }}
+                ></div>
+              </div>
+            </div>
           )}
           
           <div className="flex items-center space-x-2">
@@ -313,10 +367,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
               checked={formData.isAllDay} 
               onCheckedChange={(checked) => handleCheckboxChange('isAllDay', checked)} 
             />
-            <label
-              htmlFor="isAllDay"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
+            <label htmlFor="isAllDay" className="text-sm font-medium leading-none">
               {t('allDay')}
             </label>
           </div>
@@ -328,10 +379,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
                 checked={formData.reminders} 
                 onCheckedChange={(checked) => handleCheckboxChange('reminders', checked)} 
               />
-              <label
-                htmlFor="reminders"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
+              <label htmlFor="reminders" className="text-sm font-medium leading-none">
                 {t('useDefaultReminders')}
               </label>
             </div>

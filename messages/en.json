@@ -552,7 +552,8 @@
     "privateChat": "Private Chat",
     "groupChat": "Group Chat",
     "sentAttachment": "Sent an attachment",
-    "unreadMessages": "{count} unread messages"
+    "unreadMessages": "{count} unread messages",
+    "translate": "translate to en"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

@@ -13,7 +13,7 @@ import Image from 'next/image';
 import PengyImage from '../../../public/pengy.webp';
 import EmojiPicker from '@/components/EmojiPicker';
 import FileUploader from '@/components/FileUploader';
-import DeepLTranslator from '@/components/DeepLTranslator';
+import GoogleTranslator from '@/components/GoogleTranslator';
 import { useLastSeen } from '@/hooks/useLastSeen';
 
 export default function ChatPage() {
@@ -370,12 +370,12 @@ export default function ChatPage() {
                             </p>
                           </div>
                         )}
-                        <DeepLTranslator 
+                        <GoogleTranslator 
                           content={msg.content}
-                          targetLang={isMe ? "EN" : "ZH"} // 如果是自己的消息，翻译成英文，否则翻译成中文
+                          targetLang="en"
                         >
                           {msg.content}
-                        </DeepLTranslator>
+                        </GoogleTranslator>
                         
                         {/* 消息操作菜单 */}
                         <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
