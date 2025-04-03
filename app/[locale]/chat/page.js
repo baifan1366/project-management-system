@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Send, Paperclip, Smile, Image as ImageIcon, Gift, ChevronDown, Bot, MessageSquare } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
+import { useUserStatus } from '@/contexts/UserStatusContext';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import InviteUserPopover from '@/components/InviteUserPopover';
@@ -13,9 +14,11 @@ import PengyImage from '../../../public/pengy.webp';
 import EmojiPicker from '@/components/EmojiPicker';
 import FileUploader from '@/components/FileUploader';
 import DeepLTranslator from '@/components/DeepLTranslator';
+import { useLastSeen } from '@/hooks/useLastSeen';
 
 export default function ChatPage() {
   const t = useTranslations('Chat');
+  const { formatLastSeen } = useLastSeen();
   const [message, setMessage] = useState('');
   const { 
     currentSession, 
@@ -23,10 +26,58 @@ export default function ChatPage() {
     sendMessage, 
     chatMode  // 从 context 中获取
   } = useChat();
+  
+  // 使用增强的UserStatusContext
+  const { 
+    currentUser: statusCurrentUser, 
+    getUserStatus, 
+    usersStatus 
+  } = useUserStatus();
+  
   const [currentUser, setCurrentUser] = useState(null);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const [isPending, setIsPending] = useState(false);
+  // 添加回复消息状态
+  const [replyToMessage, setReplyToMessage] = useState(null);
+  
+  // 获取其他参与者ID
+  const otherParticipantId = currentSession?.type === 'PRIVATE' ? currentSession?.participants?.[0]?.id : null;
+  
+  // 当对话变更时立即获取用户状态
+  useEffect(() => {
+    if (otherParticipantId) {
+      getUserStatus(otherParticipantId);
+    }
+  }, [otherParticipantId, getUserStatus]);
+  
+  // 当页面可见性变化时刷新用户状态
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && otherParticipantId) {
+        getUserStatus(otherParticipantId);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [otherParticipantId, getUserStatus]);
+  
+  // 定期刷新用户状态（每60秒）
+  useEffect(() => {
+    if (!otherParticipantId) return;
+    
+    const intervalId = setInterval(() => {
+      getUserStatus(otherParticipantId);
+    }, 60000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [otherParticipantId, getUserStatus]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -52,9 +103,27 @@ export default function ChatPage() {
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (message.trim() && currentSession) {
-      sendMessage(currentSession.id, message);
+      sendMessage(currentSession.id, message, replyToMessage?.id);
       setMessage('');
+      setReplyToMessage(null); // 发送后清除回复状态
+      
+      // 发送消息后立即刷新对方状态
+      if (otherParticipantId) {
+        getUserStatus(otherParticipantId);
+      }
     }
+  };
+
+  // 回复消息处理函数
+  const handleReplyMessage = (msg) => {
+    setReplyToMessage(msg);
+    // 聚焦输入框
+    document.querySelector('textarea')?.focus();
+  };
+  
+  // 取消回复
+  const handleCancelReply = () => {
+    setReplyToMessage(null);
   };
 
   // 处理emoji选择
@@ -69,7 +138,7 @@ export default function ChatPage() {
     try {
       // 确保用户已登录且会话ID存在
       if (!currentUser?.id || !currentSession?.id) {
-        throw new Error('用户未登录或会话不存在');
+        throw new Error(t('errors.userNotLoggedIn') || '用户未登录或会话不存在');
       }
 
       // 检查用户是否是会话参与者
@@ -82,7 +151,7 @@ export default function ChatPage() {
 
       if (participantError || !participant) {
         console.error('检查用户权限失败:', participantError);
-        throw new Error('您不是该聊天会话的参与者，无法发送消息');
+        throw new Error(t('errors.notParticipant') || '您不是该聊天会话的参与者，无法发送消息');
       }
 
       // 先发送消息以获取message_id
@@ -91,7 +160,7 @@ export default function ChatPage() {
         .insert({
           session_id: currentSession.id,
           user_id: currentUser.id,
-          content: message.trim() ? message : '发送了附件'
+          content: message.trim() ? message : t('sentAttachment') || '发送了附件'
         })
         .select()
         .single();
@@ -122,9 +191,14 @@ export default function ChatPage() {
 
       // 清空消息输入
       setMessage('');
+      
+      // 发送消息后立即刷新对方状态
+      if (otherParticipantId) {
+        getUserStatus(otherParticipantId);
+      }
     } catch (error) {
       console.error('上传附件失败:', error);
-      alert(`上传失败: ${error.message || '未知错误'}`);
+      alert(`${t('errors.uploadFailed')}: ${error.message || t('errors.unknown')}`);
     } finally {
       setIsPending(false);
     }
@@ -140,6 +214,8 @@ export default function ChatPage() {
 
   // 获取其他参与者信息
   const otherParticipant = currentSession?.participants?.[0];
+  // 获取实时状态
+  const otherParticipantStatus = otherParticipantId ? usersStatus[otherParticipantId] : null;
   const sessionName = currentSession?.type === 'PRIVATE'
     ? otherParticipant?.name
     : currentSession?.name;
@@ -175,6 +251,24 @@ export default function ChatPage() {
                 <p className="text-sm text-muted-foreground">
                   {sessionEmail}
                 </p>
+                {/* 显示在线状态 - 使用实时更新的状态 */}
+                {currentSession?.type === 'PRIVATE' && (
+                  <p className="text-xs">
+                    {otherParticipantStatus?.isOnline ? (
+                      <span className="text-green-600">{t('online')}</span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {otherParticipantStatus?.lastSeen ? (
+                          formatLastSeen(otherParticipantStatus.lastSeen)
+                        ) : otherParticipant?.last_seen_at ? (
+                          formatLastSeen(otherParticipant.last_seen_at)
+                        ) : (
+                          t('offline')
+                        )}
+                      </span>
+                    )}
+                  </p>
+                )}
               </div>
             </>
           ) : (
@@ -265,12 +359,37 @@ export default function ChatPage() {
                           ? "bg-primary text-primary-foreground" 
                           : "bg-accent"
                       )}>
+                        {/* 如果是回复的消息，显示被回复的内容 */}
+                        {msg.replied_message && (
+                          <div className="mb-2 p-2 rounded bg-background/50 text-xs line-clamp-2 border-l-2 border-blue-400">
+                            <p className="font-medium text-blue-600 dark:text-blue-400">
+                              {t('replyTo')} {msg.replied_message.user?.name}:
+                            </p>
+                            <p className="text-muted-foreground truncate">
+                              {msg.replied_message.content}
+                            </p>
+                          </div>
+                        )}
                         <DeepLTranslator 
                           content={msg.content}
                           targetLang={isMe ? "EN" : "ZH"} // 如果是自己的消息，翻译成英文，否则翻译成中文
                         >
                           {msg.content}
                         </DeepLTranslator>
+                        
+                        {/* 消息操作菜单 */}
+                        <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            className="p-1 rounded hover:bg-background/60 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleReplyMessage(msg)}
+                            title={t('reply')}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="9 17 4 12 9 7"></polyline>
+                              <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                       {msg.attachments?.length > 0 && (
                         <div className="mt-2 space-y-1">
@@ -300,6 +419,27 @@ export default function ChatPage() {
           <div className="p-4 border-t">
             <form onSubmit={handleSendMessage} className="flex items-end gap-2">
               <div className="flex-1 bg-accent rounded-lg">
+                {/* 回复消息提示栏 */}
+                {replyToMessage && (
+                  <div className="px-3 pt-2 flex items-center justify-between">
+                    <div className="flex items-center text-sm">
+                      <div className="w-1 h-4 bg-blue-500 rounded-full mr-2"></div>
+                      <span className="text-muted-foreground mr-2">{t('replyTo')}</span>
+                      <span className="font-medium truncate max-w-[150px]">{replyToMessage.user?.name}</span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={handleCancelReply}
+                      className="text-muted-foreground hover:text-foreground p-1 rounded-full"
+                      title={t('cancelReply')}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center px-3 py-1 gap-1">
                   <FileUploader 
                     onUploadComplete={handleFileUploadComplete}

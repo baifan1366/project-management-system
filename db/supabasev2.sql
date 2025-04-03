@@ -16,7 +16,9 @@ CREATE TABLE "user" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "email_verified" BOOLEAN DEFAULT FALSE,
   "verification_token" VARCHAR(255),
-  "verification_token_expires" TIMESTAMP
+  "verification_token_expires" TIMESTAMP,
+  "last_seen_at" TIMESTAMP,
+  "is_online" BOOLEAN DEFAULT FALSE
 );
 
 -- 默认字段表

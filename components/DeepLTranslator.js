@@ -63,19 +63,18 @@ export default function DeepLTranslator({
       {/* 显示原始内容或翻译后的内容 */}
       {translatedText !== null ? translatedText : children}
       
-      {/* 翻译按钮 */}
+      {/* 翻译按钮 - 修改样式与回复按钮保持一致 */}
       <button
         onClick={translateText}
         disabled={isTranslating}
         className={cn(
-          "absolute bottom-1 right-1 p-1 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10",
-          translatedText ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600",
+          "absolute right-5 p-1 rounded hover:bg-background/60 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity",
           isTranslating && "cursor-wait",
           buttonClassName
         )}
         title={translatedText ? "查看原文" : "翻译"}
       >
-        <Languages size={14} />
+        <Languages size={16} />
       </button>
       
       {/* 错误提示 */}
