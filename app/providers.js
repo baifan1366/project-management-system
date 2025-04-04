@@ -6,18 +6,21 @@ import { ThemeProvider } from 'next-themes'
 import { ChatProvider } from '@/contexts/ChatContext'
 import { ChatDialogProvider } from '@/contexts/ChatDialogContext';
 import { ConfirmProvider } from '@/hooks/use-confirm';
+import { UserStatusProvider } from '@/contexts/UserStatusContext';
 
 export function Providers({ children }) {
   return (
     <Provider store={store}>
       <ThemeProvider attribute="class">
-        <ChatProvider>
-          <ChatDialogProvider>
-            <ConfirmProvider>
-              {children}
-            </ConfirmProvider>
-          </ChatDialogProvider>
-        </ChatProvider>
+        <UserStatusProvider>
+          <ChatProvider>
+            <ChatDialogProvider>
+              <ConfirmProvider>
+                {children}
+              </ConfirmProvider>
+            </ChatDialogProvider>
+          </ChatProvider>
+        </UserStatusProvider>
       </ThemeProvider>
     </Provider>
   )

@@ -28,6 +28,8 @@ export default function CalendarPage() {
   const calendarRef = useRef(null);
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [personalEvents, setPersonalEvents] = useState([]);
+  const [isLoadingPersonal, setIsLoadingPersonal] = useState(false);
 
   // 检查用户是否已经连接Google账号
   useEffect(() => {
@@ -51,6 +53,45 @@ export default function CalendarPage() {
   useEffect(() => {
     dispatch(fetchTasks());
   }, [dispatch]);
+
+  // 获取个人日历事件
+  useEffect(() => {
+    async function fetchPersonalEvents() {
+      setIsLoadingPersonal(true);
+      try {
+        const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
+        const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.error('未登录状态');
+          return;
+        }
+        
+        const { data, error } = await supabase
+          .from('personal_calendar_event')
+          .select('*')
+          .gte('start_time', `${startDate}T00:00:00`)
+          .lte('end_time', `${endDate}T23:59:59`)
+          .eq('user_id', session.user.id);
+        
+        if (error) {
+          console.error('获取个人日历事件失败:', error);
+          throw error;
+        }
+        
+        setPersonalEvents(data || []);
+      } catch (error) {
+        console.error('获取个人日历事件错误:', error);
+        toast.error('获取个人日历事件失败');
+      } finally {
+        setIsLoadingPersonal(false);
+      }
+    }
+    
+    fetchPersonalEvents();
+  }, [currentDate]);
 
   // 获取Google日历事件
   useEffect(() => {
@@ -162,6 +203,43 @@ export default function CalendarPage() {
   const handleEventCreated = () => {
     // 刷新数据
     dispatch(fetchTasks());
+    
+    // 刷新个人日历事件
+    const fetchPersonalEvents = async () => {
+      try {
+        setIsLoadingPersonal(true);
+        const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
+        const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.error('未登录状态');
+          return;
+        }
+        
+        const { data, error } = await supabase
+          .from('personal_calendar_event')
+          .select('*')
+          .gte('start_time', `${startDate}T00:00:00`)
+          .lte('end_time', `${endDate}T23:59:59`)
+          .eq('user_id', session.user.id);
+        
+        if (error) {
+          console.error('获取个人日历事件失败:', error);
+          throw error;
+        }
+        
+        setPersonalEvents(data || []);
+      } catch (error) {
+        console.error('获取个人日历事件错误:', error);
+        toast.error('获取个人日历事件失败');
+      } finally {
+        setIsLoadingPersonal(false);
+      }
+    };
+    
+    fetchPersonalEvents();
     
     if (isGoogleConnected) {
       // 刷新Google日历事件
@@ -304,6 +382,12 @@ export default function CalendarPage() {
         return isSameDay(eventStart, day);
       });
 
+      // 获取该日期的个人事件
+      const dayPersonalEvents = personalEvents.filter(event => {
+        const eventStart = parseISO(event.start_time);
+        return isSameDay(eventStart, day);
+      });
+
       days.push(
         <div 
           key={formattedDate}
@@ -322,7 +406,7 @@ export default function CalendarPage() {
             )}>
               {format(day, 'd')}
             </span>
-            {(isCurrentMonth && (dayTasks.length > 0 || dayEvents.length > 0)) && (
+            {(isCurrentMonth && (dayTasks.length > 0 || dayEvents.length > 0 || dayPersonalEvents.length > 0)) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-5 w-5">
@@ -360,6 +444,17 @@ export default function CalendarPage() {
                 title={event.summary}
               >
                 {event.summary}
+              </div>
+            ))}
+
+            {dayPersonalEvents.map((event) => (
+              <div 
+                key={`personal-${event.id}`} 
+                className="text-xs py-0.5 px-1 bg-purple-100 dark:bg-purple-900/30 rounded truncate"
+                style={event.color ? {backgroundColor: `${event.color}20`} : {}}
+                title={event.title}
+              >
+                {event.title}
               </div>
             ))}
           </div>
@@ -472,37 +567,43 @@ export default function CalendarPage() {
             <Card className="h-full p-4 overflow-y-auto">
               <h3 className="font-medium mb-3">{t('calendars')}</h3>
               
-              {!isGoogleConnected ? (
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={handleConnectGoogle}
-                >
-                  <img 
-                    src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" 
-                    alt="Google" 
-                    className="h-5 w-5 mr-2" 
-                  />
-                  {t('connectGoogle')}
-                </Button>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-                    <span>{t('myCalendar')}</span>
-                  </div>
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                  <span>{t('myCalendar')}</span>
+                </div>
+                
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                  <span>{t('personalCalendar')}</span>
+                </div>
+                
+                {isGoogleConnected ? (
                   <div className="flex items-center">
                     <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
                     <span>Google</span>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start" 
+                    onClick={handleConnectGoogle}
+                  >
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" 
+                      alt="Google" 
+                      className="h-5 w-5 mr-2" 
+                    />
+                    {t('connectGoogle')}
+                  </Button>
+                )}
+              </div>
               
               <div className="mt-6">
                 <h3 className="font-medium mb-3">{t('myTasks')}</h3>
                 <div className="space-y-2">
                   <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                    <div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
                     <span>{t('allTasks')}</span>
                   </div>
                   <div className="flex items-center">

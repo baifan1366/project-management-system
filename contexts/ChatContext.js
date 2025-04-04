@@ -326,7 +326,9 @@ export function ChatProvider({ children }) {
               id,
               name,
               avatar_url,
-              email
+              email,
+              is_online,
+              last_seen_at
             )
           )
         ),
@@ -334,7 +336,9 @@ export function ChatProvider({ children }) {
           id,
           name,
           avatar_url,
-          email
+          email,
+          is_online,
+          last_seen_at
         )
       `)
       .eq('user_id', authSession.user.id);
@@ -357,7 +361,9 @@ export function ChatProvider({ children }) {
           id,
           name,
           avatar_url,
-          email
+          email,
+          is_online,
+          last_seen_at
         )
       `)
       .in('session_id', sessionIds)
@@ -388,7 +394,9 @@ export function ChatProvider({ children }) {
             id,
             name,
             avatar_url,
-            email
+            email,
+            is_online,
+            last_seen_at
           )
         `)
         .in('session_id', aiSessionIds)
@@ -523,6 +531,16 @@ export function ChatProvider({ children }) {
           id,
           file_url,
           file_name
+        ),
+        replied_message:reply_to_message_id (
+          id,
+          content,
+          user:user_id (
+            id,
+            name,
+            avatar_url,
+            email
+          )
         )
       `)
       .eq('session_id', sessionId)
@@ -535,7 +553,11 @@ export function ChatProvider({ children }) {
 
     setMessages(data.map(msg => ({
       ...msg,
-      user: processAvatarUrl(msg.user)
+      user: processAvatarUrl(msg.user),
+      replied_message: msg.replied_message ? {
+        ...msg.replied_message,
+        user: processAvatarUrl(msg.replied_message.user)
+      } : null
     })));
     
     // 标记消息为已读
@@ -643,6 +665,16 @@ export function ChatProvider({ children }) {
           id,
           file_url,
           file_name
+        ),
+        replied_message:reply_to_message_id (
+          id,
+          content,
+          user:user_id (
+            id,
+            name,
+            avatar_url,
+            email
+          )
         )
       `)
       .single();
@@ -686,7 +718,14 @@ export function ChatProvider({ children }) {
     sentMessageIds.add(data.id);
     
     // 将消息添加到本地状态
-    setMessages(prev => [...prev, { ...data, user: processAvatarUrl(data.user) }]);
+    setMessages(prev => [...prev, { 
+      ...data, 
+      user: processAvatarUrl(data.user),
+      replied_message: data.replied_message ? {
+        ...data.replied_message,
+        user: processAvatarUrl(data.replied_message.user)
+      } : null
+    }]);
   };
 
   // 实时消息订阅
@@ -725,6 +764,16 @@ export function ChatProvider({ children }) {
               id,
               file_url,
               file_name
+            ),
+            replied_message:reply_to_message_id (
+              id,
+              content,
+              user:user_id (
+                id,
+                name,
+                avatar_url,
+                email
+              )
             )
           `)
           .eq('id', payload.new.id)
@@ -741,7 +790,14 @@ export function ChatProvider({ children }) {
           if (messageExists) {
             return prev;
           }
-          return [...prev, { ...messageData, user: processAvatarUrl(messageData.user) }];
+          return [...prev, { 
+            ...messageData, 
+            user: processAvatarUrl(messageData.user),
+            replied_message: messageData.replied_message ? {
+              ...messageData.replied_message,
+              user: processAvatarUrl(messageData.replied_message.user)
+            } : null 
+          }];
         });
         
         // 更新会话列表中的最后一条消息
@@ -853,6 +909,16 @@ export function ChatProvider({ children }) {
               id,
               file_url,
               file_name
+            ),
+            replied_message:reply_to_message_id (
+              id,
+              content,
+              user:user_id (
+                id,
+                name,
+                avatar_url,
+                email
+              )
             )
           `)
           .eq('id', payload.new.id)
@@ -881,7 +947,11 @@ export function ChatProvider({ children }) {
                 unreadCount: newUnreadCount,
                 lastMessage: {
                   ...messageData,
-                  user: processAvatarUrl(messageData.user)
+                  user: processAvatarUrl(messageData.user),
+                  replied_message: messageData.replied_message ? {
+                    ...messageData.replied_message,
+                    user: processAvatarUrl(messageData.replied_message.user)
+                  } : null
                 }
               };
             }

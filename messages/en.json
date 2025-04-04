@@ -278,7 +278,11 @@
     "unauthorized": "Unauthorized access",
     "forbidden": "Access forbidden",
     "networkError": "Network error",
-    "serverError": "Server error"
+    "serverError": "Server error",
+    "userNotLoggedIn": "User not logged in or session does not exist",
+    "notParticipant": "You are not a participant in this chat session",
+    "uploadFailed": "Upload failed",
+    "unknown": "Unknown error"
   },
   "Pricing": {
     "title": "Plans and Pricing",
@@ -538,7 +542,22 @@
     "clearChat": "Clear chat",
     "newAIChat": "New Chat",
     "readMore": "Read more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "reply": "Reply",
+    "replyTo": "Reply to",
+    "cancelReply": "Cancel reply",
+    "online": "Online",
+    "offline": "Offline",
+    "justNow": "Just now",
+    "minutesAgo": "{minutes} minutes ago",
+    "hoursAgo": "{hours} hours ago",
+    "yesterday": "Yesterday",
+    "daysAgo": "{days} days ago",
+    "privateChat": "Private Chat",
+    "groupChat": "Group Chat",
+    "sentAttachment": "Sent an attachment",
+    "unreadMessages": "{count} unread messages",
+    "translate": "translate to en"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

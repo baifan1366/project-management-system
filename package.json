@@ -13,6 +13,7 @@
     "@fortawesome/free-brands-svg-icons": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
+    "@google-cloud/translate": "^9.0.1",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^4.0.0",
     "@huggingface/inference": "^3.5.2",

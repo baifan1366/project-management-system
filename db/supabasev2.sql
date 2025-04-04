@@ -16,7 +16,9 @@ CREATE TABLE "user" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "email_verified" BOOLEAN DEFAULT FALSE,
   "verification_token" VARCHAR(255),
-  "verification_token_expires" TIMESTAMP
+  "verification_token_expires" TIMESTAMP,
+  "last_seen_at" TIMESTAMP,
+  "is_online" BOOLEAN DEFAULT FALSE
 );
 
 -- 默认字段表
@@ -202,6 +204,25 @@ CREATE TABLE "attachment" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 个人日历事件表
+CREATE TABLE "personal_calendar_event" (
+  "id" SERIAL PRIMARY KEY,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "start_time" TIMESTAMP NOT NULL,
+  "end_time" TIMESTAMP NOT NULL,
+  "is_all_day" BOOLEAN DEFAULT FALSE,
+  "location" VARCHAR(255),
+  "color" VARCHAR(20) DEFAULT '#4285F4',
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建个人日历事件索引
+CREATE INDEX idx_personal_calendar_event_user ON "personal_calendar_event"("user_id");
+CREATE INDEX idx_personal_calendar_event_time ON "personal_calendar_event"("start_time", "end_time");
 
 -- 通知表
 CREATE TABLE "notification" (
