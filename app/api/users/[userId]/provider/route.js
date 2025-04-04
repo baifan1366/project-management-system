@@ -25,6 +25,7 @@ export async function POST(request, { params }) {
         updated_at: new Date().toISOString()
       })
       .eq('id', userId)
+      .select('*')
       .single();
 
     if (userError) throw userError;

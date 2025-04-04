@@ -311,7 +311,7 @@ CREATE TABLE "action_log" (
   "user_id" UUID REFERENCES "user"("id") ON DELETE SET NULL,
   "action_type" VARCHAR(50) NOT NULL, -- 例如：'CREATE', 'UPDATE', 'DELETE'
   "entity_type" VARCHAR(50) NOT NULL, -- 例如：'task', 'project', 'team'
-  "entity_id" INT NOT NULL,           -- 被操作实体的ID
+  "entity_id" TEXT NOT NULL,           -- 被操作实体的ID
   "old_values" JSONB,                 -- 修改前的值
   "new_values" JSONB,                 -- 修改后的值
   "ip_address" VARCHAR(45),           -- 支持 IPv6
