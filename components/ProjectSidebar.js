@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslations } from 'use-intl'
 import CreateTeamDialog from './TeamDialog'
-import { fetchProjectById } from '@/lib/redux/features/projectSlice'
 import { updateTeamOrder, fetchUserTeams, fetchTeamCustomFieldForTeam } from '@/lib/redux/features/teamSlice'
 import { useDispatch, useSelector } from 'react-redux'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -14,11 +13,12 @@ import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { supabase } from '@/lib/supabase'
 import { createSelector } from '@reduxjs/toolkit';
+import { fetchProjectById } from '@/lib/redux/features/projectSlice'
 
-// 修改: 使用简单选择器而不是createSelector
+// 获取团队自定义字段
 const selectTeamCustomFields = state => state?.teams?.teamCustomFields ?? [];
 
-// 修改: 改进选择器实现，确保有转换逻辑
+// 获取团队自定义字段ID
 const selectTeamFirstCFIds = createSelector(
   [state => state?.teams?.teamFirstCFIds ?? {}],
   (teamFirstCFIds) => {
@@ -36,31 +36,29 @@ export default function ProjectSidebar({ projectId }) {
   const dispatch = useDispatch();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
-  const [themeColor, setThemeColor] = useState('');
   const dropdownRef = useRef(null);
   
-  // 修改: 从Redux store获取用户团队和自定义字段
   const customFields = useSelector(selectTeamCustomFields);
   const teamFirstCFIds = useSelector(selectTeamFirstCFIds);
   const userTeams = useSelector(state => state.teams.userTeams); 
-  const [projectName, setProjectName] = useState('');
-  const { projects } = useSelector((state) => state.projects);
-  const project = projects.find(p => String(p.id) === String(projectId));
 
+  const [projectName, setProjectName] = useState('');
+  const [themeColor, setThemeColor] = useState('');
+
+  // 项目名称下拉菜单
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setDropdownOpen(false);
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
   
-  // 获取用户加入的团队 - 修改为使用Redux Action
+  // 获取用户加入的团队
   const fetchTeams = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -78,22 +76,23 @@ export default function ProjectSidebar({ projectId }) {
     } catch (error) {
       console.error('获取用户团队失败:', error);
     }
+  }, []);
+
+  const getProjectData = useCallback(async () => {
+    if (projectId) {
+      const project = await dispatch(fetchProjectById(projectId)).unwrap();
+      setThemeColor(project?.theme_color || '#64748b');
+      setProjectName(project?.project_name || 'Project');
+    }
   }, [projectId, dispatch]);
 
-  // 初始加载用户团队
+  // 然后在useEffect中添加真正的依赖项
   useEffect(() => {
-    dispatch(fetchProjectById(projectId));
-    if (projectId) {
+    if (dispatch && projectId) {
       fetchTeams();
-    }
-  }, [projectId, fetchTeams]);
-
-  useEffect(() => {
-    if (project) {
-      setThemeColor(project.theme_color || '#64748b');
-      setProjectName(project.project_name || 'Project');
-    }
-  }, [project]);
+      getProjectData();
+    } 
+  }, [dispatch, projectId, fetchTeams, getProjectData]);
 
   // 确保有自定义字段数据后再生成菜单项
   const menuItems = useMemo(() => {

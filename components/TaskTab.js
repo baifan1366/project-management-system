@@ -4,12 +4,11 @@ import { useTranslations } from 'next-intl';
 import * as Icons from 'lucide-react';
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import { fetchTeamCustomField, updateTeamCustomFieldOrder } from '@/lib/redux/features/teamCFSlice';
 import { fetchTeamCustomFieldValue } from '@/lib/redux/features/teamCFValueSlice';
-import { debounce } from 'lodash';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import CustomField from '@/components/CustomField';
 import { useRouter, useParams } from 'next/navigation';
@@ -50,40 +49,42 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
   const customFieldValues = useSelector(selectTeamCustomFieldValues);
   const [orderedFields, setOrderedFields] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const dataFetchedRef = useRef(false);
 
   // 将 fetchData 移到 useEffect 外部，使用 useCallback 来记忆化
-  const fetchData = useMemo(
-    () =>
-      debounce(async (tid) => {
-        if (!tid) return;
-        
-        try {
-          const fields = await dispatch(fetchTeamCustomField(tid)).unwrap();
-          // 添加数据验证
-          if (Array.isArray(fields) && fields.length > 0) {
-            await Promise.all(
-              fields.map(field =>
-                dispatch(fetchTeamCustomFieldValue({
-                  teamId: tid,
-                  teamCustomFieldId: field.id
-                })).unwrap()
-              )
-            );
-          }
-        } catch (error) {
-          console.error('Error fetching data:', error);
-          // 可以在这里添加错误处理逻辑，比如显示错误提示
-        }
-      }, 500),
-    [dispatch]
-  );
+  const fetchData = useCallback(async (tid) => {
+    if (!tid) return;
+    
+    try {
+      const fields = await dispatch(fetchTeamCustomField(tid)).unwrap();
+      // 添加数据验证
+      if (Array.isArray(fields) && fields.length > 0) {
+        await Promise.all(
+          fields.map(field =>
+            dispatch(fetchTeamCustomFieldValue({
+              teamId: tid,
+              teamCustomFieldId: field.id
+            })).unwrap()
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      // 可以在这里添加错误处理逻辑，比如显示错误提示
+    }
+  }, [dispatch]);
 
   useEffect(() => {
-    if (teamId) {
+    if (teamId && !dataFetchedRef.current) {
+      dataFetchedRef.current = true;
       fetchData(teamId);
     }
+    
     return () => {
-      fetchData.cancel();
+      // 当组件卸载或 teamId 变化时重置状态
+      if (!teamId) {
+        dataFetchedRef.current = false;
+      }
     };
   }, [teamId, fetchData]);
 
@@ -187,7 +188,12 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
               >
                 <Icons.Plus className="h-4 w-4" />
               </Button>
-              <CustomField isDialogOpen={isDialogOpen} setIsDialogOpen={setIsDialogOpen} teamId={teamId} />
+              <CustomField 
+                key="custom-field-dialog"
+                isDialogOpen={isDialogOpen} 
+                setIsDialogOpen={setIsDialogOpen} 
+                teamId={teamId} 
+              />
             </TabsList>
           )}
         </Droppable>

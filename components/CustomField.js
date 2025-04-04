@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchCustomFields } from '@/lib/redux/features/customFieldSlice';
@@ -8,30 +8,36 @@ import { createTeamCustomField } from '@/lib/redux/features/teamCFSlice';
 import * as Icons from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription } from "@/components/ui/dialog";
 import { fetchTeamCustomField } from '@/lib/redux/features/teamCFSlice';
-import { shallowEqual } from 'react-redux';
 import { supabase } from '@/lib/supabase';
 
 export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
+  const dataFetchedRef = useRef(false);
   
-  // 从 Redux store 获取自定义字段模板 - 修正路径
+  // 从 Redux store 获取自定义字段模板
   const availableFields = useSelector(state => state.customFields?.fields || []);
-  
-  // 使用 shallowEqual 作为相等性函数
-  const teamCustomFields = useSelector(
-    state => {
-      const allFields = state.teamCustomFields?.fields || [];
-      return allFields.filter(f => f.team_id === teamId);
-    },
-    shallowEqual
-  );
+  const customFieldStatus = useSelector(state => state.customFields?.status || 'idle');
   
   // 获取可用的自定义字段模板
   useEffect(() => {
-    // 确保获取所有字段
-    dispatch(fetchCustomFields());
-  }, [dispatch]);
+    // 仅在对话框打开且数据未加载且未请求过时获取数据
+    if (isDialogOpen && !dataFetchedRef.current && 
+        (customFieldStatus === 'idle' || 
+         (availableFields.length === 0 && customFieldStatus !== 'loading'))) {
+      // 设置标记，避免重复请求
+      dataFetchedRef.current = true;
+      console.log('正在获取自定义字段模板...');
+      dispatch(fetchCustomFields());
+    }
+    
+    // 当对话框关闭时，不要立即重置ref，而是在下次打开前重置
+    return () => {
+      if (!isDialogOpen) {
+        dataFetchedRef.current = false;
+      }
+    };
+  }, [isDialogOpen, customFieldStatus, availableFields.length, dispatch]);
 
   // 处理字段点击事件
   const handleFieldClick = async (field) => {
@@ -39,6 +45,9 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     const userId = userData?.user?.id;
     try {
+      // 先关闭对话框，避免重复触发
+      setIsDialogOpen(false);
+      
       dispatch(createTeamCustomField({
         team_id: teamId,
         custom_field_id: field.id,
@@ -47,11 +56,11 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
       }))
       .then((result) => {
         console.log('自定义字段创建成功:', result);
-        // 关闭对话框
-        setIsDialogOpen(false);
         
-        // 触发重新获取团队自定义字段，确保 TaskTab 能够更新
-        dispatch(fetchTeamCustomField(teamId));
+        // 如果创建成功，触发重新获取团队自定义字段，确保 TaskTab 能够更新
+        if (createTeamCustomField.fulfilled.match(result)) {
+          dispatch(fetchTeamCustomField(teamId));
+        }
       })
       .catch((error) => { 
         console.error('创建自定义字段失败:', error);
@@ -96,31 +105,33 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <DialogContent 
-        className="sm:max-w-[500px] p-0"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
-        <div className="p-4 border-b">
-            <DialogHeader>
-                <DialogTitle>{t('add_view')}</DialogTitle>
-                <DialogDescription className="sr-only">
-                    {t('select_view_type')}
-                </DialogDescription>
-            </DialogHeader>
-        </div>
-        <div className="p-4">
-          <div className="grid grid-cols-2 gap-4">
-            {Array.isArray(availableFields) && availableFields.length > 0 ? (
-              availableFields.map(renderFieldItem)
-            ) : (
-              <div className="col-span-2 text-center py-4 text-muted-foreground">
-                {t('no_available_fields')}
-              </div>
-            )}
+      {isDialogOpen && (
+        <DialogContent 
+          className="sm:max-w-[500px] p-0"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <div className="p-4 border-b">
+              <DialogHeader>
+                  <DialogTitle>{t('add_view')}</DialogTitle>
+                  <DialogDescription className="sr-only">
+                      {t('select_view_type')}
+                  </DialogDescription>
+              </DialogHeader>
           </div>
-        </div>
-      </DialogContent>
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-4">
+              {Array.isArray(availableFields) && availableFields.length > 0 ? (
+                availableFields.map(renderFieldItem)
+              ) : (
+                <div className="col-span-2 text-center py-4 text-muted-foreground">
+                  {t('no_available_fields')}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      )}
     </Dialog>
   );
 }
