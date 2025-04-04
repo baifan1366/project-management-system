@@ -375,6 +375,24 @@ CREATE TABLE "promo_code" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 联系表（用于存储联系表单提交）
+CREATE TABLE "contact" (
+  "id" SERIAL PRIMARY KEY,
+  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE')), -- 区分一般查询和企业查询
+  "email" VARCHAR(255) NOT NULL,
+  "message" TEXT, -- 用于一般查询的消息
+  -- 企业查询特有字段
+  "first_name" VARCHAR(255),
+  "last_name" VARCHAR(255),
+  "company_name" VARCHAR(255),
+  "role" VARCHAR(255), -- 例如：'Executive', 'Manager', 等
+  "purchase_timeline" VARCHAR(255), -- 例如：'immediately', 'Within this month', 等
+  "user_quantity" VARCHAR(50), -- 例如：'1-5', '6-10', 等
+  "status" TEXT NOT NULL CHECK ("status" IN ('NEW', 'IN_PROGRESS', 'COMPLETED', 'SPAM')) DEFAULT 'NEW',
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 团队自定义字段值索引
 CREATE INDEX idx_team_custom_field_value_field ON "team_custom_field_value"("team_custom_field_id");
 
@@ -421,3 +439,9 @@ CREATE INDEX idx_user_subscription_user ON "user_subscription_plan"("user_id");
 CREATE INDEX idx_user_subscription_status ON "user_subscription_plan"("status");
 CREATE INDEX idx_promo_code_code ON "promo_code"("code");
 CREATE INDEX idx_promo_code_active ON "promo_code"("is_active");
+
+-- 联系表索引
+CREATE INDEX idx_contact_type ON "contact"("type");
+CREATE INDEX idx_contact_email ON "contact"("email");
+CREATE INDEX idx_contact_status ON "contact"("status");
+CREATE INDEX idx_contact_created_at ON "contact"("created_at");
