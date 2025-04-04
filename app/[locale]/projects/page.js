@@ -2,20 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { fetchProjects } from '@/lib/redux/features/projectSlice';
+import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from '@/lib/supabase';
 
 export default function ProjectsPage() {
-  const dispatch = useDispatch();
-  const router = useRouter();
   const { locale } = useParams();
-  const { projects, status, error } = useSelector(( state) => state.projects);
+  const { projects, status } = useSelector(( state) => state.projects);
   const t = useTranslations('Projects');
   const [formattedProjects, setFormattedProjects] = useState([]);
 

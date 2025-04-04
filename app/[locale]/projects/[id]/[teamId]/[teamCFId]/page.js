@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useEffect, useState} from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { fetchTeamById, fetchProjectTeams, updateTeamStar } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
@@ -25,38 +25,6 @@ const selectTeamById = createSelector(
     return teams.find(team => String(team.id) === String(teamId)) || null;
   }
 );
-
-// 创建一个统一的数据获取hook
-// 没用到 但是别删！删了就error啦！！
-const useProjectData = (projectId) => {
-  const dispatch = useDispatch();
-  const { projects, teams } = useSelector((state) => ({
-    projects: state.projects.projects,
-    teams: state.teams.teams
-  }));
-
-  useEffect(() => {
-    const loadData = async () => {
-      if (!projectId) return;
-      
-      // 只在数据不存在时加载
-      if (!projects.some(p => String(p.id) === String(projectId))) {
-        await dispatch(fetchProjectById(projectId));
-      }
-      
-      if (!teams.some(team => String(team.project_id) === String(projectId))) {
-        await dispatch(fetchProjectTeams(projectId));
-      }
-    };
-    
-    loadData();
-  }, [projectId]); // 只依赖 projectId
-
-  return {
-    project: projects.find(p => String(p.id) === String(projectId)),
-    teams: teams.filter(team => String(team.project_id) === String(projectId))
-  };
-};
 
 export default function TeamCustomFieldPage() {
   const t = useTranslations('CreateTask');
@@ -79,7 +47,6 @@ export default function TeamCustomFieldPage() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    
     const loadData = async () => {
       if (!projectId || !teamId || !teamCFId) return;
 
@@ -112,10 +79,37 @@ export default function TeamCustomFieldPage() {
     };
 
     loadData();
-  }, [dispatch, teamId, teamCFId, projectId]);
+    
+    // 清理函数
+    return () => {
+      // 组件卸载时清除加载状态
+      setIsLoading(false);
+    };
+  }, [dispatch, projectId, teamId, teamCFId]);
 
   // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
   const isStarred = selectedTeam?.star || false;
+
+  // 使用 useMemo 缓存自定义字段内容渲染结果
+  const customFieldContent = useMemo(() => {
+    if (cfStatus === 'loading') {
+      return <div></div>;
+    }
+
+    if (cfStatus === 'failed') {
+      return <div>Error: {cfError}</div>;
+    }
+
+    if (!currentItem) {
+      return <div></div>;
+    }
+    const fieldType = currentItem.custom_field?.type;
+    if (fieldType === 'LIST') {
+      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} />;
+    }
+    
+    return <div>暂不支持的字段类型: {fieldType}</div>;
+  }, [currentItem]);
 
   // 处理加载状态
   if (isLoading) {
@@ -156,27 +150,6 @@ export default function TeamCustomFieldPage() {
     } catch (error) {
       console.error('Error updating star status:', error);
     }
-  };
-
-  // 根据自定义字段的类型渲染相应的组件
-  const renderCustomFieldContent = () => {
-    if (cfStatus === 'loading') {
-      return <div></div>;
-    }
-
-    if (cfStatus === 'failed') {
-      return <div>Error: {cfError}</div>;
-    }
-
-    if (!currentItem) {
-      return <div></div>;
-    }
-    const fieldType = currentItem.custom_field?.type;
-    if (fieldType === 'LIST') {
-      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} />;
-    }
-    
-    return <div>暂不支持的字段类型: {fieldType}</div>;
   };
 
   return (
@@ -286,7 +259,7 @@ export default function TeamCustomFieldPage() {
             </div>
           </div>
         </div>
-        {renderCustomFieldContent()}
+        {customFieldContent}
       </div>
     </div>
   );

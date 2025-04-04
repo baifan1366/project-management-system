@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase'
 import { Plus, Text, Calendar, User, Sigma, Fingerprint, SquareCheck, CircleCheck, Hash, ClipboardList, Clock3, Tag, Pen, Timer } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
+import { fetchProjectById } from '@/lib/redux/features/projectSlice'
 
 export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, teamCFId }) {
     const t = useTranslations('CreateTag')
@@ -31,7 +32,6 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
     const dispatch = useDispatch()
     const [themeColor, setThemeColor] = useState('#64748b')
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const { projects } = useSelector((state) => state.projects)
     const [showDescription, setShowDescription] = useState(false)
     const [tagTypes, setTagTypes] = useState(['TEXT', 'NUMBER', 'ID', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'FORMULA', 'TIME-TRACKING', 'PROJECTS', 'TAGS', 'COMPLETED-ON', 'LAST-MODIFIED-ON', 'CREATED-ON', 'CREATED-BY'])
 
@@ -63,15 +63,18 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
       })
 
     useEffect(() => {
-        const project = projects.find(p => String(p.id) === String(projectId));
-        if (project?.theme_color) {
-            setThemeColor(project.theme_color);
+        const loadProjectData = async () => {
+            const projectData = await dispatch(fetchProjectById(projectId)).unwrap()
+            if (projectData.theme_color) {
+                setThemeColor(projectData.theme_color);
+            }
         }
         if(isOpen) {
             form.reset()
             form.clearErrors()
+            loadProjectData()
         }
-    }, [isOpen]);
+    }, [isOpen, dispatch, projectId]);
 
     useEffect(() => {
         const fetchTagTypes = async () => {

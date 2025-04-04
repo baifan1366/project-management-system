@@ -460,7 +460,11 @@
     "NOTE": "Note",
     "GANTT": "Gantt",
     "CALENDAR": "Calendar",
-    "FILES": "Files"
+    "FILES": "Files",
+    "noTagsFound": "No tags found",
+    "tags": "Tags",
+    "noTags": "No tags yet",
+    "loadingTags": "Loading..."
   },
   "ChatDialog":{
     "privateMessages": "Private Messages",
