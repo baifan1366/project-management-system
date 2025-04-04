@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Filter } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Filter, Video } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,19 +35,73 @@ export default function CalendarPage() {
   useEffect(() => {
     async function checkGoogleConnection() {
       try {
+        // 获取当前会话
         const { data: { session } } = await supabase.auth.getSession();
         
-        // 检查provider是否为google
+        // 检查是否登录和provider是否为google
+        if (!session) {
+          console.log('用户未登录');
+          setIsGoogleConnected(false);
+          return;
+        }
+        
         if (session?.user?.app_metadata?.provider === 'google') {
-          setIsGoogleConnected(true);
+          console.log('检测到Google提供商，正在检查令牌...');
+          const accessToken = session?.provider_token;
+          const refreshToken = session?.provider_refresh_token;
+          
+          if (accessToken || refreshToken) {
+            console.log('Google令牌可用，连接已建立');
+            
+            // 尝试调用API验证令牌有效性
+            try {
+              const testResponse = await fetch(`/api/check-calendar-scope`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  access_token: accessToken,
+                  refresh_token: refreshToken,
+                }),
+              });
+              
+              const testData = await testResponse.json();
+              
+              // 更新连接状态
+              if (testData.hasCalendarScope) {
+                console.log('成功验证Google日历访问权限');
+                setIsGoogleConnected(true);
+              } else {
+                console.log('Google令牌有效但缺少日历权限');
+                toast.error(t('googleAuthExpired'), {
+                  action: {
+                    label: t('goToSettings'),
+                    onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
+                  }
+                });
+                setIsGoogleConnected(false);
+              }
+            } catch (error) {
+              console.error('验证Google令牌失败:', error);
+              setIsGoogleConnected(false);
+            }
+          } else {
+            console.log('尽管使用Google提供商，但没有可用的Google令牌');
+            setIsGoogleConnected(false);
+          }
+        } else {
+          console.log('未使用Google连接');
+          setIsGoogleConnected(false);
         }
       } catch (error) {
-        console.error('Error checking Google connection:', error);
+        console.error('检查Google连接时出错:', error);
+        setIsGoogleConnected(false);
       }
     }
     
     checkGoogleConnection();
-  }, []);
+  }, [t]);
 
   // 加载任务数据
   useEffect(() => {
@@ -110,6 +164,13 @@ export default function CalendarPage() {
         
         if (!accessToken && !refreshToken) {
           console.error(t('noGoogleToken'));
+          // 显示一个通知而不是立即设置未连接
+          toast.error(t('noGoogleToken'), {
+            action: {
+              label: t('goToSettings'),
+              onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
+            }
+          });
           return;
         }
         
@@ -123,7 +184,7 @@ export default function CalendarPage() {
               onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
             }
           });
-          setIsGoogleConnected(false);
+          // 不要立即设置未连接，给用户机会刷新权限
           return;
         }
         
@@ -137,7 +198,7 @@ export default function CalendarPage() {
         setGoogleEvents(data.events || []);
       } catch (error) {
         console.error(t('getGoogleEventsFailed'), error);
-        // 使用一个静态变量记录是否显示过toast，避免重复显示
+        // 使用更好的错误处理，只显示一次toast
         if (!window.calendarErrorToastShown) {
           window.calendarErrorToastShown = true;
           toast.error(t('getGoogleEventsFailed'), {
@@ -146,6 +207,10 @@ export default function CalendarPage() {
               onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
             }
           });
+          // 5秒后重置toast状态，允许未来的错误显示
+          setTimeout(() => {
+            window.calendarErrorToastShown = false;
+          }, 5000);
         }
       } finally {
         setIsLoadingGoogle(false);
@@ -168,6 +233,9 @@ export default function CalendarPage() {
       // 总是请求日历权限
       const scopes = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
       
+      // 显示正在连接的通知
+      const toastId = toast.loading(t('connectingGoogle') || 'Connecting to Google...');
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -176,14 +244,18 @@ export default function CalendarPage() {
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
+            include_granted_scopes: 'true'
           },
         },
       });
       
       if (error) {
         console.error(t('connectGoogleFailed'), error);
+        toast.dismiss(toastId);
         throw error;
       }
+      
+      // OAuth流程会自动重定向，不需要处理成功情况
     } catch (err) {
       console.error(t('connectGoogleFailed'), err);
       toast.error(t('connectGoogleFailed'), {
@@ -440,10 +512,26 @@ export default function CalendarPage() {
             {dayEvents.map((event) => (
               <div 
                 key={`event-${event.id}`} 
-                className="text-xs py-0.5 px-1 bg-green-100 dark:bg-green-900/30 rounded truncate"
-                title={event.summary}
+                className={cn(
+                  "text-xs py-0.5 px-1 rounded truncate group cursor-pointer hover:bg-green-200 dark:hover:bg-green-800/30",
+                  event.hangoutLink 
+                    ? "bg-emerald-100 dark:bg-emerald-900/40" 
+                    : "bg-green-100 dark:bg-green-900/30"
+                )}
+                title={`${event.summary}${event.hangoutLink ? ` (${t('hasMeetLink')})` : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (event.hangoutLink) {
+                    window.open(event.hangoutLink, '_blank');
+                  }
+                }}
               >
-                {event.summary}
+                <div className="flex items-center justify-between">
+                  <span className="truncate">{event.summary}</span>
+                  {event.hangoutLink && (
+                    <Video className="h-2.5 w-2.5 ml-1 text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </div>
               </div>
             ))}
 
@@ -630,6 +718,7 @@ export default function CalendarPage() {
         setIsOpen={setIsCreateEventOpen} 
         selectedDate={selectedDate}
         onSuccess={handleEventCreated}
+        isGoogleConnected={isGoogleConnected}
       />
     </div>
   );

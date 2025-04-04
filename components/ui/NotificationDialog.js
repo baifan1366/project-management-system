@@ -21,12 +21,15 @@ import {
   deleteNotification,
   selectNotifications,
   selectUnreadCount,
-  selectNotificationsLoading
+  selectNotificationsLoading,
+  selectIsSubscribed,
+  unsubscribeFromNotifications
 } from '@/lib/redux/features/notificationSlice';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN, enUS } from 'date-fns/locale';
-import { Check, Trash, Bell, BellOff } from 'lucide-react';
+import { Check, Trash, Bell, BellOff, Calendar, User, MessageSquare, Video } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import NotificationItem from '@/components/notifications/NotificationItem';
 
 export function NotificationDialog({ open, onOpenChange }) {
   const t = useTranslations();
@@ -34,6 +37,7 @@ export function NotificationDialog({ open, onOpenChange }) {
   const notifications = useSelector(selectNotifications);
   const unreadCount = useSelector(selectUnreadCount);
   const loading = useSelector(selectNotificationsLoading);
+  const isSubscribed = useSelector(selectIsSubscribed);
   const [activeTab, setActiveTab] = useState('all');
   const [user, setUser] = useState(null);
   const [locale, setLocale] = useState('zh');
@@ -45,15 +49,21 @@ export function NotificationDialog({ open, onOpenChange }) {
         if (session?.user) {
           setUser(session.user);
           setLocale(session.user.user_metadata?.language || 'zh');
-          if (notifications.length === 0) {
+          
+          // 只在没有数据或订阅时获取通知
+          if (notifications.length === 0 || !isSubscribed) {
             dispatch(fetchNotifications(session.user.id));
           }
         }
       };
       
       getUser();
+    } else if (!open && isSubscribed) {
+      // 对话框关闭后取消订阅，但不清除通知数据
+      // 这样通知图标上的数字仍然会显示正确的未读数量
+      dispatch(unsubscribeFromNotifications());
     }
-  }, [dispatch, open, notifications.length]);
+  }, [dispatch, open, notifications.length, isSubscribed]);
 
   const handleMarkAsRead = (notificationId) => {
     if (user) {
@@ -73,6 +83,25 @@ export function NotificationDialog({ open, onOpenChange }) {
     }
   };
 
+  const handleNotificationAction = (action, notificationId) => {
+    switch (action) {
+      case 'read':
+        handleMarkAsRead(notificationId);
+        break;
+      case 'delete':
+        handleDeleteNotification(notificationId);
+        break;
+      case 'accept':
+        // 会议邀请接受后已在NotificationItem中处理
+        break;
+      case 'decline':
+        // 会议邀请拒绝后已在NotificationItem中处理
+        break;
+      default:
+        break;
+    }
+  };
+
   const formatTime = (dateString) => {
     try {
       const date = new Date(dateString);
@@ -85,21 +114,32 @@ export function NotificationDialog({ open, onOpenChange }) {
     }
   };
 
-  const getNotificationIcon = (type) => {
+  const getNotificationIcon = (type, notificationData) => {
     switch (type) {
       case 'TASK_ASSIGNED':
-        return <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">📋</div>;
+        return <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><Calendar className="h-4 w-4" /></div>;
       case 'COMMENT_ADDED':
-        return <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">💬</div>;
+        return <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600"><MessageSquare className="h-4 w-4" /></div>;
       case 'MENTION':
-        return <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600">@</div>;
-      case 'DUE_DATE':
-        return <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600">⏰</div>;
-      case 'TEAM_INVITATION':
-        return <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">👥</div>;
+        return <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600"><User className="h-4 w-4" /></div>;
       case 'SYSTEM':
+        // 检查是否是会议邀请
+        try {
+          if (notificationData) {
+            const data = typeof notificationData === 'string' 
+              ? JSON.parse(notificationData) 
+              : notificationData;
+            
+            if (data.isMeetingInvitation) {
+              return <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600"><Video className="h-4 w-4" /></div>;
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing notification data', e);
+        }
+        return <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600"><Bell className="h-4 w-4" /></div>;
       default:
-        return <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">🔔</div>;
+        return <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600"><Bell className="h-4 w-4" /></div>;
     }
   };
 
@@ -118,6 +158,11 @@ export function NotificationDialog({ open, onOpenChange }) {
               {unreadCount > 0 && (
                 <Badge variant="destructive" className="ml-2">
                   {unreadCount}
+                </Badge>
+              )}
+              {isSubscribed && (
+                <Badge variant="outline" className="ml-2 text-xs bg-green-50">
+                  {t('common.connected')}
                 </Badge>
               )}
             </div>
@@ -151,9 +196,7 @@ export function NotificationDialog({ open, onOpenChange }) {
               notifications={filteredNotifications}
               loading={loading}
               formatTime={formatTime}
-              getNotificationIcon={getNotificationIcon}
-              onMarkAsRead={handleMarkAsRead}
-              onDelete={handleDeleteNotification}
+              onAction={handleNotificationAction}
               t={t}
             />
           </TabsContent>
@@ -163,9 +206,7 @@ export function NotificationDialog({ open, onOpenChange }) {
               notifications={filteredNotifications}
               loading={loading}
               formatTime={formatTime}
-              getNotificationIcon={getNotificationIcon}
-              onMarkAsRead={handleMarkAsRead}
-              onDelete={handleDeleteNotification}
+              onAction={handleNotificationAction}
               t={t}
             />
           </TabsContent>
@@ -188,9 +229,7 @@ function NotificationList({
   notifications, 
   loading, 
   formatTime, 
-  getNotificationIcon, 
-  onMarkAsRead, 
-  onDelete,
+  onAction,
   t
 }) {
   if (loading) {
@@ -215,51 +254,11 @@ function NotificationList({
     <ScrollArea className="h-[400px] pr-4">
       <div className="space-y-4 py-2">
         {notifications.map((notification) => (
-          <div 
-            key={notification.id} 
-            className={`flex items-start gap-3 p-3 rounded-lg transition-colors ${
-              notification.is_read ? 'bg-background' : 'bg-muted/50'
-            }`}
-          >
-            {getNotificationIcon(notification.type)}
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <h4 className={`font-medium text-sm ${!notification.is_read && 'font-semibold'}`}>
-                  {notification.title}
-                </h4>
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {formatTime(notification.created_at)}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                {notification.content}
-              </p>
-            </div>
-            
-            <div className="flex flex-col gap-1">
-              {!notification.is_read && (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7" 
-                  onClick={() => onMarkAsRead(notification.id)}
-                  title={t('common.markAsRead')}
-                >
-                  <Check className="h-4 w-4" />
-                </Button>
-              )}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7 text-destructive" 
-                onClick={() => onDelete(notification.id)}
-                title={t('common.delete')}
-              >
-                <Trash className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <NotificationItem 
+            key={notification.id}
+            notification={notification}
+            onAction={onAction}
+          />
         ))}
       </div>
     </ScrollArea>

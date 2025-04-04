@@ -287,7 +287,24 @@
       "mention": "Mentioned you",
       "assignment": "Assigned to you",
       "update": "Project update",
-      "deadline": "Deadline approaching"
+      "deadline": "Deadline approaching",
+      "TASK_ASSIGNED": "Task assigned to you",
+      "COMMENT_ADDED": "New comment",
+      "MENTION": "Mentioned you",
+      "SYSTEM": "System notification"
+    },
+    "actionFailed": "Action failed, please try again",
+    "status": {
+      "unread": "Unread",
+      "read": "Read",
+      "deleted": "Deleted",
+      "archived": "Archived"
+    },
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent"
     }
   },
   "errors": {
@@ -763,9 +780,23 @@
     "connectGoogleFailed": "Failed to connect Google, please try again or authorize in settings",
     "getPersonalEventsFailed": "Failed to get personal calendar events",
     "getGoogleEventsFailed": "Failed to get Google calendar events, please check authorization",
-    "noGoogleToken": "No Google token",
+    "addGoogleMeet": "Add Google Meet video conference",
+    "noGoogleToken": "No Google token found, please reauthorize",
     "notLoggedIn": "Not logged in",
-    "googleCalendar": "Google Calendar"
+    "googleCalendar": "Google Calendar",
+    "connectingGoogle": "Connecting to Google...",
+    "inviteParticipants": "Invite Participants",
+    "participants": "Participants",
+    "selectedParticipants": "Selected Participants",
+    "searchUsers": "Search users",
+    "loading": "Loading...",
+    "noUsersFound": "No users found",
+    "meetingInvitation": "Meeting Invitation",
+    "invitedYouToMeeting": "invited you to a meeting",
+    "hasMeetLink": "Click to open Google Meet",
+    "accept": "Accept",
+    "decline": "Decline",
+    "meetingDeclined": "Meeting invitation declined"
   },
   "CreateTag": {
     "createTag": "Create new field",
@@ -805,5 +836,53 @@
     "descriptionMax":"Description cannot exceed 100 characters.",
     "descriptionMin": "Description must be at least 10 characters.",
     "addDescription": "Add description"
+  },
+  "notificationCenter": {
+    "title": "Notification Center",
+    "description": "View and manage all your notifications",
+    "all": "All Notifications",
+    "unread": "Unread Notifications",
+    "meetingInvitation": "Meeting Invitation",
+    "meetingInvitationAction": "Click to view meeting details",
+    "meetingAccepted": "Meeting accepted",
+    "meetingDeclined": "Meeting declined",
+    "acceptedYourMeeting": "has accepted your meeting invitation",
+    "declinedYourMeeting": "has declined your meeting invitation",
+    "markAsRead": "Mark as read",
+    "delete": "Delete notification",
+    "empty": "No notifications yet",
+    "filterByType": "Filter by type",
+    "sortBy": "Sort by",
+    "dateNewest": "Date (newest first)",
+    "dateOldest": "Date (oldest first)",
+    "typeTask": "Tasks",
+    "typeComment": "Comments",
+    "typeMention": "Mentions",
+    "typeSystem": "System",
+    "meetingTypes": {
+      "created": "Meeting created",
+      "updated": "Meeting updated",
+      "canceled": "Meeting canceled",
+      "reminder": "Meeting reminder",
+      "starting": "Meeting starting soon"
+    },
+    "actions": {
+      "viewMeeting": "View meeting",
+      "joinMeeting": "Join meeting",
+      "acceptMeeting": "Accept",
+      "declineMeeting": "Decline",
+      "viewDetails": "View details"
+    },
+    "priority": "Priority",
+    "status": "Status",
+    "time": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week",
+      "lastWeek": "Last week",
+      "thisMonth": "This month",
+      "older": "Older"
+    },
+    "joinMeeting": "Join meeting"
   }
 }

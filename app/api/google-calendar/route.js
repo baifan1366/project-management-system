@@ -116,7 +116,7 @@ export async function POST(request) {
   try {
     // 获取请求数据
     const requestData = await request.json();
-    const { eventData, accessToken, refreshToken } = requestData;
+    const { eventData, accessToken, refreshToken, conferenceDataVersion = 0, sendNotifications = false } = requestData;
     
     if (!eventData) {
       return NextResponse.json(
@@ -140,9 +140,17 @@ export async function POST(request) {
       );
     }
     
+    // 构建API URL，添加参数
+    let apiUrl = `https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=${conferenceDataVersion}`;
+    
+    // 如果需要发送邀请通知
+    if (sendNotifications) {
+      apiUrl += '&sendUpdates=all'; // all, externalOnly, none
+    }
+    
     // 调用Google Calendar API创建事件
     const response = await fetch(
-      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      apiUrl,
       {
         method: 'POST',
         headers: {

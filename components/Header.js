@@ -18,10 +18,14 @@ import { useSelector, useDispatch } from 'react-redux';
 import { selectUnreadCount, fetchNotifications } from '@/lib/redux/features/notificationSlice';
 import { Badge } from './ui/badge';
 import { supabase } from '@/lib/supabase';
+import { useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
 
 export function Header() {
   const t = useTranslations();
   const dispatch = useDispatch();
+  const router = useRouter();
+  const locale = useLocale();
   const [isProfileOpen, setProfileOpen] = useState(false);
   const [isNotificationOpen, setNotificationOpen] = useState(false);
   const unreadCount = useSelector(selectUnreadCount);
@@ -48,6 +52,16 @@ export function Header() {
     
   }, [dispatch]); // 只依赖于dispatch，避免重复请求
 
+  const handleNotificationClick = (event) => {
+    // 按住Shift键时，打开对话框而不是导航
+    if (event.shiftKey) {
+      setNotificationOpen(true);
+    } else {
+      // 正常点击导航到通知页面
+      router.push(`/${locale}/notifications`);
+    }
+  };
+
   return (
     <div className="fixed top-0 bottom-0 left-0 z-50 w-16 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex flex-col">
       <div className="flex flex-col h-full">
@@ -66,7 +80,7 @@ export function Header() {
                     size="icon" 
                     variant="ghost" 
                     className="w-10 h-10 relative"
-                    onClick={() => setNotificationOpen(true)}
+                    onClick={handleNotificationClick}
                   >
                     <Bell size={20} />
                     {unreadCount > 0 && (
@@ -80,7 +94,7 @@ export function Header() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  {t('common.notifications')}
+                  {t('common.notifications')} <span className="text-xs opacity-70">(Shift+点击查看快速预览)</span>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

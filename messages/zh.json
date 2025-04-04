@@ -277,7 +277,8 @@
       "assignment": "分配给您",
       "update": "项目更新",
       "deadline": "截止日期临近"
-    }
+    },
+    "actionFailed": "操作失败，请重试"
   },
   "errors": {
     "general": "出错了",
@@ -706,6 +707,75 @@
     "wed": "三",
     "thu": "四",
     "fri": "五",
-    "sat": "六"
+    "sat": "六",
+    "goToSettings": "前往设置",
+    "googleAuthExpired": "Google 授权已过期，请在设置中重新授权",
+    "connectGoogleFailed": "连接 Google 失败，请重试或在设置中授权",
+    "getPersonalEventsFailed": "获取个人日历事件失败",
+    "getGoogleEventsFailed": "获取 Google 日历事件失败，请检查授权",
+    "addGoogleMeet": "添加 Google Meet 视频会议",
+    "noGoogleToken": "没有发现Google令牌，请重新授权",
+    "notLoggedIn": "未登录状态",
+    "connectingGoogle": "正在连接 Google...",
+    "inviteParticipants": "邀请参与者",
+    "participants": "参与者",
+    "selectedParticipants": "已选择的参与者",
+    "searchUsers": "搜索用户",
+    "loading": "加载中...",
+    "noUsersFound": "未找到用户",
+    "meetingInvitation": "会议邀请",
+    "invitedYouToMeeting": "邀请您参加会议",
+    "hasMeetLink": "点击打开Google Meet",
+    "accept": "接受",
+    "decline": "拒绝",
+    "meetingDeclined": "已拒绝会议邀请"
+  },
+  "notificationCenter": {
+    "title": "通知中心",
+    "description": "查看和管理所有通知",
+    "all": "全部通知",
+    "unread": "未读通知",
+    "meetingInvitation": "会议邀请",
+    "meetingInvitationAction": "点击查看会议详情",
+    "meetingAccepted": "已接受会议",
+    "meetingDeclined": "已拒绝会议",
+    "acceptedYourMeeting": "已接受您的会议邀请",
+    "declinedYourMeeting": "已拒绝您的会议邀请",
+    "markAsRead": "标记为已读",
+    "delete": "删除通知",
+    "empty": "暂无通知",
+    "filterByType": "按类型筛选",
+    "sortBy": "排序方式",
+    "dateNewest": "日期（最新优先）",
+    "dateOldest": "日期（最早优先）",
+    "typeTask": "任务",
+    "typeComment": "评论",
+    "typeMention": "提及",
+    "typeSystem": "系统",
+    "meetingTypes": {
+      "created": "会议已创建",
+      "updated": "会议已更新",
+      "canceled": "会议已取消",
+      "reminder": "会议提醒",
+      "starting": "会议即将开始"
+    },
+    "actions": {
+      "viewMeeting": "查看会议",
+      "joinMeeting": "加入会议",
+      "acceptMeeting": "接受",
+      "declineMeeting": "拒绝",
+      "viewDetails": "查看详情"
+    },
+    "priority": "优先级",
+    "status": "状态",
+    "time": {
+      "today": "今天",
+      "yesterday": "昨天",
+      "thisWeek": "本周",
+      "lastWeek": "上周",
+      "thisMonth": "本月",
+      "older": "更早"
+    },
+    "joinMeeting": "加入会议"
   }
 }
