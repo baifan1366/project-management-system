@@ -11,6 +11,7 @@ import { Plus, Search, Users, X } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/lib/supabase';
 import { useChat } from '@/contexts/ChatContext';
+import { toast } from 'sonner';
 
 export default function NewChatPopover() {
   const t = useTranslations('Chat');
@@ -153,6 +154,7 @@ export default function NewChatPopover() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         console.error('用户未登录，无法创建聊天');
+        toast.error(t('errors.userNotLoggedIn'));
         return;
       }
 
@@ -171,6 +173,7 @@ export default function NewChatPopover() {
 
       if (chatError) {
         console.error('创建聊天会话失败:', chatError);
+        toast.error(t('errors.connectionFailed'));
         throw chatError;
       }
 
@@ -193,10 +196,12 @@ export default function NewChatPopover() {
 
       if (participantError) {
         console.error('添加聊天参与者失败:', participantError);
+        toast.error(t('invitationFailed'));
         throw participantError;
       }
 
       console.log('聊天创建成功，正在切换到新会话');
+      toast.success(selectedUsers.length === 1 ? t('chatCreated') : t('groupCreated'));
 
       // 获取完整的会话对象，包括参与者
       const { data: fullSession, error: fetchError } = await supabase
@@ -225,7 +230,7 @@ export default function NewChatPopover() {
       setIsOpen(false);
     } catch (error) {
       console.error('创建聊天时发生错误:', error);
-      // 这里可以添加错误提示UI，如果有必要
+      toast.error(t('errors.connectionFailed'));
     }
   };
 

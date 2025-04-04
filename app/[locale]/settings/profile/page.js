@@ -169,6 +169,8 @@ export default function ProfilePage() {
     
     if (provider === 'google') {
       try {
+        toast.loading(t('connectingProvider', { provider: 'Google' }));
+        
         const scopes = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
         
         const { data, error } = await supabase.auth.signInWithOAuth({
@@ -185,11 +187,15 @@ export default function ProfilePage() {
         
         if (error) {
           console.error('谷歌授权错误:', error);
+          toast.error(t('googleAuthError', { error: error.message }));
           throw error;
         }
+        
+        // 授权开始提示
+        toast.success(t('authorizationStarted', { provider: 'Google' }));
       } catch (err) {
         console.error('Google sign in error:', err);
-        toast.error(t('common.error'));
+        toast.error(t('connectProviderFailed', { provider: 'Google' }));
       }
       return;
     }
@@ -198,6 +204,8 @@ export default function ProfilePage() {
     
     setLoading(true);
     try {
+      toast.loading(t('connectingProvider', { provider }));
+      
       const resultAction = await dispatch(connectProvider({ 
         userId: user.id, 
         provider, 
@@ -209,13 +217,13 @@ export default function ProfilePage() {
           provider,
           providerId
         });
-        toast.success(t('providerConnected'));
+        toast.success(t('providerConnected', { provider }));
       } else {
         throw new Error(resultAction.error);
       }
     } catch (error) {
       console.error('Error connecting provider:', error);
-      toast.error(t('common.error'));
+      toast.error(t('connectProviderFailed', { provider }));
     } finally {
       setLoading(false);
     }
@@ -225,6 +233,8 @@ export default function ProfilePage() {
     if (!user) return;
     setLoading(true);
     try {
+      toast.loading(t('disconnectingProvider', { provider }));
+      
       const resultAction = await dispatch(disconnectProvider({
         userId: user.id,
         provider
@@ -235,13 +245,13 @@ export default function ProfilePage() {
           provider: 'local',
           providerId: ''
         });
-        toast.success(t('providerDisconnected'));
+        toast.success(t('providerDisconnected', { provider }));
       } else {
         throw new Error(resultAction.error);
       }
     } catch (error) {
       console.error('Error disconnecting provider:', error);
-      toast.error(t('common.error'));
+      toast.error(t('disconnectProviderFailed', { provider }));
     } finally {
       setLoading(false);
     }

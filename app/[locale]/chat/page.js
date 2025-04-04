@@ -15,6 +15,7 @@ import EmojiPicker from '@/components/EmojiPicker';
 import FileUploader from '@/components/FileUploader';
 import GoogleTranslator from '@/components/GoogleTranslator';
 import { useLastSeen } from '@/hooks/useLastSeen';
+import { toast } from 'sonner';
 
 export default function ChatPage() {
   const t = useTranslations('Chat');
@@ -100,16 +101,20 @@ export default function ChatPage() {
     getUser();
   }, []);
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (message.trim() && currentSession) {
-      sendMessage(currentSession.id, message, replyToMessage?.id);
-      setMessage('');
-      setReplyToMessage(null); // 发送后清除回复状态
-      
-      // 发送消息后立即刷新对方状态
-      if (otherParticipantId) {
-        getUserStatus(otherParticipantId);
+      try {
+        await sendMessage(currentSession.id, message, replyToMessage?.id);
+        setMessage('');
+        setReplyToMessage(null); // 发送后清除回复状态
+        
+        // 发送消息后立即刷新对方状态
+        if (otherParticipantId) {
+          getUserStatus(otherParticipantId);
+        }
+      } catch (error) {
+        console.error(t('errors.sendMessageFailed'), error);
       }
     }
   };
@@ -138,8 +143,10 @@ export default function ChatPage() {
     try {
       // 确保用户已登录且会话ID存在
       if (!currentUser?.id || !currentSession?.id) {
-        throw new Error(t('errors.userNotLoggedIn') || '用户未登录或会话不存在');
+        throw new Error(t('errors.userNotLoggedIn'));
       }
+
+      toast.info(t('checkingPermission'));
 
       // 检查用户是否是会话参与者
       const { data: participant, error: participantError } = await supabase
@@ -150,8 +157,8 @@ export default function ChatPage() {
         .single();
 
       if (participantError || !participant) {
-        console.error('检查用户权限失败:', participantError);
-        throw new Error(t('errors.notParticipant') || '您不是该聊天会话的参与者，无法发送消息');
+        console.error(t('errors.checkPermissionFailed'), participantError);
+        throw new Error(t('errors.notParticipant'));
       }
 
       // 先发送消息以获取message_id
@@ -160,13 +167,13 @@ export default function ChatPage() {
         .insert({
           session_id: currentSession.id,
           user_id: currentUser.id,
-          content: message.trim() ? message : t('sentAttachment') || '发送了附件'
+          content: message.trim() ? message : t('sentAttachment')
         })
         .select()
         .single();
 
       if (messageError) {
-        console.error('发送消息失败:', messageError);
+        console.error(t('errors.sendMessageFailed'), messageError);
         throw messageError;
       }
 
@@ -184,10 +191,12 @@ export default function ChatPage() {
           .insert(attachmentsToInsert);
 
         if (attachmentError) {
-          console.error('添加附件失败:', attachmentError);
+          console.error(t('errors.addAttachmentFailed'), attachmentError);
           throw attachmentError;
         }
       }
+
+      toast.success(t('attachmentAdded'));
 
       // 清空消息输入
       setMessage('');
@@ -197,8 +206,8 @@ export default function ChatPage() {
         getUserStatus(otherParticipantId);
       }
     } catch (error) {
-      console.error('上传附件失败:', error);
-      alert(`${t('errors.uploadFailed')}: ${error.message || t('errors.unknown')}`);
+      console.error(t('errors.uploadFailed'), error);
+      toast.error(`${t('errors.uploadFailed')}: ${error.message || t('errors.unknown')}`);
     } finally {
       setIsPending(false);
     }

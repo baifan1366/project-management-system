@@ -5,11 +5,29 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Bell, Lock, Globe, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 export default function SettingsLayout({ children }) {
   const t = useTranslations('profile');
   const pathname = usePathname();
   const currentTab = pathname.split('/').pop();
+  
+  // 当切换tab时显示加载提示
+  useEffect(() => {
+    const tabNames = {
+      'profile': t('profile'),
+      'notifications': t('notifications'),
+      'security': t('security'),
+      'preferences': t('preferences'),
+      'subscription': t('subscription.title')
+    };
+    
+    if (tabNames[currentTab]) {
+      // 显示正在加载提示
+      toast.info(t('loading') + ` ${tabNames[currentTab]}`);
+    }
+  }, [currentTab, t]);
 
   return (
     <div className="h-screen flex flex-col">

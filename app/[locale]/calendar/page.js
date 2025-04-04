@@ -65,7 +65,7 @@ export default function CalendarPage() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          console.error('未登录状态');
+          console.error(t('notLoggedIn'));
           return;
         }
         
@@ -77,21 +77,21 @@ export default function CalendarPage() {
           .eq('user_id', session.user.id);
         
         if (error) {
-          console.error('获取个人日历事件失败:', error);
+          console.error(t('getPersonalEventsFailed'), error);
           throw error;
         }
         
         setPersonalEvents(data || []);
       } catch (error) {
-        console.error('获取个人日历事件错误:', error);
-        toast.error('获取个人日历事件失败');
+        console.error(t('getPersonalEventsFailed'), error);
+        toast.error(t('getPersonalEventsFailed'));
       } finally {
         setIsLoadingPersonal(false);
       }
     }
     
     fetchPersonalEvents();
-  }, [currentDate]);
+  }, [currentDate, t]);
 
   // 获取Google日历事件
   useEffect(() => {
@@ -109,17 +109,17 @@ export default function CalendarPage() {
         const refreshToken = session?.provider_refresh_token;
         
         if (!accessToken && !refreshToken) {
-          console.error('没有Google令牌');
+          console.error(t('noGoogleToken'));
           return;
         }
         
         const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}`);
         
         if (response.status === 401) {
-          console.error('Google授权已过期或权限不足，请重新登录');
-          toast.error('Google授权已过期，请在设置页面重新授权', {
+          console.error(t('googleAuthExpired'));
+          toast.error(t('googleAuthExpired'), {
             action: {
-              label: '前往授权',
+              label: t('goToSettings'),
               onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
             }
           });
@@ -129,20 +129,20 @@ export default function CalendarPage() {
         
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('获取Google日历事件失败:', errorData);
-          throw new Error(errorData.error || '获取Google日历事件失败');
+          console.error(t('getGoogleEventsFailed'), errorData);
+          throw new Error(errorData.error || t('getGoogleEventsFailed'));
         }
         
         const data = await response.json();
         setGoogleEvents(data.events || []);
       } catch (error) {
-        console.error('获取Google事件错误:', error);
+        console.error(t('getGoogleEventsFailed'), error);
         // 使用一个静态变量记录是否显示过toast，避免重复显示
         if (!window.calendarErrorToastShown) {
           window.calendarErrorToastShown = true;
-          toast.error(`获取Google日历事件失败，请检查授权`, {
+          toast.error(t('getGoogleEventsFailed'), {
             action: {
-              label: '前往授权',
+              label: t('goToSettings'),
               onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
             }
           });
@@ -153,7 +153,7 @@ export default function CalendarPage() {
     }
     
     fetchGoogleEvents();
-  }, [currentDate, isGoogleConnected]);
+  }, [currentDate, isGoogleConnected, t]);
 
   const handlePrevMonth = () => {
     setCurrentDate(prev => subMonths(prev, 1));
@@ -181,14 +181,14 @@ export default function CalendarPage() {
       });
       
       if (error) {
-        console.error('谷歌授权错误:', error);
+        console.error(t('connectGoogleFailed'), error);
         throw error;
       }
     } catch (err) {
-      console.error('Google sign in error:', err);
-      toast.error('连接Google失败，请重试或在设置页面授权', {
+      console.error(t('connectGoogleFailed'), err);
+      toast.error(t('connectGoogleFailed'), {
         action: {
-          label: '前往设置',
+          label: t('goToSettings'),
           onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
         }
       });
@@ -214,7 +214,7 @@ export default function CalendarPage() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          console.error('未登录状态');
+          console.error(t('notLoggedIn'));
           return;
         }
         
@@ -226,14 +226,14 @@ export default function CalendarPage() {
           .eq('user_id', session.user.id);
         
         if (error) {
-          console.error('获取个人日历事件失败:', error);
+          console.error(t('getPersonalEventsFailed'), error);
           throw error;
         }
         
         setPersonalEvents(data || []);
       } catch (error) {
-        console.error('获取个人日历事件错误:', error);
-        toast.error('获取个人日历事件失败');
+        console.error(t('getPersonalEventsFailed'), error);
+        toast.error(t('getPersonalEventsFailed'));
       } finally {
         setIsLoadingPersonal(false);
       }
@@ -255,17 +255,17 @@ export default function CalendarPage() {
           const refreshToken = session?.provider_refresh_token;
           
           if (!accessToken && !refreshToken) {
-            console.error('没有Google令牌');
+            console.error(t('noGoogleToken'));
             return;
           }
           
           const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}`);
           
           if (response.status === 401) {
-            console.error('Google授权已过期或权限不足，请重新登录');
-            toast.error('Google授权已过期，请在设置页面重新授权', {
+            console.error(t('googleAuthExpired'));
+            toast.error(t('googleAuthExpired'), {
               action: {
-                label: '前往授权',
+                label: t('goToSettings'),
                 onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
               }
             });
@@ -275,20 +275,20 @@ export default function CalendarPage() {
           
           if (!response.ok) {
             const errorData = await response.json();
-            console.error('获取Google日历事件失败:', errorData);
-            throw new Error(errorData.error || '获取Google日历事件失败');
+            console.error(t('getGoogleEventsFailed'), errorData);
+            throw new Error(errorData.error || t('getGoogleEventsFailed'));
           }
           
           const data = await response.json();
           setGoogleEvents(data.events || []);
         } catch (error) {
-          console.error('获取Google事件错误:', error);
+          console.error(t('getGoogleEventsFailed'), error);
           // 使用一个静态变量记录是否显示过toast，避免重复显示
           if (!window.calendarErrorToastShown) {
             window.calendarErrorToastShown = true;
-            toast.error(`获取Google日历事件失败，请检查授权`, {
+            toast.error(t('getGoogleEventsFailed'), {
               action: {
-                label: '前往授权',
+                label: t('goToSettings'),
                 onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
               }
             });
@@ -581,7 +581,7 @@ export default function CalendarPage() {
                 {isGoogleConnected ? (
                   <div className="flex items-center">
                     <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-                    <span>Google</span>
+                    <span>{t('googleCalendar')}</span>
                   </div>
                 ) : (
                   <Button 

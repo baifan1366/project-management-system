@@ -642,7 +642,9 @@ export function ChatProvider({ children }) {
   // 发送消息
   const sendMessage = async (sessionId, content, replyToMessageId = null) => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!session) {
+      throw new Error('User not logged in');
+    }
 
     // 首先插入消息
     const { data, error } = await supabase
@@ -681,7 +683,7 @@ export function ChatProvider({ children }) {
 
     if (error) {
       console.error('Error sending message:', error);
-      return;
+      throw error;
     }
 
     // 获取会话的所有参与者
@@ -692,7 +694,7 @@ export function ChatProvider({ children }) {
 
     if (participantsError) {
       console.error('Error fetching participants:', participantsError);
-      return;
+      throw participantsError;
     }
 
     // 为每个参与者创建未读记录，除了发送者自己
@@ -711,6 +713,7 @@ export function ChatProvider({ children }) {
 
       if (readStatusError) {
         console.error('Error creating read status records:', readStatusError);
+        // 这里不抛出异常，因为这只是未读状态记录，不影响消息发送
       }
     }
 
@@ -726,6 +729,8 @@ export function ChatProvider({ children }) {
         user: processAvatarUrl(data.replied_message.user)
       } : null
     }]);
+    
+    return data;
   };
 
   // 实时消息订阅
@@ -1098,11 +1103,6 @@ export function ChatProvider({ children }) {
     const isAuthorized = sessions.some(s => s.id === session?.id);
     // 如果是AI模式，允许访问AI会话
     const isAISession = session?.type === 'AI';
-    
-    if (session && !isAuthorized && !isAISession) {
-      console.error('无权访问此会话');
-      return;
-    }
     
     // 如果切换到了新的会话，更新未读计数
     if (session && (!currentSession || session.id !== currentSession.id)) {

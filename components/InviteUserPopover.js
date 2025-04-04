@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, UserPlus, X } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 export default function InviteUserPopover({ sessionId, onInvite }) {
   const t = useTranslations('Chat');
@@ -79,7 +80,12 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        toast.error(t('errors.userNotLoggedIn'));
+        return;
+      }
+
+      toast.loading(t('inviting'));
 
       // 添加新参与者
       const participants = selectedUsers.map(user => ({
@@ -92,7 +98,12 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
         .from('chat_participant')
         .insert(participants);
 
-      if (participantError) throw participantError;
+      if (participantError) {
+        toast.error(t('invitationFailed'));
+        throw participantError;
+      }
+
+      toast.success(t('invitationSent'));
 
       // 重置状态并关闭 popover
       setSelectedUsers([]);
@@ -105,6 +116,7 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
       }
     } catch (error) {
       console.error('Error inviting users:', error);
+      toast.error(t('invitationFailed'));
     }
   };
 
