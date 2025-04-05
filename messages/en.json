@@ -44,6 +44,7 @@
     "markAllAsRead": "Mark All as Read",
     "noNotifications": "No notifications",
     "close": "Close",
+    "connected": "Connected",
     "confirmDialog": {
       "confirm": "Confirm",
       "cancel": "Cancel",
@@ -117,7 +118,6 @@
     "connectedAccountsDesc": "Manage your connected third-party accounts",
     "emailAccount": "Email Account",
     "primary": "Primary",
-    "connected": "Connected",
     "notConnected": "Not Connected",
     "connect": "Connect",
     "disconnect": "Disconnect",

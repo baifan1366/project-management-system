@@ -203,6 +203,41 @@ export default function NewChatPopover() {
       console.log('聊天创建成功，正在切换到新会话');
       toast.success(selectedUsers.length === 1 ? t('chatCreated') : t('groupCreated'));
 
+      // 给其他参与者发送通知
+      try {
+        const chatType = selectedUsers.length === 1 ? 'private' : 'group';
+        const chatName = selectedUsers.length === 1 
+          ? session.user.user_metadata?.name || session.user.email 
+          : `${selectedUsers.map(u => u.name).join(', ')}`;
+          
+        // 为每个参与者创建通知（除了自己）
+        for (const user of selectedUsers) {
+          await supabase
+            .from('notification')
+            .insert({
+              user_id: user.id,
+              title: selectedUsers.length === 1 ? t('newPrivateChat') : t('newGroupChat'),
+              content: selectedUsers.length === 1 
+                ? `${session.user.user_metadata?.name || session.user.email} ${t('startedChatWithYou')}` 
+                : `${session.user.user_metadata?.name || session.user.email} ${t('addedYouToGroup')} "${chatName}"`,
+              type: 'SYSTEM',
+              related_entity_type: 'chat_session',
+              related_entity_id: chatSession.id,
+              data: {
+                chat_session_id: chatSession.id,
+                chat_type: chatType,
+                created_by: session.user.id,
+                creator_name: session.user.user_metadata?.name || session.user.email
+              },
+              is_read: false
+            });
+        }
+        console.log('已向所有参与者发送聊天创建通知');
+      } catch (notifyError) {
+        console.error('发送通知失败:', notifyError);
+        // 通知发送失败不影响主流程
+      }
+
       // 获取完整的会话对象，包括参与者
       const { data: fullSession, error: fetchError } = await supabase
         .from('chat_session')

@@ -589,7 +589,13 @@
     "privateChat": "私聊",
     "groupChat": "群聊",
     "sentAttachment": "发送了附件",
-    "unreadMessages": "{count}条未读消息"
+    "unreadMessages": "{count}条未读消息",
+    "newPrivateChat": "新的私聊",
+    "newGroupChat": "新的群聊",
+    "startedChatWithYou": "开始了与您的聊天",
+    "addedYouToGroup": "将您添加到群组",
+    "chatCreated": "聊天已创建",
+    "groupCreated": "群组已创建"
   },
   "TeamInvitation": {
     "teamInvitation": "团队邀请",
