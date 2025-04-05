@@ -290,3 +290,59 @@ VALUES
 ('1', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2', 'ACTIVE', '2025-03-27 12:33:26.192', '2025-04-27 12:33:26.192', '0', '2', '0', '0', '0', '2025-03-27 12:10:53.237582', '2025-03-27 12:33:26.296'),
 ('2', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2', 'ACTIVE', '2025-03-27 12:33:26.192', '2025-04-27 12:33:26.192', '0', '2', '0', '0', '0', '2025-03-27 12:10:53.237582', '2025-03-27 12:33:26.296'),
 ('3', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2', 'ACTIVE', '2025-03-27 12:33:26.192', '2025-04-27 12:33:26.192', '0', '2', '0', '0', '0', '2025-03-27 12:10:53.237582', '2025-03-27 12:33:26.296');
+
+-- 插入基本权限数据
+INSERT INTO "admin_permission" ("name", "description", "resource", "action") VALUES
+('manage_users', '管理所有用户账户', 'users', 'manage'),
+('view_users', '查看用户列表', 'users', 'read'),
+('create_users', '创建新用户', 'users', 'create'),
+('update_users', '更新用户信息', 'users', 'update'),
+('delete_users', '删除用户账户', 'users', 'delete'),
+
+('manage_teams', '管理所有团队', 'teams', 'manage'),
+('view_teams', '查看团队列表', 'teams', 'read'),
+('create_teams', '创建新团队', 'teams', 'create'),
+('update_teams', '更新团队信息', 'teams', 'update'),
+('delete_teams', '删除团队', 'teams', 'delete'),
+
+('manage_projects', '管理所有项目', 'projects', 'manage'),
+('view_projects', '查看项目列表', 'projects', 'read'),
+('create_projects', '创建新项目', 'projects', 'create'),
+('update_projects', '更新项目信息', 'projects', 'update'),
+('delete_projects', '删除项目', 'projects', 'delete'),
+
+('manage_subscriptions', '管理所有订阅', 'subscriptions', 'manage'),
+('view_subscriptions', '查看订阅列表', 'subscriptions', 'read'),
+('create_subscriptions', '创建新订阅', 'subscriptions', 'create'),
+('update_subscriptions', '更新订阅信息', 'subscriptions', 'update'),
+('delete_subscriptions', '删除订阅', 'subscriptions', 'delete'),
+
+('manage_system', '管理系统设置', 'system', 'manage'),
+('view_logs', '查看系统日志', 'logs', 'read'),
+('manage_admins', '管理管理员账户', 'admins', 'manage');
+
+-- 为超级管理员角色分配所有权限
+INSERT INTO "admin_role_permission" ("role", "permission_id")
+SELECT 'SUPER_ADMIN', id FROM "admin_permission";
+
+-- 为普通管理员分配部分权限
+INSERT INTO "admin_role_permission" ("role", "permission_id")
+SELECT 'ADMIN', id FROM "admin_permission" 
+WHERE "name" IN (
+  'view_users', 'update_users',
+  'view_teams', 'update_teams',
+  'view_projects', 'update_projects',
+  'view_subscriptions', 'update_subscriptions',
+  'view_logs'
+);
+
+-- 为审核员分配有限权限
+INSERT INTO "admin_role_permission" ("role", "permission_id")
+SELECT 'MODERATOR', id FROM "admin_permission" 
+WHERE "name" IN (
+  'view_users',
+  'view_teams',
+  'view_projects',
+  'view_subscriptions',
+  'view_logs'
+);

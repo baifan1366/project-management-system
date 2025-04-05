@@ -414,6 +414,89 @@ CREATE TABLE "contact" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 管理员表 - 存储系统管理员信息
+CREATE TABLE "admin_user" (
+  "id" SERIAL PRIMARY KEY,
+  "username" VARCHAR(255) UNIQUE NOT NULL,
+  "email" VARCHAR(255) UNIQUE NOT NULL,
+  "password_hash" VARCHAR(255) NOT NULL,
+  "full_name" VARCHAR(255),
+  "avatar_url" VARCHAR(255),
+  "role" VARCHAR(50) CHECK ("role" IN ('SUPER_ADMIN', 'ADMIN', 'MODERATOR')) DEFAULT 'ADMIN',
+  "is_active" BOOLEAN DEFAULT TRUE,
+  "last_login" TIMESTAMP,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员权限表 - 定义系统中的各种权限
+CREATE TABLE "admin_permission" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) UNIQUE NOT NULL,
+  "description" TEXT,
+  "resource" VARCHAR(255) NOT NULL, -- 例如: 'users', 'projects', 'teams', 'subscriptions'
+  "action" VARCHAR(255) NOT NULL, -- 例如: 'create', 'read', 'update', 'delete', 'manage'
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员角色权限关联表 - 将角色与权限关联
+CREATE TABLE "admin_role_permission" (
+  "id" SERIAL PRIMARY KEY,
+  "role" VARCHAR(50) NOT NULL, -- 对应 admin_user 表中的 role
+  "permission_id" INT NOT NULL REFERENCES "admin_permission"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE ("role", "permission_id")
+);
+
+-- 管理员会话表 - 跟踪管理员登录会话
+CREATE TABLE "admin_session" (
+  "id" SERIAL PRIMARY KEY,
+  "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
+  "token" VARCHAR(255) UNIQUE NOT NULL,
+  "ip_address" VARCHAR(45),
+  "user_agent" TEXT,
+  "expires_at" TIMESTAMP NOT NULL,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员活动日志表 - 记录管理员的所有操作
+CREATE TABLE "admin_activity_log" (
+  "id" SERIAL PRIMARY KEY,
+  "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
+  "action" VARCHAR(255) NOT NULL, -- 例如: 'login', 'logout', 'create_user', 'update_subscription'
+  "entity_type" VARCHAR(50), -- 例如: 'user', 'subscription', 'team'
+  "entity_id" VARCHAR(255), -- 被操作实体的ID
+  "details" JSONB, -- 操作的详细信息
+  "ip_address" VARCHAR(45),
+  "user_agent" TEXT,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 系统设置表 - 存储全局系统配置
+CREATE TABLE "system_settings" (
+  "id" SERIAL PRIMARY KEY,
+  "key" VARCHAR(255) UNIQUE NOT NULL,
+  "value" TEXT,
+  "description" TEXT,
+  "is_public" BOOLEAN DEFAULT FALSE, -- 是否可以公开给前端
+  "updated_by" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员通知表 - 存储发送给管理员的通知
+CREATE TABLE "admin_notification" (
+  "id" SERIAL PRIMARY KEY,
+  "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
+  "title" VARCHAR(255) NOT NULL,
+  "message" TEXT NOT NULL,
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('INFO', 'WARNING', 'ERROR', 'SUCCESS')),
+  "is_read" BOOLEAN DEFAULT FALSE,
+  "link" VARCHAR(255), -- 可选的通知相关链接
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 团队自定义字段值索引
 CREATE INDEX idx_team_custom_field_value_field ON "team_custom_field_value"("team_custom_field_id");
 
@@ -466,3 +549,20 @@ CREATE INDEX idx_contact_type ON "contact"("type");
 CREATE INDEX idx_contact_email ON "contact"("email");
 CREATE INDEX idx_contact_status ON "contact"("status");
 CREATE INDEX idx_contact_created_at ON "contact"("created_at");
+
+-- 管理员表索引
+CREATE INDEX idx_admin_user_email ON "admin_user"("email");
+CREATE INDEX idx_admin_user_role ON "admin_user"("role");
+
+-- 管理员会话表索引
+CREATE INDEX idx_admin_session_admin ON "admin_session"("admin_id");
+CREATE INDEX idx_admin_session_expires ON "admin_session"("expires_at");
+
+-- 管理员活动日志表索引
+CREATE INDEX idx_admin_activity_log_admin ON "admin_activity_log"("admin_id");
+CREATE INDEX idx_admin_activity_log_action ON "admin_activity_log"("action");
+CREATE INDEX idx_admin_activity_log_created ON "admin_activity_log"("created_at");
+
+-- 管理员通知表索引
+CREATE INDEX idx_admin_notification_admin ON "admin_notification"("admin_id");
+CREATE INDEX idx_admin_notification_read ON "admin_notification"("is_read"); 
