@@ -94,13 +94,6 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
           </button>
         </div>
         
-        {/* 标签总数 */}
-        <div className="px-4 py-2 text-sm text-muted-foreground">
-          {tagsStatus === 'loading' || isLoading ? t('loadingTags') : 
-            (Array.isArray(tags) && tags.length > 0 ? 
-              `${tags.length} ${t('tags')}` : t('noTags'))}
-        </div>
-        
         <div className="mt-4">
           <div className="space-y-3">
             {tagsStatus === 'loading' || isLoading ? (

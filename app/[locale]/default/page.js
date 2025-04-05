@@ -130,21 +130,21 @@ export default function DefaultPage() {
             <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
             <table className="w-full border-collapse">
                 <thead>
-                    <tr>
-                        <th className="border p-2">{t('id')}</th>
-                        <th className="border p-2">{t('name')}</th>
-                        <th className="border p-2">{t('qty')}</th>
-                        <th className="border p-2">{t('updated_at')}</th>
-                        <th className="border p-2">{t('edited_by')}</th>
-                        <th className="border p-2">{t('actions')}</th>
+                    <tr className="bg-gray-50 dark:bg-gray-800">
+                        <th className="p-3 text-left border-b">{t('id')}</th>
+                        <th className="p-3 text-left border-b">{t('name')}</th>
+                        <th className="p-3 text-left border-b">{t('qty')}</th>
+                        <th className="p-3 text-left border-b">{t('updated_at')}</th>
+                        <th className="p-3 text-left border-b">{t('edited_by')}</th>
+                        <th className="p-3 text-left border-b">{t('actions')}</th>
                     </tr>
                 </thead>
                 <tbody>
                     {Array.isArray(defaultData) && defaultData.map((defaultItem, index) => (
-                        <tr key={defaultItem.id || `default-item-${index}`}>
-                            <td className="border p-2">{defaultItem.id}</td>
-                            <td className="border p-2">{defaultItem.name ? t(defaultItem.name) : ''}</td>
-                            <td className="border p-2">
+                        <tr key={defaultItem.id || `default-item-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="p-3 border-b">{defaultItem.id}</td>
+                            <td className="p-3 border-b">{defaultItem.name ? t(defaultItem.name) : ''}</td>
+                            <td className="p-3 border-b">
                                 {editingId === defaultItem.id ? (
                                     <input
                                         type="text"
@@ -156,9 +156,9 @@ export default function DefaultPage() {
                                     defaultItem.qty
                                 )}
                             </td>
-                            <td className="border p-2">{formatDate(defaultItem.updated_at)}</td>
-                            <td className="border p-2">{defaultItem.edited_by ? userNames[defaultItem.edited_by] || '加载中...' : ''}</td>
-                            <td className="border p-2">
+                            <td className="p-3 border-b">{formatDate(defaultItem.updated_at)}</td>
+                            <td className="p-3 border-b">{defaultItem.edited_by ? userNames[defaultItem.edited_by] || '加载中...' : ''}</td>
+                            <td className="p-3 border-b">
                                 {editingId === defaultItem.id ? (
                                     <Button
                                         onClick={() => handleSave(defaultItem)}

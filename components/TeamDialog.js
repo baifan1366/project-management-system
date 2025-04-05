@@ -20,7 +20,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux'
 import { createTeam, fetchProjectTeams } from '@/lib/redux/features/teamSlice'
 import { createTeamUser, fetchTeamUsers } from '@/lib/redux/features/teamUserSlice'
-import { createTeamCustomField } from '@/lib/redux/features/teamCFSlice'
+import { createTeamCustomField, getTags, updateTagIds } from '@/lib/redux/features/teamCFSlice'
 import { Lock, Eye, Pencil, Unlock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -32,6 +32,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const { projects } = useSelector((state) => state.projects)
   const project = projects.find(p => String(p.id) === String(projectId))
   const [themeColor, setThemeColor] = useState('#64748b');
+
 
   const buttonVariants = [
     { value: 'black', label: '黑色' },
@@ -133,16 +134,76 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
       // 默认字段数量，如果没有设置则使用 2
       const defaultCount = defaultSettings?.qty || 2;
       
+      // 查找类型为LIST的自定义字段
+      const listCustomField = defaultCustomFields.find(field => 
+        field.name.toUpperCase().includes('LIST') || 
+        field.type.toUpperCase() === 'LIST'
+      );
+      
+      let listTeamCustomFieldId = null;
+      
       // 只为默认数量的字段创建团队自定义字段配置
       for (let i = 0; i < Math.min(defaultCount, defaultCustomFields.length); i++) {
         const field = defaultCustomFields[i];
-        await dispatch(createTeamCustomField({
+        const teamCF = await dispatch(createTeamCustomField({
           team_id: team.id,
           custom_field_id: field.id,
           config: {},
           order_index: 100,
           created_by: userId
         })).unwrap();
+        
+        // 如果当前字段是LIST类型字段，保存其team_custom_field_id
+        if (listCustomField && field.id === listCustomField.id) {
+          listTeamCustomFieldId = teamCF.id;
+        }
+      }
+
+      // 获取所有默认标签
+      const { data: defaultTags, error: tagError } = await supabase
+        .from('tag')
+        .select('*')
+        .order('id');
+      
+      if (tagError) {
+        console.error('获取默认标签失败:', tagError);
+        throw tagError;
+      }
+
+      // 获取默认字段数量
+      const { data: defaultTagSettings, error: defaultTagError } = await supabase
+        .from('default')
+        .select('*')
+        .eq('name', 'tag')
+        .single();
+      
+      if (defaultTagError && defaultTagError.code !== 'PGRST116') {
+        console.error('获取默认设置失败:', defaultTagError);
+      }
+
+      // 默认字段数量，如果没有设置则使用 2
+      const defaultTagCount = defaultTagSettings?.qty || 2;
+      
+      // 只有在找到LIST类型字段的情况下才更新标签
+      if (listTeamCustomFieldId) {
+        const existingTagsResponse = await getTags(team.id, listTeamCustomFieldId);
+        const existingTagIds = existingTagsResponse.tag_ids || [];
+        
+        // 从默认标签中获取ID
+        const defaultTagIdsToAdd = defaultTags.slice(0, defaultTagCount).map(tag => tag.id);
+        const updatedTagIds = [...existingTagIds, ...defaultTagIdsToAdd];
+        
+        // 只为默认数量的字段创建团队自定义字段配置
+        for (let i = 0; i < Math.min(defaultTagCount, defaultTags.length); i++) {
+          await dispatch(updateTagIds({
+            teamId: team.id,
+            teamCFId: listTeamCustomFieldId,
+            tagIds: updatedTagIds,
+            userId: userId
+          })).unwrap();
+        }
+      } else {
+        console.log('未找到LIST类型的自定义字段，跳过更新标签');
       }
 
       // 重置状态并关闭对话框

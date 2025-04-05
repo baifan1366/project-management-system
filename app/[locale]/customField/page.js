@@ -96,82 +96,84 @@ export default function CustomField() {
 
   return (
     <div className="w-full">
-        {/* 添加字段按钮 */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
         <Button
           type="submit"
           onClick={() => setIsDialogOpen(true)}          
         >
           {t('add_field')}
         </Button>
+      </div>
       <table className="w-full border-collapse">
         <thead>
           <tr className="bg-gray-50">
-            <th className="p-3 text-left border-b">{t('ID')}</th>
-            <th className="p-3 text-left border-b">{t('Name')}</th>
-            <th className="p-3 text-left border-b">{t('Icon')}</th>
-            <th className="p-3 text-left border-b">{t('Description')}</th>
-            <th className="p-3 text-left border-b">{t('Actions')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.isArray(availableFields) && availableFields.length > 0 ? (
-            availableFields.map((field, index) => {
-              const IconComponent = getIconComponent(field.icon);
-              const defaultCount = getDefaultFieldCount();
-              const isDefault = index < defaultCount;
+              <th className="p-3 text-left border-b">{t('ID')}</th>
+              <th className="p-3 text-left border-b">{t('Name')}</th>
+              <th className="p-3 text-left border-b">{t('Icon')}</th>
+              <th className="p-3 text-left border-b">{t('Description')}</th>
+              <th className="p-3 text-left border-b">{t('Actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.isArray(availableFields) && availableFields.length > 0 ? (
+              availableFields.map((field, index) => {
+                const IconComponent = getIconComponent(field.icon);
+                const defaultCount = getDefaultFieldCount();
+                const isDefault = index < defaultCount;
 
-              return (
-                <tr key={field.id || field.type} className="hover:bg-gray-50">
-                  <td className="p-3 border-b">
-                    <span className="flex items-center gap-2">
-                      {field.id}
-                      {isDefault && (
-                        <span className="text-xs text-gray-400">{t('default')}</span>
-                      )}
-                    </span>
-                  </td>
-                  <td className="p-3 border-b">
-                    <span className="flex items-center gap-2">
-                      {field.name}
-                    </span>
-                  </td>
-                  <td className="p-3 border-b">
-                    <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                      <IconComponent className="h-5 w-5 text-blue-600" />
-                    </div>
-                  </td>
-                  <td className="p-3 border-b text-sm text-gray-600">
-                    {field.description || t(`${field.name.toLowerCase()}_description`)}
-                  </td>
-                  <td className="p-3 border-b">
-                    <div className="flex gap-2">
-                      <button
-                        className="p-2 hover:bg-gray-100 rounded-md"
-                        onClick={() => handleEdit(field.id)}
-                      >
-                        <Icons.Edit2 className="h-4 w-4 text-gray-600" />
-                      </button>
-                      {!isDefault && (
+                return (
+                  <tr key={field.id || field.type} className="hover:bg-gray-50">
+                    <td className="p-3 border-b">
+                      <span className="flex items-center gap-2">
+                        {field.id}
+                        {isDefault && (
+                          <span className="text-xs text-gray-400">{t('default')}</span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="p-3 border-b">
+                      <span className="flex items-center gap-2">
+                        {field.name}
+                      </span>
+                    </td>
+                    <td className="p-3 border-b">
+                      <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                        <IconComponent className="h-5 w-5 text-blue-600" />
+                      </div>
+                    </td>
+                    <td className="p-3 border-b text-sm text-gray-600">
+                      {field.description || t(`${field.name.toLowerCase()}_description`)}
+                    </td>
+                    <td className="p-3 border-b">
+                      <div className="flex gap-2">
                         <button
                           className="p-2 hover:bg-gray-100 rounded-md"
-                          onClick={() => handleRemove(field.id)}
+                          onClick={() => handleEdit(field.id)}
                         >
-                          <Icons.Trash2 className="h-4 w-4 text-red-600" />
+                          <Icons.Edit2 className="h-4 w-4 text-gray-600" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })
-          ) : (
-            <tr>
-              <td colSpan={5} className="text-center py-4 text-gray-500">
-                {t('no_available_fields')}
-              </td>
-            </tr>
-          )}
-        </tbody>
+                        {!isDefault && (
+                          <button
+                            className="p-2 hover:bg-gray-100 rounded-md"
+                            onClick={() => handleRemove(field.id)}
+                          >
+                            <Icons.Trash2 className="h-4 w-4 text-red-600" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={5} className="text-center py-4 text-gray-500">
+                  {t('no_available_fields')}
+                </td>
+              </tr>
+            )}
+          </tbody>
       </table>
       {isDialogOpen && (
         <CreateCustomField

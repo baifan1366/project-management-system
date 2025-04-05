@@ -724,7 +724,8 @@
     "save": "Save",
     "edit": "Edit",
     "saving": "Saving...",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "tag": "Tag"
   },
   "Calendar": {
     "calendar": "Calendar",
@@ -884,5 +885,45 @@
       "older": "Older"
     },
     "joinMeeting": "Join meeting"
+  },
+  "Tag": {
+    "title": "Tag",
+    "no_available_fields": "No available fields",
+    "add_field": "Add Custom Field",
+    "adding": "Adding...",
+    "default": "Default",
+    "ID": "ID",
+    "Name": "Name",
+    "Description": "Description",
+    "Actions": "Actions",
+    "Edit": "Edit",
+    "Delete": "Delete",
+    "cancel": "Cancel",
+    "nameMin":"Field title must be at least 2 characters.",
+    "nameMax":"Field title cannot exceed 50 characters.",
+    "typeRequired":"Field type is required.",
+    "descriptionMax":"Description cannot exceed 100 characters.",
+    "descriptionMin": "Description must be at least 10 characters.",
+    "addDescription": "Add description",
+    "Type": "Type",
+    "TEXT": "Text",
+    "NUMBER": "Number",
+    "NAME": "Name",
+    "ASIGNEE": "Asignee",
+    "DUE-DATE": "Due Date",
+    "PRIORITY": "Priority",
+    "STATUS": "Status",
+    "SINGLE-SELECT": "Single Select",
+    "MULTI-SELECT": "Multi Select",
+    "DATE": "Date",
+    "PEOPLE": "People",
+    "FORMULA": "Formula",
+    "TIME-TRACKING": "Time Tracking",
+    "PROJECTS": "Projects",
+    "TAGS": "Tags",
+    "COMPLETED-ON": "Completed On",
+    "LAST-MODIFIED-ON": "Last Modified On",
+    "CREATED-ON": "Created On",
+    "CREATED-BY": "Created By"
   }
 }
