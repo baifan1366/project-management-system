@@ -22,7 +22,24 @@ export default function AdminUserManagement() {
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState('');
+  const [roles, setRoles] = useState([]);
+  const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('');
+  const [selectedRole, setSelectedRole] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   
+  const [isPasswordValid, setIsPasswordValid] = useState(false)
+  const [isPasswordMatch, setIsPasswordMatch] = useState(false)
+  const [isEmailValid, setIsEmailValid] = useState(false)
+
+  useEffect(()=>{
+    setIsPasswordMatch(password === confirmPassword)
+    console.log("password matach? :", isPasswordMatch)
+
+  }, [password, confirmPassword])
+
   // Verify super admin session and fetch admin data
   useEffect(() => {
     const checkAdminSession = async () => {
@@ -57,7 +74,7 @@ export default function AdminUserManagement() {
         
         // Fetch admin users
         await fetchAdminUsers();
-        
+
       } catch (error) {
         console.error('Admin session check failed:', error);
         // Redirect to admin login
@@ -69,6 +86,7 @@ export default function AdminUserManagement() {
     
     checkAdminSession();
   }, []);
+  
   
   // Fetch admin users from database
   const fetchAdminUsers = async () => {
@@ -101,7 +119,32 @@ export default function AdminUserManagement() {
       console.error('Error fetching admin users:', error);
     }
   };
-  
+
+  // Fetch roles from database
+  useEffect(()=>{
+    const fetchRoles = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('admin_role_permission')
+          .select('role')
+          
+        if (error) throw error;
+        
+        // Extract unique roles from the result
+        const roles = [...new Set(data.map(item => item.role))];
+        console.log(roles);
+        setRoles(roles);
+        
+        // Return the array of roles
+        return roles;
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+        return ['SUPER_ADMIN', 'ADMIN', 'MODERATOR']; // Fallback to default roles
+      }
+    }
+    fetchRoles();
+  },[]);
+
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -321,6 +364,39 @@ export default function AdminUserManagement() {
     }
   };
   
+  // Password validation function
+  const validatePassword = (password) => {
+    // Check if password meets the requirements:
+    // - At least 8 characters
+    // - Contains at least one uppercase letter
+    // - Contains at least one lowercase letter
+    // - Contains at least one number
+    // - Contains at least one special character
+
+    const minLength = password.length >= 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+
+    return {
+      isValid: minLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar,
+      criteria: {
+        minLength,
+        hasUpperCase,
+        hasLowerCase,
+        hasNumber,
+        hasSpecialChar
+      }
+    };
+  };
+
+  useEffect(() => {
+    const validationResult = validatePassword(password);
+    setIsPasswordValid(validationResult.isValid);
+    console.log("Password valid?:", validationResult.isValid);
+  }, [password]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -545,6 +621,203 @@ export default function AdminUserManagement() {
       </div>
       
       {/* Modals would go here in a real implementation */}
+      {/*add admin modal*/}
+      {isModalOpen && modalType=="add" && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6'>
+          <div className='flex justify-between items-center mb-4'>
+            <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>Add New Admin</h2>
+            <button
+              onClick={closeModal}
+              className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            >
+              &times;
+            </button>
+          </div>
+          
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const adminUserData = {
+              username: username,
+              full_name: fullName,
+              email: email,
+              password_hash: password,
+              role: selectedRole
+            };
+            
+            createAdmin(adminUserData);
+          }}>
+            <div className='space-y-4'>
+              <div>
+                  <label htmlFor='name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Username
+                  </label>
+                  <input
+                    type='text'
+                    id='username'
+                    name='username'
+                    onChange={(e)=>{setUsername(e.target.value)}}
+                    required
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='How should we call you?'
+                  />
+                </div>
+
+              <div>
+                <label htmlFor='name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  Full Name (optional)
+                </label>
+                <input
+                  type='text'
+                  id='fullName'
+                  name='fullName'
+                  onChange={(e)=>{setFullName(e.target.value)}}
+                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  placeholder='Enter user name'
+                />
+              </div>
+              
+              <div>
+                <label htmlFor='email' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  Email
+                </label>
+                <input
+                  type='email'
+                  id='email'
+                  name='email'
+                  onChange={(e)=>{setEmail(e.target.value)}}
+                  required
+                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  placeholder='Enter email address'
+                />
+              </div>
+              
+              <div>
+                <label htmlFor='password ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  Password
+                </label>
+                <input
+                  type='password'
+                  id='password'
+                  name='password'
+                  onChange={(e)=>{setPassword(e.target.value)}}
+                  required
+                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  placeholder='Enter password'
+                />
+              </div>
+
+              <div>
+                <label htmlFor='password ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  Confirm Password
+                </label>
+                <input 
+                type='password'
+                name='confirm_password'
+                id='confirm_password'
+                onChange={(e)=>{setConfirmPassword(e.target.value)}}
+                required
+                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                placeholder='Enter confirm password'
+                />
+              </div>
+              
+              <div>
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  Role
+                </label>
+                <div className='flex items-center space-x-4'>
+                  {/*role selection*/}
+                  {roles.map(item => (
+                      <label className='inline-flex items-center' key={item}>
+                        <input
+                          type='radio'
+                          name='role'
+                          value={item}
+                          onChange={(e)=>setSelectedRole(e.target.value)}
+                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
+                        />
+                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>{item}</span>
+                      </label>
+                  ))}
+                </div>
+
+              </div>
+
+              {password && (
+                <div className="mt-1">
+                  <p className="text-xs font-medium mb-1">Password must contain:</p>
+                  <ul className="space-y-1 text-xs">
+                    <li className={`flex items-center ${validatePassword(password).criteria.minLength ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.minLength ? '✓' : '✗'}</span>
+                      At least 8 characters
+                    </li>
+                    <li className={`flex items-center ${validatePassword(password).criteria.hasUpperCase ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.hasUpperCase ? '✓' : '✗'}</span>
+                      One uppercase letter
+                    </li>
+                    <li className={`flex items-center ${validatePassword(password).criteria.hasLowerCase ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.hasLowerCase ? '✓' : '✗'}</span>
+                      One lowercase letter
+                    </li>
+                    <li className={`flex items-center ${validatePassword(password).criteria.hasNumber ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.hasNumber ? '✓' : '✗'}</span>
+                      One number
+                    </li>
+                    <li className={`flex items-center ${validatePassword(password).criteria.hasSpecialChar ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.hasSpecialChar ? '✓' : '✗'}</span>
+                      One special character
+                    </li>
+                  </ul>
+                </div>
+              )}
+
+              {confirmPassword && (
+                <div className="mt-1">
+                  <p className={`text-xs ${isPasswordMatch ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {isPasswordMatch ? '✓ Passwords match' : '✗ Passwords do not match'}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className='mt-6 flex justify-end space-x-3'>
+              <button
+                type='button'
+                onClick={closeModal}
+                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                  text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+              >
+                Cancel
+              </button>
+              
+              <button
+                type='submit'
+                disabled={!isPasswordValid || !isPasswordMatch || !username || !email || !selectedRole}
+                className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                  text-white ${isPasswordValid && isPasswordMatch && username && email && selectedRole 
+                    ? 'bg-indigo-600 hover:bg-indigo-700' 
+                    : 'bg-indigo-400 cursor-not-allowed'} 
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+              >
+                Add User
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      )}
+
       {/* For brevity, I've omitted the actual modal implementation */}
       {/* In a real app, you'd implement modals for adding, editing, and deleting admin users */}
     </div>
