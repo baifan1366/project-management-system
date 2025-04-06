@@ -510,7 +510,20 @@
     "noTagsFound": "No tags found",
     "tags": "Tags",
     "noTags": "No tags yet",
-    "loadingTags": "Loading..."
+    "loadingTags": "Loading...",
+    "name": "Name",
+    "assignee": "Assignee",
+    "dueDate": "Due Date",
+    "priority": "Priority",
+    "status": "Status",
+    "actions": "Actions",
+    "edit": "Edit",
+    "delete": "Delete",
+    "addTag": "Add",
+    "removeTag": "Remove",
+    "loadingTasks": "Loading...",
+    "noTasksFound": "No tasks found",
+    "overview": "Overview"
   },
   "ChatDialog":{
     "privateMessages": "Private Messages",

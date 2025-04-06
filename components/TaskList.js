@@ -6,62 +6,109 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Plus } from 'lucide-react';
 import CreateTagDialog from './TagDialog';
 import { getTags, resetTagsStatus } from '@/lib/redux/features/teamCFSlice';
+import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell
+} from '@/components/ui/table';
 
 export default function TaskList({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const isRequestInProgress = useRef(false);
-  const hasLoadedInitialData = useRef(false);
+  const isTagRequestInProgress = useRef(false);
+  const isSectionRequestInProgress = useRef(false);
+  const hasLoadedTags = useRef(false);
+  const hasLoadedSections = useRef(false);
   
   // 从Redux状态中获取标签数据
   const { tags: tagsData, tagsStatus, tagsError } = useSelector((state) => state.teamCF);
+  // 从Redux状态中获取部门数据
+  const { sections, status: sectionsStatus } = useSelector((state) => state.sections);
   
   // 处理标签数据
-  const tags = useMemo(() => {
-    if (!tagsData || !tagsData.tags) return [];
-    return tagsData.tags.map(tag => tag.name || '');
+  const tagInfo = useMemo(() => {
+    // 如果API直接返回标签数组而不是{tags:[...]}形式
+    if (!tagsData) return [];
+    // 检查tagsData本身是否是数组
+    if (Array.isArray(tagsData)) {
+      return tagsData.map(tag => tag.name || '');
+    }
+    // 兼容原来的结构
+    return (tagsData.tags || []).map(tag => tag.name || '');
   }, [tagsData]);
+  
+  // 处理部门数据
+  const sectionNames = useMemo(() => {
+    if (!sections || !sections.length) return [];
+    return sections.map(section => section.name || '');
+  }, [sections]);
   
   // 加载标签数据
   const loadTag = async () => {
-    if (!teamId || !teamCFId || isRequestInProgress.current) return;
+    if (!teamId || !teamCFId || isTagRequestInProgress.current) return;
     
     try {
-      isRequestInProgress.current = true;
+      isTagRequestInProgress.current = true;
       setIsLoading(true);
       
-      // 确保在开始新请求前重置状态
-      dispatch(resetTagsStatus());
-      
-      const result = await dispatch(getTags({ 
-        teamId, 
-        teamCFId 
-      })).unwrap();
-      
-      hasLoadedInitialData.current = true;
+      console.log('开始加载标签, 参数:', { teamId, teamCFId });
+      const result = await dispatch(getTags({ teamId, teamCFId })).unwrap();
+      console.log('标签加载结果(原始):', result);
+      console.log('标签加载结果类型:', typeof result, Array.isArray(result));
+      if (result) {
+        console.log('结果属性:', Object.keys(result));
+      }
+      hasLoadedTags.current = true;
     } catch (error) {
-      console.error('Error loading tags:', error);
-      // 如果加载失败，允许下次重试
-      hasLoadedInitialData.current = false;
+      console.error('加载标签失败:', error);
+      hasLoadedTags.current = false;
     } finally {
       setIsLoading(false);
-      isRequestInProgress.current = false;
+      isTagRequestInProgress.current = false;
     }
   };
 
-  // 仅在组件挂载和参数变化时加载一次数据
+  // 加载部门数据
+  const loadSections = async () => {
+    if (!teamId || isSectionRequestInProgress.current) return;
+    
+    try {
+      isSectionRequestInProgress.current = true;
+      setIsLoading(true);
+      
+      await dispatch(getSectionByTeamId(teamId)).unwrap();
+      
+      hasLoadedSections.current = true;
+    } catch (error) {
+      console.error('Error loading sections:', error);
+      hasLoadedSections.current = false;
+    } finally {
+      setIsLoading(false);
+      isSectionRequestInProgress.current = false;
+    }
+  };
+
+  // 参数变化时重置加载状态
   useEffect(() => {
     if (teamId && teamCFId) {
-      // 重置请求状态，以允许在参数变化时重新加载
-      hasLoadedInitialData.current = false; 
+      // 重置标签请求状态
+      hasLoadedTags.current = false; 
+    }
+    if (teamId) {
+      // 重置部门请求状态
+      hasLoadedSections.current = false;
     }
   }, [teamId, teamCFId]);
 
-  // 处理加载逻辑的effect
+  // 处理标签加载
   useEffect(() => {
-    if (teamId && teamCFId && !hasLoadedInitialData.current && tagsStatus !== 'loading') {
+    if (teamId && teamCFId && !hasLoadedTags.current && tagsStatus !== 'loading') {
       // 使用setTimeout避免在渲染过程中请求
       setTimeout(loadTag, 0);
     }
@@ -71,66 +118,71 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
       dispatch(resetTagsStatus());
     };
   }, [dispatch, teamId, teamCFId, tagsStatus]);
+  
+  // 处理部门加载 - 单独的useEffect
+  useEffect(() => {
+    if (teamId && !hasLoadedSections.current && sectionsStatus !== 'loading') {
+      setTimeout(loadSections, 0);
+    }
+  }, [teamId, sectionsStatus]);
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
     // 在对话框关闭后强制重新加载数据
     setTimeout(() => {
-      hasLoadedInitialData.current = false;
-      isRequestInProgress.current = false;
+      hasLoadedTags.current = false;
+      hasLoadedSections.current = false;
+      isTagRequestInProgress.current = false;
+      isSectionRequestInProgress.current = false;
       loadTag();
+      loadSections();
     }, 100);
   };
 
+  // 计算总列数（标签列 + 操作列）
+  const totalColumns = (Array.isArray(tagInfo) ? tagInfo.length : 0) + 1;
+
   return (
-    <div className="p-4">
-      <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
-        <div className="flex justify-between items-center">
-          <button 
-            onClick={() => setDialogOpen(true)} 
-            className="flex items-center px-4 py-2 text-foreground hover:bg-accent/50 transition-colors"
-          >
-            <Plus size={16} className="text-muted-foreground mr-2" />
-          </button>
-        </div>
+    <div>
+      <Table>
+        <TableHeader>
+          <TableRow>            
+            {Array.isArray(tagInfo) && tagInfo.map((tag, index) => (
+              <TableHead key={`tag-${index}`}>{tag}</TableHead>
+            ))}
+            
+            <TableHead className="text-right">
+              <button 
+                onClick={() => setDialogOpen(true)} 
+                className="text-foreground hover:bg-accent/50 transition-colors"
+              >
+                <Plus size={16} className="text-muted-foreground" />
+              </button>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
         
-        <div className="mt-4">
-          <div className="space-y-3">
-            {tagsStatus === 'loading' || isLoading ? (
-              <div className="p-4 text-center text-muted-foreground">
-                {t('loadingTags')}
-              </div>
-            ) : Array.isArray(tags) && tags.length > 0 ? (
-              tags.map((tag, index) => (
-                <div 
-                  key={index} 
-                  className="p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-base mb-1">{tag}</h4>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-4 text-center text-muted-foreground">
-                {t('noTagsFound')}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <CreateTagDialog 
-          isOpen={isDialogOpen} 
-          onClose={handleCloseDialog} 
-          projectId={projectId}
-          teamId={teamId}
-          teamCFId={teamCFId}
-        />
-      </div>
+        <TableBody>
+          {/* 部门数据展示 */}
+          {sectionNames && sectionNames.length > 0 && (
+            sectionNames.map((sectionName, index) => (
+              <TableRow key={`section-${index}`}>
+                <TableCell colSpan={totalColumns}>
+                  {sectionName}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+      
+      <CreateTagDialog 
+        isOpen={isDialogOpen} 
+        onClose={handleCloseDialog} 
+        projectId={projectId}
+        teamId={teamId}
+        teamCFId={teamCFId}
+      />
     </div>
   );
 }
