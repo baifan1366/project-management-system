@@ -91,7 +91,9 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
   // 合并处理 customFields 和 URL 参数的 useEffect
   useEffect(() => {
     if (Array.isArray(customFields) && customFields.length > 0) {
-      setOrderedFields([...customFields]);
+      // 按order_index排序
+      const sortedFields = [...customFields].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+      setOrderedFields(sortedFields);
       
       if (currentTeamCFId) {
         // 如果 URL 中有 teamCFId，使用它
@@ -101,7 +103,7 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
         }
       } else {
         // 没有 teamCFId 时设置默认标签页
-        const firstTabValue = `${customFields[0].id}`;
+        const firstTabValue = `${sortedFields[0].id}`;
         setActiveTab(firstTabValue);
         onViewChange?.(firstTabValue);
         router.push(`/projects/${projectId}/${teamId}/${firstTabValue}`);
