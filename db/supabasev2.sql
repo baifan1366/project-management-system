@@ -86,6 +86,7 @@ CREATE TABLE "section" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE, 
+  "task_ids" INT[] DEFAULT '{}',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -99,7 +100,6 @@ CREATE TABLE "task" (
   "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
   "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
   "due_date" TIMESTAMP,
-  "section_id" INT REFERENCES "section"("id") ON DELETE CASCADE,
   "assignee_ids" UUID[] DEFAULT '{}',
   "tag_values" JSONB DEFAULT '{}',
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
