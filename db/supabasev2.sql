@@ -97,10 +97,6 @@ CREATE TABLE "task" (
   "id" SERIAL PRIMARY KEY,
   "title" VARCHAR(255) NOT NULL,
   "description" TEXT,
-  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
-  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
-  "due_date" TIMESTAMP,
-  "assignee_ids" UUID[] DEFAULT '{}',
   "tag_values" JSONB DEFAULT '{}',
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,

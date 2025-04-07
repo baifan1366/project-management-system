@@ -122,28 +122,33 @@ VALUES
 
 -- Insert task data
 INSERT INTO "task" (
-  id, title, description, status, priority, due_date, 
-  assignee_ids, tag_values,
-  created_by, created_at, updated_at
-)
-VALUES 
-  -- 网站重设计项目 - 前端团队
-  (1, '创建线框图', '设计首页和关键页面的初始线框图', 'IN_PROGRESS', 'HIGH', '2023-02-15T17:00:00Z', 
-   ARRAY[('75cb09ec-f11e-4b34-a1e5-327e90026b94')::uuid],
-   jsonb_build_object('2', 'Feature', '5', 'UI'),
-   '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:00:00Z', '2023-02-03T11:00:00Z'),
-  (2, '实现响应式设计', '确保网站在所有设备上正常工作', 'TODO', 'MEDIUM', '2023-02-20T17:00:00Z',
-   ARRAY[('a9d61763-843c-4c7b-894a-fd8d8a5fc254')::uuid],
-   jsonb_build_object('3', 'Enhancement'),
-   '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:30:00Z', '2023-02-03T11:30:00Z'),
-  (3, '实现响应式设计', '确保网站在所有设备上正常工作', 'TODO', 'MEDIUM', '2023-02-20T17:00:00Z',
-   ARRAY[('a9d61763-843c-4c7b-894a-fd8d8a5fc254')::uuid],
-   jsonb_build_object('3', 'Enhancement'),
-   '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:30:00Z', '2023-02-03T11:30:00Z'),
-  (4, '实现响应式设计', '确保网站在所有设备上正常工作', 'TODO', 'MEDIUM', '2023-02-20T17:00:00Z',
-   ARRAY[('a9d61763-843c-4c7b-894a-fd8d8a5fc254')::uuid],
-   jsonb_build_object('3', 'Enhancement'),
-   '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:30:00Z', '2023-02-03T11:30:00Z');
+  id, title, description, tag_values, attachment_ids, created_by, created_at, updated_at
+) VALUES (
+  1,
+  '创建线框图',
+  '设计首页和关键页面的初始线框图',
+  '[
+    {
+      "id": "1",
+      "name": "Name",
+      "value": "Feature"
+    },
+    {
+      "id": "2",
+      "name": "Asignee",
+      "value": "75cb09ec-f11e-4b34-a1e5-327e90026b94"
+    },
+    {
+      "id": "3",
+      "name": "Due Date",
+      "value": "2023-02-15T17:00:00Z"
+    }
+  ]'::jsonb,
+  '{1}',
+  '75cb09ec-f11e-4b34-a1e5-327e90026b94',
+  '2023-02-03T11:00:00Z',
+  '2023-02-03T11:00:00Z'
+);
 
 -- Insert comment data
 INSERT INTO "comment" (id, text, task_id, user_id, created_at, updated_at)

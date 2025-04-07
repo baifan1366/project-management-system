@@ -4,21 +4,84 @@ import { NextResponse } from 'next/server'
 // GET /api/tasks
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const projectId = searchParams.get('projectId')
-
-    let query = supabase.from('task').select('*')
+    const searchParams = new URL(request.url).searchParams
+    const teamId = searchParams.get('teamId')
+    const sectionId = searchParams.get('sectionId')
+    const taskId = searchParams.get('taskId')
     
-    if (projectId) {
-      query = query.eq('project_id', projectId)
+    let data = []
+    
+    // 如果提供了特定任务ID，则只获取该任务
+    if (taskId) {
+      const { data: taskData, error: taskError } = await supabase
+        .from('task')
+        .select('*')
+        .eq('id', taskId)
+        .single()
+        
+      if (taskError) throw taskError
+      
+      data = taskData ? [taskData] : []
+    } 
+    // 如果提供了章节ID，则获取该章节下的所有任务
+    else if (sectionId) {
+      // 首先从section表获取task_ids数组
+      const { data: sectionData, error: sectionError } = await supabase
+        .from('section')
+        .select('task_ids')
+        .eq('id', sectionId)
+        .single()
+        
+      if (sectionError) throw sectionError
+      
+      if (sectionData && sectionData.task_ids && sectionData.task_ids.length > 0) {
+        // 然后根据task_ids数组获取任务详情
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('task')
+          .select('*')
+          .in('id', sectionData.task_ids)
+          
+        if (tasksError) throw tasksError
+        
+        data = tasksData || []
+      }
     }
-
-    const { data, error } = await query.order('created_at', { ascending: false })
-
-    if (error) throw error
+    // 如果提供了团队ID，获取该团队所有章节下的任务
+    else if (teamId) {
+      // 获取团队下所有章节
+      const { data: sectionsData, error: sectionsError } = await supabase
+        .from('section')
+        .select('task_ids')
+        .eq('team_id', teamId)
+        
+      if (sectionsError) throw sectionsError
+      
+      if (sectionsData && sectionsData.length > 0) {
+        // 收集所有章节的任务ID
+        const allTaskIds = []
+        sectionsData.forEach(section => {
+          if (section.task_ids && section.task_ids.length > 0) {
+            allTaskIds.push(...section.task_ids)
+          }
+        })
+        
+        if (allTaskIds.length > 0) {
+          // 获取所有任务的详情
+          const { data: tasksData, error: tasksError } = await supabase
+            .from('task')
+            .select('*')
+            .in('id', [...new Set(allTaskIds)]) // 去重
+            
+          if (tasksError) throw tasksError
+          
+          data = tasksData || []
+        }
+      }
+    }
     
-    return NextResponse.json(data || [], { status: 200 })
+    return NextResponse.json(data, { status: 200 })
   } catch (error) {
+    console.error('Error fetching tasks:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
