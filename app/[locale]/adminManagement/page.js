@@ -34,12 +34,6 @@ export default function AdminUserManagement() {
   const [isPasswordMatch, setIsPasswordMatch] = useState(false)
   const [isEmailValid, setIsEmailValid] = useState(false)
 
-  useEffect(()=>{
-    setIsPasswordMatch(password === confirmPassword)
-    console.log("password matach? :", isPasswordMatch)
-
-  }, [password, confirmPassword])
-
   // Verify super admin session and fetch admin data
   useEffect(() => {
     const checkAdminSession = async () => {
@@ -195,23 +189,50 @@ export default function AdminUserManagement() {
   };
   
   // Edit admin
-  const editAdmin = async (adminUserData) => {
+  const editAdmin = async (newAdminData) => {
     try {
       // Prevent non-super admins from elevating privileges
-      if (adminData.role !== 'SUPER_ADMIN' && adminUserData.role === 'SUPER_ADMIN') {
-        throw new Error('Only super admins can create other super admins');
+      if (adminData.role !== 'SUPER_ADMIN') {
+        throw new Error('Only super admins can modify other admins');
       }
+      
+      // Create a filtered version of newAdminData that only includes non-empty values
+      const filteredAdminData = {};
+      
+      // Only include fields that have values
+      if (newAdminData.username && newAdminData.username.trim() !== '') {
+        filteredAdminData.username = newAdminData.username;
+      }
+      
+      if (newAdminData.full_name) {
+        filteredAdminData.full_name = newAdminData.full_name;
+      }
+      
+      if (newAdminData.email && newAdminData.email.trim() !== '') {
+        filteredAdminData.email = newAdminData.email;
+      }
+      
+      if (newAdminData.password_hash && newAdminData.password_hash.trim() !== '') {
+        filteredAdminData.password_hash = newAdminData.password_hash;
+      }
+      
+      if (newAdminData.role && ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(newAdminData.role)) {
+        filteredAdminData.role = newAdminData.role;
+      }
+      
+      // Always update the updated_at timestamp
+      filteredAdminData.updated_at = new Date().toISOString();
       
       const { error } = await supabase
         .from('admin_user')
-        .update(adminUserData)
+        .update(filteredAdminData)
         .eq('id', selectedAdmin.id);
       
       if (error) throw error;
       
       // Update local data
       setAdmins(admins.map(admin => 
-        admin.id === selectedAdmin.id ? { ...admin, ...adminUserData } : admin
+        admin.id === selectedAdmin.id ? { ...admin, ...filteredAdminData } : admin
       ));
       
       // Log activity
@@ -221,7 +242,7 @@ export default function AdminUserManagement() {
           action: 'update_admin_user',
           entity_type: 'admin_user',
           entity_id: selectedAdmin.id,
-          details: { updated_fields: Object.keys(adminUserData) },
+          details: { updated_fields: Object.keys(filteredAdminData) },
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
         });
@@ -394,8 +415,10 @@ export default function AdminUserManagement() {
   useEffect(() => {
     const validationResult = validatePassword(password);
     setIsPasswordValid(validationResult.isValid);
+    setIsPasswordMatch(password === confirmPassword)
     console.log("Password valid?:", validationResult.isValid);
-  }, [password]);
+    console.log("password matach? :", isPasswordMatch)
+  }, [password, confirmPassword]);
 
   if (loading) {
     return (
@@ -551,7 +574,7 @@ export default function AdminUserManagement() {
                           )}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {formatDate(admin.last_login)}
+                          {admin.last_login ? formatDate(admin.last_login) : 'Never logged in'}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
                           <button
@@ -816,6 +839,177 @@ export default function AdminUserManagement() {
           </form>
         </div>
       </div>
+      )}
+
+       {/* Edit admin Modal */}
+      {isModalOpen && modalType === 'edit' && selectedAdmin && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>Edit Admin</h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const newAdminData = {
+                username: username,
+                full_name: fullName,
+                email: email,
+                password_hash: password ,
+                role: selectedRole,
+                updated_at: new Date().toISOString()
+              };
+              
+              editAdmin(newAdminData);
+            }}>
+              <div className='space-y-4'>
+
+                <div>
+                  <label htmlFor='edit-username' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    New Username
+                  </label>
+                  <input
+                    type='text'
+                    id='edit-username'
+                    name='username'
+                    required
+                    defaultValue={selectedAdmin.username}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter new username'
+                    onChange={(e)=> {setUsername(e.target.value)}}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor='edit-fullName' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Full Name (optional)
+                  </label>
+                  <input
+                    type='text'
+                    id='edit-fullName'
+                    name='fullName'
+                    defaultValue={selectedAdmin.full_name || ''}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter new full name'
+                    onChange={(e)=> {setFullName(e.target.value)}}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='edit-email' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Email
+                  </label>
+                  <input
+                    type='email'
+                    id='edit-email'
+                    name='email'
+                    required
+                    defaultValue={selectedAdmin.email || ''}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter email address'
+                    onChange={(e)=>{setEmail(e.target.value)}}
+                  />
+                </div>
+
+                <div>
+                <label htmlFor='newPassword ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  New Password
+                </label>
+                <input
+                  type='password'
+                  id='newPassword'
+                  name='newPassword'
+                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  placeholder='Enter new password'
+                  onChange={(e)=>{setPassword(e.target.value)}}
+                />
+              </div>
+
+              <div>
+                <label htmlFor='confirmNewPassword ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  Confirm New Password
+                </label>
+                <input 
+                type='password'
+                name='confirmNewPassword'
+                id='confirmNewPassword'
+                onChange={(e)=>{setConfirmPassword(e.target.value)}}
+                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                placeholder='Enter confirm password'
+                />
+              </div>
+
+              <div>
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  New Role
+                </label>
+                <div className='flex items-center space-x-4'>
+                  
+                  {roles.map(item => (
+                      <label className='inline-flex items-center' key={item}>
+                        <input
+                          type='radio'
+                          name='role'
+                          value={item}
+                          defaultChecked={selectedAdmin.role === item}
+                          onChange={(e)=>setSelectedRole(e.target.value)}
+                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
+                        />
+                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>{item}</span>
+                      </label>
+                  ))}
+                </div>
+
+              </div>
+               
+                
+                <div className='pt-3 border-t border-gray-200 dark:border-gray-700'>
+                  <p className='text-xs text-gray-500 dark:text-gray-400'>
+                    Admin ID: {selectedAdmin.id}<br />
+                    Created: {formatDate(selectedAdmin.created_at)}<br />
+                    Last Updated: {formatDate(selectedAdmin.updated_at)}
+                  </p>
+                </div>
+              </div>
+              
+              <div className='mt-6 flex justify-end space-x-3'>
+                <button
+                  type='button'
+                  onClick={closeModal}
+                  className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                    text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                >
+                  Cancel
+                </button>
+                
+                <button
+                  type='submit'
+                  className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500'
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* For brevity, I've omitted the actual modal implementation */}
