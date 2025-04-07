@@ -5,7 +5,7 @@ import { Search, MessageSquare } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { useUserStatus } from '@/contexts/UserStatusContext';
-import NewChatPopover from '@/components/NewChatPopover';
+import NewChatPopover from '@/components/chat/NewChatPopover';
 import { useLastSeen } from '@/hooks/useLastSeen';
 import { useChatTime } from '@/hooks/useChatTime';
 import { useDynamicMetadata } from '@/hooks/useDynamicMetadata';

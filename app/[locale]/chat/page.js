@@ -7,13 +7,13 @@ import { useChat } from '@/contexts/ChatContext';
 import { useUserStatus } from '@/contexts/UserStatusContext';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import InviteUserPopover from '@/components/InviteUserPopover';
-import AIChatBot from '@/components/AIChatBot';
+import InviteUserPopover from '@/components/chat/InviteUserPopover';
+import AIChatBot from '@/components/chat/AIChatBot';
 import Image from 'next/image';
 import PengyImage from '../../../public/pengy.webp';
-import EmojiPicker from '@/components/EmojiPicker';
-import FileUploader from '@/components/FileUploader';
-import GoogleTranslator from '@/components/GoogleTranslator';
+import EmojiPicker from '@/components/chat/EmojiPicker';
+import FileUploader from '@/components/chat/FileUploader';
+import GoogleTranslator from '@/components/chat/GoogleTranslator';
 import { useLastSeen } from '@/hooks/useLastSeen';
 import { toast } from 'sonner';
 

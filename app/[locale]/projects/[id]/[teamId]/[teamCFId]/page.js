@@ -9,10 +9,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { fetchTeamById, fetchProjectTeams, updateTeamStar } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
-import TaskTab from "@/components/TaskTab"
-import InvitationDialog from '@/components/InvitationDialog';
+import TaskTab from "@/components/team/TaskTab"
+import InvitationDialog from '@/components/team/InvitationDialog';
 import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
-import TaskList from '@/components/TaskList';
+import TaskList from '@/components/team/TaskList';
 
 // 创建记忆化的选择器
 const selectTeams = state => state.teams.teams;

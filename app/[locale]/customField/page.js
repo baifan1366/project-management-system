@@ -6,7 +6,7 @@ import { fetchDefaultByName } from '@/lib/redux/features/defaultSlice';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import * as Icons from 'lucide-react';
-import CreateCustomField from '@/components/CreateCustomField';
+import CreateCustomField from '@/components/admin/CreateCustomField';
 import { Button } from '@/components/ui/button';
 
 export default function CustomField() {

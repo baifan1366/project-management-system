@@ -10,7 +10,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { fetchTeamCustomField, updateTeamCustomFieldOrder } from '@/lib/redux/features/teamCFSlice';
 import { fetchTeamCustomFieldValue } from '@/lib/redux/features/teamCFValueSlice';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import CustomField from '@/components/CustomField';
+import CustomField from '@/components/team/CustomField';
 import { useRouter, useParams } from 'next/navigation';
 
 // 修复记忆化的 selectors - 确保返回新的引用

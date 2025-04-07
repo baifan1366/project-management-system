@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react';
 import CreateTagDialog from './TagDialog';
 import { getTags, resetTagsStatus } from '@/lib/redux/features/teamCFSlice';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
+import { fetchTasksBySectionId, fetchTaskById } from '@/lib/redux/features/taskSlice';
 import {
   Table,
   TableHeader,
@@ -23,13 +24,17 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   const [isLoading, setIsLoading] = useState(false);
   const isTagRequestInProgress = useRef(false);
   const isSectionRequestInProgress = useRef(false);
+  const isTaskRequestInProgress = useRef(false);
   const hasLoadedTags = useRef(false);
   const hasLoadedSections = useRef(false);
-  
+  const hasLoadedTasks = useRef(false);
+
   // 从Redux状态中获取标签数据
   const { tags: tagsData, tagsStatus, tagsError } = useSelector((state) => state.teamCF);
   // 从Redux状态中获取部门数据
   const { sections, status: sectionsStatus } = useSelector((state) => state.sections);
+  // 从Redux状态中获取任务数据
+  const { tasks, status: tasksStatus } = useSelector((state) => state.tasks);
   
   // 处理标签数据
   const tagInfo = useMemo(() => {
@@ -44,10 +49,16 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   }, [tagsData]);
   
   // 处理部门数据
-  const sectionNames = useMemo(() => {
+  const sectionInfo = useMemo(() => {
     if (!sections || !sections.length) return [];
     return sections.map(section => section.name || '');
   }, [sections]);
+  
+  // 处理任务数据
+  const taskInfo = useMemo(() => {
+    if (!tasks || !tasks.length) return [];
+    return tasks.map(task => task.name || '');
+  }, [tasks]);
   
   // 加载标签数据
   const loadTag = async () => {
@@ -57,13 +68,7 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
       isTagRequestInProgress.current = true;
       setIsLoading(true);
       
-      console.log('开始加载标签, 参数:', { teamId, teamCFId });
-      const result = await dispatch(getTags({ teamId, teamCFId })).unwrap();
-      console.log('标签加载结果(原始):', result);
-      console.log('标签加载结果类型:', typeof result, Array.isArray(result));
-      if (result) {
-        console.log('结果属性:', Object.keys(result));
-      }
+      await dispatch(getTags({ teamId, teamCFId })).unwrap();
       hasLoadedTags.current = true;
     } catch (error) {
       console.error('加载标签失败:', error);
@@ -94,6 +99,32 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     }
   };
 
+  // 加载所有部门的任务
+  const loadAllSectionTasks = async () => {
+    if (!teamId || isTaskRequestInProgress.current || !sections || !sections.length) return;
+    
+    try {
+      isTaskRequestInProgress.current = true;
+      setIsLoading(true);
+      
+      // 为每个部门加载任务
+      for (let i = 0; i < sections.length; i++) {
+        const section = sections[i];
+        if (section && section.id) {
+          await dispatch(fetchTasksBySectionId(section.id)).unwrap();
+        }
+      }
+      
+      hasLoadedTasks.current = true;
+    } catch (error) {
+      console.error('加载所有任务失败:', error);
+      hasLoadedTasks.current = false;
+    } finally {
+      setIsLoading(false);
+      isTaskRequestInProgress.current = false;
+    }
+  };
+
   // 参数变化时重置加载状态
   useEffect(() => {
     if (teamId && teamCFId) {
@@ -103,6 +134,7 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     if (teamId) {
       // 重置部门请求状态
       hasLoadedSections.current = false;
+      hasLoadedTasks.current = false;
     }
   }, [teamId, teamCFId]);
 
@@ -125,6 +157,13 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
       setTimeout(loadSections, 0);
     }
   }, [teamId, sectionsStatus]);
+  
+  // 处理任务加载 - 在sections加载完成后
+  useEffect(() => {
+    if (teamId && sections && sections.length > 0 && !hasLoadedTasks.current && tasksStatus !== 'loading') {
+      setTimeout(() => loadAllSectionTasks(), 0);
+    }
+  }, [teamId, sections, tasksStatus]);
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
@@ -164,8 +203,8 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
         
         <TableBody>
           {/* 部门数据展示 */}
-          {sectionNames && sectionNames.length > 0 && (
-            sectionNames.map((sectionName, index) => (
+          {sectionInfo && sectionInfo.length > 0 && (
+            sectionInfo.map((sectionName, index) => (
               <TableRow key={`section-${index}`}>
                 <TableCell colSpan={totalColumns}>
                   {sectionName}
