@@ -122,28 +122,26 @@ VALUES
 
 -- Insert task data
 INSERT INTO "task" (
-  id, title, description, tag_values, attachment_ids, created_by, created_at, updated_at
+  id, tag_values, attachment_ids, created_by, created_at, updated_at
 ) VALUES (
   1,
-  '创建线框图',
-  '设计首页和关键页面的初始线框图',
-  '[
-    {
-      "id": "1",
-      "name": "Name",
-      "value": "Feature"
-    },
-    {
-      "id": "2",
-      "name": "Asignee",
-      "value": "75cb09ec-f11e-4b34-a1e5-327e90026b94"
-    },
-    {
-      "id": "3",
-      "name": "Due Date",
-      "value": "2023-02-15T17:00:00Z"
-    }
-  ]'::jsonb,
+  '{"name":"Proposal of the project","asignee":"75cb09ec-f11e-4b34-a1e5-327e90026b94","dueDate":"2023-02-15T17:00:00Z"}',
+  '{1}',
+  '75cb09ec-f11e-4b34-a1e5-327e90026b94',
+  '2023-02-03T11:00:00Z',
+  '2023-02-03T11:00:00Z'
+),
+(
+  2,
+  '{"name":"Research on the project","asignee":"75cb09ec-f11e-4b34-a1e5-327e90026b94","dueDate":"2023-02-15T17:00:00Z"}',
+  '{1}',
+  '75cb09ec-f11e-4b34-a1e5-327e90026b94',
+  '2023-02-03T11:00:00Z',
+  '2023-02-03T11:00:00Z'
+),
+(
+  3,
+  '{"name":"Create a wireframe","asignee":"75cb09ec-f11e-4b34-a1e5-327e90026b94","dueDate":"2023-02-15T17:00:00Z"}',
   '{1}',
   '75cb09ec-f11e-4b34-a1e5-327e90026b94',
   '2023-02-03T11:00:00Z',
