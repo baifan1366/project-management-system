@@ -55,10 +55,10 @@ export function MainNav() {
       active: pathname === `/${locale}/search`,
     },
     {
-      href: `/${locale}/mytasks`,
+      href: `/${locale}/myTasks`,
       label: t('nav.mytasks'),
       icon: CheckSquare,
-      active: pathname === `/${locale}/mytasks`,
+      active: pathname === `/${locale}/myTasks`,
     },
     {
       href: `/${locale}/calendar`,

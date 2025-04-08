@@ -1,50 +1,36 @@
 import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server';
 
-export async function GET(request, { params }) {
+export async function GET(request,{ params }) {
   try {
     const { userId } = await params;
 
-    // 1. 获取用户所在的所有团队
-    const { data: userTeams, error: teamsError } = await supabase
-      .from('user_team')
-      .select('team_id')
-      .eq('user_id', userId);
+    let data, error
 
-    if (teamsError) throw teamsError;
-
-    if (!userTeams || userTeams.length === 0) {
-      return NextResponse.json([]);
+    if (userId) {
+      // Fetch a specific project by ID
+      ({ data, error } = await supabase
+        .from('project')
+        .select('*')
+        .eq('created_by', userId))
+    } else {
+      // Fetch all projects
+      ({ data, error } = await supabase
+        .from('project')
+        .select('*'))
     }
 
-    const teamIds = userTeams.map(ut => ut.team_id);
-
-    // 2. 获取这些团队所属的项目
-    const { data: teams, error: projectsError } = await supabase
-      .from('team')
-      .select('project_id')
-      .in('id', teamIds);
-
-    if (projectsError) throw projectsError;
-
-    if (!teams || teams.length === 0) {
-      return NextResponse.json([]);
+    if (error) {
+      console.error('Database error:', error)
+      throw error
     }
 
-    const projectIds = [...new Set(teams.map(t => t.project_id))];
-
-    // 3. 获取项目详细信息
-    const { data: projects, error: finalError } = await supabase
-      .from('project')
-      .select('*')
-      .in('id', projectIds)
-      .order('created_at', { ascending: false });
-
-    if (finalError) throw finalError;
-
-    return NextResponse.json(projects || []);
+    return NextResponse.json(data)
   } catch (error) {
-    console.error('获取用户项目失败:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Error fetching projects:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch projects' },
+      { status: 500 }
+    )
   }
-} 
+}

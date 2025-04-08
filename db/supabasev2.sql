@@ -16,7 +16,18 @@ CREATE TABLE "user" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "email_verified" BOOLEAN DEFAULT FALSE,
   "verification_token" VARCHAR(255),
-  "verification_token_expires" TIMESTAMP
+  "verification_token_expires" TIMESTAMP,
+  "last_seen_at" TIMESTAMP,
+  "is_online" BOOLEAN DEFAULT FALSE
+);
+
+-- 默认字段表
+CREATE TABLE "default" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "qty" INT NOT NULL,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "edited_by" UUID NULL REFERENCES "user"("id") ON DELETE CASCADE
 );
 
 -- 项目表
@@ -74,8 +85,8 @@ CREATE TABLE "user_team_invitation" (
 CREATE TABLE "section" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
-  "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE, 
+  "task_ids" INT[] DEFAULT '{}',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -86,22 +97,34 @@ CREATE TABLE "task" (
   "id" SERIAL PRIMARY KEY,
   "title" VARCHAR(255) NOT NULL,
   "description" TEXT,
-  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
-  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
-  "due_date" TIMESTAMP,
-  "section_id" INT REFERENCES "section"("id") ON DELETE CASCADE,
-  "project_id" INT NOT NULL REFERENCES "project"("id") ON DELETE CASCADE,
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "tag_values" JSONB DEFAULT '{}',
+  "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 任务指派表
-CREATE TABLE "task_assignee" (
+-- 标签表
+CREATE TABLE "tag" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "type" TEXT NOT NULL CHECK ("type" IN ('NAME','ASIGNEE', 'DUE-DATE', 'PRIORITY', 'STATUS', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'FORMULA', 'ID', 'TIME-TRACKING', 'PROJECTS', 'TAGS', 'COMPLETED-ON', 'LAST-MODIFIED-ON', 'CREATED-ON', 'CREATED-BY')),
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 任务时间记录表（用于时间跟踪）
+CREATE TABLE "time_entry" (
   "id" SERIAL PRIMARY KEY,
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "start_time" TIMESTAMP NOT NULL,
+  "end_time" TIMESTAMP,
+  "duration" INT, -- 以秒为单位
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 自定义字段模板表
@@ -111,7 +134,6 @@ CREATE TABLE "custom_field" (
   "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'DASHBOARD', 'NOTE', 'GANTT', 'CALENDAR', 'BOARD', 'FILES')),
   "description" TEXT,
   "icon" VARCHAR(255),
-  "default_config" JSONB, -- 存储字段的默认配置
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
@@ -122,8 +144,8 @@ CREATE TABLE "team_custom_field" (
   "id" SERIAL PRIMARY KEY,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "custom_field_id" INT NOT NULL REFERENCES "custom_field"("id") ON DELETE CASCADE,
-  "config" JSONB, -- 存储团队特定的字段配置
-  "order_index" INT DEFAULT 0,
+  "order_index" INT DEFAULT 0,    
+  "tag_ids" INT[] DEFAULT '{}',
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
@@ -140,6 +162,22 @@ CREATE TABLE "team_custom_field_value" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
+);
+
+
+-- 任务模板表（用于创建任务模板）
+CREATE TABLE "task_template" (
+  "id" SERIAL PRIMARY KEY,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
+  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
+  "team_custom_field_id" INT NOT NULL REFERENCES "team_custom_field"("id") ON DELETE CASCADE,
+  "tag_values" JSONB DEFAULT '{}', 
+  "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 任务评论表
@@ -163,53 +201,35 @@ CREATE TABLE "attachment" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 标签表
-CREATE TABLE "tag" (
-  "id" SERIAL PRIMARY KEY,
-  "name" VARCHAR(255) NOT NULL,
-  "color" VARCHAR(50),
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 任务与标签的关系表（多对多）
-CREATE TABLE "task_tag" (
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "tag_id" INT NOT NULL REFERENCES "tag"("id") ON DELETE CASCADE,
-  PRIMARY KEY ("task_id", "tag_id")
-);
-
--- 任务时间记录表（用于时间跟踪）
-CREATE TABLE "time_entry" (
-  "id" SERIAL PRIMARY KEY,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "start_time" TIMESTAMP NOT NULL,
-  "end_time" TIMESTAMP,
-  "duration" INT, -- 以秒为单位
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 任务依赖关系表（用于任务之间的依赖）
-CREATE TABLE "task_dependency" (
-  "id" SERIAL PRIMARY KEY,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "depends_on_task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 任务模板表（用于创建任务模板）
-CREATE TABLE "task_template" (
+-- 个人日历事件表
+CREATE TABLE "personal_calendar_event" (
   "id" SERIAL PRIMARY KEY,
   "title" VARCHAR(255) NOT NULL,
   "description" TEXT,
-  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
-  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "start_time" TIMESTAMP NOT NULL,
+  "end_time" TIMESTAMP NOT NULL,
+  "is_all_day" BOOLEAN DEFAULT FALSE,
+  "location" VARCHAR(255),
+  "color" VARCHAR(20) DEFAULT '#4285F4',
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建个人日历事件索引
+CREATE INDEX idx_personal_calendar_event_user ON "personal_calendar_event"("user_id");
+CREATE INDEX idx_personal_calendar_event_time ON "personal_calendar_event"("start_time", "end_time");
+
+-- 通知表
+CREATE TABLE "notification" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "title" VARCHAR(255) NOT NULL,
+  "content" TEXT NOT NULL,
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('TASK_ASSIGNED', 'COMMENT_ADDED', 'MENTION', 'DUE_DATE', 'TEAM_INVITATION', 'SYSTEM')),
+  "related_entity_type" VARCHAR(50), -- 例如：'task', 'project', 'team', 'comment'
+  "related_entity_id" VARCHAR(255), -- 相关实体的ID
+  "is_read" BOOLEAN DEFAULT FALSE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -217,7 +237,7 @@ CREATE TABLE "task_template" (
 -- 聊天会话表（用于管理私聊和群聊会话）
 CREATE TABLE "chat_session" (
   "id" SERIAL PRIMARY KEY,
-  "type" TEXT NOT NULL CHECK ("type" IN ('PRIVATE', 'GROUP')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('PRIVATE', 'GROUP', 'AI')),
   "name" VARCHAR(255),
   "team_id" INT REFERENCES "team"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -253,6 +273,24 @@ CREATE TABLE "chat_message_read_status" (
   PRIMARY KEY ("message_id", "user_id")
 );
 
+-- AI聊天历史表
+CREATE TABLE "ai_chat_message" (
+  "id" SERIAL PRIMARY KEY,
+  "session_id" INT REFERENCES "chat_session"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "role" TEXT NOT NULL CHECK ("role" IN ('user', 'assistant', 'system')),
+  "content" TEXT NOT NULL,
+  "conversation_id" VARCHAR(255) NOT NULL, -- 用于分组同一次对话的消息
+  "timestamp" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "model" VARCHAR(255) DEFAULT 'Qwen/QwQ-32B', -- 使用的AI模型名称
+  "metadata" JSONB -- 存储额外的元数据
+);
+
+-- AI聊天历史索引
+CREATE INDEX idx_ai_chat_message_user ON "ai_chat_message"("user_id");
+CREATE INDEX idx_ai_chat_message_conversation ON "ai_chat_message"("conversation_id");
+CREATE INDEX idx_ai_chat_message_timestamp ON "ai_chat_message"("timestamp");
+
 -- 聊天附件表
 CREATE TABLE "chat_attachment" (
   "id" SERIAL PRIMARY KEY,
@@ -269,7 +307,7 @@ CREATE TABLE "action_log" (
   "user_id" UUID REFERENCES "user"("id") ON DELETE SET NULL,
   "action_type" VARCHAR(50) NOT NULL, -- 例如：'CREATE', 'UPDATE', 'DELETE'
   "entity_type" VARCHAR(50) NOT NULL, -- 例如：'task', 'project', 'team'
-  "entity_id" INT NOT NULL,           -- 被操作实体的ID
+  "entity_id" TEXT NOT NULL,           -- 被操作实体的ID
   "old_values" JSONB,                 -- 修改前的值
   "new_values" JSONB,                 -- 修改后的值
   "ip_address" VARCHAR(45),           -- 支持 IPv6
@@ -319,6 +357,142 @@ CREATE TABLE "subscription_payment" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 用户订阅计划表
+CREATE TABLE "user_subscription_plan" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
+  "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
+  "start_date" TIMESTAMP NOT NULL,
+  "end_date" TIMESTAMP NOT NULL,
+  -- 使用统计
+  "current_users" INT DEFAULT 0,
+  "current_projects" INT DEFAULT 0,
+  "current_ai_agents" INT DEFAULT 0,
+  "current_automation_flows" INT DEFAULT 0,
+  "current_tasks_this_month" INT DEFAULT 0,
+  -- 时间戳
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 促销码表
+CREATE TABLE "promo_code" (
+  "id" SERIAL PRIMARY KEY,
+  "code" VARCHAR(50) UNIQUE NOT NULL,
+  "description" TEXT,
+  "discount_type" TEXT NOT NULL CHECK ("discount_type" IN ('PERCENTAGE', 'FIXED_AMOUNT')),
+  "discount_value" DECIMAL(10, 2) NOT NULL,
+  "max_uses" INT,
+  "current_uses" INT DEFAULT 0,
+  "start_date" TIMESTAMP NOT NULL,
+  "end_date" TIMESTAMP,
+  "is_active" BOOLEAN DEFAULT TRUE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 联系表（用于存储联系表单提交）
+CREATE TABLE "contact" (
+  "id" SERIAL PRIMARY KEY,
+  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE')), -- 区分一般查询和企业查询
+  "email" VARCHAR(255) NOT NULL,
+  "message" TEXT, -- 用于一般查询的消息
+  -- 企业查询特有字段
+  "first_name" VARCHAR(255),
+  "last_name" VARCHAR(255),
+  "company_name" VARCHAR(255),
+  "role" VARCHAR(255), -- 例如：'Executive', 'Manager', 等
+  "purchase_timeline" VARCHAR(255), -- 例如：'immediately', 'Within this month', 等
+  "user_quantity" VARCHAR(50), -- 例如：'1-5', '6-10', 等
+  "status" TEXT NOT NULL CHECK ("status" IN ('NEW', 'IN_PROGRESS', 'COMPLETED', 'SPAM')) DEFAULT 'NEW',
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员表 - 存储系统管理员信息
+CREATE TABLE "admin_user" (
+  "id" SERIAL PRIMARY KEY,
+  "username" VARCHAR(255) UNIQUE NOT NULL,
+  "email" VARCHAR(255) UNIQUE NOT NULL,
+  "password_hash" VARCHAR(255) NOT NULL,
+  "full_name" VARCHAR(255),
+  "avatar_url" VARCHAR(255),
+  "role" VARCHAR(50) CHECK ("role" IN ('SUPER_ADMIN', 'ADMIN', 'MODERATOR')) DEFAULT 'ADMIN',
+  "is_active" BOOLEAN DEFAULT TRUE,
+  "last_login" TIMESTAMP,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员权限表 - 定义系统中的各种权限
+CREATE TABLE "admin_permission" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) UNIQUE NOT NULL,
+  "description" TEXT,
+  "resource" VARCHAR(255) NOT NULL, -- 例如: 'users', 'projects', 'teams', 'subscriptions'
+  "action" VARCHAR(255) NOT NULL, -- 例如: 'create', 'read', 'update', 'delete', 'manage'
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员角色权限关联表 - 将角色与权限关联
+CREATE TABLE "admin_role_permission" (
+  "id" SERIAL PRIMARY KEY,
+  "role" VARCHAR(50) NOT NULL, -- 对应 admin_user 表中的 role
+  "permission_id" INT NOT NULL REFERENCES "admin_permission"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE ("role", "permission_id")
+);
+
+-- 管理员会话表 - 跟踪管理员登录会话
+CREATE TABLE "admin_session" (
+  "id" SERIAL PRIMARY KEY,
+  "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
+  "token" VARCHAR(255) UNIQUE NOT NULL,
+  "ip_address" VARCHAR(45),
+  "user_agent" TEXT,
+  "expires_at" TIMESTAMP NOT NULL,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员活动日志表 - 记录管理员的所有操作
+CREATE TABLE "admin_activity_log" (
+  "id" SERIAL PRIMARY KEY,
+  "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
+  "action" VARCHAR(255) NOT NULL, -- 例如: 'login', 'logout', 'create_user', 'update_subscription'
+  "entity_type" VARCHAR(50), -- 例如: 'user', 'subscription', 'team'
+  "entity_id" VARCHAR(255), -- 被操作实体的ID
+  "details" JSONB, -- 操作的详细信息
+  "ip_address" VARCHAR(45),
+  "user_agent" TEXT,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 系统设置表 - 存储全局系统配置
+CREATE TABLE "system_settings" (
+  "id" SERIAL PRIMARY KEY,
+  "key" VARCHAR(255) UNIQUE NOT NULL,
+  "value" TEXT,
+  "description" TEXT,
+  "is_public" BOOLEAN DEFAULT FALSE, -- 是否可以公开给前端
+  "updated_by" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员通知表 - 存储发送给管理员的通知
+CREATE TABLE "admin_notification" (
+  "id" SERIAL PRIMARY KEY,
+  "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
+  "title" VARCHAR(255) NOT NULL,
+  "message" TEXT NOT NULL,
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('INFO', 'WARNING', 'ERROR', 'SUCCESS')),
+  "is_read" BOOLEAN DEFAULT FALSE,
+  "link" VARCHAR(255), -- 可选的通知相关链接
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 团队自定义字段值索引
 CREATE INDEX idx_team_custom_field_value_field ON "team_custom_field_value"("team_custom_field_id");
 
@@ -329,12 +503,14 @@ CREATE INDEX idx_team_custom_field_field ON "team_custom_field"("custom_field_id
 -- 用户索引
 CREATE INDEX idx_user_email ON "user"("email");
 
--- 任务索引
-CREATE INDEX idx_task_project_id ON "task"("project_id");
-
 -- 时间记录索引
 CREATE INDEX idx_time_entry_task_id ON "time_entry"("task_id");
 CREATE INDEX idx_time_entry_user_id ON "time_entry"("user_id");
+
+-- 通知索引
+CREATE INDEX idx_notification_user_id ON "notification"("user_id");
+CREATE INDEX idx_notification_read ON "notification"("is_read");
+CREATE INDEX idx_notification_created_at ON "notification"("created_at"); 
 
 -- 聊天索引
 CREATE INDEX idx_chat_message_session ON "chat_message"("session_id");
@@ -357,3 +533,32 @@ CREATE INDEX idx_subscription_payment_subscription ON "subscription_payment"("te
 CREATE INDEX idx_team_invitation_email ON "user_team_invitation"("user_email");
 CREATE INDEX idx_team_invitation_team ON "user_team_invitation"("team_id");
 CREATE INDEX idx_team_invitation_status ON "user_team_invitation"("status");
+
+-- 索引
+CREATE INDEX idx_user_subscription_user ON "user_subscription_plan"("user_id");
+CREATE INDEX idx_user_subscription_status ON "user_subscription_plan"("status");
+CREATE INDEX idx_promo_code_code ON "promo_code"("code");
+CREATE INDEX idx_promo_code_active ON "promo_code"("is_active");
+
+-- 联系表索引
+CREATE INDEX idx_contact_type ON "contact"("type");
+CREATE INDEX idx_contact_email ON "contact"("email");
+CREATE INDEX idx_contact_status ON "contact"("status");
+CREATE INDEX idx_contact_created_at ON "contact"("created_at");
+
+-- 管理员表索引
+CREATE INDEX idx_admin_user_email ON "admin_user"("email");
+CREATE INDEX idx_admin_user_role ON "admin_user"("role");
+
+-- 管理员会话表索引
+CREATE INDEX idx_admin_session_admin ON "admin_session"("admin_id");
+CREATE INDEX idx_admin_session_expires ON "admin_session"("expires_at");
+
+-- 管理员活动日志表索引
+CREATE INDEX idx_admin_activity_log_admin ON "admin_activity_log"("admin_id");
+CREATE INDEX idx_admin_activity_log_action ON "admin_activity_log"("action");
+CREATE INDEX idx_admin_activity_log_created ON "admin_activity_log"("created_at");
+
+-- 管理员通知表索引
+CREATE INDEX idx_admin_notification_admin ON "admin_notification"("admin_id");
+CREATE INDEX idx_admin_notification_read ON "admin_notification"("is_read"); 

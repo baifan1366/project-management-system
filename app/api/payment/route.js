@@ -1,47 +1,68 @@
+//payment intent
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY);
+// 确保使用正确的环境变量名称
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16'  // 指定 API 版本
+});
 
-export async function POST(req) {
+export async function POST(request) {
   try {
-    // 验证 Stripe 密钥
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('Stripe secret key is missing. Check your environment variables.');
+    // 首先验证是否有 API key
+    if (!process.env.STRIPE_SECRET_KEY && !process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY) {
+      console.error('Missing Stripe API key');
+      return NextResponse.json(
+        { error: 'Stripe API key not configured' },
+        { status: 500 }
+      );
     }
-    
-    // 从请求中获取数据
-    const { amount, quantity } = await req.json();
-    
-    // 验证必要参数
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: 'Valid amount is required' }, { status: 400 });
+
+    // 解析请求体并立即记录
+    const body = await request.json();
+    console.log('Received payment request body:', body);
+
+    // 解构参数并验证
+    const { planId, amount, quantity = 1, userId, planName } = body;
+
+    // 详细的参数验证
+    if (!userId) {
+      console.error('Missing userId in request body');
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
-    
-    if (!quantity || quantity < 1) {
-      return NextResponse.json({ error: 'Quantity must be at least 1' }, { status: 400 });
+
+    if (!planId) {
+      console.error('Missing planId in request body');
+      return NextResponse.json({ error: 'planId is required' }, { status: 400 });
     }
-    
-    console.log('Creating payment intent for amount:', amount * quantity);
+
+    if (!amount && amount !== 0) {
+      console.error('Missing amount in request body');
+      return NextResponse.json({ error: 'amount is required' }, { status: 400 });
+    }
 
     // 创建支付意向
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * quantity * 100), // 转换为分
+      amount: amount * 100 * quantity,
       currency: 'usd',
-      automatic_payment_methods: {
-        enabled: true,
-      },
       metadata: {
+        planId,
+        userId,
+        planName: planName || '',
         quantity: quantity.toString()
       }
     });
-    
-    console.log('Payment intent created with ID:', paymentIntent.id);
-    
-    // 返回客户端密钥
-    return NextResponse.json({ clientSecret: paymentIntent.client_secret });
+
+    console.log('Payment intent created:', paymentIntent.id);
+
+    return NextResponse.json({
+      clientSecret: paymentIntent.client_secret
+    });
   } catch (error) {
-    console.error('Error creating payment intent:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Payment route error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

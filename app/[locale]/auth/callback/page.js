@@ -22,7 +22,7 @@ export default function AuthCallbackPage() {
           .from('user')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (existingProfile) {
           // 如果用户存在，更新 email_verified 状态
@@ -59,6 +59,12 @@ export default function AuthCallbackPage() {
               name: user.identities?.[0]?.identity_data?.preferred_username || user.email.split('@')[0],
               avatar_url: user.identities?.[0]?.identity_data?.avatar_url,
             };
+          } else if (provider === 'azure') {
+            userData = {
+              ...userData,
+              name: user.identities?.[0]?.identity_data?.name || user.email.split('@')[0],
+              avatar_url: user.identities?.[0]?.identity_data?.avatar_url,
+            };
           } else {
             // 本地注册用户
             userData = {
@@ -73,15 +79,80 @@ export default function AuthCallbackPage() {
             .insert([userData]);
 
           if (insertError) throw insertError;
+          
+          // 4. 为新用户创建免费订阅计划
+          const now = new Date();
+          const oneYearFromNow = new Date(now);
+          oneYearFromNow.setFullYear(now.getFullYear() + 1);
+          
+          const { error: subscriptionError } = await supabase
+            .from('user_subscription_plan')
+            .insert([
+              {
+                user_id: user.id,
+                plan_id: 1, // 免费计划ID
+                status: 'active',
+                start_date: now.toISOString(),
+                end_date: oneYearFromNow.toISOString()
+              },
+            ]);
+
+          if (subscriptionError) {
+            console.error('Failed to create subscription:', subscriptionError);
+            // 继续处理，即使订阅创建失败
+          } else {
+            console.log('Free subscription created for user:', user.id);
+          }
         }
 
-        // 4. 重定向到仪表板
-        router.push("https://team-sync-pms.vercel.app/en/projects");
-        //router.push(`${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/${window.location.pathname.split('/')[1]}/projects`);
+        // 5. 检查用户是否已有订阅计划
+        const { data: existingSubscription, error: subscriptionCheckError } = await supabase
+          .from('user_subscription_plan')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        // 如果没有订阅，创建一个免费订阅
+        if ((!existingSubscription || existingSubscription.length === 0) && !subscriptionCheckError) {
+          const now = new Date();
+          const oneYearFromNow = new Date(now);
+          oneYearFromNow.setFullYear(now.getFullYear() + 1);
+          
+          const { error: createSubscriptionError } = await supabase
+            .from('user_subscription_plan')
+            .insert([
+              {
+                user_id: user.id,
+                plan_id: 1, // 免费计划ID
+                status: 'active',
+                start_date: now.toISOString(),
+                end_date: oneYearFromNow.toISOString()
+              },
+            ]);
+
+          if (createSubscriptionError) {
+            console.error('Failed to create subscription for existing user:', createSubscriptionError);
+          } else {
+            console.log('Free subscription created for existing user:', user.id);
+          }
+        }
+
+        // 6. 获取URL参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const planId = urlParams.get('plan_id');
+        const redirect = urlParams.get('redirect');
+
+        // 如果URL中有plan_id参数并且redirect=payment，则跳转到payment页面
+        if (planId && redirect === 'payment') {
+          router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/payment?plan_id=${planId}&user_id=${user.id}`);
+        } else {
+          // 否则重定向到仪表板
+          router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/projects`);
+        }
       } catch (error) {
         console.error('Auth callback error:', error);
-        router.push("https://team-sync-pms.vercel.app/en/login");
-        //router.push(`${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/${window.location.pathname.split('/')[1]}/login?error='` + encodeURIComponent(error.message || 'Authentication failed'));
+        router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/login`);
       }
     };
 

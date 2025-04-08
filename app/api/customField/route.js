@@ -49,7 +49,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const data = await request.json();
-    const { name, type, description, icon, default_config, created_by } = data;
+    const { name, type, description, icon, created_by } = data;
 
     // 验证必填字段
     if (!name || !type) {
@@ -71,7 +71,6 @@ export async function POST(request) {
           type, 
           description: description || null, 
           icon: icon || null, 
-          default_config: default_config || null ,
           created_by: created_by || null
         }
       ])
@@ -80,7 +79,6 @@ export async function POST(request) {
 
     if (error) {
       console.error('创建自定义字段失败:', error);
-      return NextResponse.json({ error: '创建自定义字段失败' }, { status: 500 });
     }
 
     return NextResponse.json(newField);
@@ -101,7 +99,7 @@ export async function PATCH(request) {
     }
 
     const data = await request.json();
-    const { name, type, description, icon, default_config } = data;
+    const { name, type, description, icon } = data;
 
     // 构建更新对象
     const updateData = {};
@@ -119,7 +117,6 @@ export async function PATCH(request) {
 
     if (description !== undefined) updateData.description = description;
     if (icon !== undefined) updateData.icon = icon;
-    if (default_config !== undefined) updateData.default_config = default_config;
     
     // 添加更新时间
     updateData.updated_at = new Date().toISOString();

@@ -2,118 +2,116 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslations } from 'use-intl'
-import CreateTeamDialog from './TeamDialog'
-import { fetchProjectById } from '@/lib/redux/features/projectSlice'
-import { fetchProjectTeams, updateTeamOrder, initializeTeamOrder } from '@/lib/redux/features/teamSlice'
+import CreateTeamDialog from './team/TeamDialog'
+import { updateTeamOrder, fetchUserTeams, fetchTeamCustomFieldForTeam } from '@/lib/redux/features/teamSlice'
 import { useDispatch, useSelector } from 'react-redux'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { Home, Search, Lock, Unlock, Eye, Pencil, Plus, Settings, Users, Bell, Archive, Zap, Edit, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { supabase } from '@/lib/supabase'
-import { api } from '@/lib/api'
+import { createSelector } from '@reduxjs/toolkit';
+import { fetchProjectById } from '@/lib/redux/features/projectSlice'
+
+// 获取团队自定义字段
+const selectTeamCustomFields = state => state?.teams?.teamCustomFields ?? [];
+
+// 获取团队自定义字段ID
+const selectTeamFirstCFIds = createSelector(
+  [state => state?.teams?.teamFirstCFIds ?? {}],
+  (teamFirstCFIds) => {
+    // 添加转换逻辑，例如过滤或格式化
+    return Object.entries(teamFirstCFIds).reduce((acc, [teamId, cfId]) => {
+      acc[teamId] = cfId;
+      return acc;
+    }, {});
+  }
+);
 
 export default function ProjectSidebar({ projectId }) {
   const t = useTranslations('Projects');
   const pathname = usePathname();
   const dispatch = useDispatch();
-  const { projects } = useSelector((state) => state.projects);
-  const { teams, lastFetchTime } = useSelector((state) => state.teams);
-  const project = projects.find(p => String(p.id) === String(projectId));
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
-  const [themeColor, setThemeColor] = useState('');
-  const [isMounted, setIsMounted] = useState(false);
-  const [userTeams, setUserTeams] = useState([]);
   const dropdownRef = useRef(null);
-  const prevDialogOpenRef = useRef(isDialogOpen);
+  
+  const customFields = useSelector(selectTeamCustomFields);
+  const teamFirstCFIds = useSelector(selectTeamFirstCFIds);
+  const userTeams = useSelector(state => state.teams.userTeams); 
 
-  // 添加客户端挂载检查
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const [projectName, setProjectName] = useState('');
+  const [themeColor, setThemeColor] = useState('');
 
+  // 项目名称下拉菜单
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setDropdownOpen(false);
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
+  
   // 获取用户加入的团队
-  const fetchUserTeams = useCallback(async () => {
+  const fetchTeams = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const teams = await api.teams.listUserTeams(user.id, projectId);
-      setUserTeams(teams);
+      // 使用Redux action获取用户团队
+      const teams = await dispatch(fetchUserTeams({ userId: user.id, projectId })).unwrap();
+      
+      // 对每个团队都获取自定义字段
+      if (teams && teams.length > 0) {
+        for (const team of teams) {
+          await dispatch(fetchTeamCustomFieldForTeam(team.id)).unwrap();
+        }
+      }
     } catch (error) {
       console.error('获取用户团队失败:', error);
     }
-  }, [projectId]);
+  }, []);
 
-  // 监听对话框状态变化
-  useEffect(() => {
-    // 如果对话框从打开状态变为关闭状态，刷新团队列表
-    if (prevDialogOpenRef.current && !isDialogOpen) {
-      fetchUserTeams();
-    }
-    prevDialogOpenRef.current = isDialogOpen;
-  }, [isDialogOpen, fetchUserTeams]);
-
-  // 初始加载用户团队
-  useEffect(() => {
+  const getProjectData = useCallback(async () => {
     if (projectId) {
-      fetchUserTeams();
+      const project = await dispatch(fetchProjectById(projectId)).unwrap();
+      setThemeColor(project?.theme_color || '#64748b');
+      setProjectName(project?.project_name || 'Project');
     }
-  }, [projectId, fetchUserTeams]);
+  }, [projectId, dispatch]);
 
-  // 过滤出当前项目的团队
-  const menuItems = userTeams.map((team, index) => ({
-    ...team,
-    id: team.id,
-    label: team.name,
-    href: `/projects/${projectId}/${team.id}`,
-    access: team.access,
-    order_index: team.order_index || index
-  })).sort((a, b) => a.order_index - b.order_index);
-
-  // 加载项目数据
+  // 然后在useEffect中添加真正的依赖项
   useEffect(() => {
-    const loadData = async () => {
-      if (!projectId) return;
-      
-      const currentProject = projects.find(p => String(p.id) === String(projectId));
-      
-      if (!currentProject) {
-        await dispatch(fetchProjectById(projectId));
-      }
-    };
+    if (dispatch && projectId) {
+      fetchTeams();
+      getProjectData();
+    } 
+  }, [dispatch, projectId, fetchTeams, getProjectData]);
+
+  // 确保有自定义字段数据后再生成菜单项
+  const menuItems = useMemo(() => {
+    if (!customFields || customFields.length === 0) return [];
     
-    // 添加防抖处理
-    const debounceTimeout = setTimeout(() => {
-      loadData();
-    }, 300);
-
-    return () => {
-      clearTimeout(debounceTimeout);
-    };
-  }, [projectId, projects, dispatch]);
-
-  useEffect(() => {
-    if (project) {
-      setThemeColor(project.theme_color || '#64748b');
-    }
-  }, [project]);
+    return userTeams.map((team, index) => {
+      // 获取该团队的第一个自定义字段ID，如果没有则使用默认的第一个自定义字段
+      const teamCFId = teamFirstCFIds[team.id] || customFields[0]?.id || '';
+      
+      return {
+        ...team,
+        id: team.id,
+        label: team.name,
+        href: `/projects/${projectId}/${team.id}/${teamCFId}`, 
+        access: team.access,
+        order_index: team.order_index || index
+      };
+    }).sort((a, b) => a.order_index - b.order_index);
+  }, [userTeams, customFields, teamFirstCFIds]);
 
   // 处理拖拽结束
   const handleDragEnd = useCallback(async (result) => {
@@ -134,15 +132,11 @@ export default function ProjectSidebar({ projectId }) {
       await dispatch(updateTeamOrder(updatedItems)).unwrap();
       
       // 重新获取用户团队以确保顺序正确
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const teams = await api.teams.listUserTeams(user.id, projectId);
-        setUserTeams(teams);
-      }
+      fetchTeams();
     } catch (error) {
       console.error('更新团队顺序失败:', error);
     }
-  }, [menuItems, projectId, dispatch]);
+  }, [menuItems, projectId, dispatch, fetchTeams]);
 
   // 获取项目名称的首字母
   const getProjectInitial = (name) => {
@@ -168,10 +162,6 @@ export default function ProjectSidebar({ projectId }) {
     </Tooltip>
   );
 
-  if (!isMounted) {
-    return null;
-  }
-
   return (
     <TooltipProvider>
       <div className="w-64 h-screen bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r border-border">
@@ -185,11 +175,11 @@ export default function ProjectSidebar({ projectId }) {
               <div className="flex items-center gap-2">
                 <div 
                   className="w-6 h-6 rounded-md flex items-center justify-center text-white text-sm font-medium"
-                  style={{ backgroundColor: project?.theme_color || '#E91E63' }}
+                  style={{ backgroundColor: themeColor || '#E91E63' }}
                 >
-                  {getProjectInitial(project?.project_name)}
+                  {getProjectInitial(projectName)}
                 </div>
-                <span className="text-sm font-medium">{project ? project.project_name : 'Project'}</span>
+                <span className="text-sm font-medium">{projectName}</span>
               </div>
               <ChevronDown className="ml-auto text-muted-foreground"/>
             </button>
@@ -325,7 +315,9 @@ export default function ProjectSidebar({ projectId }) {
 
           {/* 创建团队按钮 */}
           <button 
-            onClick={() => setDialogOpen(true)} 
+            onClick={() => {
+              setDialogOpen(true);
+            }} 
             className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors mt-2"
           >
             <Plus size={16} className="text-muted-foreground" />
@@ -335,7 +327,10 @@ export default function ProjectSidebar({ projectId }) {
 
         <CreateTeamDialog 
           isOpen={isDialogOpen} 
-          onClose={() => setDialogOpen(false)} 
+          onClose={() => {
+            setDialogOpen(false);
+            fetchTeams();
+          }} 
           projectId={projectId}
         />
       </div>

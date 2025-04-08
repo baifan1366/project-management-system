@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useChat } from './ChatContext';
 import { supabase } from '@/lib/supabase';
-import ChatDialog from '@/components/ChatDialog';
+import ChatDialog from '@/components/chat/ChatDialog';
 import { usePathname } from 'next/navigation';
 
 const ChatDialogContext = createContext();

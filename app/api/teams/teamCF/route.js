@@ -6,19 +6,28 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const teamId = searchParams.get('teamId')
+    const teamCFId = searchParams.get('teamCFId')
 
     if (!teamId) {
       return NextResponse.json({ error: '需要团队ID' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('team_custom_field')
       .select(`
         *,
         custom_field (*)
       `)
       .eq('team_id', teamId)
-      .order('order_index')
+
+    // 如果提供了teamCFId，则获取单个字段详情
+    if (teamCFId) {
+      query = query.eq('id', teamCFId).single()
+    } else {
+      query = query.order('order_index')
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 
@@ -37,7 +46,7 @@ export async function POST(request) {
     const body = await request.json()
     console.log('接收到的请求体:', body);
     
-    const { customFieldId, config, order_index, created_by } = body
+    const { customFieldId, order_index, created_by } = body
 
     if (!teamId || !customFieldId) {
       console.log('缺少必需参数:', { teamId, customFieldId });
@@ -48,7 +57,6 @@ export async function POST(request) {
       .insert({
         team_id: teamId,
         custom_field_id: customFieldId,
-        config: config || {},
         order_index,
         created_by: created_by
       })

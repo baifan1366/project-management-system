@@ -2,34 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { fetchProjects } from '@/lib/redux/features/projectSlice';
+import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from '@/lib/supabase';
 
 export default function ProjectsPage() {
-  const dispatch = useDispatch();
-  const router = useRouter();
   const { locale } = useParams();
-  const { projects, status, error } = useSelector((state) => state.projects);
+  const { projects, status } = useSelector(( state) => state.projects);
   const t = useTranslations('Projects');
   const [formattedProjects, setFormattedProjects] = useState([]);
-
-  const clearCredentialsAndLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      
-      localStorage.clear();
-      
-      router.push(`/${locale}/login`);
-    } catch (err) {
-      console.error('Error clearing credentials:', err);
-    }
-  };
 
   useEffect(() => {
     if (projects.length > 0) {
@@ -63,21 +47,14 @@ export default function ProjectsPage() {
     <div className="h-full">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold tracking-tight">{t('projects')}</h1>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={clearCredentialsAndLogout}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4 py-2"
-          >
-            Clear Credentials & Logout
-          </button>
-          
+
           <Link
             href={`/${locale}/createProject`}
             className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
           >
             {t('createNewProject')}
           </Link>
-        </div>
+
       </div>
       <ScrollArea className="h-[calc(100vh-10rem)]">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
