@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, startOfWeek, addDays, getDay, isSameDay, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchTasks } from '@/lib/redux/features/taskSlice';
+import { fetchTaskById } from '@/lib/redux/features/taskSlice';
 import CreateCalendarEvent from '@/components/CreateCalendarEvent';
 import { toast } from 'sonner';
 
@@ -105,7 +105,7 @@ export default function CalendarPage() {
 
   // 加载任务数据
   useEffect(() => {
-    dispatch(fetchTasks());
+    dispatch(fetchTaskById());
   }, [dispatch]);
 
   // 获取个人日历事件

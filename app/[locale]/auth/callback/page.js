@@ -59,6 +59,12 @@ export default function AuthCallbackPage() {
               name: user.identities?.[0]?.identity_data?.preferred_username || user.email.split('@')[0],
               avatar_url: user.identities?.[0]?.identity_data?.avatar_url,
             };
+          } else if (provider === 'azure') {
+            userData = {
+              ...userData,
+              name: user.identities?.[0]?.identity_data?.name || user.email.split('@')[0],
+              avatar_url: user.identities?.[0]?.identity_data?.avatar_url,
+            };
           } else {
             // 本地注册用户
             userData = {

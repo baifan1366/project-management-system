@@ -5,7 +5,7 @@ import { Send, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
-import PengyImage from '../public/pengy.webp';
+import PengyImage from '../../public/pengy.webp';
 import { useChat } from '@/contexts/ChatContext';
 import { supabase } from '@/lib/supabase';
 import ChatMessage from '@/components/ui/chat-message';

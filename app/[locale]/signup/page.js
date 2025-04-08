@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaGoogle, FaGithub } from 'react-icons/fa';
+import { FaGoogle, FaGithub, FaMicrosoft } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import LogoImage from '../../../public/logo.png';
 
@@ -119,6 +119,25 @@ export default function SignupPage() {
     }
   };
 
+  const handleMicrosoftSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'azure',
+        options: {
+          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/auth/callback`,
+          scopes: 'email profile openid',
+        },
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Microsoft sign in error:', err);
+      setError(err.message || 'Failed to sign in with Microsoft. Please try again.');
+      setLoading(false);
+    }
+  };
+
   const handleResendVerification = async () => {
     setError('');
     setLoading(true);
@@ -211,6 +230,14 @@ export default function SignupPage() {
             >
               <FaGithub className="w-5 h-5" />
               Sign up with GitHub
+            </button>
+
+            <button
+              onClick={handleMicrosoftSignIn}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <FaMicrosoft className="w-5 h-5 text-blue-500" />
+              Sign up with Microsoft
             </button>
           </div>
 
