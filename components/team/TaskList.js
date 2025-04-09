@@ -194,7 +194,7 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   
   // 处理部门加载
   useEffect(() => {
-    if (teamId && !hasLoadedSections.current && sectionsStatus !== 'loading') {
+    if (teamId && !hasLoadedSections.current) {
       setTimeout(loadSections, 0);
     }
   }, [teamId, sectionsStatus]);
@@ -218,11 +218,6 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
       loadTag();
       loadSections();
     }, 100);
-  };
-
-  // 处理调整宽度结束
-  const handleResizeEnd = () => {
-    setResizingTagIndex(null);
   };
 
   // 处理拖放结束事件
@@ -552,18 +547,14 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
                               }`}
                               style={{
                                 ...provided.draggableProps.style,
-                                width: `${index === 0 ? getTagWidth(index) + 44 : getTagWidth(index)}px`,
-                                minWidth: `${index === 0 ? getTagWidth(index) + 44 : getTagWidth(index)}px`,
-                                maxWidth: `${index === 0 ? getTagWidth(index) + 44 : getTagWidth(index)}px`,
+                                width: `${index === 0 ? getTagWidth(index) + 36 : getTagWidth(index)}px`,
+                                minWidth: `${index === 0 ? getTagWidth(index) + 36 : getTagWidth(index)}px`,
+                                maxWidth: `${index === 0 ? getTagWidth(index) + 36 : getTagWidth(index)}px`,
                               }}
                             >
                               <div className="flex items-center p-2 font-medium text-sm">
                                 {tag}
                               </div>
-                              {/* 调整宽度的手柄 */}
-                              <div 
-                                className="absolute top-0 right-0 h-full w-2 cursor-col-resize hover:bg-primary/30 z-20"
-                              />
                             </div>
                           )}
                         </Draggable>
@@ -631,14 +622,6 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
         teamId={teamId}
         teamCFId={teamCFId}
       />
-      
-      {/* 遮罩层，仅在调整宽度时显示，用于捕获整个页面的鼠标事件 */}
-      {resizingTagIndex !== null && (
-        <div 
-          className="fixed inset-0 z-50 cursor-col-resize" 
-          onClick={handleResizeEnd}
-        />
-      )}
     </div>
   );
 }
