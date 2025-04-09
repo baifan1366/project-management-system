@@ -6,6 +6,7 @@ import SearchInput from '@/components/search/SearchInput';
 import SearchResults from '@/components/search/SearchResults';
 import RecentSearches from '@/components/search/RecentSearches';
 import SuggestedSearches from '@/components/search/SuggestedSearches';
+import { supabase } from '@/lib/supabase';
 
 export default function SearchPage() {
   const t = useTranslations();
@@ -14,35 +15,32 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
 
-  // 加载最近搜索记录
+  // Load recent searches
   useEffect(() => {
-    const storedSearches = localStorage.getItem('recentSearches');
-    if (storedSearches) {
-      setRecentSearches(JSON.parse(storedSearches));
+    async function loadRecentSearches() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { data, error } = await supabase
+          .from('search_history')
+          .select('search_term')
+          .eq('user_id', session.user.id)
+          .order('last_searched_at', { ascending: false })
+          .limit(10);
+
+        if (error) throw error;
+        
+        setRecentSearches(data.map(item => item.search_term));
+      } catch (error) {
+        console.error('Failed to load recent searches:', error);
+      }
     }
+
+    loadRecentSearches();
   }, []);
 
-  // 保存搜索记录
-  const saveSearch = (searchQuery) => {
-    if (!searchQuery.trim()) return;
-    
-    const searches = [...recentSearches];
-    // 如果已经存在相同搜索，移除它
-    const existingIndex = searches.findIndex(s => s.toLowerCase() === searchQuery.toLowerCase());
-    if (existingIndex !== -1) {
-      searches.splice(existingIndex, 1);
-    }
-    
-    // 添加到数组开头
-    searches.unshift(searchQuery);
-    
-    // 最多保存10条搜索记录
-    const updatedSearches = searches.slice(0, 10);
-    setRecentSearches(updatedSearches);
-    localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
-  };
-
-  // 处理搜索请求
+  // Handle search request
   const handleSearch = async (searchQuery = query) => {
     if (!searchQuery.trim()) {
       setResults([]);
@@ -56,20 +54,82 @@ export default function SearchPage() {
       
       if (response.ok) {
         setResults(data.results || []);
-        saveSearch(searchQuery);
+        
+        // Update recent searches
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          // First check if this search term already exists for this user
+          const { data: existingSearch, error: fetchError } = await supabase
+            .from('search_history')
+            .select('id, count')
+            .eq('search_term', searchQuery)
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          if (fetchError) {
+            console.error('Failed to check existing search:', fetchError);
+          } else if (existingSearch) {
+            // Update existing record
+            const { error: updateError } = await supabase
+              .from('search_history')
+              .update({
+                count: existingSearch.count + 1,
+                last_searched_at: new Date().toISOString()
+              })
+              .eq('id', existingSearch.id);
+              
+            if (updateError) console.error('Failed to update search history:', updateError);
+          } else {
+            // Insert new record
+            const { error: insertError } = await supabase
+              .from('search_history')
+              .insert({
+                search_term: searchQuery,
+                user_id: session.user.id,
+                count: 1
+              });
+              
+            if (insertError) console.error('Failed to insert search history:', insertError);
+          }
+          
+          // Reload recent searches
+          const { data: recentData } = await supabase
+            .from('search_history')
+            .select('search_term')
+            .eq('user_id', session.user.id)
+            .order('last_searched_at', { ascending: false })
+            .limit(10);
+          
+          if (recentData) {
+            setRecentSearches(recentData.map(item => item.search_term));
+          }
+        }
       } else {
-        console.error('搜索失败:', data.error);
+        console.error('Search failed:', data.error);
       }
     } catch (error) {
-      console.error('搜索请求失败:', error);
+      console.error('Search request failed:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleClearRecent = () => {
-    setRecentSearches([]);
-    localStorage.removeItem('recentSearches');
+  const handleClearRecent = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { error } = await supabase
+        .from('search_history')
+        .delete()
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+      
+      setRecentSearches([]);
+    } catch (error) {
+      console.error('Failed to clear search history:', error);
+    }
   };
 
   return (
