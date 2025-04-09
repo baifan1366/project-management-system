@@ -188,10 +188,10 @@ export default function TeamCustomFieldPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-2">
-      <div className="border-0 bg-background text-foreground">
-        <div className="border-b">
-          <div className="flex items-center justify-between">
+    <div className="w-full px-0 max-w-none overflow-hidden">
+      <div className="w-full max-w-none border-0 bg-background text-foreground">
+        <div className="w-full">
+          <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-semibold">{selectedTeam?.name}</h2>
               <DropdownMenu>
@@ -260,8 +260,8 @@ export default function TeamCustomFieldPage() {
           </div>
           <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
         </div>
-        <div className="p-0">
-          <div className="border-b p-2 flex items-center justify-between">
+        <div className="w-full p-0">
+          <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm">
                 <Plus className="h-4 w-4 mr-1" />
@@ -294,7 +294,9 @@ export default function TeamCustomFieldPage() {
             </div>
           </div>
         </div>
-        {customFieldContent}
+        <div className="w-full max-w-none">
+          {customFieldContent}
+        </div>
       </div>
     </div>
   );

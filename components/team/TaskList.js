@@ -8,12 +8,13 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import CreateTagDialog from './TagDialog';
 import { getTags, resetTagsStatus } from '@/lib/redux/features/teamCFSlice';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
-import { fetchTasksBySectionId, fetchTaskById, createTask } from '@/lib/redux/features/taskSlice';
+import { fetchTasksBySectionId, createTask } from '@/lib/redux/features/taskSlice';
+import { updateTaskIds } from '@/lib/redux/features/sectionSlice';
+import { supabase } from '@/lib/supabase';
 import {
   Table,
   TableHeader,
   TableBody,
-  TableHead,
   TableRow,
   TableCell
 } from '@/components/ui/table';
@@ -53,8 +54,10 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   const [tagWidths, setTagWidths] = useState({});
   // 存储任务数据
   const [localTasks, setLocalTasks] = useState({});
-  // 存储正在调整宽度的标签索引
-  const [resizingTagIndex, setResizingTagIndex] = useState(null);
+  // 存储编辑中的任务状态
+  const [editingTask, setEditingTask] = useState(null);
+  // 存储编辑中的任务内容
+  const [editingTaskValues, setEditingTaskValues] = useState({});
 
   // 从Redux状态中获取标签数据
   const { tags: tagsData, tagsStatus } = useSelector((state) => state.teamCF);
@@ -308,9 +311,115 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
 
   // 添加新任务
   const handleAddTask = (sectionId) => {
-    console.log('向部门', sectionId, '添加任务');
-    // 在这里添加创建任务的逻辑
-    // dispatch(createTask({ ... }));
+    // 创建临时的任务ID
+    const tempTaskId = `temp-${Date.now()}`;
+    
+    // 创建空的编辑状态任务
+    const newEmptyTask = {
+      id: tempTaskId,
+      tag_values: {},
+      isNew: true,
+      sectionId: sectionId
+    };
+    
+    // 更新本地任务列表，添加空任务行
+    setLocalTasks(prevTasks => ({
+      ...prevTasks,
+      [sectionId]: [...(prevTasks[sectionId] || []), newEmptyTask]
+    }));
+    
+    // 设置为编辑状态
+    setEditingTask(tempTaskId);
+    setEditingTaskValues({});
+  };
+
+  // 处理任务值更新
+  const handleTaskValueChange = (taskId, tagId, value) => {
+    setEditingTaskValues(prev => ({
+      ...prev,
+      [tagId]: value
+    }));
+  };
+
+  // 处理任务编辑完成
+  const handleTaskEditComplete = async (taskId, sectionId) => {
+    if (!editingTask || editingTask !== taskId) return;
+    
+    // 如果没有填写任何标签值，或者所有值都为空，则取消操作
+    const hasValues = Object.values(editingTaskValues).some(value => value && value.trim() !== '');
+    if (!hasValues) {
+      // 从本地任务列表中移除临时任务
+      setLocalTasks(prevTasks => ({
+        ...prevTasks,
+        [sectionId]: (prevTasks[sectionId] || []).filter(task => task.id !== taskId)
+      }));
+      
+      // 清除编辑状态
+      setEditingTask(null);
+      setEditingTaskValues({});
+      return;
+    }
+    
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      
+      // 确保至少有一个值，如果第一个标签值是空的，设置默认值
+      const tagValues = { ...editingTaskValues };
+      if (!tagValues['1'] || tagValues['1'].trim() === '') {
+        tagValues['1'] = '新任务';
+      }
+      
+      // 准备任务数据
+      const taskData = {
+        tag_values: tagValues,
+        created_by: userId,
+      };
+      
+      // 创建任务
+      const result = await dispatch(createTask({ ...taskData }));
+      
+      // 获取所有任务IDs并添加新任务ID
+      const taskIds = (localTasks[sectionId] || [])
+        .filter(task => !task.isNew) // 过滤掉临时任务
+        .map(task => task.id);
+      
+      // 添加新创建的任务ID
+      taskIds.push(result.payload.id);
+      
+      // 更新部门的任务IDs
+      await dispatch(updateTaskIds({
+        sectionId,
+        teamId,
+        newTaskIds: taskIds
+      }));
+      
+      // 重新加载任务
+      await loadAllSectionTasks();
+      
+      // 清除编辑状态
+      setEditingTask(null);
+      setEditingTaskValues({});
+    } catch (error) {
+      console.error('保存任务失败:', error);
+      
+      // 发生错误时也要清理临时任务
+      setLocalTasks(prevTasks => ({
+        ...prevTasks,
+        [sectionId]: (prevTasks[sectionId] || []).filter(task => task.id !== taskId)
+      }));
+      
+      setEditingTask(null);
+      setEditingTaskValues({});
+    }
+  };
+
+  // 处理按键事件
+  const handleKeyDown = (e, taskId, sectionId) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTaskEditComplete(taskId, sectionId);
+    }
   };
 
   // 计算总列数（标签列 + 操作列）
@@ -435,8 +544,14 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     // 如果该部门没有任务，显示没有任务的提示
     if (!localTasks[sectionId] || localTasks[sectionId].length === 0) {
       return (
-        <div className="text-muted-foreground text-sm p-2 text-center">
-          没有任务
+        <div className="text-muted-foreground text-sm p-1 text-center">
+          <Button 
+            variant="ghost" 
+            className="text-muted-foreground p-1 text-center"
+            onClick={() => handleAddTask(sectionId)}
+          >
+            <Plus size={16} className="text-muted-foreground" />
+          </Button>
         </div>
       );
     }
@@ -447,10 +562,8 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className="space-y-1"
           >
             {localTasks[sectionId].map((task, taskIndex) => {
-              console.log('渲染单个任务', task);
               return (
                 <Draggable
                   key={`task-${task.id}`}
@@ -487,17 +600,42 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
                               tagValue = task.tag_values[tagId];
                             }
                             
+                            // 检查是否是正在编辑的任务
+                            const isEditing = editingTask === task.id;
+                            
                             return (
                               <div 
                                 key={`task-${task.id}-tag-${tagId}`} 
-                                className="p-2 overflow-hidden text-ellipsis whitespace-nowrap border-r"
+                                className={`p-2 overflow-hidden text-ellipsis whitespace-nowrap border-r ${isEditing ? 'bg-accent/10' : ''}`}
                                 style={{
                                   width: `${getTagWidth(tagIndex)}px`,
                                   minWidth: `${getTagWidth(tagIndex)}px`, 
                                   maxWidth: `${getTagWidth(tagIndex)}px`,
                                 }}
+                                onClick={() => {
+                                  if (task.isNew && !isEditing) {
+                                    setEditingTask(task.id);
+                                  }
+                                }}
                               >
-                                {tagValue}
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={editingTaskValues[tagId] || ''}
+                                    onChange={(e) => handleTaskValueChange(task.id, tagId, e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, task.id, task.sectionId)}
+                                    onBlur={() => {
+                                      if (Object.keys(editingTaskValues).length > 0) {
+                                        handleTaskEditComplete(task.id, task.sectionId);
+                                      }
+                                    }}
+                                    autoFocus={tagIndex === 0}
+                                    className="w-full bg-transparent border-none focus:outline-none"
+                                    placeholder={`输入${tag}`}
+                                  />
+                                ) : (
+                                  tagValue
+                                )}
                               </div>
                             );
                           })}
@@ -508,6 +646,15 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
                 </Draggable>
               );
             })}
+            <div className="text-muted-foreground text-sm p-1 text-center">
+              <Button 
+                variant="ghost" 
+                className="text-muted-foreground p-1 text-center"
+                onClick={() => handleAddTask(sectionId)}
+              >
+                <Plus size={16} className="text-muted-foreground" />
+              </Button>
+            </div>
             {provided.placeholder}
           </div>
         )}
@@ -516,8 +663,8 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   };
 
   return (
-    <div>
-      <Table>
+    <div className="w-full overflow-hidden">
+      <Table className="w-full">
         <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
           <TableHeader>
             <TableRow>
@@ -578,7 +725,7 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
             </TableRow>
           </TableHeader>
           
-          <TableBody>
+          <TableBody className="overflow-auto">
             <TableRow>
               <TableCell colSpan={totalColumns+1} className="p-0">
                 <Droppable droppableId="sections" type="SECTION">
@@ -586,7 +733,6 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className="space-y-2"
                     >
                       {/* 部门列表 */}
                       {sectionInfo.length > 0 ? (

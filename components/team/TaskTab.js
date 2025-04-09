@@ -148,7 +148,7 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
         <Droppable droppableId="tabs" direction="horizontal">
           {(provided) => (
             <TabsList 
-              className="border-b-0" 
+              className="border-b-0 w-full" 
               ref={provided.innerRef}
               {...provided.droppableProps}
             >
@@ -163,7 +163,7 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
                         value={`${field.id}`}
-                        className="flex items-center gap-1"
+                        className="flex items-center gap-1 hover:text-accent-foreground"
                         title={fieldValue?.value || field.custom_field?.default_value || ''}
                       >
                         {(() => {
