@@ -319,7 +319,8 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
                   eventTitle: formData.title,
                   startTime: startDateTime,
                   endTime: endDateTime,
-                  isMeetingInvitation: true
+                  isMeetingInvitation: true,
+                  inviterId: session.user.id
                 },
                 is_read: false
               });

@@ -16,6 +16,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import CreateCalendarEvent from '@/components/CreateCalendarEvent';
 import { toast } from 'sonner';
 import { FaGoogle } from 'react-icons/fa';
+import { WeekView, DayView } from '@/components/calendar';
 
 export default function CalendarPage() {
   const t = useTranslations('Calendar');
@@ -247,6 +248,26 @@ export default function CalendarPage() {
     setCurrentDate(prev => addMonths(prev, 1));
   };
 
+  const handlePrevWeek = () => {
+    setCurrentDate(prev => addDays(prev, -7));
+  };
+
+  const handleNextWeek = () => {
+    setCurrentDate(prev => addDays(prev, 7));
+  };
+
+  const handlePrevDay = () => {
+    setCurrentDate(prev => addDays(prev, -1));
+  };
+
+  const handleNextDay = () => {
+    setCurrentDate(prev => addDays(prev, 1));
+  };
+
+  const handleTodayClick = () => {
+    setCurrentDate(new Date());
+  };
+
   const handleConnectGoogle = async () => {
     try {
       // 总是请求日历权限
@@ -410,14 +431,27 @@ export default function CalendarPage() {
         </Tabs>
         
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+          <Button variant="outline" size="icon" onClick={() => {
+            if (view === 'month') handlePrevMonth();
+            else if (view === 'week') handlePrevWeek();
+            else handlePrevDay();
+          }}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="font-medium">
-            {format(currentDate, 'MMMM yyyy')}
+            {view === 'month' && format(currentDate, 'MMMM yyyy')}
+            {view === 'week' && `${format(startOfWeek(currentDate), 'MMM d')} - ${format(addDays(startOfWeek(currentDate), 6), 'MMM d, yyyy')}`}
+            {view === 'day' && format(currentDate, 'EEEE, MMMM d, yyyy')}
           </div>
-          <Button variant="outline" size="icon" onClick={handleNextMonth}>
+          <Button variant="outline" size="icon" onClick={() => {
+            if (view === 'month') handleNextMonth();
+            else if (view === 'week') handleNextWeek();
+            else handleNextDay();
+          }}>
             <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" className="ml-2" onClick={handleTodayClick}>
+            {t('today')}
           </Button>
         </div>
         
@@ -842,82 +876,35 @@ export default function CalendarPage() {
 
   // 渲染周视图
   const renderWeekView = () => {
-    // 周视图实现（基本结构）
     return (
-      <Card className="p-3">
-        <div className="min-h-[600px] flex flex-col">
-          <div className="grid grid-cols-8 border-b">
-            <div className="py-2 px-3 text-center font-medium"></div>
-            {Array.from({ length: 7 }).map((_, index) => {
-              const date = addDays(startOfWeek(currentDate), index);
-              return (
-                <div 
-                  key={index} 
-                  className="py-2 px-3 text-center font-medium border-l cursor-pointer hover:bg-accent/5"
-                  onClick={() => handleOpenCreateEvent(date)}
-                >
-                  <div>{t(format(date, 'EEE').toLowerCase())}</div>
-                  <div className={cn(
-                    "inline-flex h-7 w-7 items-center justify-center rounded-full text-sm mx-auto mt-1",
-                    isSameDay(date, new Date()) && "bg-primary text-primary-foreground"
-                  )}>
-                    {format(date, 'd')}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          <div className="flex-1 overflow-auto">
-            {/* 时间段和事件将在这里渲染 */}
-            <div className="text-center py-10 text-muted-foreground">
-              {!isGoogleConnected ? (
-                <div>
-                  <p className="mb-4">{t('connectGoogleCalendarPrompt')}</p>
-                  <div className="flex justify-center space-x-2">
-                    <Button onClick={handleConnectGoogle}>
-                      {t('connectGoogle')}
-                    </Button>
-                    <Button variant="outline" onClick={() => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`}>
-                      {t('goToSettings')}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <p>{t('weekViewComingSoon')}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
+      <WeekView
+        currentDate={currentDate}
+        handleOpenCreateEvent={handleOpenCreateEvent}
+        t={t}
+        isGoogleConnected={isGoogleConnected}
+        handleConnectGoogle={handleConnectGoogle}
+        googleEvents={googleEvents}
+        personalEvents={personalEvents}
+        tasks={tasks}
+        googleCalendarColors={googleCalendarColors}
+      />
     );
   };
 
   // 渲染日视图
   const renderDayView = () => {
-    // 日视图实现（基本结构）
     return (
-      <Card className="p-3">
-        <div className="min-h-[600px]">
-          <div className="text-center py-10 text-muted-foreground">
-            {!isGoogleConnected ? (
-              <div>
-                <p className="mb-4">{t('connectGoogleCalendarPrompt')}</p>
-                <div className="flex justify-center space-x-2">
-                  <Button onClick={handleConnectGoogle}>
-                    {t('connectGoogle')}
-                  </Button>
-                  <Button variant="outline" onClick={() => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`}>
-                    {t('goToSettings')}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p>{t('dayViewComingSoon')}</p>
-            )}
-          </div>
-        </div>
-      </Card>
+      <DayView
+        currentDate={currentDate}
+        handleOpenCreateEvent={handleOpenCreateEvent}
+        t={t}
+        isGoogleConnected={isGoogleConnected}
+        handleConnectGoogle={handleConnectGoogle}
+        googleEvents={googleEvents}
+        personalEvents={personalEvents}
+        tasks={tasks}
+        googleCalendarColors={googleCalendarColors}
+      />
     );
   };
 
