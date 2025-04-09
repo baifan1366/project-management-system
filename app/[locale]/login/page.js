@@ -161,6 +161,25 @@ export default function LoginPage() {
     }
   };
 
+  // const handleMicrosoftSignIn = async () => {
+  //   setError('');
+  //   setLoading(true);
+  //   try {
+  //     const { error } = await supabase.auth.signInWithOAuth({
+  //       provider: 'azure',
+  //       options: {
+  //         redirectTo: buildRedirectUrl(),
+  //         scopes: 'email profile openid',
+  //       },
+  //     });
+  //     if (error) throw error;
+  //   } catch (err) {
+  //     console.error('Microsoft sign in error:', err);
+  //     setError(err.message || 'Failed to sign in with Microsoft. Please try again.');
+  //     setLoading(false);
+  //   }
+  // };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -198,6 +217,7 @@ export default function LoginPage() {
               <FaGithub className="w-5 h-5" />
               Sign in with GitHub
             </button>
+
           </div>
 
           <div className="relative my-8">

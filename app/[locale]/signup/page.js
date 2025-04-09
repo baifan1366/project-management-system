@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaGoogle, FaGithub } from 'react-icons/fa';
+import { FaGoogle, FaGithub, FaMicrosoft } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import LogoImage from '../../../public/logo.png';
 
@@ -118,6 +118,25 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
+
+  // const handleMicrosoftSignIn = async () => {
+  //   setError('');
+  //   setLoading(true);
+  //   try {
+  //     const { error } = await supabase.auth.signInWithOAuth({
+  //       provider: 'azure',
+  //       options: {
+  //         redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/auth/callback`,
+  //         scopes: 'email profile openid',
+  //       },
+  //     });
+  //     if (error) throw error;
+  //   } catch (err) {
+  //     console.error('Microsoft sign in error:', err);
+  //     setError(err.message || 'Failed to sign in with Microsoft. Please try again.');
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleResendVerification = async () => {
     setError('');

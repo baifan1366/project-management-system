@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Rule: Write Code Comments in English
+
+Please write all code comments in English, even if the code itself is in another language. Avoid using Chinese or any other non-English language in comments.

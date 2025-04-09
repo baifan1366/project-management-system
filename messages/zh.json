@@ -290,7 +290,8 @@
     "userNotLoggedIn": "用户未登录或会话不存在",
     "notParticipant": "您不是该聊天会话的参与者，无法发送消息",
     "uploadFailed": "上传失败",
-    "unknown": "未知错误"
+    "unknown": "未知错误",
+    "searchFailed": "搜索失败，请稍后再试"
   },
   "Pricing": {
     "title": "方案和价格",
@@ -783,5 +784,38 @@
       "older": "更早"
     },
     "joinMeeting": "加入会议"
+  },
+  "search": {
+    "title": "搜索",
+    "placeholder": "搜索项目、任务、用户等...",
+    "button": "搜索",
+    "searching": "正在搜索...",
+    "noResults": "未找到结果",
+    "tryDifferent": "请尝试使用不同的关键词或检查拼写",
+    "resultsFound": "个结果",
+    "types": {
+      "project": "项目",
+      "task": "任务",
+      "user": "用户",
+      "team": "团队",
+      "calendar": "日历",
+      "message": "消息"
+    },
+    "recentSearches": "最近搜索",
+    "suggestedSearches": "推荐搜索",
+    "clearAll": "清除全部",
+    "createdAt": "创建于",
+    "project": "项目",
+    "creator": "创建者",
+    "status": "状态",
+    "untitled": "无标题",
+    "message": "聊天消息",
+    "suggestions": {
+      "projects": "进行中的项目",
+      "tasks": "我的任务",
+      "teams": "我的团队",
+      "reports": "月度报告",
+      "team": "团队成员"
+    }
   }
 }

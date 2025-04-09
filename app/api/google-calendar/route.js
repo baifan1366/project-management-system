@@ -47,66 +47,151 @@ async function refreshAccessToken(refreshToken) {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: process.env.NEXT_PUBLIC_SUPABASE_GOOGLE_CLIENT_ID,
-        client_secret: process.env.NEXT_PUBLIC_SUPABASE_GOOGLE_CLIENT_SECRET,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
       }),
     });
-    
+
     if (!response.ok) {
-      throw new Error('Failed to refresh access token');
+      const error = await response.json();
+      console.error('Failed to refresh access token:', error);
+      return null;
     }
-    
+
     const data = await response.json();
-    return data.access_token;
+    return {
+      access_token: data.access_token,
+      expires_in: data.expires_in,
+      token_type: data.token_type,
+    };
   } catch (error) {
     console.error('Error refreshing access token:', error);
-    throw error;
+    return null;
+  }
+}
+
+async function updateUserMetadata(userId, accessToken, refreshToken) {
+  try {
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        google_tokens: {
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          updated_at: new Date().toISOString()
+        }
+      }
+    });
+
+    if (error) {
+      console.error('Failed to update user metadata:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating user metadata:', error);
+    return false;
   }
 }
 
 export async function GET(request) {
   try {
-    // 获取查询参数
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('start');
     const endDate = searchParams.get('end');
-    const accessToken = searchParams.get('access_token');
+    let accessToken = searchParams.get('access_token');
     const refreshToken = searchParams.get('refresh_token');
-    
+
     if (!startDate || !endDate) {
       return NextResponse.json(
-        { error: 'Start and end dates are required' },
+        { error: 'Missing required parameters' },
         { status: 400 }
       );
     }
-    
-    // 使用前端传递的token
-    let token = accessToken;
-    
-    // 如果没有访问令牌，但有刷新令牌，尝试刷新
-    if (!token && refreshToken) {
-      token = await refreshAccessToken(refreshToken);
-    }
-    
-    if (!token) {
+
+    if (!accessToken && !refreshToken) {
       return NextResponse.json(
-        { error: 'No access token available' },
+        { error: 'No valid tokens provided' },
         { status: 401 }
       );
     }
-    
-    // 获取日历事件
-    const events = await getCalendarEvents(token, startDate, endDate);
-    
-    return NextResponse.json({ events });
+
+    // If we only have a refresh token, try to get a new access token
+    if (!accessToken && refreshToken) {
+      const tokenData = await refreshAccessToken(refreshToken);
+      if (!tokenData) {
+        return NextResponse.json(
+          { error: 'Failed to refresh access token' },
+          { status: 401 }
+        );
+      }
+      accessToken = tokenData.access_token;
+    }
+
+    // Fetch calendar events
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startDate}T00:00:00Z&timeMax=${endDate}T23:59:59Z&singleEvents=true&orderBy=startTime`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (response.status === 401 && refreshToken) {
+      // Token expired, try to refresh
+      const tokenData = await refreshAccessToken(refreshToken);
+      if (!tokenData) {
+        return NextResponse.json(
+          { error: 'Failed to refresh access token' },
+          { status: 401 }
+        );
+      }
+
+      // Retry with new access token
+      const retryResponse = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startDate}T00:00:00Z&timeMax=${endDate}T23:59:59Z&singleEvents=true&orderBy=startTime`,
+        {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+          },
+        }
+      );
+
+      if (!retryResponse.ok) {
+        return NextResponse.json(
+          { error: 'Failed to fetch calendar events' },
+          { status: retryResponse.status }
+        );
+      }
+
+      const events = await retryResponse.json();
+
+      // Update user metadata with new tokens
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await updateUserMetadata(session.user.id, tokenData.access_token, refreshToken);
+      }
+
+      return NextResponse.json(events);
+    }
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: 'Failed to fetch calendar events' },
+        { status: response.status }
+      );
+    }
+
+    const events = await response.json();
+    return NextResponse.json(events);
   } catch (error) {
-    console.error('API Error:', error);
-    
+    console.error('Error in Google Calendar API:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: error.status || 500 }
+      { error: 'Internal server error' },
+      { status: 500 }
     );
   }
 }

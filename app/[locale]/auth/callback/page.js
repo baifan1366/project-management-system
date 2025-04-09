@@ -53,10 +53,34 @@ export default function AuthCallbackPage() {
               name: user.identities?.[0]?.identity_data?.full_name || user.email.split('@')[0],
               avatar_url: user.identities?.[0]?.identity_data?.avatar_url,
             };
+            
+            // 保存Google令牌到用户元数据
+            if (user.provider_token || user.provider_refresh_token) {
+              try {
+                await supabase.auth.updateUser({
+                  data: {
+                    google_tokens: {
+                      access_token: user.provider_token,
+                      refresh_token: user.provider_refresh_token,
+                      updated_at: new Date().toISOString()
+                    }
+                  }
+                });
+                console.log('成功保存Google令牌到用户元数据');
+              } catch (error) {
+                console.error('保存Google令牌到用户元数据失败:', error);
+              }
+            }
           } else if (provider === 'github') {
             userData = {
               ...userData,
               name: user.identities?.[0]?.identity_data?.preferred_username || user.email.split('@')[0],
+              avatar_url: user.identities?.[0]?.identity_data?.avatar_url,
+            };
+          } else if (provider === 'azure') {
+            userData = {
+              ...userData,
+              name: user.identities?.[0]?.identity_data?.name || user.email.split('@')[0],
               avatar_url: user.identities?.[0]?.identity_data?.avatar_url,
             };
           } else {
