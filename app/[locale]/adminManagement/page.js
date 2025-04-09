@@ -34,12 +34,6 @@ export default function AdminUserManagement() {
   const [isPasswordMatch, setIsPasswordMatch] = useState(false)
   const [isEmailValid, setIsEmailValid] = useState(false)
 
-  useEffect(()=>{
-    setIsPasswordMatch(password === confirmPassword)
-    console.log("password matach? :", isPasswordMatch)
-
-  }, [password, confirmPassword])
-
   // Verify super admin session and fetch admin data
   useEffect(() => {
     const checkAdminSession = async () => {
@@ -195,23 +189,50 @@ export default function AdminUserManagement() {
   };
   
   // Edit admin
-  const editAdmin = async (adminUserData) => {
+  const editAdmin = async (newAdminData) => {
     try {
       // Prevent non-super admins from elevating privileges
-      if (adminData.role !== 'SUPER_ADMIN' && adminUserData.role === 'SUPER_ADMIN') {
-        throw new Error('Only super admins can create other super admins');
+      if (adminData.role !== 'SUPER_ADMIN') {
+        throw new Error('Only super admins can modify other admins');
       }
+      
+      // Create a filtered version of newAdminData that only includes non-empty values
+      const filteredAdminData = {};
+      
+      // Only include fields that have values
+      if (newAdminData.username && newAdminData.username.trim() !== '') {
+        filteredAdminData.username = newAdminData.username;
+      }
+      
+      if (newAdminData.full_name) {
+        filteredAdminData.full_name = newAdminData.full_name;
+      }
+      
+      if (newAdminData.email && newAdminData.email.trim() !== '') {
+        filteredAdminData.email = newAdminData.email;
+      }
+      
+      if (newAdminData.password_hash && newAdminData.password_hash.trim() !== '') {
+        filteredAdminData.password_hash = newAdminData.password_hash;
+      }
+      
+      if (newAdminData.role && ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(newAdminData.role)) {
+        filteredAdminData.role = newAdminData.role;
+      }
+      
+      // Always update the updated_at timestamp
+      filteredAdminData.updated_at = new Date().toISOString();
       
       const { error } = await supabase
         .from('admin_user')
-        .update(adminUserData)
+        .update(filteredAdminData)
         .eq('id', selectedAdmin.id);
       
       if (error) throw error;
       
       // Update local data
       setAdmins(admins.map(admin => 
-        admin.id === selectedAdmin.id ? { ...admin, ...adminUserData } : admin
+        admin.id === selectedAdmin.id ? { ...admin, ...filteredAdminData } : admin
       ));
       
       // Log activity
@@ -221,7 +242,7 @@ export default function AdminUserManagement() {
           action: 'update_admin_user',
           entity_type: 'admin_user',
           entity_id: selectedAdmin.id,
-          details: { updated_fields: Object.keys(adminUserData) },
+          details: { updated_fields: Object.keys(filteredAdminData) },
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
         });
@@ -394,8 +415,10 @@ export default function AdminUserManagement() {
   useEffect(() => {
     const validationResult = validatePassword(password);
     setIsPasswordValid(validationResult.isValid);
+    setIsPasswordMatch(password === confirmPassword)
     console.log("Password valid?:", validationResult.isValid);
-  }, [password]);
+    console.log("password matach? :", isPasswordMatch)
+  }, [password, confirmPassword]);
 
   if (loading) {
     return (
@@ -551,7 +574,7 @@ export default function AdminUserManagement() {
                           )}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {formatDate(admin.last_login)}
+                          {admin.last_login ? formatDate(admin.last_login) : 'Never logged in'}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
                           <button
@@ -817,6 +840,261 @@ export default function AdminUserManagement() {
         </div>
       </div>
       )}
+
+       {/* Edit admin Modal */}
+      {isModalOpen && modalType === 'edit' && selectedAdmin && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>Edit Admin</h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const newAdminData = {
+                username: username,
+                full_name: fullName,
+                email: email,
+                password_hash: password ,
+                role: selectedRole,
+                updated_at: new Date().toISOString()
+              };
+              
+              editAdmin(newAdminData);
+            }}>
+              <div className='space-y-4'>
+
+                <div>
+                  <label htmlFor='edit-username' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    New Username
+                  </label>
+                  <input
+                    type='text'
+                    id='edit-username'
+                    name='username'
+                    required
+                    defaultValue={selectedAdmin.username}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter new username'
+                    onChange={(e)=> {setUsername(e.target.value)}}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor='edit-fullName' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Full Name (optional)
+                  </label>
+                  <input
+                    type='text'
+                    id='edit-fullName'
+                    name='fullName'
+                    defaultValue={selectedAdmin.full_name || ''}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter new full name'
+                    onChange={(e)=> {setFullName(e.target.value)}}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='edit-email' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Email
+                  </label>
+                  <input
+                    type='email'
+                    id='edit-email'
+                    name='email'
+                    required
+                    defaultValue={selectedAdmin.email || ''}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter email address'
+                    onChange={(e)=>{setEmail(e.target.value)}}
+                  />
+                </div>
+
+                <div>
+                <label htmlFor='newPassword ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  New Password
+                </label>
+                <input
+                  type='password'
+                  id='newPassword'
+                  name='newPassword'
+                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  placeholder='Enter new password'
+                  onChange={(e)=>{setPassword(e.target.value)}}
+                />
+              </div>
+
+              <div>
+                <label htmlFor='confirmNewPassword ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  Confirm New Password
+                </label>
+                <input 
+                type='password'
+                name='confirmNewPassword'
+                id='confirmNewPassword'
+                onChange={(e)=>{setConfirmPassword(e.target.value)}}
+                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                placeholder='Enter confirm password'
+                />
+              </div>
+
+              <div>
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  New Role
+                </label>
+                <div className='flex items-center space-x-4'>
+                  
+                  {roles.map(item => (
+                      <label className='inline-flex items-center' key={item}>
+                        <input
+                          type='radio'
+                          name='role'
+                          value={item}
+                          defaultChecked={selectedAdmin.role === item}
+                          onChange={(e)=>setSelectedRole(e.target.value)}
+                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
+                        />
+                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>{item}</span>
+                      </label>
+                  ))}
+                </div>
+
+              </div>
+               
+                
+                <div className='pt-3 border-t border-gray-200 dark:border-gray-700'>
+                  <p className='text-xs text-gray-500 dark:text-gray-400'>
+                    Admin ID: {selectedAdmin.id}<br />
+                    Created: {formatDate(selectedAdmin.created_at)}<br />
+                    Last Updated: {formatDate(selectedAdmin.updated_at)}
+                  </p>
+                </div>
+              </div>
+              
+              <div className='mt-6 flex justify-end space-x-3'>
+                <button
+                  type='button'
+                  onClick={closeModal}
+                  className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                    text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                >
+                  Cancel
+                </button>
+                
+                <button
+                  type='submit'
+                  className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500'
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Modal */}
+    {isModalOpen && modalType === 'delete' && selectedAdmin && (
+      <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6'>
+          <div className='flex justify-between items-center mb-4'>
+            <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>Delete Admin</h2>
+            <button
+              onClick={closeModal}
+              className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            >
+              &times;
+            </button>
+          </div>
+          
+          <div className='space-y-4'>
+            <div className='flex items-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800'>
+              <div className='flex-shrink-0 mr-3 text-red-500 dark:text-red-400'>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className='text-sm font-medium text-red-800 dark:text-red-200'>Warning: This action cannot be undone</h3>
+                <p className='mt-1 text-sm text-red-700 dark:text-red-300'>
+                  You are about to permanently delete this user account and all associated data.
+                </p>
+              </div>
+            </div>
+            
+            <div className='p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600'>
+              <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>User Details</h4>
+              <div className='flex items-center mb-2'>
+                <div className='w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3'>
+                  {selectedAdmin.username?.charAt(0).toUpperCase() || selectedAdmin.email?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div>
+                  <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.username || 'Admin'}</p>
+                  <p className='text-xs text-gray-500 dark:text-gray-400'>{selectedAdmin.email}</p>
+                </div>
+              </div>
+              <p className='text-xs text-gray-500 dark:text-gray-400'>
+                Registered: {formatDate(selectedAdmin.created_at)}
+              </p>
+            </div>
+            
+            <div className='p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800'>
+              <p className='text-sm text-yellow-700 dark:text-yellow-300'>
+                To confirm deletion, please type <strong>{selectedAdmin.username || selectedAdmin.email}</strong> below:
+              </p>
+              <input
+                type='text'
+                id='delete-confirmation'
+                className='mt-2 w-full px-3 py-2 border border-yellow-300 dark:border-yellow-700 rounded-md text-sm
+                  placeholder-yellow-500 dark:placeholder-yellow-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                  focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500'
+                placeholder={`Type ${selectedAdmin.username || selectedAdmin.email} to confirm`}
+              />
+            </div>
+          </div>
+          
+          <div className='mt-6 flex justify-end space-x-3'>
+            <button
+              type='button'
+              onClick={closeModal}
+              className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+            >
+              Cancel
+            </button>
+            
+            <button
+              type='button'
+              onClick={deleteAdmin}
+              className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2
+                focus:ring-offset-2 focus:ring-red-500'
+            >
+              Delete User
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
       {/* For brevity, I've omitted the actual modal implementation */}
       {/* In a real app, you'd implement modals for adding, editing, and deleting admin users */}
