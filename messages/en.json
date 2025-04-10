@@ -279,6 +279,46 @@
     },
     "noTasks": "No tasks"
   },
+  "myTasks": {
+    "title": "My Tasks",
+    "results": "results",
+    "type": {
+      "label": "TYPE",
+      "pastDue": "Past Due",
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "noDate": "No Date"
+    },
+    "assignedTo": {
+      "label": "ASSIGNED TO",
+      "unassigned": "Unassigned",
+      "me": "Me"
+    },
+    "workspaceTeams": {
+      "label": "WORKSPACE & TEAMS",
+      "all": "All",
+      "shared": "Shared with me",
+      "workspace": "Workspace"
+    },
+    "dueDate": {
+      "label": "DUE DATE",
+      "createdBy": "Created by me"
+    },
+    "filters": {
+      "all": "All Tasks",
+      "assignedToMe": "Assigned to Me",
+      "createdByMe": "Created by Me",
+      "completed": "Completed"
+    },
+    "searchPlaceholder": "Search tasks...",
+    "status": {
+      "todo": "To Do",
+      "in_progress": "In Progress",
+      "done": "Done",
+      "in_review": "In Review"
+    },
+    "noTasks": "No tasks"
+  },
   "notifications": {
     "title": "Notifications",
     "markAllRead": "Mark all as read",
