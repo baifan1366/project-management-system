@@ -13,6 +13,7 @@ import TaskTab from "@/components/team/TaskTab"
 import InvitationDialog from '@/components/team/InvitationDialog';
 import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
 import TaskList from '@/components/team/TaskList';
+import { store } from '@/lib/redux/store';
 
 // 创建记忆化的选择器
 const selectTeams = state => state.teams.teams;
@@ -47,20 +48,17 @@ export default function TeamCustomFieldPage() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    let unsubscribe = null;
+    let isMounted = true;
+    
     const loadData = async () => {
       if (!projectId || !teamId || !teamCFId) return;
 
       try {
         setIsLoading(true);
         
-        // 并行加载团队数据和自定义字段数据
-        const [teamResult] = await Promise.all([
-          dispatch(fetchTeamById(teamId)).unwrap(),
-          dispatch(fetchTeamCustomFieldById({
-            teamId,
-            teamCFId
-          }))
-        ]);
+        // 先加载团队数据
+        const teamResult = await dispatch(fetchTeamById(teamId)).unwrap();
 
         // 检查团队数据是否有效
         const hasValidTeam = teamResult && (
@@ -71,10 +69,42 @@ export default function TeamCustomFieldPage() {
         if (!hasValidTeam) {
           await dispatch(fetchProjectTeams(projectId)).unwrap();
         }
+
+        // 检查Redux状态中是否已加载完成所有团队的自定义字段
+        const teamCustomFieldsStatus = (state) => state.teams.status;
+        const status = teamCustomFieldsStatus(store.getState());
+        
+        // 只有在所有团队的自定义字段加载完成后，才加载特定字段
+        if (status === 'succeeded') {
+          if (isMounted) {
+            await dispatch(fetchTeamCustomFieldById({
+              teamId,
+              teamCFId
+            })).unwrap();
+          }
+        } else {
+          // 如果未加载完成，则监听状态变化
+          unsubscribe = store.subscribe(() => {
+            const currentStatus = teamCustomFieldsStatus(store.getState());
+            if (currentStatus === 'succeeded' && isMounted) {
+              dispatch(fetchTeamCustomFieldById({
+                teamId,
+                teamCFId
+              }));
+              
+              if (unsubscribe) {
+                unsubscribe();
+                unsubscribe = null;
+              }
+            }
+          });
+        }
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -82,8 +112,13 @@ export default function TeamCustomFieldPage() {
     
     // 清理函数
     return () => {
-      // 组件卸载时清除加载状态
+      isMounted = false;
       setIsLoading(false);
+      
+      // 如果存在订阅，则取消订阅
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [dispatch, projectId, teamId, teamCFId]);
 
@@ -153,10 +188,10 @@ export default function TeamCustomFieldPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-2">
-      <div className="border-0 bg-background text-foreground">
-        <div className="border-b">
-          <div className="flex items-center justify-between">
+    <div className="w-full px-0 max-w-none overflow-hidden">
+      <div className="w-full max-w-none border-0 bg-background text-foreground">
+        <div className="w-full">
+          <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-semibold">{selectedTeam?.name}</h2>
               <DropdownMenu>
@@ -225,8 +260,8 @@ export default function TeamCustomFieldPage() {
           </div>
           <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
         </div>
-        <div className="p-0">
-          <div className="border-b p-2 flex items-center justify-between">
+        <div className="w-full p-0">
+          <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm">
                 <Plus className="h-4 w-4 mr-1" />
@@ -259,7 +294,9 @@ export default function TeamCustomFieldPage() {
             </div>
           </div>
         </div>
-        {customFieldContent}
+        <div className="w-full max-w-none">
+          {customFieldContent}
+        </div>
       </div>
     </div>
   );
