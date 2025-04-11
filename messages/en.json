@@ -198,7 +198,7 @@
   },
   "Projects": {
     "create": "Create Project",
-    "statusTitle":"Status",
+    "statusTitle": "Status",
     "status": {
       "pending": "Pending",
       "in_progress": "In Progress",
@@ -437,7 +437,7 @@
     "activeProjects": "active projects",
     "noTeams": "No teams created yet"
   },
-  "CreateProject":{
+  "CreateProject": {
     "createProject": "Create Project",
     "projectName": "Project Name",
     "cancel": "Cancel",
@@ -461,7 +461,7 @@
     "error": "Error",
     "themeColorLoadError": "Theme color load error"
   },
-  "CreateTask":{
+  "CreateTask": {
     "createTask": "Create Task",
     "taskName": "Task Name",
     "cancel": "Cancel",
@@ -564,9 +564,11 @@
     "removeTag": "Remove",
     "loadingTasks": "Loading...",
     "noTasksFound": "No tasks found",
-    "overview": "Overview"
+    "overview": "Overview",
+    "addNewSection": "Add Section",
+    "enterSectionName": "Enter section name..."
   },
-  "ChatDialog":{
+  "ChatDialog": {
     "privateMessages": "Private Messages",
     "groupChat": "Group Chat",
     "privateMessagesContent": "This is the content for private messages.",
@@ -722,7 +724,7 @@
   "CustomField": {
     "title": "Custom Fields",
     "no_available_fields": "No available fields",
-    "add_field": "Add Custom Field",
+    "add_field": "Add",
     "adding": "Adding...",
     "default": "Default",
     "Name": "Name",
@@ -852,10 +854,10 @@
     "accept": "Accept",
     "decline": "Decline",
     "meetingDeclined": "Meeting invitation declined",
-    "color":"color"
+    "color": "color"
   },
   "CreateTag": {
-    "createTag": "Create new field",
+    "createTag": "Create New Field",
     "createTagDescription": "You may create your own field.",
     "tagName": "Field title",
     "tagPlaceholder": "Name, Asignee, Status...",
@@ -883,13 +885,13 @@
     "CREATED-BY": "Created By",
     "description": "Description",
     "descriptionPlaceholder": "Enter description",
-    "cancel":"Cancel",
-    "adding":"Creating...",
+    "cancel": "Cancel",
+    "adding": "Creating...",
     "addTag": "Create",
-    "nameMin":"Field title must be at least 2 characters.",
-    "nameMax":"Field title cannot exceed 50 characters.",
-    "typeRequired":"Field type is required.",
-    "descriptionMax":"Description cannot exceed 100 characters.",
+    "nameMin": "Field title must be at least 2 characters.",
+    "nameMax": "Field title cannot exceed 50 characters.",
+    "typeRequired": "Field type is required.",
+    "descriptionMax": "Description cannot exceed 100 characters.",
     "descriptionMin": "Description must be at least 10 characters.",
     "addDescription": "Add description"
   },
@@ -954,10 +956,10 @@
     "Edit": "Edit",
     "Delete": "Delete",
     "cancel": "Cancel",
-    "nameMin":"Field title must be at least 2 characters.",
-    "nameMax":"Field title cannot exceed 50 characters.",
-    "typeRequired":"Field type is required.",
-    "descriptionMax":"Description cannot exceed 100 characters.",
+    "nameMin": "Field title must be at least 2 characters.",
+    "nameMax": "Field title cannot exceed 50 characters.",
+    "typeRequired": "Field type is required.",
+    "descriptionMax": "Description cannot exceed 100 characters.",
     "descriptionMin": "Description must be at least 10 characters.",
     "addDescription": "Add description",
     "Type": "Type",
