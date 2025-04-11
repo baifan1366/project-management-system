@@ -173,7 +173,7 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       {isDialogOpen && (
         <DialogContent 
-          className="sm:max-w-[500px] p-0"
+          className="sm:max-w-[1000px] p-0"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
@@ -185,12 +185,12 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
                   </DialogDescription>
               </DialogHeader>
           </div>
-          <div className="p-4">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="px-4 pt-2 pb-4">
+            <div className="grid grid-cols-3 gap-4">
               {Array.isArray(availableFields) && availableFields.length > 0 ? (
                 availableFields.map(renderFieldItem)
               ) : (
-                <div className="col-span-2 text-center py-4 text-muted-foreground">
+                <div className="col-span-2 text-center text-muted-foreground">
                   {t('no_available_fields')}
                 </div>
               )}

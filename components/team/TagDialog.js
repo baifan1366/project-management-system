@@ -23,7 +23,6 @@ import { updateTagIds } from '@/lib/redux/features/teamCFSlice'
 import { supabase } from '@/lib/supabase'
 import { Plus, Text, Calendar, User, Sigma, Fingerprint, SquareCheck, CircleCheck, Hash, ClipboardList, Clock3, Tag, Pen, Timer } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
-import { api } from '@/lib/api'
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
 
 export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, teamCFId }) {
@@ -130,7 +129,7 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
             })).unwrap()
             
             // 先获取现有的标签IDs
-            const existingTagsResponse = await api.teams.teamCustomFields.getTags(teamId, teamCFId);
+            const existingTagsResponse = await getTags(teamId, teamCFId);
             const existingTagIds = existingTagsResponse.tag_ids || [];
             
             // 将新标签添加到现有标签列表

@@ -188,9 +188,9 @@ export default function TeamCustomFieldPage() {
   };
 
   return (
-    <div className="w-full px-0 max-w-none overflow-hidden">
-      <div className="w-full max-w-none border-0 bg-background text-foreground">
-        <div className="w-full">
+    <div className="w-full h-full flex flex-col">
+      <div className="max-w-none border-0 bg-background text-foreground flex flex-col flex-grow">
+        <div>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-semibold">{selectedTeam?.name}</h2>
@@ -294,7 +294,7 @@ export default function TeamCustomFieldPage() {
             </div>
           </div>
         </div>
-        <div className="w-full max-w-none">
+        <div className="overflow-y-auto flex-grow h-0">
           {customFieldContent}
         </div>
       </div>

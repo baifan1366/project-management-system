@@ -15,8 +15,11 @@ import {
   TableCell
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import AddTask from './AddTask';
 import BodyContent from './BodyContent';
+import { supabase } from '@/lib/supabase';
+import { createSection } from '@/lib/redux/features/sectionSlice';
 
 export default function TaskList({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
@@ -35,6 +38,10 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   const [localTasks, setLocalTasks] = useState({});
   // 存储创建任务状态
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  // 新增：存储创建部门状态
+  const [isCreatingSection, setIsCreatingSection] = useState(false);
+  // 新增：存储部门名称输入
+  const [newSectionName, setNewSectionName] = useState('');
 
   // 从Redux状态中获取标签数据
   const { tags: tagsData, tagsStatus } = useSelector((state) => state.teamCF);
@@ -158,8 +165,12 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
 
   // 处理拖放开始事件（处理所有类型的拖拽）
   const handleDragStart = (result) => {
-    const { type } = result;
+    const { type, source } = result;
     if (type === 'TAG') {
+      // 确保第一列不能开始拖拽
+      if (source.index === 0) {
+        return;
+      }
       setIsDraggingTag(true);
     } else if (type === 'TASK' || type === 'SECTION') {
       // 将其他类型的拖拽事件传递给 BodyContent
@@ -181,6 +192,12 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
 
     // 处理标签拖放
     if (type === 'TAG') {
+      // 阻止第一列被拖动或其他列被拖到第一列的位置
+      if (source.index === 0 || destination.index === 0) {
+        setIsDraggingTag(false);
+        return;
+      }
+      
       const newTagOrder = Array.from(tagOrder);
       const [removed] = newTagOrder.splice(source.index, 1);
       newTagOrder.splice(destination.index, 0, removed);
@@ -325,13 +342,59 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     }
   }, [teamId, loadSections]);
 
+  // 新增：处理部门创建
+  const handleAddSection = () => {
+    setIsCreatingSection(true);
+    setNewSectionName('');
+  };
+
+  // 新增：处理部门名称输入变化
+  const handleSectionNameChange = (e) => {
+    setNewSectionName(e.target.value);
+  };
+
+  // 新增：处理部门创建提交
+  const handleCreateSection = async (e) => {
+    if (e.key === 'Enter' && newSectionName.trim()) {
+      try {
+        // 开始创建，显示加载状态
+        setIsCreatingSection(true);
+        const {data: userData} = await supabase.auth.getUser()
+        const userId = userData?.user?.id
+        // 准备创建部门的数据
+        const sectionData = {
+          teamId,
+          sectionName: newSectionName.trim(),
+          createdBy: userId
+        };
+        
+        // 调用Redux Action创建部门
+        await dispatch(createSection({teamId, sectionData})).unwrap();
+        
+        // 重新加载部门列表
+        await loadSections();
+        
+        // 重置创建状态
+        setIsCreatingSection(false);
+        setNewSectionName('');
+      } catch (error) {
+        console.error('创建部门失败:', error);
+        setIsCreatingSection(false);
+      }
+    } else if (e.key === 'Escape') {
+      // 取消创建
+      setIsCreatingSection(false);
+      setNewSectionName('');
+    }
+  };
+
   // 计算总列数（标签列 + 操作列）
   const totalColumns = (Array.isArray(tagInfo) ? tagInfo.length : 0) + 1;
 
   return (
-    <div className="w-full overflow-hidden">
+    <div className="w-full h-full">
       <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
-        <Table className="w-full">
+        <Table className="w-full overflow-auto">
           <TableHeader>
             <TableRow>
               <TableCell colSpan={totalColumns} className="p-0">
@@ -344,13 +407,21 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
                       {...provided.droppableProps}
                     >
                       {Array.isArray(sortedTagInfo) && sortedTagInfo.map((tag, index) => (
-                        <Draggable key={`tag-${index}`} draggableId={`tag-${index}`} index={index}>
+                        <Draggable 
+                          key={`tag-${index}`} 
+                          draggableId={`tag-${index}`} 
+                          index={index}
+                          isDragDisabled={index === 0} // 禁止第一列拖动
+                        >
                           {(provided, snapshot) => (
                             <div 
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className={`hover:bg-accent/50 border-r relative ${snapshot.isDragging ? 'bg-accent/30' : ''} ${(isCreatingTask || isLoading) && !snapshot.isDragging ? 'pointer-events-none' : ''}`}
+                              className={`border-r relative 
+                                ${index === 0 ? 'cursor-default' : 'hover:bg-accent/50'} 
+                                ${snapshot.isDragging ? 'bg-accent/30' : ''} 
+                                ${(isCreatingTask || isLoading) && !snapshot.isDragging ? 'pointer-events-none' : ''}`}
                               style={{
                                 ...provided.draggableProps.style,
                                 width: `${index === 0 ? getTagWidth(index) + 36 : getTagWidth(index)}px`,
@@ -387,6 +458,31 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
             <TableRow>
               <TableCell colSpan={totalColumns+1} className="p-0">
                 {renderBodyContent()}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell colSpan={totalColumns+1} className="p-2 border-t">
+                {isCreatingSection ? (
+                  <div className="flex items-center space-x-2 p-1">
+                    <Input
+                      autoFocus
+                      placeholder={t('enterSectionName')}
+                      value={newSectionName}
+                      onChange={handleSectionNameChange}
+                      onKeyDown={handleCreateSection}
+                      className="h-8"
+                    />
+                  </div>
+                ) : (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full text-left text-muted-foreground hover:text-foreground"
+                    onClick={handleAddSection}
+                  >
+                    {t('addNewSection')}
+                  </Button>
+                )}
               </TableCell>
             </TableRow>
           </TableBody>
