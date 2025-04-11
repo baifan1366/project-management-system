@@ -23,7 +23,7 @@ export const config = {
      * /_static (静态文件)
      * /favicon.ico (浏览器图标)
      */
-    '/((?!api|_next/static|_next/image|penggy.webp|penguin.glb|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|.*\\.png|.*\\.webp|.*\\.glb|favicon.ico).*)',
     '/:locale(en|zh|my)/:path*'
   ]
 };
