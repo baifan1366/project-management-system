@@ -22,7 +22,8 @@
     "search": "Search",
     "mytasks": "My Tasks",
     "calendar": "Calendar",
-    "chat": "Chat"
+    "chat": "Chat",
+    "taskAssistant": "Task Assistant"
   },
   "common": {
     "save": "Save",
@@ -279,6 +280,46 @@
     },
     "noTasks": "No tasks"
   },
+  "myTasks": {
+    "title": "My Tasks",
+    "results": "results",
+    "type": {
+      "label": "TYPE",
+      "pastDue": "Past Due",
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "noDate": "No Date"
+    },
+    "assignedTo": {
+      "label": "ASSIGNED TO",
+      "unassigned": "Unassigned",
+      "me": "Me"
+    },
+    "workspaceTeams": {
+      "label": "WORKSPACE & TEAMS",
+      "all": "All",
+      "shared": "Shared with me",
+      "workspace": "Workspace"
+    },
+    "dueDate": {
+      "label": "DUE DATE",
+      "createdBy": "Created by me"
+    },
+    "filters": {
+      "all": "All Tasks",
+      "assignedToMe": "Assigned to Me",
+      "createdByMe": "Created by Me",
+      "completed": "Completed"
+    },
+    "searchPlaceholder": "Search tasks...",
+    "status": {
+      "todo": "To Do",
+      "in_progress": "In Progress",
+      "done": "Done",
+      "in_review": "In Review"
+    },
+    "noTasks": "No tasks"
+  },
   "notifications": {
     "title": "Notifications",
     "markAllRead": "Mark all as read",
@@ -324,7 +365,8 @@
     "fileTooLarge": "File is too large",
     "invalidFileType": "Invalid file type",
     "connectionFailed": "Failed to connect to server",
-    "sessionInvalid": "Your session is invalid or expired"
+    "sessionInvalid": "Your session is invalid or expired",
+    "searchFailed": "Search failed, please try again later"
   },
   "Pricing": {
     "title": "Plans and Pricing",
@@ -756,7 +798,7 @@
     "myTasks": "My Tasks",
     "allTasks": "All Tasks",
     "upcomingTasks": "Upcoming Tasks",
-    "connectGoogle": "Connect Google Calendar",
+    "connectGoogle": "Connect Google",
     "connectGoogleCalendarPrompt": "Connect your Google Calendar to view all events",
     "weekViewComingSoon": "Week view coming soon",
     "dayViewComingSoon": "Day view coming soon",
@@ -810,7 +852,8 @@
     "hasMeetLink": "Click to open Google Meet",
     "accept": "Accept",
     "decline": "Decline",
-    "meetingDeclined": "Meeting invitation declined"
+    "meetingDeclined": "Meeting invitation declined",
+    "color":"color"
   },
   "CreateTag": {
     "createTag": "Create new field",
@@ -938,5 +981,44 @@
     "LAST-MODIFIED-ON": "Last Modified On",
     "CREATED-ON": "Created On",
     "CREATED-BY": "Created By"
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search projects, tasks, users, and more...",
+    "button": "Search",
+    "searching": "Searching...",
+    "noResults": "No results found",
+    "tryDifferent": "Try different keywords or check spelling",
+    "resultsFound": "results found",
+    "types": {
+      "project": "Project",
+      "task": "Task",
+      "user": "User",
+      "team": "Team",
+      "calendar": "Calendar",
+      "message": "Message"
+    },
+    "recentSearches": "Recent Searches",
+    "suggestedSearches": "Suggested Searches",
+    "clearAll": "Clear All",
+    "createdAt": "Created on",
+    "project": "Project",
+    "creator": "Creator",
+    "status": "Status",
+    "untitled": "Untitled",
+    "message": "Create projects and tasks using natural language. Example: \"Create a marketing project with copywriting, poster design, and social media posting tasks, high priority, due next Friday\"",
+    "description": "Just describe your needs, and the AI assistant will automatically create projects and tasks for you",
+    "examples": "Example prompts",
+    "suggestedSearches": {
+      "projects": "Active projects",
+      "tasks": "My tasks",
+      "teams": "My teams",
+      "reports": "Monthly reports",
+      "team": "Team members",
+      "designProject": "Create a website redesign project with UI/UX design, frontend development, and testing tasks",
+      "marketingProject": "Create a product launch task list with market analysis, prototype design, and user testing high priority tasks",
+      "weeklyTasks": "Create a project for next week's market activities, including 5 tasks: content creation, design production, placement review, traffic analysis, and effectiveness evaluation",
+      "developmentProject": "Plan a three-month software development project with tasks related to requirements analysis, design, development, testing, and release phases"
+    }
   }
 }

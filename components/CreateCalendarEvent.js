@@ -43,6 +43,15 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     inviteParticipants: false, // 是否邀请参与者
   });
 
+  // 当selectedDate变化时更新表单数据
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      startDate: selectedDate,
+      endDate: selectedDate
+    }));
+  }, [selectedDate]);
+
   // 获取用户列表
   useEffect(() => {
     if (formData.inviteParticipants && eventType === 'google') {
@@ -207,7 +216,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
           console.error('创建个人日历事件失败:', error);
           throw new Error(error.message || '创建个人日历事件失败');
         }
-      } else {
+      } else if (eventType === 'google') {
         // 创建Google日历事件
         const startDateTime = formData.isAllDay 
           ? format(formData.startDate, 'yyyy-MM-dd')
@@ -310,7 +319,8 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
                   eventTitle: formData.title,
                   startTime: startDateTime,
                   endTime: endDateTime,
-                  isMeetingInvitation: true
+                  isMeetingInvitation: true,
+                  inviterId: session.user.id
                 },
                 is_read: false
               });

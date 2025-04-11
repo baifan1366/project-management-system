@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 3D model files - exclude from git
+*.glb
+*.gltf
+public/penguin.glb

@@ -6,11 +6,26 @@ import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
 
 export default function NotificationItem({ notification, onAction }) {
   const t = useTranslations('notifications');
   const tCalendar = useTranslations('Calendar');
   const tNotif = useTranslations('notificationCenter');
+  
+  // 添加状态来跟踪会议邀请的状态
+  const [localMeetingData, setLocalMeetingData] = useState(null);
+  const [localIsDeclined, setLocalIsDeclined] = useState(false);
+  const [localIsAccepted, setLocalIsAccepted] = useState(false);
+  
+  // 初始化本地状态
+  useEffect(() => {
+    const data = getMeetingData();
+    setLocalMeetingData(data);
+    setLocalIsDeclined(data && data.declined);
+    setLocalIsAccepted(data && data.accepted);
+  }, [notification]);
+  
   const formatDate = (date) => {
     const d = new Date(date);
     return formatDistanceToNow(d, { addSuffix: true });
@@ -153,6 +168,10 @@ export default function NotificationItem({ notification, onAction }) {
       
       if (error) throw error;
       
+      // 更新本地状态
+      setLocalMeetingData(updatedData);
+      setLocalIsAccepted(true);
+      
       // 向邀请人发送接受通知
       await sendResponseNotification(meetData, true);
       
@@ -188,6 +207,10 @@ export default function NotificationItem({ notification, onAction }) {
       
       if (error) throw error;
       
+      // 更新本地状态
+      setLocalMeetingData(updatedData);
+      setLocalIsDeclined(true);
+      
       // 向邀请人发送拒绝通知
       await sendResponseNotification(data, false);
       
@@ -201,10 +224,10 @@ export default function NotificationItem({ notification, onAction }) {
   };
 
   // 解析会议数据
-  const meetingData = getMeetingData();
+  const meetingData = localMeetingData || getMeetingData();
   const isMeeting = isMeetingInvitation();
-  const isDeclined = isMeetingDeclined();
-  const isAccepted = meetingData && meetingData.accepted;
+  const isDeclined = localIsDeclined || isMeetingDeclined();
+  const isAccepted = localIsAccepted || (meetingData && meetingData.accepted);
 
   return (
     <div className={cn(
