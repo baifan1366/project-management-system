@@ -1010,8 +1010,8 @@
     "creator": "Creator",
     "status": "Status",
     "untitled": "Untitled",
-    "message": "Create projects and tasks using natural language. Example: \"Create a marketing project with copywriting, poster design, and social media posting tasks, high priority, due next Friday\"",
-    "description": "Just describe your needs, and the AI assistant will automatically create projects and tasks for you",
+    "message": "Create projects and tasks using natural language.",
+    "description": "Just describe your needs, and Pengy will automatically create projects and tasks for you",
     "examples": "Example prompts",
     "suggestedSearches": {
       "projects": "Active projects",
@@ -1024,5 +1024,16 @@
       "weeklyTasks": "Create a project for next week's market activities, including 5 tasks: content creation, design production, placement review, traffic analysis, and effectiveness evaluation",
       "developmentProject": "Plan a three-month software development project with tasks related to requirements analysis, design, development, testing, and release phases"
     }
+  },
+  "pengy": {
+    "title": "Pengy Task Assistant",
+    "description": "Your penguin-themed task management assistant",
+    "greeting": "Hello! I'm Pengy, your task management assistant",
+    "prompt": "Tell me what project or tasks you want to create!",
+    "thinking": "Pengy is thinking...",
+    "success": "Task waddle-fully created!",
+    "error": "Pengy slipped on the ice. Let's try again!",
+    "tips": "Penguin Pro Tips",
+    "tipDetails": "For best results, include details like due dates, priorities, and task descriptions"
   }
 }

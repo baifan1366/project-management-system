@@ -6,9 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from 'sonner';
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageSquare, CheckCircle2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 
 export default function TaskManagerAgent({ userId }) {
   const [instruction, setInstruction] = useState('');
@@ -71,29 +72,47 @@ export default function TaskManagerAgent({ userId }) {
   };
   
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>{t('nav.taskAssistant')}</CardTitle>
-        <CardDescription>
-          {t('search.message')}
-        </CardDescription>
+    <Card className="w-full shadow-md overflow-hidden">
+      <CardHeader className="border-b bg-muted/20">
+        <div className="flex items-center space-x-3">
+          <div className="hidden sm:block">
+            <Image 
+              src="/pengy assistant.png" 
+              alt="Pengy" 
+              width={40} 
+              height={40} 
+              className="rounded-full"
+            />
+          </div>
+          <div>
+            <CardTitle>
+              {t('pengy.title')}
+            </CardTitle>
+            <CardDescription>
+              {t('pengy.greeting')}
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6 max-h-[calc(100vh-220px)] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <div className="grid w-full gap-4">
-            <Textarea
-              placeholder={t('Chat.inputPlaceholder')}
-              value={instruction}
-              onChange={(e) => setInstruction(e.target.value)}
-              className="min-h-[120px]"
-            />
+            <div className="relative">
+              <Textarea
+                placeholder={t('pengy.prompt')}
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                className="min-h-[120px] pr-10"
+              />
+              <MessageSquare className="absolute right-3 bottom-3 h-5 w-5 text-muted-foreground" />
+            </div>
             <Button 
               type="submit" 
               disabled={isLoading || !instruction.trim() || !userId}
               className="w-full"
             >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? t('CreateTask.creating') : t('common.create')}
+              {isLoading ? t('pengy.thinking') : t('common.create')}
             </Button>
           </div>
         </form>
@@ -101,7 +120,10 @@ export default function TaskManagerAgent({ userId }) {
         {results && results.success && (
           <div className="mt-6 space-y-4">
             <div className="rounded-md bg-green-50 p-4">
-              <p className="text-green-700">{t('CreateTask.createSuccess')}</p>
+              <div className="flex items-center">
+                <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
+                <p className="text-green-700">{t('pengy.success')}</p>
+              </div>
             </div>
             
             {results.projectId && (
@@ -116,9 +138,16 @@ export default function TaskManagerAgent({ userId }) {
                 <h3 className="font-medium">{t('tasks.title')}:</h3>
                 <ul className="space-y-1 text-sm text-gray-500">
                   {results.tasks.map((task, index) => (
-                    <li key={index}>
-                      {task.tag_values.title || t('CreateTask.untitled')} 
-                      {task.tag_values.priority && ` (${t('Projects.priority')}: ${task.tag_values.priority})`}
+                    <li key={index} className="flex items-start">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-gray-400 mt-1.5 mr-2"></span>
+                      <span>
+                        {task.tag_values.title || t('CreateTask.untitled')} 
+                        {task.tag_values.priority && (
+                          <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                            {task.tag_values.priority}
+                          </span>
+                        )}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -126,6 +155,15 @@ export default function TaskManagerAgent({ userId }) {
             )}
           </div>
         )}
+        
+        <div className="mt-8 rounded-md bg-muted/30 p-4 text-sm border">
+          <h4 className="font-medium mb-2">
+            {t('pengy.tips')}
+          </h4>
+          <p className="text-muted-foreground">
+            {t('pengy.tipDetails')}
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

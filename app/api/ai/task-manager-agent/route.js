@@ -14,8 +14,10 @@ const openai = new OpenAI({
 
 // System prompt for the task manager agent
 const SYSTEM_PROMPT = `
-You are TaskAgent, an AI assistant specialized in managing projects and tasks.
+You are Pengy, a helpful penguin-themed AI assistant specialized in managing projects and tasks. 
 Your job is to help users create projects and tasks based on their natural language instructions.
+Your personality is friendly, efficient, and somewhat playful - occasionally using penguin-related 
+metaphors like "let's waddle through this project together" or "diving into tasks efficiently".
 
 You must extract the following information from the user's message:
 1. Project information (if any):
@@ -40,9 +42,9 @@ Respond ONLY with the JSON object matching this format:
   "action": "create_project_and_tasks", // or "create_tasks" if only tasks are mentioned
   "project": {
     "project_name": "string",
-    "description": "string",
+    "description": "string", 
     "visibility": "private", // or "public"
-    "theme_color": "white", // default
+    "theme_color": "white", // default theme color
     "status": "PENDING" // default for new projects
   },
   "tasks": [
@@ -89,6 +91,8 @@ export async function POST(request) {
     const body = await request.json();
     const { instruction, userId } = body;
     
+    console.log("接收到请求:", { instruction: instruction.substring(0, 50) + "...", userId });
+    
     // 验证必要参数
     if (!instruction) {
       return NextResponse.json(
@@ -105,6 +109,7 @@ export async function POST(request) {
     }
     
     // Call AI to parse the instruction
+    console.log("正在调用AI解析指令...");
     const completion = await openai.chat.completions.create({
       model: "qwen/qwen2.5-vl-32b-instruct:free",
       messages: [
@@ -118,6 +123,8 @@ export async function POST(request) {
     
     // 提取并安全解析AI的响应
     const aiContent = completion.choices[0]?.message?.content || "";
+    console.log("AI响应:", aiContent.substring(0, 200) + "...");
+    
     const { data: aiResponse, error: parseError } = safeParseJSON(aiContent);
     
     if (parseError || !aiResponse) {
@@ -140,6 +147,8 @@ export async function POST(request) {
           created_by: userId
         };
         
+        console.log("正在创建项目:", newProjectData);
+        
         // Insert project into database
         const { data: createdProject, error: projectError } = await supabase
           .from('project')
@@ -147,16 +156,20 @@ export async function POST(request) {
           .select();
           
         if (projectError) {
+          console.error("创建项目失败:", projectError);
           throw new Error(`Failed to create project: ${projectError.message}`);
         }
         
         projectId = createdProject[0].id;
+        console.log("项目创建成功，ID:", projectId);
       }
       
       // Process tasks
       const tasksResults = [];
       
       if (aiResponse.tasks && aiResponse.tasks.length > 0 && projectId) {
+        console.log("开始处理任务...");
+        
         // Create a team if we have a new project
         if (aiResponse.action === "create_project_and_tasks") {
           const newTeamData = {
@@ -167,19 +180,24 @@ export async function POST(request) {
             project_id: projectId
           };
           
+          console.log("正在创建团队:", newTeamData);
+          
           const { data: createdTeam, error: teamError } = await supabase
             .from('team')
             .insert([newTeamData])
             .select();
             
           if (teamError) {
+            console.error("创建团队失败:", teamError);
             throw new Error(`Failed to create team: ${teamError.message}`);
           }
           
           const teamId = createdTeam[0].id;
+          console.log("团队创建成功，ID:", teamId);
           
           // Add user to team
-          await supabase
+          console.log("正在将用户添加到团队...");
+          const { error: userTeamError } = await supabase
             .from('user_team')
             .insert([{
               user_id: userId,
@@ -188,25 +206,35 @@ export async function POST(request) {
               created_by: userId
             }]);
             
+          if (userTeamError) {
+            console.error("将用户添加到团队失败:", userTeamError);
+            throw new Error(`Failed to add user to team: ${userTeamError.message}`);
+          }
+            
           // Create a default section
+          console.log("正在创建默认分区...");
           const { data: sectionData, error: sectionError } = await supabase
             .from('section')
             .insert([{
               name: "默认分区",
               team_id: teamId,
-              created_by: userId
+              created_by: userId,
+              task_ids: [] // 确保初始化为空数组
             }])
             .select();
             
           if (sectionError) {
+            console.error("创建分区失败:", sectionError);
             throw new Error(`Failed to create section: ${sectionError.message}`);
           }
           
           const sectionId = sectionData[0].id;
+          console.log("分区创建成功，ID:", sectionId);
           
           // Process each task
           for (const taskInfo of aiResponse.tasks) {
             // Create task record
+            console.log("正在创建任务:", taskInfo.title);
             const { data: taskData, error: taskError } = await supabase
               .from('task')
               .insert([{
@@ -222,18 +250,26 @@ export async function POST(request) {
               .select();
               
             if (taskError) {
+              console.error("创建任务失败:", taskError);
               throw new Error(`Failed to create task: ${taskError.message}`);
             }
             
             const taskId = taskData[0].id;
+            console.log("任务创建成功，ID:", taskId);
             
             // Update section's task_ids array
-            await supabase
+            console.log("正在将任务添加到分区...");
+            const { error: updateSectionError } = await supabase
               .from('section')
               .update({
                 task_ids: supabase.sql`array_append(task_ids, ${taskId})`
               })
               .eq('id', sectionId);
+              
+            if (updateSectionError) {
+              console.error("更新分区任务列表失败:", updateSectionError);
+              throw new Error(`Failed to update section task list: ${updateSectionError.message}`);
+            }
               
             tasksResults.push(taskData[0]);
           }
