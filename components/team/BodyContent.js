@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { ChevronRight, ChevronDown, MoreHorizontal, Plus, Circle } from 'lucide-react';
@@ -33,10 +33,10 @@ export default function BodyContent({
 }) {
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
-  const isSectionRequestInProgress = useState(false)[0];
-  const isTaskRequestInProgress = useState(false)[0];
-  const hasLoadedSections = useState(false)[0];
-  const hasLoadedTasks = useState(false)[0];
+  const isSectionRequestInProgress = useRef(false);
+  const isTaskRequestInProgress = useRef(false);
+  const hasLoadedSections = useRef(false);
+  const hasLoadedTasks = useRef(false);
   
   // 存储折叠状态的对象
   const [collapsedSections, setCollapsedSections] = useState({});
@@ -55,8 +55,11 @@ export default function BodyContent({
 
   // 加载部门数据
   const loadSections = async () => {
-    if (!teamId || isSectionRequestInProgress) return;
+    if (!teamId || isSectionRequestInProgress.current) return;
     
+    // 检查sections是否已经存在且有数据，如果有则不需要再次请求
+    if (sections && sections.length > 0) return;
+    isSectionRequestInProgress.current = true;
     try {
       setIsLoading(true);
       
@@ -65,13 +68,14 @@ export default function BodyContent({
       console.error('Error loading sections:', error);
     } finally {
       setIsLoading(false);
+      isSectionRequestInProgress.current = false;
     }
   };
 
   // 加载所有部门的任务
   const loadAllSectionTasks = async () => {
-    if (!teamId || isTaskRequestInProgress || !sections || !sections.length) return;
-    
+    if (!teamId || isTaskRequestInProgress.current || !sections || !sections.length) return;
+    isTaskRequestInProgress.current = true;
     try {
       setIsLoading(true);
       
@@ -92,6 +96,7 @@ export default function BodyContent({
       console.error('加载所有任务失败:', error);
     } finally {
       setIsLoading(false);
+      isTaskRequestInProgress.current = false;
     }
   };
 
@@ -112,11 +117,13 @@ export default function BodyContent({
   const handleDragEnd = (result) => {
     const { destination, source, type } = result;
 
+    // 无论操作是否成功，都要重置拖拽状态
+    setIsDragging(false);
+
     // 如果没有目标位置或目标位置相同，则不执行任何操作
     if (!destination || 
         (destination.droppableId === source.droppableId && 
          destination.index === source.index)) {
-      setIsDragging(false);
       return;
     }
 
@@ -130,8 +137,6 @@ export default function BodyContent({
       console.log('将部门从', source.index, '移动到', destination.index);
       // 在这里添加更新部门位置的逻辑
     }
-    
-    setIsDragging(false);
   };
 
   // 获取标签宽度
@@ -288,13 +293,13 @@ export default function BodyContent({
                     <div
                       ref={taskProvided.innerRef}
                       {...taskProvided.draggableProps}
-                      className={`border-b border-border ${
+                      className={`border-b border-border h-10 ${
                         snapshot.isDragging ? 'shadow-lg bg-accent/30' : ''
                       } ${hoveredTaskRow === task.id ? 'bg-accent/20' : ''}`}
                       onMouseEnter={() => setHoveredTaskRow(task.id)}
                       onMouseLeave={() => setHoveredTaskRow(null)}
                     >
-                      <div className="flex items-center w-full">
+                      <div className="flex items-center w-full h-full">
                         {/* 拖拽手柄 */}
                         <div {...taskProvided.dragHandleProps} className="flex justify-start items-center pl-4 pr-2 cursor-grab flex-shrink-0" >
                           <Circle size={12} className="text-muted-foreground" />
@@ -319,7 +324,7 @@ export default function BodyContent({
                             return (
                               <div 
                                 key={`task-${task.id}-tag-${tagId}`} 
-                                className={`p-2 overflow-hidden text-ellipsis whitespace-nowrap border-r ${isEditing ? 'bg-accent/10' : ''}`}
+                                className={`p-2 overflow-hidden text-ellipsis whitespace-nowrap border-r h-10 flex items-center ${isEditing ? 'bg-accent/10' : ''}`}
                                 style={{
                                   width: `${getTagWidth(tagIndex)}px`,
                                   minWidth: `${getTagWidth(tagIndex)}px`, 
@@ -343,7 +348,7 @@ export default function BodyContent({
                                       }
                                     }}
                                     autoFocus={tagIndex === 0}
-                                    className="w-full bg-transparent border-none focus:outline-none"
+                                    className="w-full bg-transparent border-none focus:outline-none h-10"
                                     placeholder={`输入${tag}`}
                                   />
                                 ) : (
@@ -413,9 +418,9 @@ export default function BodyContent({
     collapsedSections,
     isDragging,
     handleDragStart,
-    handleDragEnd,
     loadSections,
     loadAllSectionTasks,
-    renderBodyContent
+    renderBodyContent,
+    handleBodyDragEnd: handleDragEnd
   };
 }

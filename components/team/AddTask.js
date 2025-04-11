@@ -73,7 +73,7 @@ export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks }
       // 确保至少有一个值，如果第一个标签值是空的，设置默认值
       const tagValues = { ...editingTaskValues };
       if (!tagValues['1'] || tagValues['1'].trim() === '') {
-        tagValues['1'] = '新任务';
+        tagValues['1'] = 'New Task';
       }
       
       // 准备任务数据
