@@ -158,8 +158,12 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
 
   // 处理拖放开始事件（处理所有类型的拖拽）
   const handleDragStart = (result) => {
-    const { type } = result;
+    const { type, source } = result;
     if (type === 'TAG') {
+      // 确保第一列不能开始拖拽
+      if (source.index === 0) {
+        return;
+      }
       setIsDraggingTag(true);
     } else if (type === 'TASK' || type === 'SECTION') {
       // 将其他类型的拖拽事件传递给 BodyContent
@@ -181,6 +185,12 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
 
     // 处理标签拖放
     if (type === 'TAG') {
+      // 阻止第一列被拖动或其他列被拖到第一列的位置
+      if (source.index === 0 || destination.index === 0) {
+        setIsDraggingTag(false);
+        return;
+      }
+      
       const newTagOrder = Array.from(tagOrder);
       const [removed] = newTagOrder.splice(source.index, 1);
       newTagOrder.splice(destination.index, 0, removed);
@@ -329,9 +339,9 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   const totalColumns = (Array.isArray(tagInfo) ? tagInfo.length : 0) + 1;
 
   return (
-    <div className="w-full overflow-hidden">
+    <div className="w-full h-full">
       <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
-        <Table className="w-full">
+        <Table className="w-full overflow-auto">
           <TableHeader>
             <TableRow>
               <TableCell colSpan={totalColumns} className="p-0">
@@ -344,13 +354,21 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
                       {...provided.droppableProps}
                     >
                       {Array.isArray(sortedTagInfo) && sortedTagInfo.map((tag, index) => (
-                        <Draggable key={`tag-${index}`} draggableId={`tag-${index}`} index={index}>
+                        <Draggable 
+                          key={`tag-${index}`} 
+                          draggableId={`tag-${index}`} 
+                          index={index}
+                          isDragDisabled={index === 0} // 禁止第一列拖动
+                        >
                           {(provided, snapshot) => (
                             <div 
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className={`hover:bg-accent/50 border-r relative ${snapshot.isDragging ? 'bg-accent/30' : ''} ${(isCreatingTask || isLoading) && !snapshot.isDragging ? 'pointer-events-none' : ''}`}
+                              className={`border-r relative 
+                                ${index === 0 ? 'cursor-default' : 'hover:bg-accent/50'} 
+                                ${snapshot.isDragging ? 'bg-accent/30' : ''} 
+                                ${(isCreatingTask || isLoading) && !snapshot.isDragging ? 'pointer-events-none' : ''}`}
                               style={{
                                 ...provided.draggableProps.style,
                                 width: `${index === 0 ? getTagWidth(index) + 36 : getTagWidth(index)}px`,
