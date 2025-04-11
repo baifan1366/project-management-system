@@ -282,7 +282,11 @@
   },
   "errors": {
     "general": "出错了",
-    "notFound": "未找到资源",
+    "notFound": "页面未找到",
+    "notFoundDescription": "抱歉，您要查找的页面不存在或已被移动。",
+    "backToHome": "返回首页",
+    "goBack": "返回上一页",
+    "redirectCountdown": "将在 {countdown} 秒后自动跳转到首页...",
     "unauthorized": "未授权访问",
     "forbidden": "禁止访问",
     "networkError": "网络错误",

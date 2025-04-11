@@ -350,7 +350,11 @@
   },
   "errors": {
     "general": "Something went wrong",
-    "notFound": "Resource not found",
+    "notFound": "Page Not Found",
+    "notFoundDescription": "Sorry, the page you are looking for does not exist or has been moved.",
+    "backToHome": "Back to Home",
+    "goBack": "Go Back",
+    "redirectCountdown": "You will be redirected to home page in {countdown} seconds...",
     "unauthorized": "Unauthorized access",
     "forbidden": "Access forbidden",
     "networkError": "Network error",
