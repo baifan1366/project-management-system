@@ -1,7 +1,7 @@
 import { PopoverContent } from '@/components/ui/popover';
 import { useTranslations } from 'next-intl';
 import { Button } from './button';
-import { ChevronRight, Settings, User, Zap, LogOut } from 'lucide-react';
+import { ChevronRight, Settings, User, Zap, LogOut, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -10,12 +10,14 @@ import { ThemeToggle } from './ThemeToggle';
 import { useDispatch } from 'react-redux';
 import { clearProjects } from '@/lib/redux/features/projectSlice';
 import { clearTeams } from '@/lib/redux/features/teamSlice';
+import { useLocale } from 'next-intl';
 
 export function ProfilePopover({ onClose }) {
   const t = useTranslations();
   const router = useRouter();
   const [user, setUser] = useState(null);
   const dispatch = useDispatch();
+  const locale = useLocale();
 
   useEffect(() => {
     const getUser = async () => {
@@ -116,6 +118,19 @@ export function ProfilePopover({ onClose }) {
                 <ChevronRight className="w-4 h-4" />
               </Button>
             ))}
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-between px-4 py-2 h-auto font-normal"
+              onClick={() => router.push(`/${locale}/task-assistant`)}
+            >
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-4 h-4" />
+                <span>{t('nav.taskAssistant')}</span>
+              </div>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            
             <LanguageSwitcher/>
             <ThemeToggle/>
           </div>

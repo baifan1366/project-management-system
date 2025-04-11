@@ -22,7 +22,8 @@
     "search": "Search",
     "mytasks": "My Tasks",
     "calendar": "Calendar",
-    "chat": "Chat"
+    "chat": "Chat",
+    "taskAssistant": "Task Assistant"
   },
   "common": {
     "save": "Save",
@@ -1005,13 +1006,19 @@
     "creator": "Creator",
     "status": "Status",
     "untitled": "Untitled",
-    "message": "Chat Message",
-    "suggestions": {
+    "message": "Create projects and tasks using natural language. Example: \"Create a marketing project with copywriting, poster design, and social media posting tasks, high priority, due next Friday\"",
+    "description": "Just describe your needs, and the AI assistant will automatically create projects and tasks for you",
+    "examples": "Example prompts",
+    "suggestedSearches": {
       "projects": "Active projects",
       "tasks": "My tasks",
       "teams": "My teams",
       "reports": "Monthly reports",
-      "team": "Team members"
+      "team": "Team members",
+      "designProject": "Create a website redesign project with UI/UX design, frontend development, and testing tasks",
+      "marketingProject": "Create a product launch task list with market analysis, prototype design, and user testing high priority tasks",
+      "weeklyTasks": "Create a project for next week's market activities, including 5 tasks: content creation, design production, placement review, traffic analysis, and effectiveness evaluation",
+      "developmentProject": "Plan a three-month software development project with tasks related to requirements analysis, design, development, testing, and release phases"
     }
   }
 }
