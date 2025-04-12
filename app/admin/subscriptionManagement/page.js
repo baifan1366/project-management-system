@@ -50,6 +50,30 @@ export default function AdminSubscriptions() {
     }
   };
 
+  // Function to parse features from different formats
+  const parseFeatures = (featuresData) => {
+    try {
+      let featuresArray = [];
+      
+      if (!featuresData) {
+        return [];
+      }
+      
+      if (Array.isArray(featuresData)) {
+        return featuresData;
+      }
+      
+      if (typeof featuresData === 'object' && featuresData !== null) {
+        featuresArray = featuresData.features || [];
+      }
+      
+      return featuresArray;
+    } catch (error) {
+      console.error('Error parsing features:', error);
+      return [];
+    }
+  };
+
   // Use it in useEffect
   useEffect(() => {
     fetchSubscriptionPlans();
@@ -159,22 +183,9 @@ export default function AdminSubscriptions() {
       setPlanBilling(plan.billing_interval || '');
       setDescription(plan.description || '');
       
-      // Parse the features properly
-      try {
-        let featuresArray = [];
-        if (typeof plan.features === 'string') {
-          // Handle double-stringified JSON
-          const cleanedString = plan.features.replace(/^"(.*)"$/, '$1').replace(/\\/g, '');
-          const parsed = JSON.parse(cleanedString);
-          featuresArray = parsed.features || [];
-        } else if (typeof plan.features === 'object' && plan.features !== null) {
-          featuresArray = plan.features.features || [];
-        }
-        setFeatures(featuresArray);
-      } catch (error) {
-        console.error('Error parsing features:', error);
-        setFeatures([]);
-      }
+      // Use the parseFeatures function
+      const featuresArray = parseFeatures(plan.features);
+      setFeatures(featuresArray);
 
       setPlanActiveUsers(plan.active_users || '');
       setPlanMaxMembers(plan.max_members || '');
@@ -493,13 +504,9 @@ export default function AdminSubscriptions() {
                       {/* features */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {Array.isArray(plan.features) ? (
-                            plan.features.map((feature) => (
-                              <div key={feature}>{feature}</div>
-                            ))
-                          ) : (
-                            <div>No features available</div>
-                          )}
+                          {parseFeatures(plan.features).map((feature) => (
+                            <div key={feature}>{feature}</div>
+                          ))}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
