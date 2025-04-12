@@ -22,8 +22,9 @@ export const config = {
      * /_next (Next.js 内部路由)
      * /_static (静态文件)
      * /favicon.ico (浏览器图标)
+     * /admin (Admin routes)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|admin).*)',
     '/:locale(en|zh|my)/:path*'
   ]
 };

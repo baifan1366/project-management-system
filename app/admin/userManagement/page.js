@@ -1,19 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck } from 'react-icons/fa';
-import AdminSidebar from '@/components/admin/AdminSidebar';
+import { FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck } from 'react-icons/fa';
 
 export default function UserManagement() {
   const router = useRouter();
-  const params = useParams();
-  const locale = params.locale || 'en';
   
-  const [adminData, setAdminData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
@@ -22,47 +16,44 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [adminData, setAdminData] = useState(null);
   
-  // Verify admin session and fetch admin data
+  // Fetch users on component mount
   useEffect(() => {
-    const checkAdminSession = async () => {
+    const initialize = async () => {
       try {
-        setLoading(true);
-        
         // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        const { data: sessionData } = await supabase.auth.getSession();
         
-        if (sessionError || !sessionData.session) {
-          throw new Error('No active session found');
+        if (sessionData.session) {
+          // Get admin data
+          const { data: admin } = await supabase
+            .from('admin_user')
+            .select('*')
+            .eq('email', sessionData.session.user.email)
+            .eq('is_active', true)
+            .single();
+            
+          if (admin) {
+            setAdminData(admin);
+          }
         }
-        
-        // Check if user is an admin
-        const { data: admin, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', sessionData.session.user.email)
-          .eq('is_active', true)
-          .single();
-          
-        if (adminError || !admin) {
-          throw new Error('Unauthorized access');
-        }
-        
-        setAdminData(admin);
         
         // Fetch users
         await fetchUsers();
-        
       } catch (error) {
-        console.error('Admin session check failed:', error);
-        // Redirect to admin login
-        router.replace(`/${locale}/admin/login`);
+        console.error('Error initializing:', error);
       } finally {
         setLoading(false);
       }
     };
     
-    checkAdminSession();
+    initialize();
   }, []);
   
   // Fetch users from database
@@ -91,30 +82,6 @@ export default function UserManagement() {
     }
   };
   
-  // Handle logout
-  const handleLogout = async () => {
-    try {
-      // Log the logout action
-      if (adminData) {
-        await supabase.from('admin_activity_log').insert({
-          admin_id: adminData.id,
-          action: 'logout',
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
-      }
-      
-      // Sign out
-      await supabase.auth.signOut();
-      
-      // Redirect to admin login
-      router.replace(`/${locale}/admin/login`);
-      
-    } catch (error) {
-      console.error('Error during logout:', error);
-    }
-  };
-  
   // Handle filter change
   const handleFilterChange = (newFilter) => {
     setFilter(newFilter);
@@ -131,6 +98,21 @@ export default function UserManagement() {
   const openModal = (type, user = null) => {
     setModalType(type);
     setSelectedUser(user);
+    
+    // Initialize form state values with the user data if editing
+    if (type === 'edit' && user) {
+      setName(user.name || '');
+      setEmail(user.email || '');
+      setPhone(user.phone || '');
+      setIsEmailVerified(user.email_verified || false);
+    } else {
+      // Reset form values for other modal types
+      setName('');
+      setEmail('');
+      setPhone('');
+      setIsEmailVerified(false);
+    }
+    
     setIsModalOpen(true);
   };
   
@@ -204,6 +186,15 @@ export default function UserManagement() {
       alert(`Failed to update user: ${error.message}`);
     }
   };
+
+  // Debug
+  useEffect(()=>{
+    console.log(email);
+    console.log(name);
+    console.log(phone);
+
+  },[email,name,phone])
+
   
   // Delete user
   const deleteUser = async () => {
@@ -337,216 +328,201 @@ const addUser = async (userData) => {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading user management...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading user data...</p>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      {/* Sidebar */}
-      <AdminSidebar activePage="users" adminData={adminData} onLogout={handleLogout} />
-      
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">User Management</h2>
-            
-            <div className="flex items-center">
-              <button className="p-2 mr-4 text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400">
-                <FaBell />
-              </button>
-              
-              <div className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-2">
-                  {adminData?.username?.charAt(0).toUpperCase() || 'A'}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{adminData?.full_name || adminData?.username}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{adminData?.role}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-        
-        {/* User Management Content */}
-        <div className="p-6">
-          {/* Top Controls */}
-          <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Filter */}
-              <div className="flex items-center space-x-2">
-                <FaFilter className="text-gray-400" />
-                <select 
-                  className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md py-1.5 px-3 text-sm"
-                  value={filter}
-                  onChange={(e) => handleFilterChange(e.target.value)}
-                >
-                  <option value="all">All Users</option>
-                  <option value="verified">Verified</option>
-                  <option value="unverified">Unverified</option>
-                </select>
-              </div>
-              
-              {/* Search */}
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search users..."
-                  className="pl-9 pr-4 py-1.5 w-full md:w-64 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-sm"
-                  value={searchQuery}
-                  onChange={handleSearch}
-                />
-                <FaSearch className="absolute left-3 top-2 text-gray-400" />
-              </div>
-            </div>
-            
-            {/* Add User Button */}
-            <button
-              onClick={() => openModal('add')}
-              className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
-            >
-              <FaUserPlus className="mr-2" />
-              Add New User
+    <>
+      {/* Header */}
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
+        <div className="px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">User Management</h2>
+          
+          <div className="flex items-center">
+            <button className="p-2 mr-4 text-gray-500 dark:text-gray-400 hover:text-slate-500 dark:hover:text-slate-400">
+              <FaBell />
             </button>
           </div>
-          
-          {/* Users Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      User
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Registered
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {currentUsers.length > 0 ? (
-                    currentUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
-                              {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {user.name || 'Unnamed User'}
-                              </div>
-                              {user.phone && (
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  {user.phone}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {user.email}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          {user.email_verified ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                              <FaUserCheck className="mr-1" />
-                              Verified
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">
-                              <FaUserLock className="mr-1" />
-                              Unverified
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {formatDate(user.created_at)}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
-                          <button
-                            onClick={() => openModal('edit', user)}
-                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal('delete', user)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            <FaTrash />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="5" className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        {searchQuery
-                          ? 'No users match your search criteria'
-                          : 'No users found'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+        </div>
+      </header>
+      
+      {/* User Management Content */}
+      <div className="p-6">
+        {/* Top Controls */}
+        <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Filter */}
+            <div className="flex items-center space-x-2">
+              <FaFilter className="text-gray-400" />
+              <select 
+                className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md py-1.5 px-3 text-sm"
+                value={filter}
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
+                <option value="all">All Users</option>
+                <option value="verified">Verified</option>
+                <option value="unverified">Unverified</option>
+              </select>
             </div>
             
-            {/* Pagination */}
-            {filteredUsers.length > usersPerPage && (
-              <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
-                <div className="flex-1 flex justify-between items-center">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                      currentPage === 1
-                        ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
-                        : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                      currentPage === totalPages
-                        ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
-                        : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search users..."
+                className="pl-9 pr-4 py-1.5 w-full md:w-64 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-sm"
+                value={searchQuery}
+                onChange={handleSearch}
+              />
+              <FaSearch className="absolute left-3 top-2 text-gray-400" />
+            </div>
           </div>
+          
+          {/* Add User Button */}
+          <button
+            onClick={() => openModal('add')}
+            className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
+          >
+            <FaUserPlus className="mr-2" />
+            Add New User
+          </button>
+        </div>
+        
+        {/* Users Table */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Registered
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {currentUsers.length > 0 ? (
+                  currentUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
+                            {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {user.name || 'Unnamed User'}
+                            </div>
+                            {user.phone && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {user.phone}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {user.email}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {user.email_verified ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                            <FaUserCheck className="mr-1" />
+                            Verified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">
+                            <FaUserLock className="mr-1" />
+                            Unverified
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {formatDate(user.created_at)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
+                        <button
+                          onClick={() => openModal('edit', user)}
+                          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => openModal('delete', user)}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          <FaTrash />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                      {searchQuery
+                        ? 'No users match your search criteria'
+                        : 'No users found'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          {filteredUsers.length > usersPerPage && (
+            <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+              <div className="flex-1 flex justify-between items-center">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+                    currentPage === 1
+                      ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                      : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+                    currentPage === totalPages
+                      ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                      : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       
       {/* Modals would go here in a real implementation */}
+      {/* Add User Modal */}
       {isModalOpen && modalType === 'add' && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
           <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6'>
@@ -562,12 +538,11 @@ const addUser = async (userData) => {
             
             <form onSubmit={(e) => {
               e.preventDefault();
-              const formData = new FormData(e.target);
               const userData = {
-                name: formData.get('name'),
-                email: formData.get('email'),
-                phone: formData.get('phone') || null,
-                email_verified: formData.get('email_verified') === 'true',
+                name: name,
+                email: email,
+                phone: phone|| null,
+                email_verified: isEmailVerified,
                 created_at: new Date().toISOString()
               };
               
@@ -587,6 +562,7 @@ const addUser = async (userData) => {
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                       focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                     placeholder='Enter user name'
+                    onChange={(e) => setName(e.target.value)}
                   />
                 </div>
                 
@@ -603,6 +579,7 @@ const addUser = async (userData) => {
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                       focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                     placeholder='Enter email address'
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
                 
@@ -618,6 +595,7 @@ const addUser = async (userData) => {
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                       focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                     placeholder='Enter phone number'
+                    onChange={(e) => setPhone(e.target.value)}
                   />
                 </div>
                 
@@ -640,9 +618,9 @@ const addUser = async (userData) => {
                       <input
                         type='radio'
                         name='email_verified'
-                        value='false'
+                        value={isEmailVerified}
                         className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                        defaultChecked
+                        defaultChecked='false'
                       />
                       <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Unverified</span>
                     </label>
@@ -690,12 +668,11 @@ const addUser = async (userData) => {
           
           <form onSubmit={(e) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
             const userData = {
-              name: formData.get('name'),
-              email: formData.get('email'),
-              phone: formData.get('phone') || null,
-              email_verified: formData.get('email_verified') === 'true',
+              name: name,
+              email: email,
+              phone: phone || null,
+              email_verified: isEmailVerified,
               updated_at: new Date().toISOString()
             };
             
@@ -716,6 +693,7 @@ const addUser = async (userData) => {
                     placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                     focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                   placeholder='Enter user name'
+                  onChange={(e) => setName(e.target.value)}
                 />
               </div>
               
@@ -733,6 +711,7 @@ const addUser = async (userData) => {
                     placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                     focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                   placeholder='Enter email address'
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               
@@ -749,6 +728,7 @@ const addUser = async (userData) => {
                     placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                     focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                   placeholder='Enter phone number'
+                  onChange={(e) => setPhone(e.target.value)}
                 />
               </div>
               
@@ -916,6 +896,6 @@ const addUser = async (userData) => {
       </div>
     )}
 
-    </div>
+    </>
   );
 } 
