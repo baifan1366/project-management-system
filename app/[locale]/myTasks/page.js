@@ -47,8 +47,10 @@ export default function MyTasksPage() {
     if (tasks && tasks.length > 0) {
       const filteredBySearch = searchQuery 
         ? tasks.filter(task => 
-            task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()))
+            task.tag_values && 
+            Object.values(task.tag_values).some(value => 
+              value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())
+            )
           )
         : tasks;
       

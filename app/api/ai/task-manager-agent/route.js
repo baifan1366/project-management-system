@@ -262,7 +262,7 @@ export async function POST(request) {
             const { error: updateSectionError } = await supabase
               .from('section')
               .update({
-                task_ids: supabase.sql`array_append(task_ids, ${taskId})`
+                task_ids: [...(sectionData[0].task_ids || []), taskId]
               })
               .eq('id', sectionId);
               
