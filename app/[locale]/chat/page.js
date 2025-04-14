@@ -25,7 +25,8 @@ export default function ChatPage() {
     currentSession, 
     messages, 
     sendMessage, 
-    chatMode  // 从 context 中获取
+    chatMode,  // 从 context 中获取
+    fetchChatSessions  // 添加这个函数导入
   } = useChat();
   
   // 使用增强的UserStatusContext

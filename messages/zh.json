@@ -256,9 +256,9 @@
     "searchPlaceholder": "搜索任务...",
     "filters": {
       "all": "所有任务",
-      "assignedToMe": "分配给我",
+      "assignedToMe": "分配给我的",
       "createdByMe": "我创建的",
-      "completed": "已完成"
+      "completed": "已完成的"
     },
     "sort": {
       "byDueDate": "按截止日期",
@@ -266,7 +266,18 @@
       "byCreatedDate": "按创建日期",
       "byUpdatedDate": "按更新日期"
     },
-    "noTasks": "没有任务"
+    "noTasks": "没有任务",
+    "structure": {
+      "tag_values": "任务属性",
+      "attachments": "附件",
+      "creator": "创建者"
+    },
+    "priority": {
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "urgent": "紧急"
+    }
   },
   "notifications": {
     "title": "通知",
@@ -564,6 +575,7 @@
     "inviteSelected": "邀请选中的用户",
     "invitationSent": "邀请已发送",
     "invitationFailed": "邀请失败",
+    "inviting": "邀请用户中...",
     "newMessage": "新消息",
     "switchToAI": "切换至AI助手",
     "switchToNormal": "返回普通聊天",
@@ -595,12 +607,23 @@
     "groupChat": "群聊",
     "sentAttachment": "发送了附件",
     "unreadMessages": "{count}条未读消息",
-    "newPrivateChat": "新的私聊",
-    "newGroupChat": "新的群聊",
-    "startedChatWithYou": "开始了与您的聊天",
-    "addedYouToGroup": "将您添加到群组",
+    "translate": "翻译成中文",
+    "seeOriginal": "查看原文",
+    "uploadSuccess": "文件上传成功",
+    "uploadStarted": "文件上传开始",
+    "uploadComplete": "文件上传完成",
+    "messageSent": "消息已发送",
+    "messageFailed": "消息发送失败",
+    "checkingPermission": "检查用户权限中...",
+    "attachmentAdded": "附件添加成功",
+    "attachmentFailed": "附件添加失败",
+    "fileSizeLimit": "文件大小超出限制",
+    "fileTypeNotAllowed": "不允许的文件类型",
+    "connectionError": "连接错误，请重试",
+    "sessionExpired": "会话已过期，请重新登录",
     "chatCreated": "聊天已创建",
-    "groupCreated": "群组已创建"
+    "groupCreated": "群组已创建",
+    "creating": "创建聊天中..."
   },
   "TeamInvitation": {
     "teamInvitation": "团队邀请",
@@ -712,13 +735,20 @@
     "task": "任务",
     "event": "事件",
     "color": "颜色",
-    "sun": "日",
-    "mon": "一",
-    "tue": "二",
-    "wed": "三",
-    "thu": "四",
-    "fri": "五",
-    "sat": "六",
+    "sun": "周日",
+    "mon": "周一",
+    "tue": "周二",
+    "wed": "周三",
+    "thu": "周四",
+    "fri": "周五",
+    "sat": "周六",
+    "sunShort": "日",
+    "monShort": "一",
+    "tueShort": "二", 
+    "wedShort": "三",
+    "thuShort": "四",
+    "friShort": "五",
+    "satShort": "六",
     "goToSettings": "前往设置",
     "googleAuthExpired": "Google 授权已过期，请在设置中重新授权",
     "connectGoogleFailed": "连接 Google 失败，请重试或在设置中授权",
@@ -820,6 +850,82 @@
       "teams": "我的团队",
       "reports": "月度报告",
       "team": "团队成员"
+    }
+  },
+  "myTasks": {
+    "title": "我的任务",
+    "results": "结果",
+    "type": {
+      "label": "类型",
+      "pastDue": "已过期",
+      "today": "今天",
+      "upcoming": "即将到来",
+      "noDate": "无日期"
+    },
+    "assignedTo": {
+      "label": "分配给",
+      "unassigned": "未分配",
+      "me": "我"
+    },
+    "workspaceTeams": {
+      "label": "工作区和团队",
+      "all": "全部",
+      "shared": "与我共享",
+      "workspace": "工作区"
+    },
+    "dueDate": {
+      "label": "截止日期",
+      "createdBy": "由我创建"
+    },
+    "filters": {
+      "all": "所有任务",
+      "assignedToMe": "分配给我",
+      "createdByMe": "由我创建",
+      "completed": "已完成"
+    },
+    "searchPlaceholder": "搜索任务...",
+    "status": {
+      "todo": "待办",
+      "in_progress": "进行中",
+      "done": "已完成",
+      "in_review": "审核中"
+    },
+    "noTasks": "没有任务",
+    "noTitle": "无标题任务",
+    "section": "分区",
+    "createdBy": "创建者",
+    "assignee": "负责人",
+    "loading": "正在加载任务...",
+    "priority": {
+      "label": "优先级",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "urgent": "紧急"
+    },
+    "tagValues": {
+      "title": "标题",
+      "description": "描述",
+      "status": "状态",
+      "assignee": "负责人",
+      "priority": "优先级",
+      "dueDate": "截止日期",
+      "section": "分区",
+      "project": "项目"
+    },
+    "actions": {
+      "edit": "编辑任务",
+      "delete": "删除任务",
+      "assign": "分配给我",
+      "unassign": "取消分配",
+      "markAsComplete": "标记为完成",
+      "markAsIncomplete": "标记为未完成"
+    },
+    "errors": {
+      "loadingFailed": "加载任务失败",
+      "updateFailed": "更新任务失败",
+      "missingSection": "缺少分区ID",
+      "notFound": "未找到任务"
     }
   }
 }
