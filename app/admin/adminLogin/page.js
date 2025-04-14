@@ -37,7 +37,7 @@ export default function AdminLoginPage() {
           
         if (!adminError && adminData && adminData.is_active) {
           console.log('Admin already logged in, redirecting to dashboard');
-          router.replace(`/${locale}/adminDashboard`);
+          router.replace(`/admin/adminDashboard`);
         }
       }
     };

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell } from 'react-icons/fa';
-import AdminSidebar from '@/components/admin/AdminSidebar'
+
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function AdminDashboard() {
       } catch (error) {
         console.error('Admin session check failed:', error);
         // Redirect to admin login
-        router.replace(`/${locale}/adminLogin`);
+        router.replace(`/admin/adminLogin`);
       } finally {
         setLoading(false);
       }
@@ -155,7 +155,7 @@ export default function AdminDashboard() {
       await supabase.auth.signOut();
       
       // Redirect to admin login
-      router.replace(`/${locale}/admin/login`);
+      router.replace(`/admin/adminLogin`);
       
     } catch (error) {
       console.error('Error during logout:', error);
@@ -195,9 +195,6 @@ export default function AdminDashboard() {
   
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      {/* Sidebar */}
-      <AdminSidebar activePage="dashboard" adminData={adminData} onLogout={handleLogout} />
-      
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         {/* Header */}
@@ -238,7 +235,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="mt-4">
-                <Link href={`/${locale}/userManagement`} className="text-sm text-blue-500 dark:text-blue-400 hover:underline">
+                <Link href={`/admin/userManagement`} className="text-sm text-blue-500 dark:text-blue-400 hover:underline">
                   View all users →
                 </Link>
               </div>
@@ -255,7 +252,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="mt-4">
-                <Link href={`/${locale}/subscriptionManagement`} className="text-sm text-green-500 dark:text-green-400 hover:underline">
+                <Link href={`/admin/subscriptionManagement`} className="text-sm text-green-500 dark:text-green-400 hover:underline">
                   Manage subscriptions →
                 </Link>
               </div>
@@ -272,7 +269,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="mt-4">
-                <Link href={`/${locale}/supportManagement`} className="text-sm text-yellow-500 dark:text-yellow-400 hover:underline">
+                <Link href={`/admin/supportManagement`} className="text-sm text-yellow-500 dark:text-yellow-400 hover:underline">
                   View support tickets →
                 </Link>
               </div>
@@ -289,7 +286,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="mt-4">
-                <Link href={`/${locale}/adminAnalytics`} className="text-sm text-purple-500 dark:text-purple-400 hover:underline">
+                <Link href={`/admin/adminAnalytics`} className="text-sm text-purple-500 dark:text-purple-400 hover:underline">
                   View analytics →
                 </Link>
               </div>
@@ -342,7 +339,7 @@ export default function AdminDashboard() {
             )}
             
             <div className="mt-4 text-right">
-              <Link href={`/${locale}/admin/activity`} className="text-sm text-indigo-500 dark:text-indigo-400 hover:underline">
+              <Link href={`/admin/adminActivity`} className="text-sm text-indigo-500 dark:text-indigo-400 hover:underline">
                 View all activity →
               </Link>
             </div>

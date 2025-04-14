@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserShield, FaUserCog } from 'react-icons/fa';
-import AdminSidebar from '@/components/admin/AdminSidebar';
 
 export default function AdminUserManagement() {
   const router = useRouter();
@@ -72,7 +70,7 @@ export default function AdminUserManagement() {
       } catch (error) {
         console.error('Admin session check failed:', error);
         // Redirect to admin login
-        router.replace(`/${locale}/admin/login`);
+        router.replace(`/${locale}/adminLogin`);
       } finally {
         setLoading(false);
       }
@@ -156,7 +154,7 @@ export default function AdminUserManagement() {
       await supabase.auth.signOut();
       
       // Redirect to admin login
-      router.replace(`/${locale}/admin/login`);
+      router.replace(`/${locale}/adminLogin`);
       
     } catch (error) {
       console.error('Error during logout:', error);
@@ -433,8 +431,6 @@ export default function AdminUserManagement() {
   
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      {/* Sidebar */}
-      <AdminSidebar activePage="admins" adminData={adminData} onLogout={handleLogout} />
       
       {/* Main Content */}
       <div className="flex-1 overflow-auto">

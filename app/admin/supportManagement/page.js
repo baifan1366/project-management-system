@@ -2,11 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaFilter, FaSearch, FaEnvelope, FaBuilding, FaUser, FaClock, FaCheck, FaTimes, FaSpinner, FaReply } from 'react-icons/fa';
-import AdminSidebar from '@/components/admin/AdminSidebar';
 
 export default function AdminSupport() {
   const router = useRouter();
@@ -278,8 +275,6 @@ export default function AdminSupport() {
   
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      {/* Sidebar */}
-      <AdminSidebar activePage="support"  adminData={adminData} onLogout={handleLogout} />
       
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
