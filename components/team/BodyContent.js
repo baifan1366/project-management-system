@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { ChevronRight, ChevronDown, MoreHorizontal, Plus, Circle } from 'lucide-react';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
@@ -46,6 +46,9 @@ export default function BodyContent({
   const [hoveredTaskRow, setHoveredTaskRow] = useState(null);
   // 存储拖拽状态
   const [isDragging, setIsDragging] = useState(false);
+
+  // 从Redux中获取标签数据，用于获取真实的标签ID
+  const { tags: tagsData } = useSelector((state) => state.teamCF);
 
   // 处理部门数据
   const sectionInfo = useMemo(() => {
@@ -276,11 +279,18 @@ export default function BodyContent({
     }
 
     return (
-      <Droppable droppableId={`tasks-${sectionId}`} type="TASK">
+      <Droppable 
+        droppableId={`tasks-${sectionId}`} 
+        type="TASK" 
+        mode="standard"
+        ignoreContainerClipping={true}
+        isCombineEnabled={false}
+      >
         {(provided) => (
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
+            className="task-container"
           >
             {localTasks[sectionId].map((task, taskIndex) => {
               return (
@@ -310,12 +320,43 @@ export default function BodyContent({
                           {sortedTagInfo.map((tag, tagIndex) => {
                             // 获取该标签对应的真实索引
                             const realIndex = tagOrder[tagIndex];
-                            const tagId = String(realIndex + 1); // 标签ID从1开始，转为字符串
                             
-                            // 根据截图中的数据结构调整获取标签值的方式
+                            // 从tagsData获取真实标签ID
+                            let tagId = String(realIndex + 1); // 默认的计算方式
+                            
+                            // 如果tagsData存在且包含tags数组，从中获取真实tagId
+                            if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[realIndex]) {
+                              tagId = String(tagsData.tags[realIndex].id);
+                            }
+                            
+                            // 查找task.tag_values中存在的tagId匹配的值
                             let tagValue = '';
-                            if (task.tag_values && tagId in task.tag_values) {
-                              tagValue = task.tag_values[tagId];
+                            if (task.tag_values) {
+                              // 尝试各种可能的格式匹配tagId
+                              const tagIdStr = String(tagId);
+                              // 直接使用字符串ID匹配
+                              if (tagIdStr in task.tag_values) {
+                                tagValue = task.tag_values[tagIdStr];
+                              } 
+                              // 尝试使用数字ID匹配（如果传入的是字符串形式）
+                              else if (tagId in task.tag_values) {
+                                tagValue = task.tag_values[tagId];
+                              }
+                              // 尝试使用纯数字ID匹配（去除前缀）
+                              else {
+                                const numericTagId = tagIdStr.replace(/^\D+/g, '');
+                                Object.keys(task.tag_values).forEach(key => {
+                                  if (key === numericTagId || String(key) === numericTagId) {
+                                    tagValue = task.tag_values[key];
+                                  } else {
+                                    // 移除键前缀再比较
+                                    const numericKey = String(key).replace(/^\D+/g, '');
+                                    if (numericKey === numericTagId) {
+                                      tagValue = task.tag_values[key];
+                                    }
+                                  }
+                                });
+                              }
                             }
                             
                             // 检查是否是正在编辑的任务
@@ -324,14 +365,15 @@ export default function BodyContent({
                             return (
                               <div 
                                 key={`task-${task.id}-tag-${tagId}`} 
-                                className={`p-2 overflow-hidden text-ellipsis whitespace-nowrap border-r h-10 flex items-center ${isEditing ? 'bg-accent/10' : ''}`}
+                                className={`p-2 text-ellipsis whitespace-nowrap border-r h-10 flex items-center ${isEditing ? 'bg-accent/10' : ''}`}
                                 style={{
                                   width: `${getTagWidth(tagIndex)}px`,
                                   minWidth: `${getTagWidth(tagIndex)}px`, 
                                   maxWidth: `${getTagWidth(tagIndex)}px`,
                                 }}
                                 onClick={() => {
-                                  if (task.isNew && !isEditing) {
+                                  // 允许用户点击任何任务开始编辑，不仅限于新任务
+                                  if (!isEditing) {
                                     setEditingTask(task.id);
                                   }
                                 }}
@@ -339,14 +381,9 @@ export default function BodyContent({
                                 {isEditing ? (
                                   <input
                                     type="text"
-                                    value={editingTaskValues[tagId] || ''}
+                                    value={editingTaskValues[tagId] || editingTaskValues[String(tagId)] || ''}
                                     onChange={(e) => handleTaskValueChange(task.id, tagId, e.target.value)}
                                     onKeyDown={(e) => handleKeyDown(e, task.id, task.sectionId)}
-                                    onBlur={() => {
-                                      if (Object.keys(editingTaskValues).length > 0) {
-                                        handleTaskEditComplete(task.id, task.sectionId);
-                                      }
-                                    }}
                                     autoFocus={tagIndex === 0}
                                     className="w-full bg-transparent border-none focus:outline-none h-10"
                                     placeholder={`输入${tag}`}
@@ -383,11 +420,12 @@ export default function BodyContent({
   // 渲染主体内容
   const renderBodyContent = () => {
     return (
-      <Droppable droppableId="sections" type="SECTION">
+      <Droppable droppableId="sections" type="SECTION" mode="standard" direction="vertical" ignoreContainerClipping={true}>
         {(provided) => (
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
+            className="sections-container"
           >
             {/* 部门列表 */}
             {sectionInfo.length > 0 ? (

@@ -298,7 +298,7 @@ export default function TeamCustomFieldPage() {
             </div>
           </div>
         </div>
-        <div className="overflow-y-auto flex-grow h-0 mb-2">
+        <div className="overflow-y-auto flex-grow h-0 mb-2" data-rbd-scroll-container-style="true">
           {customFieldContent}
         </div>
       </div>

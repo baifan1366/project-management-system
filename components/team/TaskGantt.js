@@ -12,6 +12,8 @@ import EditTaskDialog from './EditTaskDialog';
 import { Plus } from 'lucide-react';
 import { initZoom, setZoom as applyZoom, handleZoomChange as changeZoom } from './GanttTools';
 import { useConfirm } from '@/hooks/use-confirm';
+import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
+import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 
 export default function TaskGantt({ projectId, teamId, teamCFId }) {
   const ganttContainer = useRef(null);

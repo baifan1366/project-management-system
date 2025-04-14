@@ -394,12 +394,12 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   return (
     <div className="w-full h-full">
       <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
-        <Table className="w-full overflow-auto">
+        <Table className="w-full">
           <TableHeader>
             <TableRow>
               <TableCell colSpan={totalColumns} className="p-0">
                 {/* 标签标题行 */}
-                <Droppable droppableId="tag-headers" direction="horizontal" type="TAG">
+                <Droppable droppableId="tag-headers" direction="horizontal" type="TAG" mode="standard">
                   {(provided) => (
                     <div 
                       className={`flex ${isDraggingTag ? 'bg-accent/10' : ''}`}
@@ -454,7 +454,7 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
             </TableRow>
           </TableHeader>
           
-          <TableBody className="overflow-auto">
+          <TableBody>
             <TableRow>
               <TableCell colSpan={totalColumns+1} className="p-0">
                 {renderBodyContent()}

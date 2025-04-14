@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/form"
 import { useDispatch, useSelector } from 'react-redux'
 import { createTag, fetchAllTags } from '@/lib/redux/features/tagSlice'
-import { updateTagIds } from '@/lib/redux/features/teamCFSlice'
+import { updateTagIds, getTags } from '@/lib/redux/features/teamCFSlice'
 import { supabase } from '@/lib/supabase'
 import { Plus, Text, Calendar, User, Sigma, Fingerprint, SquareCheck, CircleCheck, Hash, ClipboardList, Clock3, Tag, Pen, Timer } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
@@ -129,7 +129,7 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
             })).unwrap()
             
             // 先获取现有的标签IDs
-            const existingTagsResponse = await getTags(teamId, teamCFId);
+            const existingTagsResponse = await dispatch (getTags({teamId, teamCFId})).unwrap();
             const existingTagIds = existingTagsResponse.tag_ids || [];
             
             // 将新标签添加到现有标签列表
