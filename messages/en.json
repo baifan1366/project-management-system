@@ -543,6 +543,9 @@
     "timeline": "Timeline",
     "text": "Text",
     "gantt": "Gantt",
+    "day": "Day",
+    "week": "Week",
+    "month": "Month",
     "addTask": "Add task",
     "note": "Note",
     "file": "File",
@@ -1053,7 +1056,6 @@
       "message": "Message"
     },
     "recentSearches": "Recent Searches",
-    "suggestedSearches": "Suggested Searches",
     "clearAll": "Clear All",
     "createdAt": "Created on",
     "project": "Project",
@@ -1064,6 +1066,7 @@
     "description": "Just describe your needs, and Pengy will automatically create projects and tasks for you",
     "examples": "Example prompts",
     "suggestedSearches": {
+      "suggestedSearches": "Suggested Searches", 
       "projects": "Active projects",
       "tasks": "My tasks",
       "teams": "My teams",

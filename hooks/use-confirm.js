@@ -139,7 +139,7 @@ export function ConfirmDialog({
     <AlertDialog open={open} onOpenChange={(isOpen) => {
       if (!isOpen) handleCancel();
     }}>
-      <AlertDialogContent className="max-w-[425px]">
+      <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             {getIcon(variant)}

@@ -13,6 +13,7 @@ import TaskTab from "@/components/team/TaskTab"
 import InvitationDialog from '@/components/team/InvitationDialog';
 import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
 import TaskList from '@/components/team/TaskList';
+import TaskGantt from '@/components/team/TaskGantt';
 import { store } from '@/lib/redux/store';
 
 // 创建记忆化的选择器
@@ -141,6 +142,9 @@ export default function TeamCustomFieldPage() {
     const fieldType = currentItem.custom_field?.type;
     if (fieldType === 'LIST') {
       return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} />;
+    }
+    if (fieldType === 'GANTT') {
+      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
     }
     
     return <div>暂不支持的字段类型: {fieldType}</div>;
@@ -294,7 +298,7 @@ export default function TeamCustomFieldPage() {
             </div>
           </div>
         </div>
-        <div className="overflow-y-auto flex-grow h-0">
+        <div className="overflow-y-auto flex-grow h-0 mb-2">
           {customFieldContent}
         </div>
       </div>
