@@ -300,38 +300,34 @@ function TaskList() {
 
 ## Gantt Chart
 
-This project uses [Gantt Chart](https://github.com/frappe/gantt) for project timeline visualization.
+This project uses [DHTMLX Gantt](https://dhtmlx.com/docs/products/dhtmlxGantt/) for project timeline visualization.
 
 1. Install dependency:
 ```bash
-npm install frappe-gantt
+npm install dhtmlx-gantt
 ```
 
 2. Basic usage example:
 ```javascript
-import { Gantt } from 'frappe-gantt';
+import { Gantt } from 'dhtmlx-gantt';
 
 function ProjectTimeline() {
   useEffect(() => {
     const tasks = [
       {
-        id: '1',
-        name: 'Task 1',
-        start: '2024-03-01',
-        end: '2024-03-05',
-        progress: 20
+        id: 1,
+        text: 'Task 1',
+        start_date: '2024-03-01',
+        end_date: '2024-03-05',
+        progress: 0.2
       }
     ];
 
-    const gantt = new Gantt('#gantt', tasks, {
-      view_mode: 'Week',
-      on_click: (task) => {
-        console.log(task);
-      }
-    });
+    gantt.init("gantt");
+    gantt.parse({ data: tasks });
   }, []);
 
-  return <div id="gantt"></div>;
+  return <div id="gantt" style={{ width: "100%", height: "500px" }}></div>;
 }
 ```
 
