@@ -8,11 +8,43 @@ export async function GET(request) {
     const teamId = searchParams.get('teamId')
     const sectionId = searchParams.get('sectionId')
     const taskId = searchParams.get('taskId')
+    const userId = searchParams.get('userId')
+    const fetchAll = searchParams.get('fetchAll') === 'true'
     
     let data = []
     
+    // 获取当前登录用户
+    if (userId === 'current') {
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      
+      if (userError) throw userError
+      
+      if (userData && userData.user) {
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('task')
+          .select('*')
+          .eq('assignee_id', userData.user.id)
+          
+        if (tasksError) throw tasksError
+        
+        data = tasksData || []
+      } else {
+        throw new Error('User not authenticated')
+      }
+    }
+    // 获取所有任务
+    else if (fetchAll) {
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('task')
+        .select('*')
+        .order('created_at', { ascending: false })
+        
+      if (tasksError) throw tasksError
+      
+      data = tasksData || []
+    }
     // 如果提供了特定任务ID，则只获取该任务
-    if (taskId) {
+    else if (taskId) {
       const { data: taskData, error: taskError } = await supabase
         .from('task')
         .select('*')
@@ -23,6 +55,17 @@ export async function GET(request) {
       
       data = taskData ? [taskData] : []
     } 
+    // 如果提供了用户ID，则获取分配给该用户的所有任务
+    else if (userId) {
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('task')
+        .select('*')
+        .eq('assignee_id', userId)
+        
+      if (tasksError) throw tasksError
+      
+      data = tasksData || []
+    }
     // 如果提供了章节ID，则获取该章节下的所有任务
     else if (sectionId) {
       // 首先从section表获取task_ids数组

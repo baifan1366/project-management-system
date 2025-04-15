@@ -22,7 +22,8 @@
     "search": "Search",
     "mytasks": "My Tasks",
     "calendar": "Calendar",
-    "chat": "Chat"
+    "chat": "Chat",
+    "taskAssistant": "Task Assistant"
   },
   "common": {
     "save": "Save",
@@ -93,6 +94,7 @@
     "passwordMismatch": "New password and confirm password do not match",
     "passwordChanged": "Password has been changed successfully",
     "timezone": "Timezone",
+    "timeFormat": "Time Format",
     "emailNotifications": "Email Notifications",
     "emailNotificationsDesc": "Receive emails for important updates and alerts",
     "pushNotifications": "Push Notifications",
@@ -198,7 +200,7 @@
   },
   "Projects": {
     "create": "Create Project",
-    "statusTitle":"Status",
+    "statusTitle": "Status",
     "status": {
       "pending": "Pending",
       "in_progress": "In Progress",
@@ -277,7 +279,94 @@
       "byCreatedDate": "By Created Date",
       "byUpdatedDate": "By Updated Date"
     },
-    "noTasks": "No tasks"
+    "noTasks": "No tasks",
+    "structure": {
+      "tag_values": "Task Properties",
+      "attachments": "Attachments",
+      "creator": "Creator"
+    },
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent"
+    }
+  },
+  "myTasks": {
+    "title": "My Tasks",
+    "results": "results",
+    "type": {
+      "label": "TYPE",
+      "pastDue": "Past Due",
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "noDate": "No Date"
+    },
+    "assignedTo": {
+      "label": "ASSIGNED TO",
+      "unassigned": "Unassigned",
+      "me": "Me"
+    },
+    "workspaceTeams": {
+      "label": "WORKSPACE & TEAMS",
+      "all": "All",
+      "shared": "Shared with me",
+      "workspace": "Workspace"
+    },
+    "dueDate": {
+      "label": "DUE DATE",
+      "createdBy": "Created by me"
+    },
+    "filters": {
+      "all": "All Tasks",
+      "assignedToMe": "Assigned to Me",
+      "createdByMe": "Created by Me",
+      "completed": "Completed"
+    },
+    "searchPlaceholder": "Search tasks...",
+    "status": {
+      "todo": "To Do",
+      "in_progress": "In Progress",
+      "done": "Done",
+      "in_review": "In Review"
+    },
+    "noTasks": "No tasks",
+    "noTitle": "Untitled Task",
+    "section": "Section",
+    "createdBy": "Created by",
+    "assignee": "Assignee",
+    "loading": "Loading tasks...",
+    "priority": {
+      "label": "Priority",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent"
+    },
+    "tagValues": {
+      "title": "Title",
+      "description": "Description",
+      "status": "Status",
+      "assignee": "Assignee",
+      "priority": "Priority",
+      "dueDate": "Due Date",
+      "section": "Section",
+      "project": "Project"
+    },
+    "actions": {
+      "edit": "Edit Task",
+      "delete": "Delete Task",
+      "assign": "Assign to me",
+      "unassign": "Unassign",
+      "markAsComplete": "Mark as complete",
+      "markAsIncomplete": "Mark as incomplete"
+    },
+    "errors": {
+      "loadingFailed": "Failed to load tasks",
+      "updateFailed": "Failed to update task",
+      "missingSection": "Missing section ID",
+      "notFound": "Task not found"
+    }
   },
   "notifications": {
     "title": "Notifications",
@@ -309,7 +398,11 @@
   },
   "errors": {
     "general": "Something went wrong",
-    "notFound": "Resource not found",
+    "notFound": "Page Not Found",
+    "notFoundDescription": "Sorry, the page you are looking for does not exist or has been moved.",
+    "backToHome": "Back to Home",
+    "goBack": "Go Back",
+    "redirectCountdown": "You will be redirected to home page in {countdown} seconds...",
     "unauthorized": "Unauthorized access",
     "forbidden": "Access forbidden",
     "networkError": "Network error",
@@ -324,7 +417,8 @@
     "fileTooLarge": "File is too large",
     "invalidFileType": "Invalid file type",
     "connectionFailed": "Failed to connect to server",
-    "sessionInvalid": "Your session is invalid or expired"
+    "sessionInvalid": "Your session is invalid or expired",
+    "searchFailed": "Search failed, please try again later"
   },
   "Pricing": {
     "title": "Plans and Pricing",
@@ -396,7 +490,7 @@
     "activeProjects": "active projects",
     "noTeams": "No teams created yet"
   },
-  "CreateProject":{
+  "CreateProject": {
     "createProject": "Create Project",
     "projectName": "Project Name",
     "cancel": "Cancel",
@@ -420,7 +514,7 @@
     "error": "Error",
     "themeColorLoadError": "Theme color load error"
   },
-  "CreateTask":{
+  "CreateTask": {
     "createTask": "Create Task",
     "taskName": "Task Name",
     "cancel": "Cancel",
@@ -450,6 +544,9 @@
     "timeline": "Timeline",
     "text": "Text",
     "gantt": "Gantt",
+    "day": "Day",
+    "week": "Week",
+    "month": "Month",
     "addTask": "Add task",
     "note": "Note",
     "file": "File",
@@ -523,9 +620,11 @@
     "removeTag": "Remove",
     "loadingTasks": "Loading...",
     "noTasksFound": "No tasks found",
-    "overview": "Overview"
+    "overview": "Overview",
+    "addNewSection": "Add Section",
+    "enterSectionName": "Enter section name..."
   },
-  "ChatDialog":{
+  "ChatDialog": {
     "privateMessages": "Private Messages",
     "groupChat": "Group Chat",
     "privateMessagesContent": "This is the content for private messages.",
@@ -559,16 +658,16 @@
     "title": "Chat",
     "searchPlaceholder": "Search chats",
     "newChat": "New Chat",
-    "noMessages": "No messages",
+    "noMessages": "No messages yet",
     "inputPlaceholder": "Type a message...",
     "send": "Send",
     "attachFile": "Attach file",
-    "attachImage": "Image",
-    "attachGift": "Gift",
+    "attachImage": "Attach image",
+    "attachGift": "Attach gift",
     "emoji": "Emoji",
     "selectChat": "Select a chat to start",
     "searchUsers": "Search users",
-    "searching": "Searching",
+    "searching": "Searching...",
     "noResults": "No results found",
     "recentContacts": "Recent contacts",
     "startChat": "Start chat",
@@ -576,27 +675,27 @@
     "minimize": "Minimize",
     "maximize": "Maximize",
     "close": "Close",
-    "members": "members",
+    "members": "Members",
     "inviteUsers": "Invite users",
     "inviteSelected": "Invite selected users",
     "invitationSent": "Invitation sent",
     "invitationFailed": "Invitation failed",
     "inviting": "Inviting users...",
     "newMessage": "New message",
-    "switchToAI": "Switch to AI Chat",
+    "switchToAI": "Switch to AI assistant",
     "switchToNormal": "Return to normal chat",
     "unknownChat": "Unknown chat",
-    "aiAssistant": "Project Manager Penguin",
+    "aiAssistant": "Project Management Penguin",
     "poweredBy": "Powered by Qwen/QwQ-32B",
-    "welcomeTitle": "Welcome to Project Manager Penguin",
-    "welcomeMessage": "I'm your professional project management assistant. Ask me anything about project planning, task organization, or team coordination!",
+    "welcomeTitle": "Welcome to Project Management Penguin",
+    "welcomeMessage": "I'm your professional project management assistant. Feel free to ask me about project planning, task organization, or team coordination!",
     "user": "User",
     "thinking": "Thinking...",
-    "aiResponseError": "AI response error:",
-    "aiApiError": "AI API call error:",
-    "errorMessage": "Sorry, an error occurred while processing your request. Please try again later.",
+    "aiResponseError": "AI Response Error:",
+    "aiApiError": "AI API Call Error:",
+    "errorMessage": "Sorry, there was an error processing your request. Please try again later.",
     "clearChat": "Clear chat",
-    "newAIChat": "New Chat",
+    "newAIChat": "New conversation",
     "readMore": "Read more",
     "showLess": "Show less",
     "reply": "Reply",
@@ -609,26 +708,43 @@
     "hoursAgo": "{hours} hours ago",
     "yesterday": "Yesterday",
     "daysAgo": "{days} days ago",
-    "privateChat": "Private Chat",
-    "groupChat": "Group Chat",
+    "privateChat": "Private chat",
+    "groupChat": "Group chat",
     "sentAttachment": "Sent an attachment",
     "unreadMessages": "{count} unread messages",
-    "translate": "translate to en",
-    "uploadSuccess": "File uploaded successfully",
+    "translate": "Translate to English",
+    "seeOriginal": "See original",
+    "uploadSuccess": "File upload successful",
     "uploadStarted": "File upload started",
     "uploadComplete": "File upload complete",
-    "messageSent": "Message sent successfully",
-    "messageFailed": "Failed to send message",
-    "checkingPermission": "Checking user permission...",
+    "messageSent": "Message sent",
+    "messageFailed": "Message failed to send",
+    "checkingPermission": "Checking user permissions...",
     "attachmentAdded": "Attachment added successfully",
     "attachmentFailed": "Failed to add attachment",
     "fileSizeLimit": "File size exceeds limit",
     "fileTypeNotAllowed": "File type not allowed",
     "connectionError": "Connection error, please try again",
-    "sessionExpired": "Session expired, please login again",
-    "chatCreated": "Chat created successfully",
-    "groupCreated": "Group created successfully",
-    "creating": "Creating chat..."
+    "sessionExpired": "Session expired, please log in again",
+    "chatCreated": "Chat created",
+    "groupCreated": "Group created",
+    "creating": "Creating chat...",
+    "sun": "Sunday",
+    "mon": "Monday",
+    "tue": "Tuesday",
+    "wed": "Wednesday",
+    "thu": "Thursday",
+    "fri": "Friday",
+    "sat": "Saturday",
+    "search": {
+      "title": "Search",
+      "placeholder": "Search messages, files, and more...",
+      "noResults": "No results found",
+      "recentSearches": "Recent searches",
+      "clearAll": "Clear all",
+      "searching": "Searching...",
+      "matchesFound": "matching message(s)"
+    }
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
@@ -681,7 +797,7 @@
   "CustomField": {
     "title": "Custom Fields",
     "no_available_fields": "No available fields",
-    "add_field": "Add Custom Field",
+    "add_field": "Add",
     "adding": "Adding...",
     "default": "Default",
     "Name": "Name",
@@ -756,7 +872,7 @@
     "myTasks": "My Tasks",
     "allTasks": "All Tasks",
     "upcomingTasks": "Upcoming Tasks",
-    "connectGoogle": "Connect Google Calendar",
+    "connectGoogle": "Connect Google",
     "connectGoogleCalendarPrompt": "Connect your Google Calendar to view all events",
     "weekViewComingSoon": "Week view coming soon",
     "dayViewComingSoon": "Day view coming soon",
@@ -810,10 +926,11 @@
     "hasMeetLink": "Click to open Google Meet",
     "accept": "Accept",
     "decline": "Decline",
-    "meetingDeclined": "Meeting invitation declined"
+    "meetingDeclined": "Meeting invitation declined",
+    "color": "color"
   },
   "CreateTag": {
-    "createTag": "Create new field",
+    "createTag": "Create New Field",
     "createTagDescription": "You may create your own field.",
     "tagName": "Field title",
     "tagPlaceholder": "Name, Asignee, Status...",
@@ -841,13 +958,13 @@
     "CREATED-BY": "Created By",
     "description": "Description",
     "descriptionPlaceholder": "Enter description",
-    "cancel":"Cancel",
-    "adding":"Creating...",
+    "cancel": "Cancel",
+    "adding": "Creating...",
     "addTag": "Create",
-    "nameMin":"Field title must be at least 2 characters.",
-    "nameMax":"Field title cannot exceed 50 characters.",
-    "typeRequired":"Field type is required.",
-    "descriptionMax":"Description cannot exceed 100 characters.",
+    "nameMin": "Field title must be at least 2 characters.",
+    "nameMax": "Field title cannot exceed 50 characters.",
+    "typeRequired": "Field type is required.",
+    "descriptionMax": "Description cannot exceed 100 characters.",
     "descriptionMin": "Description must be at least 10 characters.",
     "addDescription": "Add description"
   },
@@ -912,10 +1029,10 @@
     "Edit": "Edit",
     "Delete": "Delete",
     "cancel": "Cancel",
-    "nameMin":"Field title must be at least 2 characters.",
-    "nameMax":"Field title cannot exceed 50 characters.",
-    "typeRequired":"Field type is required.",
-    "descriptionMax":"Description cannot exceed 100 characters.",
+    "nameMin": "Field title must be at least 2 characters.",
+    "nameMax": "Field title cannot exceed 50 characters.",
+    "typeRequired": "Field type is required.",
+    "descriptionMax": "Description cannot exceed 100 characters.",
     "descriptionMin": "Description must be at least 10 characters.",
     "addDescription": "Add description",
     "Type": "Type",
@@ -938,5 +1055,55 @@
     "LAST-MODIFIED-ON": "Last Modified On",
     "CREATED-ON": "Created On",
     "CREATED-BY": "Created By"
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search projects, tasks, users, and more...",
+    "button": "Search",
+    "searching": "Searching...",
+    "noResults": "No results found",
+    "tryDifferent": "Try different keywords or check spelling",
+    "resultsFound": "results found",
+    "types": {
+      "project": "Project",
+      "task": "Task",
+      "user": "User",
+      "team": "Team",
+      "calendar": "Calendar",
+      "message": "Message"
+    },
+    "recentSearches": "Recent Searches",
+    "clearAll": "Clear All",
+    "createdAt": "Created on",
+    "project": "Project",
+    "creator": "Creator",
+    "status": "Status",
+    "untitled": "Untitled",
+    "message": "Create projects and tasks using natural language.",
+    "description": "Just describe your needs, and Pengy will automatically create projects and tasks for you",
+    "examples": "Example prompts",
+    "suggestedSearches": {
+      "suggestedSearches": "Suggested Searches", 
+      "projects": "Active projects",
+      "tasks": "My tasks",
+      "teams": "My teams",
+      "reports": "Monthly reports",
+      "team": "Team members",
+      "designProject": "Create a website redesign project with UI/UX design, frontend development, and testing tasks",
+      "marketingProject": "Create a product launch task list with market analysis, prototype design, and user testing high priority tasks",
+      "weeklyTasks": "Create a project for next week's market activities, including 5 tasks: content creation, design production, placement review, traffic analysis, and effectiveness evaluation",
+      "developmentProject": "Plan a three-month software development project with tasks related to requirements analysis, design, development, testing, and release phases"
+    }
+  },
+  "pengy": {
+    "title": "Pengy Task Assistant",
+    "description": "Your penguin-themed task management assistant",
+    "greeting": "Hello! I'm Pengy, your task management assistant",
+    "prompt": "Tell me what project or tasks you want to create!",
+    "thinking": "Pengy is thinking...",
+    "success": "Task waddle-fully created!",
+    "error": "Pengy slipped on the ice. Let's try again!",
+    "tips": "Penguin Pro Tips",
+    "tipDetails": "For best results, include details like due dates, priorities, and task descriptions"
   }
 }

@@ -13,7 +13,7 @@ import {
 import { useState, useEffect } from 'react';
 import { ProfilePopover } from './ui/ProfilePopover';
 import { Popover, PopoverTrigger } from '@/components/ui/popover';
-import { NotificationDialog } from './ui/NotificationDialog';
+import { NotificationDialog } from './notifications/NotificationDialog';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectUnreadCount, fetchNotifications } from '@/lib/redux/features/notificationSlice';
 import { Badge } from './ui/badge';

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 // 替换为你的DeepL API密钥
-const DEEPL_API_KEY = NEXT_PUBLIC_process.env.DEEPL_API_KEY;
+const DEEPL_API_KEY = process.env.NEXT_PUBLIC_DEEPL_API_KEY;
 const DEEPL_API_URL = 'https://api-free.deepl.com/v2/translate';
 
 export async function POST(request) {

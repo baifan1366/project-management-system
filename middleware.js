@@ -24,7 +24,7 @@ export const config = {
      * /favicon.ico (浏览器图标)
      * /admin (Admin routes)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|admin).*)',
+    '/((?!api|_next/static|_next/image|.*\\.png|.*\\.webp|.*\\.glb|favicon.ico|admin).*)',
     '/:locale(en|zh|my)/:path*'
   ]
 };

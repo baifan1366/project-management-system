@@ -25,6 +25,7 @@ export default function FileUploader({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState(''); // 添加消息状态
   const fileInputRef = useRef(null);
 
   const handleFileSelect = (e) => {
@@ -126,14 +127,15 @@ export default function FileUploader({
       // 清空文件列表
       setFiles([]);
       
-      // 调用上传完成回调
-      onUploadComplete(uploadResults);
+      // 调用上传完成回调，传入消息内容
+      onUploadComplete(uploadResults, message);
       
     } catch (error) {
       console.error('上传过程中出错:', error);
       setError(error.message || '上传失败');
     } finally {
       setUploading(false);
+      setMessage(''); // 清空消息
     }
   };
 
@@ -177,6 +179,17 @@ export default function FileUploader({
               </div>
 
               <div className="p-4">
+                {/* 添加消息输入框 */}
+                <div className="mb-4">
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="添加消息（可选）"
+                    className="w-full bg-accent/50 rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                    rows={2}
+                  />
+                </div>
+
                 <div className="mt-4 space-y-2">
                   <p className="text-sm font-medium">已选择的文件</p>
                   {files.map((file, index) => (

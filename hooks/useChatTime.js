@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { useUserTimezone } from './useUserTimezone';
 
 /**
  * 用于格式化聊天消息时间的hook
@@ -10,21 +11,31 @@ import { useTranslations } from 'next-intl';
  */
 export function useChatTime() {
   const t = useTranslations('Chat');
+  const { userTimezone, hourFormat, adjustTimeByOffset } = useUserTimezone();
   
   const formatChatTime = (dateString) => {
     if (!dateString) return '';
     
     const date = new Date(dateString);
     const now = new Date();
-    const diffMs = now - date;
+    
+    // 使用手动时区调整
+    const dateInUserTz = adjustTimeByOffset(date);
+    const nowInUserTz = adjustTimeByOffset(now);
+    
+    const diffMs = nowInUserTz - dateInUserTz;
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
 
     // 如果是今天的消息，显示时间
-    if (diffDay < 1 && date.getDate() === now.getDate()) {
-      return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    if (diffDay < 1 && dateInUserTz.getDate() === nowInUserTz.getDate()) {
+      return dateInUserTz.toLocaleTimeString([], {
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: hourFormat === '12h'
+      });
     }
     
     // 如果是昨天的消息
@@ -35,11 +46,17 @@ export function useChatTime() {
     // 一周内的消息显示星期几
     if (diffDay < 7) {
       const weekdays = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-      return t(weekdays[date.getDay()]);
+      // 使用调整后的日期获取星期几
+      const dayOfWeek = dateInUserTz.getDay();
+      return t(weekdays[dayOfWeek]);
     }
     
     // 超过一周的消息显示日期
-    return date.toLocaleDateString([], {month: 'short', day: 'numeric'});
+    return dateInUserTz.toLocaleDateString([], {
+      month: 'short', 
+      day: 'numeric',
+      hour12: hourFormat === '12h'
+    });
   };
 
   return { formatChatTime };

@@ -69,9 +69,13 @@ export default function ProjectSidebar({ projectId }) {
       
       // 对每个团队都获取自定义字段
       if (teams && teams.length > 0) {
-        for (const team of teams) {
-          await dispatch(fetchTeamCustomFieldForTeam(team.id)).unwrap();
-        }
+        // 并行等待所有自定义字段获取完成
+        const customFieldPromises = teams.map(team => 
+          dispatch(fetchTeamCustomFieldForTeam(team.id)).unwrap()
+        );
+        
+        // 等待所有自定义字段加载完成
+        await Promise.all(customFieldPromises);
       }
     } catch (error) {
       console.error('获取用户团队失败:', error);

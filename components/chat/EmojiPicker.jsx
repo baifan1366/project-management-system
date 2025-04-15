@@ -19,11 +19,12 @@ export default function EmojiPicker({
   buttonClassName,
   iconClassName,
   buttonOnly = false,
-  buttonTitle = "选择表情",
+  buttonTitle = "select emoji",
   showPreview = true,
   position = "top", // top, bottom, left, right
   offset = 5, // 弹出框偏移距离
   isPending = false,
+  emojiVersion = "5.0" // 使用更广泛支持的emoji版本
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef(null);
@@ -61,13 +62,42 @@ export default function EmojiPicker({
       zIndex: 50
     };
 
-    switch (position) {
+    // 获取触发按钮的位置
+    const triggerRect = triggerRef.current?.getBoundingClientRect();
+    if (!triggerRect) return baseStyles;
+
+    // 获取视口尺寸
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // 计算可用空间
+    const spaceRight = viewportWidth - triggerRect.right;
+    const spaceLeft = triggerRect.left;
+    const spaceTop = triggerRect.top;
+    const spaceBottom = viewportHeight - triggerRect.bottom;
+
+    // 默认位置
+    let finalPosition = position;
+
+    // 如果指定了位置，检查是否有足够空间
+    if (position === 'top' && spaceTop < 350) {
+      finalPosition = 'bottom';
+    } else if (position === 'bottom' && spaceBottom < 350) {
+      finalPosition = 'top';
+    } else if (position === 'left' && spaceLeft < 320) {
+      finalPosition = 'right';
+    } else if (position === 'right' && spaceRight < 320) {
+      finalPosition = 'left';
+    }
+
+    // 根据最终位置返回样式
+    switch (finalPosition) {
       case 'top':
         return {
           ...baseStyles,
           bottom: `calc(100% + ${offset}px)`,
-          left: '50%',
-          transform: 'translateX(-50%)'
+          left: '-100%',
+          transform: 'translateX(-75%)'
         };
       case 'bottom':
         return {
@@ -130,6 +160,7 @@ export default function EmojiPicker({
             width={320}
             height={350}
             theme="auto" // 根据系统设置决定深色或浅色
+            emojiVersion={emojiVersion} // 添加emoji版本限制
           />
         </div>
       )}
