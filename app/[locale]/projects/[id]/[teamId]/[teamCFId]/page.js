@@ -12,8 +12,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import TaskTab from "@/components/team/TaskTab"
 import InvitationDialog from '@/components/team/InvitationDialog';
 import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
-import TaskList from '@/components/team/TaskList';
-import TaskGantt from '@/components/team/TaskGantt';
+import TaskList from '@/components/team/list/TaskList';
+import TaskGantt from '@/components/team/gantt/TaskGantt';
 import { store } from '@/lib/redux/store';
 
 // 创建记忆化的选择器

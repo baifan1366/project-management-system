@@ -440,9 +440,7 @@ export default function BodyContent({
                 </Draggable>
               ))
             ) : (
-              <div className="text-muted-foreground text-center p-4">
-                没有部门数据
-              </div>
+              ''
             )}
             {provided.placeholder}
           </div>

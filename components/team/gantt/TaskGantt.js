@@ -3,17 +3,16 @@
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
 import './Gantt.css';
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '../ui/button';
+import { Button } from '../../ui/button';
 import { ChevronDown } from 'lucide-react'
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useTranslations } from 'next-intl';
 import AddTaskDialog from './AddTaskDialog';
 import EditTaskDialog from './EditTaskDialog';
 import { Plus } from 'lucide-react';
 import { initZoom, setZoom as applyZoom, handleZoomChange as changeZoom } from './GanttTools';
 import { useConfirm } from '@/hooks/use-confirm';
-import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
-import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
+import { useGanttData, formatDateForGantt } from './BodyContent';
 
 export default function TaskGantt({ projectId, teamId, teamCFId }) {
   const ganttContainer = useRef(null);
@@ -21,24 +20,31 @@ export default function TaskGantt({ projectId, teamId, teamCFId }) {
   const { confirm } = useConfirm();
   const project = useSelector(state => 
     state.projects.projects.find(p => p.id.toString() === projectId.toString())
-  );  
+  );
+  
   const zoom = 'Days';
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [newTask, setNewTask] = useState({
     text: '',
-    start_date: new Date(),
+    start_date: new Date().toISOString().split('T')[0] + ' 00:00',
     duration: 1
   });
   const [editTask, setEditTask] = useState({
     id: null,
     text: '',
-    start_date: new Date(),
+    start_date: new Date().toISOString().split('T')[0] + ' 00:00',
     duration: 1,
     progress: 0
   });
   const taskColor = project?.theme_color;
+  
+  // 初始化gantt对象，避免循环依赖
+  const [ganttObj, setGanttObj] = useState(null);
+  
+  // 使用BodyContent中的自定义hook获取数据
+  const { sections, allTasks, ganttTasks, tags } = useGanttData(teamId, teamCFId, ganttObj);
 
   // Apply zoom level
   const setZoom = (value) => {
@@ -53,46 +59,57 @@ export default function TaskGantt({ projectId, teamId, teamCFId }) {
   const handleAddTask = () => {
     if (newTask.text.trim() === '') return;
 
-    const formattedDate = gantt.date.format(newTask.start_date, "%Y-%m-%d %H:%i");
-    const taskToAdd = {
-      text: newTask.text,
-      start_date: formattedDate,
-      duration: parseInt(newTask.duration) || 1,
-      progress: 0
-    };
-    
-    const taskId = gantt.addTask(taskToAdd);
-    setShowTaskForm(false);
-    setNewTask({
-      text: '',
-      start_date: new Date(),
-      duration: 1
-    });
+    try {
+      // 使用BodyContent中的格式化函数
+      const dateObj = formatDateForGantt(newTask.start_date);
+      
+      const taskToAdd = {
+        text: newTask.text,
+        start_date: dateObj,
+        duration: parseInt(newTask.duration) || 1,
+        progress: 0
+      };
+      
+      // 使用calculateEndDate自动计算结束日期
+      taskToAdd.end_date = gantt.calculateEndDate(taskToAdd);
+      
+      const taskId = gantt.addTask(taskToAdd);
+      setShowTaskForm(false);
+      setNewTask({
+        text: '',
+        start_date: new Date().toISOString().split('T')[0] + ' 00:00',
+        duration: 1
+      });
+    } catch (error) {
+      console.error("Error adding task:", error);
+      alert("添加任务时出错，请检查日期格式");
+    }
   }
 
   const handleUpdateTask = () => {
     if (editTask.text.trim() === '') return;
 
-    let formattedDate;
-    if (editTask.start_date instanceof Date) {
-      formattedDate = gantt.date.format(editTask.start_date, "%Y-%m-%d %H:%i");
-    } else {
-      // 如果已经是字符串格式但需要确保时间部分
-      formattedDate = editTask.start_date.includes(' ') 
-        ? editTask.start_date 
-        : `${editTask.start_date} 00:00`;
+    try {
+      // 使用BodyContent中的格式化函数
+      const dateObj = formatDateForGantt(editTask.start_date);
+      
+      const taskToUpdate = {
+        id: editTask.id,
+        text: editTask.text,
+        start_date: dateObj,
+        duration: parseInt(editTask.duration) || 1,
+        progress: editTask.progress
+      };
+  
+      // 使用calculateEndDate自动计算结束日期
+      taskToUpdate.end_date = gantt.calculateEndDate(taskToUpdate);
+      
+      gantt.updateTask(editTask.id, taskToUpdate);
+      setShowEditForm(false);
+    } catch (error) {
+      console.error("Error updating task:", error);
+      alert("更新任务时出错，请检查日期格式");
     }
-
-    const taskToUpdate = {
-      id: editTask.id,
-      text: editTask.text,
-      start_date: formattedDate,
-      duration: parseInt(editTask.duration) || 1,
-      progress: editTask.progress
-    };
-    
-    gantt.updateTask(editTask.id, taskToUpdate);
-    setShowEditForm(false);
   }
 
   const handleDeleteTask = () => {
@@ -165,8 +182,15 @@ export default function TaskGantt({ projectId, teamId, teamCFId }) {
   };
 
   useEffect(() => {
+    if (!ganttContainer.current) return;
+    
+    // Initialize gantt
+    gantt.init(ganttContainer.current);
+    setGanttObj(gantt);
+    
     // Configure gantt
-    gantt.config.date_format = "%Y-%m-%d %H:%i";  
+    gantt.config.date_format = "%Y-%m-%d %H:%i";
+    gantt.config.xml_date = "%Y-%m-%d %H:%i";
     gantt.config.show_grid = false;
     
     // Customize task color
@@ -233,41 +257,49 @@ export default function TaskGantt({ projectId, teamId, teamCFId }) {
       {name: "add", label: "", width: 44}
     ];
     
-    const data = {
+    // 默认数据 - 仅在没有任务数据时使用
+    const defaultData = {
       data: [
-        { id: 1, text: 'Task #1', start_date: '2025-04-15', duration: 3, progress: 0.6 },
-        { id: 2, text: 'Task #2', start_date: '2025-04-18', duration: 3, progress: 0.4 },
-        { id: 3, text: 'Task #3', start_date: '2025-04-15', duration: 1, progress: 0.4 },
-        { id: 4, text: 'Task #4', start_date: '2025-04-15', duration: 2, progress: 0.4 },
-        { id: 5, text: 'Task #5', start_date: '2025-04-15', duration: 3, progress: 0.4 },
-        { id: 6, text: 'Task #6', start_date: '2025-04-15', duration: 3, progress: 0.4 },
-        { id: 7, text: 'Task #7', start_date: '2025-04-15', duration: 3, progress: 0.4 },
-        { id: 8, text: 'Task #8', start_date: '2025-04-15', duration: 3, progress: 0.4 },
-        { id: 9, text: 'Task #9', start_date: '2025-04-15', duration: 3, progress: 0.4 },
-        { id: 10, text: 'Task #10', start_date: '2025-04-15', duration: 3, progress: 0.4 },
-        { id: 11, text: 'Task #11', start_date: '2025-04-15', duration: 3, progress: 0.4 },
-        { id: 12, text: 'Task #12', start_date: '2025-04-15', duration: 3, progress: 0.4 },
-        { id: 13, text: 'Task #13', start_date: '2025-04-15', duration: 3, progress: 0.4 },
-        { id: 14, text: 'Task #14', start_date: '2025-04-15', duration: 3, progress: 0.4 }
+        { id: 1, text: 'Task #1', start_date: '2025-04-15 00:00', duration: 3, progress: 0.6 },
+        { id: 2, text: 'Task #2', start_date: '2025-04-18 00:00', duration: 3, progress: 0.4 }
       ],
       links: [
         { id: 1, source: 1, target: 2, type: '0' }
       ]
     };
     
-    gantt.init(ganttContainer.current);
-    gantt.parse(data);
-    
-    // Initialize with default zoom level
+    // 初始缩放设置
     initZoom();
     setZoom(currentZoom);
     
     return () => {
-      // Clean up event listeners
-      gantt.detachEvent(linkClickEventId);
-      gantt.clearAll();
+      // 在组件卸载时正确清理所有事件监听器
+      if (gantt) {
+        gantt.detachEvent(linkClickEventId);
+        // 清理所有其他可能附加的事件
+        gantt.detachAllEvents();
+        gantt.clearAll();
+      }
     };
-  }, []);
+  }, []);  // 仅在组件挂载时运行一次
+
+  // 单独处理数据更新的effect，避免与初始化混在一起
+  useEffect(() => {
+    if (!ganttObj) return;
+    
+    // 当任务数据或缩放级别更新时，更新Gantt图表
+    if (ganttTasks.length > 0) {
+      ganttObj.clearAll();
+      ganttObj.parse({
+        data: ganttTasks,
+        links: []
+      });
+      setZoom(currentZoom);
+    } else if (ganttObj && currentZoom) {
+      // 如果没有任务数据但有缩放级别更新，只更新缩放
+      setZoom(currentZoom);
+    }
+  }, [ganttObj, ganttTasks, currentZoom]);
 
   return (
     <div className={`w-full h-full overflow-hidden`}>
