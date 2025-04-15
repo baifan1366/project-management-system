@@ -19,7 +19,8 @@ export default function PreferencesPage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     language: 'zh',
-    timezone: 'UTC+8'
+    timezone: 'UTC+8',
+    hourFormat: '24h'
   });
 
   useEffect(() => {
@@ -38,7 +39,8 @@ export default function PreferencesPage() {
     
     setFormData({
       language: session.user.user_metadata?.language || 'zh',
-      timezone: session.user.user_metadata?.timezone || 'UTC+8'
+      timezone: session.user.user_metadata?.timezone || 'UTC+8',
+      hourFormat: session.user.user_metadata?.hourFormat || '24h'
     });
   };
 
@@ -59,6 +61,7 @@ export default function PreferencesPage() {
       const preferenceData = {
         language: formData.language,
         timezone: formData.timezone,
+        hourFormat: formData.hourFormat,
         theme
       };
       
@@ -72,6 +75,7 @@ export default function PreferencesPage() {
           data: {
             language: formData.language,
             timezone: formData.timezone,
+            hourFormat: formData.hourFormat,
             theme
           }
         });
@@ -132,8 +136,28 @@ export default function PreferencesPage() {
                 className="w-full p-2 border rounded-md"
               >
                 <option value="UTC+8">中国标准时间 (UTC+8)</option>
-                <option value="UTC+0">世界标准时间 (UTC+0)</option>
+                <option value="UTC+0">格林威治标准时间 (UTC+0)</option>
                 <option value="UTC-8">太平洋标准时间 (UTC-8)</option>
+                <option value="UTC-5">东部标准时间 (UTC-5)</option>
+                <option value="UTC+1">中欧标准时间 (UTC+1)</option>
+                <option value="UTC+9">日本标准时间 (UTC+9)</option>
+                <option value="UTC+10">澳大利亚东部标准时间 (UTC+10)</option>
+                <option value="UTC+5.5">印度标准时间 (UTC+5.5)</option>
+                <option value="UTC+7">东南亚标准时间 (UTC+7)</option>
+                <option value="UTC+3">莫斯科标准时间 (UTC+3)</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hourFormat">{t('timeFormat')}</Label>
+              <select
+                id="hourFormat"
+                name="hourFormat"
+                value={formData.hourFormat}
+                onChange={handleInputChange}
+                className="w-full p-2 border rounded-md"
+              >
+                <option value="24h">24小时制 (14:30)</option>
+                <option value="12h">12小时制 (2:30 PM)</option>
               </select>
             </div>
           </div>
