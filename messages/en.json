@@ -94,6 +94,7 @@
     "passwordMismatch": "New password and confirm password do not match",
     "passwordChanged": "Password has been changed successfully",
     "timezone": "Timezone",
+    "timeFormat": "Time Format",
     "emailNotifications": "Email Notifications",
     "emailNotificationsDesc": "Receive emails for important updates and alerts",
     "pushNotifications": "Push Notifications",
@@ -727,7 +728,23 @@
     "sessionExpired": "Session expired, please log in again",
     "chatCreated": "Chat created",
     "groupCreated": "Group created",
-    "creating": "Creating chat..."
+    "creating": "Creating chat...",
+    "sun": "Sunday",
+    "mon": "Monday",
+    "tue": "Tuesday",
+    "wed": "Wednesday",
+    "thu": "Thursday",
+    "fri": "Friday",
+    "sat": "Saturday",
+    "search": {
+      "title": "Search",
+      "placeholder": "Search messages, files, and more...",
+      "noResults": "No results found",
+      "recentSearches": "Recent searches",
+      "clearAll": "Clear all",
+      "searching": "Searching...",
+      "matchesFound": "matching message(s)"
+    }
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

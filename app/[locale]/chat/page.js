@@ -15,11 +15,13 @@ import EmojiPicker from '@/components/chat/EmojiPicker';
 import FileUploader from '@/components/chat/FileUploader';
 import GoogleTranslator from '@/components/chat/GoogleTranslator';
 import { useLastSeen } from '@/hooks/useLastSeen';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { toast } from 'sonner';
 
 export default function ChatPage() {
   const t = useTranslations('Chat');
   const { formatLastSeen } = useLastSeen();
+  const { userTimezone, hourFormat, adjustTimeByOffset } = useUserTimezone();
   const [message, setMessage] = useState('');
   const { 
     currentSession, 
@@ -139,7 +141,7 @@ export default function ChatPage() {
   };
 
   // 处理文件上传完成
-  const handleFileUploadComplete = async (uploadResults) => {
+  const handleFileUploadComplete = async (uploadResults, messageContent) => {
     setIsPending(true);
     try {
       // 确保用户已登录且会话ID存在
@@ -168,7 +170,7 @@ export default function ChatPage() {
         .insert({
           session_id: currentSession.id,
           user_id: currentUser.id,
-          content: message.trim() ? message : t('sentAttachment')
+          content: messageContent || t('sentAttachment')
         })
         .select()
         .single();
@@ -360,7 +362,14 @@ export default function ChatPage() {
                       )}>
                         <span className="font-medium truncate">{msg.user?.name}</span>
                         <span className="text-xs text-muted-foreground flex-shrink-0">
-                          {new Date(msg.created_at).toLocaleTimeString()}
+                          {adjustTimeByOffset && new Date(msg.created_at) ? 
+                            adjustTimeByOffset(new Date(msg.created_at)).toLocaleTimeString([], {
+                              hour: '2-digit', 
+                              minute: '2-digit',
+                              hour12: hourFormat === '12h'
+                            }) : 
+                            new Date(msg.created_at).toLocaleTimeString()
+                          }
                         </span>
                       </div>
                       <div className={cn(

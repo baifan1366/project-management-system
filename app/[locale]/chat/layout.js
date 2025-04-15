@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Search, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, MessageSquare, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { useUserStatus } from '@/contexts/UserStatusContext';
@@ -9,7 +9,7 @@ import NewChatPopover from '@/components/chat/NewChatPopover';
 import { useLastSeen } from '@/hooks/useLastSeen';
 import { useChatTime } from '@/hooks/useChatTime';
 import { useDynamicMetadata } from '@/hooks/useDynamicMetadata';
-
+import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import PengyImage from '../../../public/pengy.webp';
 
@@ -19,6 +19,8 @@ function ChatLayout({ children }) {
   const { formatChatTime } = useChatTime(); // 使用聊天时间钩子
   const { usersStatus } = useUserStatus(); // 使用增强的用户状态上下文
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
   const { 
     sessions, 
     currentSession, 
@@ -35,9 +37,141 @@ function ChatLayout({ children }) {
     unreadCount: totalUnreadCount,
     currentSession
   });
+
+  // 搜索聊天功能
+  const handleSearch = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      // 获取当前用户会话信息
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setIsSearching(false);
+        return;
+      }
+      
+      // 获取用户参与的会话ID
+      const { data: userSessions, error: sessionError } = await supabase
+        .from('chat_participant')
+        .select('session_id')
+        .eq('user_id', session.user.id);
+        
+      if (sessionError) {
+        console.error('搜索聊天错误:', sessionError);
+        setIsSearching(false);
+        return;
+      }
+      
+      const sessionIds = userSessions.map(s => s.session_id);
+      
+      // 搜索消息内容
+      const { data: messageResults, error: messageError } = await supabase
+        .from('chat_message')
+        .select(`
+          id,
+          content,
+          created_at,
+          session_id,
+          user:user_id (
+            id,
+            name,
+            avatar_url,
+            email
+          )
+        `)
+        .in('session_id', sessionIds)
+        .ilike('content', `%${query}%`)
+        .order('created_at', { ascending: false })
+        .limit(20);
+        
+      if (messageError) {
+        console.error('搜索消息错误:', messageError);
+      }
+      
+      // 获取会话信息
+      const { data: sessionData, error: sessionDataError } = await supabase
+        .from('chat_session')
+        .select(`
+          id,
+          type,
+          name,
+          participants:chat_participant(
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email,
+              is_online,
+              last_seen_at
+            )
+          )
+        `)
+        .in('id', sessionIds)
+        .or(`name.ilike.%${query}%, type.eq.PRIVATE`);
+        
+      if (sessionDataError) {
+        console.error('获取会话信息错误:', sessionDataError);
+      }
+      
+      // 处理会话数据，添加匹配的消息
+      const processedSessions = sessionData?.map(session => {
+        // 过滤掉自己
+        const filteredParticipants = session.participants
+          .filter(p => p.user.id !== session.user?.id)
+          .map(p => p.user);
+          
+        // 对于私聊，检查对方用户名是否匹配搜索词
+        let matches = false;
+        if (session.type === 'PRIVATE' && filteredParticipants.length > 0) {
+          const otherUser = filteredParticipants[0];
+          matches = otherUser.name.toLowerCase().includes(query.toLowerCase());
+        } else {
+          // 对于群聊，检查群名是否匹配
+          matches = session.name.toLowerCase().includes(query.toLowerCase());
+        }
+        
+        // 获取该会话中匹配的消息
+        const matchedMessages = messageResults?.filter(msg => msg.session_id === session.id) || [];
+        
+        return {
+          ...session,
+          participants: filteredParticipants,
+          matchedMessages,
+          matches
+        };
+      }).filter(session => session.matches || session.matchedMessages.length > 0) || [];
+      
+      setSearchResults(processedSessions);
+    } catch (error) {
+      console.error('搜索过程中发生错误:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
   
-  // 添加日志查看所有sessions
-  console.log('所有聊天会话:', sessions);
+  // 当搜索词变化时进行搜索
+  useEffect(() => {
+    // 实现防抖功能
+    const debounceTimeout = setTimeout(() => {
+      if (searchQuery.trim()) {
+        handleSearch(searchQuery);
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+    
+    return () => clearTimeout(debounceTimeout);
+  }, [searchQuery]);
+
+  // 处理清除搜索
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+  };
 
   const handleChatClick = (session) => {
     if (chatMode === 'ai' && session.type !== 'AI') {
@@ -49,12 +183,23 @@ function ChatLayout({ children }) {
   };
   
   const toggleChatMode = () => {
-    console.log('当前聊天模式:', chatMode);
     const newMode = chatMode === 'normal' ? 'ai' : 'normal';
-    console.log('切换到新模式:', newMode);
     setChatMode(newMode);
     setCurrentSession(null);
   };
+  
+  // 过滤会话列表
+  const filteredSessions = useMemo(() => {
+    // 如果有搜索结果，使用搜索结果
+    if (searchQuery.trim() && searchResults.length > 0) {
+      return searchResults;
+    }
+    
+    // 否则根据聊天模式显示不同类型的会话
+    return sessions.filter(session => 
+      chatMode === 'normal' ? session.type !== 'AI' : session.type === 'AI'
+    );
+  }, [chatMode, sessions, searchQuery, searchResults]);
 
   return (
     <div className="flex h-screen">
@@ -91,20 +236,49 @@ function ChatLayout({ children }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder={t('searchPlaceholder')}
+              placeholder={t('search.placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-accent/50 rounded-md text-sm placeholder:text-muted-foreground focus:outline-none"
-              aria-label={t('searchPlaceholder')}
+              className="w-full pl-9 pr-8 py-2 bg-accent/50 rounded-md text-sm placeholder:text-muted-foreground focus:outline-none"
+              aria-label={t('search.placeholder')}
             />
+            {searchQuery && (
+              <button 
+                onClick={handleClearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
+          {isSearching && (
+            <div className="mt-2 text-center text-sm text-muted-foreground">
+              {t('search.searching')}
+            </div>
+          )}
+          {searchQuery && !isSearching && searchResults.length === 0 && (
+            <div className="mt-2 text-center text-sm text-muted-foreground">
+              {t('search.noResults')}
+            </div>
+          )}
         </div>
 
         {/* 聊天列表 */}
         <div className="flex-1 overflow-y-auto">
-          {sessions
-            .filter(session => chatMode === 'normal' ? session.type !== 'AI' : session.type === 'AI') // 根据模式显示不同类型的会话
-            .map((session) => {
+          {filteredSessions.map((session) => {
+            // 处理显示内容
+            const sessionName = session.type === 'PRIVATE' 
+              ? session.participants[0]?.name
+              : session.name;
+              
+            const avatar = session.type === 'PRIVATE' 
+              ? session.participants[0]?.avatar_url 
+              : null;
+              
+            const lastMessageContent = session.matchedMessages && session.matchedMessages.length > 0
+              ? session.matchedMessages[0].content 
+              : session.lastMessage?.content;
+              
             return (
               <div
                 key={session.id}
@@ -113,8 +287,8 @@ function ChatLayout({ children }) {
                 }`}
                 onClick={() => handleChatClick(session)}
                 title={session.type === 'PRIVATE' 
-                  ? t('privateChat') + ': ' + (session.participants[0]?.name || '')
-                  : (session.type === 'AI' ? t('aiAssistant') : t('groupChat') + ': ' + (session.name || ''))}
+                  ? t('privateChat') + ': ' + (sessionName || '')
+                  : (session.type === 'AI' ? t('aiAssistant') : t('groupChat') + ': ' + (sessionName || ''))}
               >
                 <div className="relative flex-shrink-0">
                   <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden">
@@ -127,17 +301,17 @@ function ChatLayout({ children }) {
                         />
                       </div>
                     ) : session.type === 'PRIVATE' ? (
-                      session.participants[0]?.avatar_url && session.participants[0]?.avatar_url !== '' ? (
+                      avatar && avatar !== '' ? (
                         <img 
-                          src={session.participants[0].avatar_url} 
-                          alt={session.participants[0].name || t('privateChat')}
+                          src={avatar} 
+                          alt={sessionName || t('privateChat')}
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <span>{session.participants[0]?.name?.charAt(0) || '?'}</span>
+                        <span>{sessionName?.charAt(0) || '?'}</span>
                       )
                     ) : (
-                      <span>{session.name?.charAt(0) || '?'}</span>
+                      <span>{sessionName?.charAt(0) || '?'}</span>
                     )}
                   </div>
                   {session.unreadCount > 0 && (
@@ -154,21 +328,17 @@ function ChatLayout({ children }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between">
                     <h3 className={`font-medium truncate ${session.unreadCount > 0 ? 'text-foreground font-semibold' : ''}`}>
-                      {session.type === 'PRIVATE' 
-                        ? session.participants[0]?.name
-                        : session.name}
+                      {sessionName}
                     </h3>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatChatTime(session.lastMessage?.created_at)}
+                      {formatChatTime(session.lastMessage?.created_at || session.matchedMessages?.[0]?.created_at)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1">
                     <p className={`text-sm truncate ${session.unreadCount > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-                      {session.lastMessage ? (
-                        session.lastMessage.role === 'assistant' ? 
-                          `🤖 ${session.lastMessage.content || t('noMessages')}` : 
-                          session.lastMessage.content || t('noMessages')
-                      ) : t('noMessages')}
+                      {lastMessageContent
+                        ? (session.lastMessage?.role === 'assistant' ? `🤖 ${lastMessageContent}` : lastMessageContent)
+                        : t('noMessages')}
                     </p>
                     {session.unreadCount > 0 && currentSession?.id !== session.id && (
                       <div className="ml-2 w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"
@@ -191,10 +361,24 @@ function ChatLayout({ children }) {
                       )}
                     </div>
                   )}
+                  
+                  {/* 如果是搜索结果，显示匹配消息数 */}
+                  {searchQuery && session.matchedMessages && session.matchedMessages.length > 0 && (
+                    <div className="mt-1 text-xs text-blue-500">
+                      {session.matchedMessages.length} {t('search.matchesFound', { count: session.matchedMessages.length })}
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
+          
+          {/* 如果有搜索查询但没有结果 */}
+          {searchQuery && filteredSessions.length === 0 && !isSearching && (
+            <div className="p-4 text-center text-muted-foreground">
+              {t('search.noResults')}
+            </div>
+          )}
         </div>
 
         {/* 新建聊天按钮 */}
