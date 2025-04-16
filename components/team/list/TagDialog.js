@@ -108,7 +108,7 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
             'TAGS': <Tag className="w-4 h-4 mr-2 text-gray-500" />,
             'COMPLETED-ON': <Clock3 className="w-4 h-4 mr-2 text-gray-500" />,
             'LAST-MODIFIED-ON': <Pen className="w-4 h-4 mr-2 text-gray-500" />,
-            'CREATED-ON': <Clock3 className="w-4 h-4 mr-2 text-gray-500" />,
+            'CREATED-AT': <Clock3 className="w-4 h-4 mr-2 text-gray-500" />,
             'CREATED-BY': <User className="w-4 h-4 mr-2 text-gray-500" />
         }
         return iconMap[type] || null

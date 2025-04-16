@@ -3,9 +3,8 @@
 import { useTranslations } from 'next-intl';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Plus } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import CreateTagDialog from './TagDialog';
+import TagPopover from './TagPopover';
 import { getTags, resetTagsStatus } from '@/lib/redux/features/teamCFSlice';
 import {
   Table,
@@ -24,7 +23,7 @@ import { createSection } from '@/lib/redux/features/sectionSlice';
 export default function TaskList({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
-  const [isDialogOpen, setDialogOpen] = useState(false);
+  const [isPopoverOpen, setPopoverOpen] = useState(false);
   const isTagRequestInProgress = useRef(false);
   const hasLoadedTags = useRef(false);
   
@@ -140,27 +139,22 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     };
   }, [dispatch, teamId, teamCFId, tagsStatus]);
 
-  // 关闭创建标签对话框
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
+  // 当标签更新时的回调函数
+  const handleTagsUpdated = () => {
+    // 重置标签加载状态
+    hasLoadedTags.current = false;
+    isTagRequestInProgress.current = false;
     
-    // 在对话框关闭后强制重新加载数据
-    setTimeout(() => {
-      // 重置标签加载状态
-      hasLoadedTags.current = false;
-      isTagRequestInProgress.current = false;
-      
-      // 重置Redux状态
-      dispatch(resetTagsStatus());
-      
-      // 重新加载标签数据
-      loadTag().then(() => {
-        // 在加载完成后，如有需要，重置标签顺序为默认顺序
-        if (tagInfo.length > tagOrder.length) {
-          setTagOrder(tagInfo.map((_, index) => index));
-        }
-      });
-    }, 100);
+    // 重置Redux状态
+    dispatch(resetTagsStatus());
+    
+    // 重新加载标签数据
+    loadTag().then(() => {
+      // 在加载完成后，如有需要，重置标签顺序为默认顺序
+      if (tagInfo.length > tagOrder.length) {
+        setTagOrder(tagInfo.map((_, index) => index));
+      }
+    });
   };
 
   // 处理拖放开始事件（处理所有类型的拖拽）
@@ -443,13 +437,14 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
               </TableCell>
               {/* 添加标签按钮 */}
               <TableCell className="text-right" >
-                <Button 
-                  onClick={() => setDialogOpen(true)} 
-                  variant="ghost"
-                  size="sm"
-                >
-                  <Plus className="w-4 h-4"/>
-                </Button>
+                <TagPopover
+                  isOpen={isPopoverOpen}
+                  onClose={() => setPopoverOpen(false)}
+                  projectId={projectId}
+                  teamId={teamId}
+                  teamCFId={teamCFId}
+                  onTagsUpdated={handleTagsUpdated}
+                />
               </TableCell>
             </TableRow>
           </TableHeader>
@@ -488,14 +483,6 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
           </TableBody>
         </Table>
       </DragDropContext>
-      
-      <CreateTagDialog 
-        isOpen={isDialogOpen} 
-        onClose={handleCloseDialog} 
-        projectId={projectId}
-        teamId={teamId}
-        teamCFId={teamCFId}
-      />
     </div>
   );
 }
