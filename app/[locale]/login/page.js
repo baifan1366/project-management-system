@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaGoogle, FaGithub } from 'react-icons/fa';
+import { FaGoogle, FaGithub, FaEye, FaEyeSlash, FaQuestionCircle } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import LogoImage from '../../../public/logo.png';
+import { useTranslations } from 'next-intl';
 
 export default function LoginPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
+  const rememberMeRef = useRef(null);
+  const t = useTranslations('auth');
   
   // 获取当前语言
   const locale = params.locale || 'en';
@@ -24,8 +27,11 @@ export default function LoginPage() {
     email: '',
     password: '',
   });
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
 
   // 处理重定向逻辑
   const handleRedirect = (user) => {
@@ -78,12 +84,21 @@ export default function LoginPage() {
     });
   };
 
+  const handleRememberMeChange = (e) => {
+    setRememberMe(e.target.checked);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
+      // 如果选择了记住我，设置表单的autocomplete属性为"on"
+      if (rememberMe && rememberMeRef.current) {
+        rememberMeRef.current.setAttribute('autocomplete', 'on');
+      }
+
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
@@ -180,8 +195,16 @@ export default function LoginPage() {
   //   }
   // };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const togglePasswordTooltip = () => {
+    setShowPasswordTooltip(!showPasswordTooltip);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen min-w-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 dotted-bg">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="text-center">
@@ -194,10 +217,10 @@ export default function LoginPage() {
               priority
             />
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Sign in
+              {t('login.title')}
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-8">
-              Welcome back! 👋
+              {t('login.subtitle')} 👋
             </p>
           </div>
 
@@ -231,7 +254,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" ref={rememberMeRef} autoComplete={rememberMe ? 'on' : 'off'}>
             <div>
               <input
                 type="email"
@@ -241,19 +264,57 @@ export default function LoginPage() {
                 onChange={handleChange}
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 required
+                autoComplete={rememberMe ? 'email' : 'off'}
               />
             </div>
 
-            <div>
+            <div className="relative">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 name="password"
                 placeholder="Password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 pr-20"
                 required
+                autoComplete={rememberMe ? 'current-password' : 'off'}
               />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none flex items-center justify-center"
+                >
+                  {showPassword ? (
+                    <FaEyeSlash className="h-5 w-5" />
+                  ) : (
+                    <FaEye className="h-5 w-5" />
+                  )}
+                </button>
+                <div className="relative flex items-center">
+                  <button
+                    type="button"
+                    onMouseEnter={togglePasswordTooltip}
+                    onMouseLeave={togglePasswordTooltip}
+                    className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none flex items-center justify-center"
+                    aria-label={t('password.requirements')}
+                  >
+                    <FaQuestionCircle className="h-4 w-4" />
+                  </button>
+                  {showPasswordTooltip && (
+                    <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-white dark:bg-gray-700 rounded-lg shadow-lg text-xs text-gray-600 dark:text-gray-200 z-10">
+                      <p className="font-semibold mb-1">{t('password.requirementsTitle')}</p>
+                      <ul className="space-y-1 list-disc pl-4">
+                        <li>{t('password.minLength')}</li>
+                        <li>{t('password.uppercase')}</li>
+                        <li>{t('password.lowercase')}</li>
+                        <li>{t('password.number')}</li>
+                        <li>{t('password.special')}</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
@@ -263,14 +324,16 @@ export default function LoginPage() {
                   name="remember-me"
                   type="checkbox"
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  checked={rememberMe}
+                  onChange={handleRememberMeChange}
                 />
                 <label htmlFor="remember-me" className="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                  Remember me
+                  {t('password.rememberMe')}
                 </label>
               </div>
 
               <Link href="/forgot-password" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                Forgot password?
+                {t('login.forgotPassword')}
               </Link>
             </div>
 
@@ -285,14 +348,14 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 dark:bg-pink-500 dark:hover:bg-pink-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? t('login.loading') : t('login.button')}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-            Don't have an account?{' '}
+            {t('login.noAccount')}{' '}
             <Link href="/signup" className="text-blue-600 dark:text-blue-400 hover:underline">
-              Sign up
+              {t('login.signup')}
             </Link>
           </p>
         </div>

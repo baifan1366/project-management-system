@@ -1,15 +1,23 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaGoogle, FaGithub, FaMicrosoft } from 'react-icons/fa';
+import { FaGoogle, FaGithub, FaEye, FaEyeSlash, FaQuestionCircle } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import LogoImage from '../../../public/logo.png';
+import { useTranslations } from 'next-intl';
 
 export default function SignupPage() {
   const router = useRouter();
+  const params = useParams();
+  const formRef = useRef(null);
+  const t = useTranslations('auth');
+  
+  // 获取当前语言
+  const locale = params.locale || 'en';
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -19,12 +27,27 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
+  };
+
+  const togglePasswordTooltip = () => {
+    setShowPasswordTooltip(!showPasswordTooltip);
   };
 
   const handleSubmit = async (e) => {
@@ -162,25 +185,25 @@ export default function SignupPage() {
 
   if (verificationSent) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="min-h-screen min-w-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 dotted-bg">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                Check your email
+                {t('login.emailVerification.title')}
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                We've sent a verification link to <strong>{formData.email}</strong>. 
+                {t('login.emailVerification.description')} <strong>{formData.email}</strong>. 
                 Please check your email and click the link to verify your account.
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Didn't receive the email? Check your spam folder or{' '}
+                {t('login.emailVerification.spam')}{' '}
                 <button
                   onClick={handleResendVerification}
                   disabled={loading}
                   className="text-blue-600 dark:text-blue-400 hover:text-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'sending...' : 'click here to resend'}
+                  {loading ? t('login.emailVerification.resending') : t('login.emailVerification.resend')}
                 </button>
               </p>
               {error && (
@@ -196,7 +219,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen min-w-screen  bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 dotted-bg">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
           <div className="text-center">
@@ -208,10 +231,10 @@ export default function SignupPage() {
               className="mx-auto mb-6"
             />
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Sign up
+              {t('signup.title')}
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-8">
-              Create your free account 😊
+              {t('signup.subtitle')} 😊
             </p>
           </div>
 
@@ -244,7 +267,7 @@ export default function SignupPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" ref={formRef}>
             <div>
               <input
                 type="text"
@@ -269,28 +292,77 @@ export default function SignupPage() {
               />
             </div>
 
-            <div>
+            <div className="relative">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 name="password"
                 placeholder="Password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 pr-20"
                 required
               />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none flex items-center justify-center"
+                  aria-label={showPassword ? t('password.hide') : t('password.show')}
+                >
+                  {showPassword ? (
+                    <FaEyeSlash className="h-5 w-5" />
+                  ) : (
+                    <FaEye className="h-5 w-5" />
+                  )}
+                </button>
+                <div className="relative flex items-center">
+                  <button
+                    type="button"
+                    onMouseEnter={togglePasswordTooltip}
+                    onMouseLeave={togglePasswordTooltip}
+                    className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none flex items-center justify-center"
+                    aria-label={t('password.requirements')}
+                  >
+                    <FaQuestionCircle className="h-4 w-4" />
+                  </button>
+                  {showPasswordTooltip && (
+                    <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-white dark:bg-gray-700 rounded-lg shadow-lg text-xs text-gray-600 dark:text-gray-200 z-10">
+                      <p className="font-semibold mb-1">{t('password.requirementsTitle')}</p>
+                      <ul className="space-y-1 list-disc pl-4">
+                        <li>{t('password.minLength')}</li>
+                        <li>{t('password.uppercase')}</li>
+                        <li>{t('password.lowercase')}</li>
+                        <li>{t('password.number')}</li>
+                        <li>{t('password.special')}</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div>
+            <div className="relative">
               <input
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
                 placeholder="Confirm Password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 pr-12"
                 required
               />
+              <button
+                type="button"
+                onClick={toggleConfirmPasswordVisibility}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none"
+                aria-label={showConfirmPassword ? t('password.hide') : t('password.show')}
+              >
+                {showConfirmPassword ? (
+                  <FaEyeSlash className="h-5 w-5" />
+                ) : (
+                  <FaEye className="h-5 w-5" />
+                )}
+              </button>
             </div>
 
             {error && (
@@ -304,21 +376,21 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 dark:bg-pink-500 dark:hover:bg-pink-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {loading ? 'Signing up...' : 'Sign up'}
+              {loading ? t('signup.loading') : t('signup.button')}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-            By signing up you agree to our{' '}
+            {t('signup.agree')}{' '}
             <Link href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">
-              Terms of Service
+              {t('signup.termsOfService')}
             </Link>
           </p>
 
           <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
-            Already have an account?{' '}
+            {t('signup.alreadyAccount')}{' '}
             <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
-              Log In
+              {t('signup.login')}
             </Link>
           </p>
         </div>
