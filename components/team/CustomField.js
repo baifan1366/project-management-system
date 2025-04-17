@@ -190,7 +190,7 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
               {Array.isArray(availableFields) && availableFields.length > 0 ? (
                 availableFields.map(renderFieldItem)
               ) : (
-                <div className="col-span-2 text-center text-muted-foreground">
+                <div className="text-center text-muted-foreground col-span-3 items-center justify-center">
                   {t('no_available_fields')}
                 </div>
               )}
