@@ -46,6 +46,10 @@
     "noNotifications": "No notifications",
     "close": "Close",
     "connected": "Connected",
+    "type": "Type",
+    "status": "Status",
+    "filters": "Filters",
+    "settings": "Settings",
     "confirmDialog": {
       "confirm": "Confirm",
       "cancel": "Cancel",
@@ -255,7 +259,9 @@
     "inviteOnlyTooltip": "Only visible to your and people you invite",
     "canEditTooltip": "Can edit",
     "canCheckTooltip": "Can check",
-    "canViewTooltip": "Can view"
+    "canViewTooltip": "Can view",
+    "addTask":"Add task",
+    "openInTeams":"Open in teams"
   },
   "tasks": {
     "title": "Tasks",
@@ -927,7 +933,8 @@
     "accept": "Accept",
     "decline": "Decline",
     "meetingDeclined": "Meeting invitation declined",
-    "color": "color"
+    "color": "color",
+    "noEvents":"No available event"
   },
   "CreateTag": {
     "createTag": "Create New Field",
@@ -971,6 +978,7 @@
   "notificationCenter": {
     "title": "Notification Center",
     "description": "View and manage all your notifications",
+    "filterDescription": "Filtered by notification type:",
     "all": "All Notifications",
     "unread": "Unread Notifications",
     "meetingInvitation": "Meeting Invitation",
@@ -1146,5 +1154,17 @@
         "resending": "sending..."
       }
     }
+  },
+  "notificationType": {
+    "task": "Task",
+    "meeting": "Meeting",
+    "alert": "Alert",
+    "system": "System",
+    "comment": "Comment",
+    "mention": "Mention",
+    "deadline": "Deadline",
+    "invitation": "Invitation",
+    "update": "Update",
+    "reminder": "Reminder"
   }
 }

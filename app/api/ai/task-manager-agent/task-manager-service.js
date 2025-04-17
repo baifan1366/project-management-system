@@ -12,7 +12,7 @@ export async function parseInstruction(instruction) {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: instruction }
     ],
-    temperature: 0.2,
+    temperature: 0.1,
     max_tokens: 1500,
     response_format: { type: "json_object" },
     // 添加明确指示，确保响应是纯JSON

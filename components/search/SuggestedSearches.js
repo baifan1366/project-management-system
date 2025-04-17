@@ -24,10 +24,10 @@ export default function SuggestedSearches({ onSearch }) {
         
         // 如果没有足够的热门搜索，添加一些默认推荐
         const defaultSuggestions = [
-          t('search.suggestions.projects'),
-          t('search.suggestions.tasks'),
-          t('search.suggestions.reports'),
-          t('search.suggestions.team')
+          t('search.suggestedSearches.projects'),
+          t('search.suggestedSearches.tasks'),
+          t('search.suggestedSearches.reports'),
+          t('search.suggestedSearches.team')
         ];
         
         let mergedSuggestions = [];
@@ -56,10 +56,10 @@ export default function SuggestedSearches({ onSearch }) {
         console.error('加载推荐搜索失败:', error);
         // 出错时使用默认推荐
         setSuggestions([
-          t('search.suggestions.projects'),
-          t('search.suggestions.tasks'),
-          t('search.suggestions.reports'),
-          t('search.suggestions.team')
+          t('search.suggestedSearches.projects'),
+          t('search.suggestedSearches.tasks'),
+          t('search.suggestedSearches.reports'),
+          t('search.suggestedSearches.team')
         ]);
       } finally {
         setLoading(false);
@@ -75,7 +75,7 @@ export default function SuggestedSearches({ onSearch }) {
     <div>
       <h2 className="text-lg font-medium flex items-center mb-3">
         <Sparkles className="h-5 w-5 mr-2 text-gray-500" />
-        {t('search.suggestedSearches')}
+        {t('search.suggestedSearches.suggestedSearches')}
       </h2>
       
       <div className="flex flex-wrap gap-2">

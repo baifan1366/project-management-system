@@ -12,6 +12,7 @@ import { useDynamicMetadata } from '@/hooks/useDynamicMetadata';
 import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import PengyImage from '../../../public/pengy.webp';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function ChatLayout({ children }) {
   const t = useTranslations('Chat');
@@ -26,7 +27,8 @@ function ChatLayout({ children }) {
     currentSession, 
     setCurrentSession, 
     chatMode,
-    setChatMode 
+    setChatMode,
+    loading: chatLoading
   } = useChat();
   
   // 计算总未读消息数
@@ -201,6 +203,21 @@ function ChatLayout({ children }) {
     );
   }, [chatMode, sessions, searchQuery, searchResults]);
 
+  // 渲染聊天会话项的骨架屏
+  const ChatItemSkeleton = ({ index }) => (
+    <div className="flex items-center gap-3 p-4 animate-pulse">
+      <Skeleton className="w-10 h-10 rounded-lg flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between">
+          <Skeleton className={`h-4 w-${index % 2 === 0 ? '1/3' : '1/2'} mb-1`} />
+          <Skeleton className="h-3 w-12" />
+        </div>
+        <Skeleton className="h-3 w-full mt-1.5" />
+        <Skeleton className="h-2 w-2/3 mt-1.5" />
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-screen">
       {/* 聊天列表侧边栏 */}
@@ -265,119 +282,128 @@ function ChatLayout({ children }) {
 
         {/* 聊天列表 */}
         <div className="flex-1 overflow-y-auto">
-          {filteredSessions.map((session) => {
-            // 处理显示内容
-            const sessionName = session.type === 'PRIVATE' 
-              ? session.participants[0]?.name
-              : session.name;
-              
-            const avatar = session.type === 'PRIVATE' 
-              ? session.participants[0]?.avatar_url 
-              : null;
-              
-            const lastMessageContent = session.matchedMessages && session.matchedMessages.length > 0
-              ? session.matchedMessages[0].content 
-              : session.lastMessage?.content;
-              
-            return (
-              <div
-                key={session.id}
-                className={`flex items-center gap-3 p-4 hover:bg-accent/50 cursor-pointer transition-colors relative ${
-                  currentSession?.id === session.id ? 'bg-accent' : ''
-                }`}
-                onClick={() => handleChatClick(session)}
-                title={session.type === 'PRIVATE' 
-                  ? t('privateChat') + ': ' + (sessionName || '')
-                  : (session.type === 'AI' ? t('aiAssistant') : t('groupChat') + ': ' + (sessionName || ''))}
-              >
-                <div className="relative flex-shrink-0">
-                  <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden">
-                    {session.type === 'AI' ? (
-                      <div className="w-full h-full">
-                        <Image 
-                          src={PengyImage} 
-                          alt={t('aiAssistant')}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
+          {chatLoading ? (
+            // 显示骨架屏
+            Array(6).fill().map((_, index) => (
+              <ChatItemSkeleton key={`chat-skeleton-${index}`} index={index} />
+            ))
+          ) : (
+            <>
+              {filteredSessions.map((session) => {
+                // 处理显示内容
+                const sessionName = session.type === 'PRIVATE' 
+                  ? session.participants[0]?.name
+                  : session.name;
+                  
+                const avatar = session.type === 'PRIVATE' 
+                  ? session.participants[0]?.avatar_url 
+                  : null;
+                  
+                const lastMessageContent = session.matchedMessages && session.matchedMessages.length > 0
+                  ? session.matchedMessages[0].content 
+                  : session.lastMessage?.content;
+                  
+                return (
+                  <div
+                    key={session.id}
+                    className={`flex items-center gap-3 p-4 hover:bg-accent/50 cursor-pointer transition-colors relative ${
+                      currentSession?.id === session.id ? 'bg-accent' : ''
+                    }`}
+                    onClick={() => handleChatClick(session)}
+                    title={session.type === 'PRIVATE' 
+                      ? t('privateChat') + ': ' + (sessionName || '')
+                      : (session.type === 'AI' ? t('aiAssistant') : t('groupChat') + ': ' + (sessionName || ''))}
+                  >
+                    <div className="relative flex-shrink-0">
+                      <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden">
+                        {session.type === 'AI' ? (
+                          <div className="w-full h-full">
+                            <Image 
+                              src={PengyImage} 
+                              alt={t('aiAssistant')}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                          </div>
+                        ) : session.type === 'PRIVATE' ? (
+                          avatar && avatar !== '' ? (
+                            <img 
+                              src={avatar} 
+                              alt={sessionName || t('privateChat')}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span>{sessionName?.charAt(0) || '?'}</span>
+                          )
+                        ) : (
+                          <span>{sessionName?.charAt(0) || '?'}</span>
+                        )}
                       </div>
-                    ) : session.type === 'PRIVATE' ? (
-                      avatar && avatar !== '' ? (
-                        <img 
-                          src={avatar} 
-                          alt={sessionName || t('privateChat')}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span>{sessionName?.charAt(0) || '?'}</span>
-                      )
-                    ) : (
-                      <span>{sessionName?.charAt(0) || '?'}</span>
-                    )}
-                  </div>
-                  {session.unreadCount > 0 && (
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-background flex items-center justify-center shadow-sm"
-                         title={t('unreadMessages', { count: session.unreadCount }) || `${session.unreadCount} 未读消息`}>
-                      <span className="text-xs text-white font-bold">{session.unreadCount > 9 ? '9+' : session.unreadCount}</span>
-                    </div>
-                  )}
-                  {session.type === 'PRIVATE' && !session.unreadCount && session.participants[0]?.is_online && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background"
-                         title={t('online')}></div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between">
-                    <h3 className={`font-medium truncate ${session.unreadCount > 0 ? 'text-foreground font-semibold' : ''}`}>
-                      {sessionName}
-                    </h3>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatChatTime(session.lastMessage?.created_at || session.matchedMessages?.[0]?.created_at)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className={`text-sm truncate ${session.unreadCount > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-                      {lastMessageContent
-                        ? (session.lastMessage?.role === 'assistant' ? `🤖 ${lastMessageContent}` : lastMessageContent)
-                        : t('noMessages')}
-                    </p>
-                    {session.unreadCount > 0 && currentSession?.id !== session.id && (
-                      <div className="ml-2 w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"
-                           title={t('unreadMessages', { count: session.unreadCount }) || `${session.unreadCount} 未读消息`}></div>
-                    )}
-                  </div>
-                  {/* 在线状态指示器 */}
-                  {session.type === 'PRIVATE' && (
-                    <div className="mt-0.5">
-                      {/* 使用usersStatus获取最新状态 */}
-                      {session.participants[0]?.id && usersStatus[session.participants[0].id]?.isOnline ? (
-                        <p className="text-xs text-green-600">{t('online')}</p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          {session.participants[0]?.id && usersStatus[session.participants[0].id]?.lastSeen ? 
-                            formatLastSeen(usersStatus[session.participants[0].id].lastSeen) :
-                            formatLastSeen(session.participants[0]?.last_seen_at)
-                          }
-                        </p>
+                      {session.unreadCount > 0 && (
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-background flex items-center justify-center shadow-sm"
+                             title={t('unreadMessages', { count: session.unreadCount }) || `${session.unreadCount} 未读消息`}>
+                          <span className="text-xs text-white font-bold">{session.unreadCount > 9 ? '9+' : session.unreadCount}</span>
+                        </div>
+                      )}
+                      {session.type === 'PRIVATE' && !session.unreadCount && session.participants[0]?.is_online && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background"
+                             title={t('online')}></div>
                       )}
                     </div>
-                  )}
-                  
-                  {/* 如果是搜索结果，显示匹配消息数 */}
-                  {searchQuery && session.matchedMessages && session.matchedMessages.length > 0 && (
-                    <div className="mt-1 text-xs text-blue-500">
-                      {session.matchedMessages.length} {t('search.matchesFound', { count: session.matchedMessages.length })}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between">
+                        <h3 className={`font-medium truncate ${session.unreadCount > 0 ? 'text-foreground font-semibold' : ''}`}>
+                          {sessionName}
+                        </h3>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {formatChatTime(session.lastMessage?.created_at || session.matchedMessages?.[0]?.created_at)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className={`text-sm truncate ${session.unreadCount > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                          {lastMessageContent
+                            ? (session.lastMessage?.role === 'assistant' ? `🤖 ${lastMessageContent}` : lastMessageContent)
+                            : t('noMessages')}
+                        </p>
+                        {session.unreadCount > 0 && currentSession?.id !== session.id && (
+                          <div className="ml-2 w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"
+                               title={t('unreadMessages', { count: session.unreadCount }) || `${session.unreadCount} 未读消息`}></div>
+                        )}
+                      </div>
+                      {/* 在线状态指示器 */}
+                      {session.type === 'PRIVATE' && (
+                        <div className="mt-0.5">
+                          {/* 使用usersStatus获取最新状态 */}
+                          {session.participants[0]?.id && usersStatus[session.participants[0].id]?.isOnline ? (
+                            <p className="text-xs text-green-600">{t('online')}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              {session.participants[0]?.id && usersStatus[session.participants[0].id]?.lastSeen ? 
+                                formatLastSeen(usersStatus[session.participants[0].id].lastSeen) :
+                                formatLastSeen(session.participants[0]?.last_seen_at)
+                              }
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* 如果是搜索结果，显示匹配消息数 */}
+                      {searchQuery && session.matchedMessages && session.matchedMessages.length > 0 && (
+                        <div className="mt-1 text-xs text-blue-500">
+                          {session.matchedMessages.length} {t('search.matchesFound', { count: session.matchedMessages.length })}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                );
+              })}
+              
+              {/* 如果有搜索查询但没有结果 */}
+              {searchQuery && filteredSessions.length === 0 && !isSearching && (
+                <div className="p-4 text-center text-muted-foreground">
+                  {t('search.noResults')}
                 </div>
-              </div>
-            );
-          })}
-          
-          {/* 如果有搜索查询但没有结果 */}
-          {searchQuery && filteredSessions.length === 0 && !isSearching && (
-            <div className="p-4 text-center text-muted-foreground">
-              {t('search.noResults')}
-            </div>
+              )}
+            </>
           )}
         </div>
 

@@ -16,7 +16,43 @@ import FileUploader from '@/components/chat/FileUploader';
 import GoogleTranslator from '@/components/chat/GoogleTranslator';
 import { useLastSeen } from '@/hooks/useLastSeen';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+
+// Message skeleton component for loading state
+const MessageSkeleton = ({ isOwnMessage = false }) => (
+  <div className={cn(
+    "flex items-start gap-2 max-w-2xl animate-pulse",
+    isOwnMessage ? "ml-auto flex-row-reverse" : ""
+  )}>
+    <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
+    <div className="min-w-0 max-w-full">
+      <div className={cn(
+        "flex items-baseline gap-2",
+        isOwnMessage ? "flex-row-reverse" : ""
+      )}>
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-3 w-12" />
+      </div>
+      <Skeleton className={cn(
+        "mt-1 rounded-lg h-16 w-60",
+        isOwnMessage ? "ml-auto" : ""
+      )} />
+    </div>
+  </div>
+);
+
+// Header skeleton for loading state
+const HeaderSkeleton = () => (
+  <div className="flex items-center gap-3 animate-pulse">
+    <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
+    <div>
+      <Skeleton className="h-5 w-32 mb-1" />
+      <Skeleton className="h-3 w-24 mb-1" />
+      <Skeleton className="h-2 w-16" />
+    </div>
+  </div>
+);
 
 export default function ChatPage() {
   const t = useTranslations('Chat');
@@ -27,8 +63,9 @@ export default function ChatPage() {
     currentSession, 
     messages, 
     sendMessage, 
-    chatMode,  // 从 context 中获取
-    fetchChatSessions  // 添加这个函数导入
+    chatMode,
+    fetchChatSessions,
+    loading: messagesLoading
   } = useChat();
   
   // 使用增强的UserStatusContext
@@ -242,65 +279,69 @@ export default function ChatPage() {
     <div className="flex flex-col h-screen bg-background">
       {/* 聊天头部 */}
       <div className="flex items-center justify-between px-4 py-3 border-b">
-        <div className="flex items-center gap-3">
-          {chatMode === 'normal' ? (
-            <>
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0">
-                {sessionAvatar ? (
-                  <img 
-                    src={sessionAvatar} 
-                    alt={sessionName}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span>{sessionName?.charAt(0) || '?'}</span>
-                )}
-              </div>
-              <div>
-                <h2 className="text-base font-medium">
-                  {sessionName || t('unknownChat')}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {sessionEmail}
-                </p>
-                {/* 显示在线状态 - 使用实时更新的状态 */}
-                {currentSession?.type === 'PRIVATE' && (
-                  <p className="text-xs">
-                    {otherParticipantStatus?.isOnline ? (
-                      <span className="text-green-600">{t('online')}</span>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        {otherParticipantStatus?.lastSeen ? (
-                          formatLastSeen(otherParticipantStatus.lastSeen)
-                        ) : otherParticipant?.last_seen_at ? (
-                          formatLastSeen(otherParticipant.last_seen_at)
-                        ) : (
-                          t('offline')
-                        )}
-                      </span>
-                    )}
-                  </p>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                <div className="relative w-full h-full">
-                  <Image 
-                    src={PengyImage} 
-                    alt="Project Manager Penguin" 
-                    className="w-full h-full object-cover rounded-lg"
-                  />
+        {messagesLoading ? (
+          <HeaderSkeleton />
+        ) : (
+          <div className="flex items-center gap-3">
+            {chatMode === 'normal' ? (
+              <>
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0">
+                  {sessionAvatar ? (
+                    <img 
+                      src={sessionAvatar} 
+                      alt={sessionName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>{sessionName?.charAt(0) || '?'}</span>
+                  )}
                 </div>
-              </div>
-              <div>
-                <h2 className="text-base font-medium">{t('aiAssistant')}</h2>
-                <p className="text-sm text-muted-foreground">{t('poweredBy', { model: 'Qwen QwQ-32B' })}</p>
-              </div>
-            </>
-          )}
-        </div>
+                <div>
+                  <h2 className="text-base font-medium">
+                    {sessionName || t('unknownChat')}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {sessionEmail}
+                  </p>
+                  {/* 显示在线状态 - 使用实时更新的状态 */}
+                  {currentSession?.type === 'PRIVATE' && (
+                    <p className="text-xs">
+                      {otherParticipantStatus?.isOnline ? (
+                        <span className="text-green-600">{t('online')}</span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {otherParticipantStatus?.lastSeen ? (
+                            formatLastSeen(otherParticipantStatus.lastSeen)
+                          ) : otherParticipant?.last_seen_at ? (
+                            formatLastSeen(otherParticipant.last_seen_at)
+                          ) : (
+                            t('offline')
+                          )}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <div className="relative w-full h-full">
+                    <Image 
+                      src={PengyImage} 
+                      alt="Project Manager Penguin" 
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-base font-medium">{t('aiAssistant')}</h2>
+                  <p className="text-sm text-muted-foreground">{t('poweredBy', { model: 'Qwen QwQ-32B' })}</p>
+                </div>
+              </>
+            )}
+          </div>
+        )}
         <div className="flex items-center gap-2">
           {currentSession?.type !== 'PRIVATE' && chatMode === 'normal' && (
             <InviteUserPopover 
@@ -318,119 +359,129 @@ export default function ChatPage() {
       {chatMode === 'normal' ? (
         <>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 relative" ref={chatContainerRef}>
-            {/* 使用 Set 对象和 map 来去重消息 */}
-            {(() => {
-              // 使用消息ID创建一个去重的消息列表
-              const uniqueMessages = [];
-              const messageIds = new Set();
-              
-              for (const msg of messages) {
-                if (!messageIds.has(msg.id)) {
-                  messageIds.add(msg.id);
-                  uniqueMessages.push(msg);
+            {messagesLoading ? (
+              // 骨架屏加载状态
+              Array(5).fill().map((_, index) => (
+                <MessageSkeleton 
+                  key={`message-skeleton-${index}`}
+                  isOwnMessage={index % 2 === 0}
+                />
+              ))
+            ) : (
+              // 正常消息显示
+              (() => {
+                // 使用消息ID创建一个去重的消息列表
+                const uniqueMessages = [];
+                const messageIds = new Set();
+                
+                for (const msg of messages) {
+                  if (!messageIds.has(msg.id)) {
+                    messageIds.add(msg.id);
+                    uniqueMessages.push(msg);
+                  }
                 }
-              }
-              
-              return uniqueMessages.map((msg) => {    
-                const isMe = msg.user_id === currentUser?.id;
-                return (
-                  <div
-                    key={msg.id}
-                    className={cn(
-                      "flex items-start gap-2 max-w-2xl",
-                      isMe ? "ml-auto flex-row-reverse" : ""
-                    )}
-                  >
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
-                      isMe ? "bg-green-600" : "bg-blue-600"
-                    )}>
-                      {msg.user?.avatar_url && msg.user?.avatar_url !== '' ? (
-                        <img 
-                          src={msg.user.avatar_url} 
-                          alt={msg.user.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span>{msg.user?.name?.charAt(0) || '?'}</span>
+                
+                return uniqueMessages.map((msg) => {    
+                  const isMe = msg.user_id === currentUser?.id;
+                  return (
+                    <div
+                      key={msg.id}
+                      className={cn(
+                        "flex items-start gap-2 max-w-2xl",
+                        isMe ? "ml-auto flex-row-reverse" : ""
                       )}
-                    </div>
-                    <div className="min-w-0 max-w-full">
+                    >
                       <div className={cn(
-                        "flex items-baseline gap-2",
-                        isMe ? "flex-row-reverse" : ""
+                        "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
+                        isMe ? "bg-green-600" : "bg-blue-600"
                       )}>
-                        <span className="font-medium truncate">{msg.user?.name}</span>
-                        <span className="text-xs text-muted-foreground flex-shrink-0">
-                          {adjustTimeByOffset && new Date(msg.created_at) ? 
-                            adjustTimeByOffset(new Date(msg.created_at)).toLocaleTimeString([], {
-                              hour: '2-digit', 
-                              minute: '2-digit',
-                              hour12: hourFormat === '12h'
-                            }) : 
-                            new Date(msg.created_at).toLocaleTimeString()
-                          }
-                        </span>
+                        {msg.user?.avatar_url && msg.user?.avatar_url !== '' ? (
+                          <img 
+                            src={msg.user.avatar_url} 
+                            alt={msg.user.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span>{msg.user?.name?.charAt(0) || '?'}</span>
+                        )}
                       </div>
-                      <div className={cn(
-                        "mt-1 rounded-lg p-3 text-sm break-words group relative",
-                        isMe 
-                          ? "bg-primary text-primary-foreground" 
-                          : "bg-accent"
-                      )}>
-                        {/* 如果是回复的消息，显示被回复的内容 */}
-                        {msg.replied_message && (
-                          <div className="mb-2 p-2 rounded bg-background/50 text-xs line-clamp-2 border-l-2 border-blue-400">
-                            <p className="font-medium text-blue-600 dark:text-blue-400">
-                              {t('replyTo')} {msg.replied_message.user?.name}:
-                            </p>
-                            <p className="text-muted-foreground truncate">
-                              {msg.replied_message.content}
-                            </p>
+                      <div className="min-w-0 max-w-full">
+                        <div className={cn(
+                          "flex items-baseline gap-2",
+                          isMe ? "flex-row-reverse" : ""
+                        )}>
+                          <span className="font-medium truncate">{msg.user?.name}</span>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            {adjustTimeByOffset && new Date(msg.created_at) ? 
+                              adjustTimeByOffset(new Date(msg.created_at)).toLocaleTimeString([], {
+                                hour: '2-digit', 
+                                minute: '2-digit',
+                                hour12: hourFormat === '12h'
+                              }) : 
+                              new Date(msg.created_at).toLocaleTimeString()
+                            }
+                          </span>
+                        </div>
+                        <div className={cn(
+                          "mt-1 rounded-lg p-3 text-sm break-words group relative",
+                          isMe 
+                            ? "bg-primary text-primary-foreground" 
+                            : "bg-accent"
+                        )}>
+                          {/* 如果是回复的消息，显示被回复的内容 */}
+                          {msg.replied_message && (
+                            <div className="mb-2 p-2 rounded bg-background/50 text-xs line-clamp-2 border-l-2 border-blue-400">
+                              <p className="font-medium text-blue-600 dark:text-blue-400">
+                                {t('replyTo')} {msg.replied_message.user?.name}:
+                              </p>
+                              <p className="text-muted-foreground truncate">
+                                {msg.replied_message.content}
+                              </p>
+                            </div>
+                          )}
+                          <GoogleTranslator 
+                            content={msg.content}
+                            targetLang="en"
+                          >
+                            {msg.content}
+                          </GoogleTranslator>
+                          
+                          {/* 消息操作菜单 */}
+                          <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              className="p-1 rounded hover:bg-background/60 text-muted-foreground hover:text-foreground"
+                              onClick={() => handleReplyMessage(msg)}
+                              title={t('reply')}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="9 17 4 12 9 7"></polyline>
+                                <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        {msg.attachments?.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {msg.attachments.map((attachment) => (
+                              <a
+                                key={attachment.id}
+                                href={attachment.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                              >
+                                <Paperclip className="h-4 w-4" />
+                                {attachment.file_name}
+                              </a>
+                            ))}
                           </div>
                         )}
-                        <GoogleTranslator 
-                          content={msg.content}
-                          targetLang="en"
-                        >
-                          {msg.content}
-                        </GoogleTranslator>
-                        
-                        {/* 消息操作菜单 */}
-                        <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            className="p-1 rounded hover:bg-background/60 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleReplyMessage(msg)}
-                            title={t('reply')}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="9 17 4 12 9 7"></polyline>
-                              <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
-                            </svg>
-                          </button>
-                        </div>
                       </div>
-                      {msg.attachments?.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          {msg.attachments.map((attachment) => (
-                            <a
-                              key={attachment.id}
-                              href={attachment.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
-                            >
-                              <Paperclip className="h-4 w-4" />
-                              {attachment.file_name}
-                            </a>
-                          ))}
-                        </div>
-                      )}
                     </div>
-                  </div>
-                );
-              });
-            })()}
+                  );
+                });
+              })()
+            )}
             <div ref={messagesEndRef} />
           </div>
 

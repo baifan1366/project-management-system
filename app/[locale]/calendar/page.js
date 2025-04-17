@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, MoreHorizontal, Filter, Video } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import CreateCalendarEvent from '@/components/CreateCalendarEvent';
 import { toast } from 'sonner';
 import { FaGoogle } from 'react-icons/fa';
 import { WeekView, DayView } from '@/components/calendar';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function CalendarPage() {
   const t = useTranslations('Calendar');
@@ -32,6 +33,8 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [personalEvents, setPersonalEvents] = useState([]);
   const [isLoadingPersonal, setIsLoadingPersonal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isViewLoading, setIsViewLoading] = useState(false);
 
   // Google日历颜色对应表
   const googleCalendarColors = {
@@ -59,6 +62,7 @@ export default function CalendarPage() {
         if (!session) {
           console.log('用户未登录');
           setIsGoogleConnected(false);
+          setIsLoading(false); // 如果未登录，立即结束加载状态
           return;
         }
         
@@ -114,6 +118,13 @@ export default function CalendarPage() {
       } catch (error) {
         console.error('检查Google连接时出错:', error);
         setIsGoogleConnected(false);
+      } finally {
+        // 在完成Google连接检查后，初始加载状态由数据加载函数管理
+        // 不需要在这里直接设置isLoading，而是通过后续的数据加载来处理
+        // 仅当没有数据加载函数被触发时才直接设置isLoading为false
+        if (!isLoadingGoogle && !isLoadingPersonal) {
+          setIsLoading(false);
+        }
       }
     }
     
@@ -128,7 +139,9 @@ export default function CalendarPage() {
   // 获取个人日历事件
   useEffect(() => {
     async function fetchPersonalEvents() {
-      setIsLoadingPersonal(true);
+      if (isViewLoading) {
+        setIsLoadingPersonal(true);
+      }
       try {
         const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
         const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
@@ -158,15 +171,28 @@ export default function CalendarPage() {
         toast.error(t('getPersonalEventsFailed'));
       } finally {
         setIsLoadingPersonal(false);
+        // 更新加载状态
+        if (isViewLoading) {
+          setIsViewLoading(false);
+        }
+        // 如果初始加载尚未完成，并且Google事件也已加载完成（或不需要加载），则完成初始加载
+        if (isLoading && (!isGoogleConnected || !isLoadingGoogle)) {
+          setIsLoading(false);
+        }
       }
     }
     
     fetchPersonalEvents();
-  }, [currentDate, t]);
+  }, [currentDate, t, isViewLoading, isLoading, isGoogleConnected, isLoadingGoogle]);
 
   // 获取Google日历事件
   useEffect(() => {
-    if (!isGoogleConnected) return;
+    if (!isGoogleConnected) {
+      if (isViewLoading) {
+        setIsViewLoading(false);
+      }
+      return;
+    }
     
     async function fetchGoogleEvents() {
       setIsLoadingGoogle(true);
@@ -234,37 +260,52 @@ export default function CalendarPage() {
         }
       } finally {
         setIsLoadingGoogle(false);
+        // 更新加载状态
+        if (isViewLoading) {
+          setIsViewLoading(false);
+        }
+        // 如果初始加载尚未完成，并且个人事件也已加载完成，则完成初始加载
+        if (isLoading && !isLoadingPersonal) {
+          setIsLoading(false);
+        }
       }
     }
     
     fetchGoogleEvents();
-  }, [currentDate, isGoogleConnected, t]);
+  }, [currentDate, isGoogleConnected, t, isViewLoading, isLoading, isLoadingPersonal]);
 
   const handlePrevMonth = () => {
+    setIsViewLoading(true);
     setCurrentDate(prev => subMonths(prev, 1));
   };
 
   const handleNextMonth = () => {
+    setIsViewLoading(true);
     setCurrentDate(prev => addMonths(prev, 1));
   };
 
   const handlePrevWeek = () => {
+    setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, -7));
   };
 
   const handleNextWeek = () => {
+    setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, 7));
   };
 
   const handlePrevDay = () => {
+    setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, -1));
   };
 
   const handleNextDay = () => {
+    setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, 1));
   };
 
   const handleTodayClick = () => {
+    setIsViewLoading(true);
     setCurrentDate(new Date());
   };
 
@@ -313,8 +354,8 @@ export default function CalendarPage() {
   };
 
   const handleEventCreated = () => {
-    // 刷新数据
-    //dispatch(fetchTasksByUserId());
+    // 设置视图加载状态
+    setIsViewLoading(true);
     
     // 刷新个人日历事件
     const fetchPersonalEvents = async () => {
@@ -348,72 +389,284 @@ export default function CalendarPage() {
         toast.error(t('getPersonalEventsFailed'));
       } finally {
         setIsLoadingPersonal(false);
+        // 检查Google是否已完成加载，如果是或不需要加载Google，则关闭视图加载状态
+        if (!isLoadingGoogle || !isGoogleConnected) {
+          setIsViewLoading(false);
+        }
       }
     };
     
-    fetchPersonalEvents();
-    
-    if (isGoogleConnected) {
-      // 刷新Google日历事件
-      const fetchGoogleEvents = async () => {
-        try {
-          setIsLoadingGoogle(true);
-          const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
-          const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
-          
-          // 获取当前会话信息
-          const { data: { session } } = await supabase.auth.getSession();
-          const accessToken = session?.provider_token;
-          const refreshToken = session?.provider_refresh_token;
-          
-          if (!accessToken && !refreshToken) {
-            console.error(t('noGoogleToken'));
-            return;
-          }
-          
-          const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}`);
-          
-          if (response.status === 401) {
-            console.error(t('googleAuthExpired'));
-            toast.error(t('googleAuthExpired'), {
-              action: {
-                label: t('goToSettings'),
-                onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
-              }
-            });
-            setIsGoogleConnected(false);
-            return;
-          }
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error(t('getGoogleEventsFailed'), errorData);
-            throw new Error(errorData.error || t('getGoogleEventsFailed'));
-          }
-          
-          const data = await response.json();
-          setGoogleEvents(data.items || []);
-        } catch (error) {
-          console.error(t('getGoogleEventsFailed'), error);
-          // 使用一个静态变量记录是否显示过toast，避免重复显示
-          if (!window.calendarErrorToastShown) {
-            window.calendarErrorToastShown = true;
-            toast.error(t('getGoogleEventsFailed'), {
-              action: {
-                label: t('goToSettings'),
-                onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
-              }
-            });
-          }
-        } finally {
-          setIsLoadingGoogle(false);
+    // 刷新Google日历事件
+    const fetchGoogleEvents = async () => {
+      if (!isGoogleConnected) {
+        // 如果没有连接Google，则直接关闭视图加载状态（如果个人事件已完成加载）
+        if (!isLoadingPersonal) {
+          setIsViewLoading(false);
         }
-      };
+        return;
+      }
       
+      try {
+        setIsLoadingGoogle(true);
+        const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
+        const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
+        
+        // 获取当前会话信息
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.provider_token;
+        const refreshToken = session?.provider_refresh_token;
+        
+        if (!accessToken && !refreshToken) {
+          console.error(t('noGoogleToken'));
+          return;
+        }
+        
+        const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}`);
+        
+        if (response.status === 401) {
+          console.error(t('googleAuthExpired'));
+          toast.error(t('googleAuthExpired'), {
+            action: {
+              label: t('goToSettings'),
+              onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
+            }
+          });
+          setIsGoogleConnected(false);
+          return;
+        }
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error(t('getGoogleEventsFailed'), errorData);
+          throw new Error(errorData.error || t('getGoogleEventsFailed'));
+        }
+        
+        const data = await response.json();
+        setGoogleEvents(data.items || []);
+      } catch (error) {
+        console.error(t('getGoogleEventsFailed'), error);
+        if (!window.calendarErrorToastShown) {
+          window.calendarErrorToastShown = true;
+          toast.error(t('getGoogleEventsFailed'), {
+            action: {
+              label: t('goToSettings'),
+              onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
+            }
+          });
+        }
+      } finally {
+        setIsLoadingGoogle(false);
+        // 检查个人事件是否已完成加载，如果是，则关闭视图加载状态
+        if (!isLoadingPersonal) {
+          setIsViewLoading(false);
+        }
+      }
+    };
+    
+    // 并行执行两个数据获取操作
+    fetchPersonalEvents();
+    if (isGoogleConnected) {
       fetchGoogleEvents();
     }
   };
 
+  // 渲染加载骨架屏
+  const renderSkeletonCalendar = () => (
+    <div className="h-screen flex flex-col">
+      <div className="flex-none py-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <Skeleton className="h-5 w-5 rounded-full" />
+            <Skeleton className="h-8 w-40" />
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Skeleton className="h-10 w-48" />
+            
+            <div className="flex items-center space-x-2">
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-9 w-16 rounded-md ml-2" />
+            </div>
+            
+            <Skeleton className="h-9 w-24 rounded-md" />
+            <Skeleton className="h-9 w-32 rounded-md" />
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex-1 overflow-hidden">
+        <div className="h-[calc(100vh-120px)] grid grid-cols-12 gap-4">
+          <div className="col-span-2">
+            <Card className="h-full p-4">
+              <Skeleton className="h-6 w-24 mb-3" />
+              
+              <div className="space-y-3">
+                <div className="flex items-center">
+                  <Skeleton className="w-3 h-3 rounded-full mr-2" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                
+                <div className="flex items-center">
+                  <Skeleton className="w-3 h-3 rounded-full mr-2" />
+                  <Skeleton className="h-4 w-36" />
+                </div>
+                
+                <Skeleton className="h-9 w-full rounded-md mt-1" />
+              </div>
+              
+              <div className="mt-6">
+                <Skeleton className="h-6 w-20 mb-3" />
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <Skeleton className="w-3 h-3 rounded-full mr-2" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                  <div className="flex items-center">
+                    <Skeleton className="w-3 h-3 rounded-full mr-2" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+          
+          <div className="col-span-10 overflow-hidden">
+            {view === 'month' && (
+              <Card className="p-2">
+                {/* 月视图骨架屏 */}
+                <div className="grid grid-cols-7 gap-px">
+                  {Array(7).fill().map((_, i) => (
+                    <Skeleton key={`week-day-${i}`} className="h-8" />
+                  ))}
+                </div>
+                
+                <div className="mt-px">
+                  {Array(6).fill().map((_, weekIndex) => (
+                    <div key={`week-${weekIndex}`} className="grid grid-cols-7 gap-px mt-px">
+                      {Array(7).fill().map((_, dayIndex) => (
+                        <Skeleton 
+                          key={`day-${weekIndex}-${dayIndex}`} 
+                          className="min-h-[120px]" 
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+            
+            {view === 'week' && (
+              <Card className="p-0 overflow-hidden">
+                {/* 周视图骨架屏 */}
+                <div className="grid grid-cols-8 border-b">
+                  <div className="py-3 px-3">
+                    <Skeleton className="h-10 w-10" />
+                  </div>
+                  {Array(7).fill().map((_, i) => (
+                    <div key={`week-header-${i}`} className="py-3 px-3 text-center border-l border-l-border/40">
+                      <Skeleton className="h-4 w-16 mx-auto mb-1" />
+                      <Skeleton className="h-7 w-7 rounded-full mx-auto" />
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 全天事件骨架屏 */}
+                <div className="grid grid-cols-8 border-b">
+                  <div className="py-2 px-3">
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  {Array(7).fill().map((_, i) => (
+                    <div key={`all-day-${i}`} className="py-2 px-2 border-l border-l-border/40">
+                      <Skeleton className="h-6 w-full" />
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 时间网格骨架屏 */}
+                <div className="grid grid-cols-8">
+                  {/* 时间标签列 */}
+                  <div className="border-r border-r-border/40">
+                    {Array(24).fill().map((_, i) => (
+                      <div key={`time-${i}`} className="h-12 pr-2 text-right border-t border-t-border/40">
+                        <Skeleton className="h-3 w-10 ml-auto" />
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* 天列 */}
+                  {Array(7).fill().map((_, dayIndex) => (
+                    <div key={`day-col-${dayIndex}`} className="border-l border-l-border/40">
+                      {Array(24).fill().map((_, hourIndex) => (
+                        <div 
+                          key={`hour-${dayIndex}-${hourIndex}`} 
+                          className="h-12 border-t border-t-border/40 relative"
+                        >
+                          {hourIndex % 4 === 0 && (
+                            <Skeleton 
+                              className="absolute h-10 w-[90%] top-1 left-[5%] rounded-md"
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+            
+            {view === 'day' && (
+              <Card className="p-0 overflow-hidden">
+                {/* 日视图骨架屏 */}
+                <div className="p-4 border-b">
+                  <Skeleton className="h-6 w-64 mx-auto" />
+                </div>
+                
+                {/* 全天事件骨架屏 */}
+                <div className="p-2 border-b">
+                  <Skeleton className="h-4 w-16 mb-2" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+                
+                {/* 时间网格骨架屏 */}
+                <div className="grid grid-cols-[80px_1fr]">
+                  {Array(24).fill().map((_, i) => (
+                    <React.Fragment key={`day-time-${i}`}>
+                      <div className="h-14 pr-3 text-right py-1 border-t border-t-border/40">
+                        <Skeleton className="h-3 w-12 ml-auto mt-1" />
+                      </div>
+                      <div className="h-14 relative border-t border-t-border/40">
+                        {i % 3 === 1 && (
+                          <Skeleton 
+                            className="absolute h-12 w-[95%] top-1 left-[2.5%] rounded-md"
+                          />
+                        )}
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+  
+  if (isLoading) {
+    return renderSkeletonCalendar();
+  }
+
+  // 修改视图切换函数以添加加载效果
+  const handleViewChange = (newView) => {
+    if (newView === view) return;
+    
+    setIsViewLoading(true);
+    setView(newView);
+  };
+  
+  // 修改日历头部以使用新的视图切换函数
   const renderCalendarHeader = () => (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center space-x-2">
@@ -422,7 +675,7 @@ export default function CalendarPage() {
       </div>
       
       <div className="flex items-center space-x-2">
-        <Tabs value={view} onValueChange={setView} className="mr-2">
+        <Tabs value={view} onValueChange={handleViewChange} className="mr-2">
           <TabsList>
             <TabsTrigger value="month">{t('month')}</TabsTrigger>
             <TabsTrigger value="week">{t('week')}</TabsTrigger>
@@ -968,11 +1221,132 @@ export default function CalendarPage() {
           </div>
           
           <div className="col-span-10 overflow-hidden">
-            <div className="h-full overflow-y-auto">
-              {view === 'month' && renderMonthView()}
-              {view === 'week' && renderWeekView()}
-              {view === 'day' && renderDayView()}
-            </div>
+            {isViewLoading ? (
+              // 根据当前视图显示相应的骨架屏
+              <>
+                {view === 'month' && (
+                  <Card className="p-2">
+                    {/* 月视图骨架屏 */}
+                    <div className="grid grid-cols-7 gap-px">
+                      {Array(7).fill().map((_, i) => (
+                        <Skeleton key={`view-week-day-${i}`} className="h-8" />
+                      ))}
+                    </div>
+                    
+                    <div className="mt-px">
+                      {Array(6).fill().map((_, weekIndex) => (
+                        <div key={`view-week-${weekIndex}`} className="grid grid-cols-7 gap-px mt-px">
+                          {Array(7).fill().map((_, dayIndex) => (
+                            <Skeleton 
+                              key={`view-day-${weekIndex}-${dayIndex}`} 
+                              className="min-h-[120px]" 
+                            />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+                
+                {view === 'week' && (
+                  <Card className="p-0 overflow-hidden">
+                    {/* 周视图骨架屏 */}
+                    <div className="grid grid-cols-8 border-b">
+                      <div className="py-3 px-3">
+                        <Skeleton className="h-10 w-10" />
+                      </div>
+                      {Array(7).fill().map((_, i) => (
+                        <div key={`view-week-header-${i}`} className="py-3 px-3 text-center border-l border-l-border/40">
+                          <Skeleton className="h-4 w-16 mx-auto mb-1" />
+                          <Skeleton className="h-7 w-7 rounded-full mx-auto" />
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* 全天事件骨架屏 */}
+                    <div className="grid grid-cols-8 border-b">
+                      <div className="py-2 px-3">
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                      {Array(7).fill().map((_, i) => (
+                        <div key={`view-all-day-${i}`} className="py-2 px-2 border-l border-l-border/40">
+                          <Skeleton className="h-6 w-full" />
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* 时间网格骨架屏 */}
+                    <div className="grid grid-cols-8">
+                      {/* 时间标签列 */}
+                      <div className="border-r border-r-border/40">
+                        {Array(24).fill().map((_, i) => (
+                          <div key={`view-time-${i}`} className="h-12 pr-2 text-right border-t border-t-border/40">
+                            <Skeleton className="h-3 w-10 ml-auto" />
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* 天列 */}
+                      {Array(7).fill().map((_, dayIndex) => (
+                        <div key={`view-day-col-${dayIndex}`} className="border-l border-l-border/40">
+                          {Array(24).fill().map((_, hourIndex) => (
+                            <div 
+                              key={`view-hour-${dayIndex}-${hourIndex}`} 
+                              className="h-12 border-t border-t-border/40 relative"
+                            >
+                              {hourIndex % 4 === 0 && (
+                                <Skeleton 
+                                  className="absolute h-10 w-[90%] top-1 left-[5%] rounded-md"
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+                
+                {view === 'day' && (
+                  <Card className="p-0 overflow-hidden">
+                    {/* 日视图骨架屏 */}
+                    <div className="p-4 border-b">
+                      <Skeleton className="h-6 w-64 mx-auto" />
+                    </div>
+                    
+                    {/* 全天事件骨架屏 */}
+                    <div className="p-2 border-b">
+                      <Skeleton className="h-4 w-16 mb-2" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                    
+                    {/* 时间网格骨架屏 */}
+                    <div className="grid grid-cols-[80px_1fr]">
+                      {Array(24).fill().map((_, i) => (
+                        <React.Fragment key={`view-day-time-${i}`}>
+                          <div className="h-14 pr-3 text-right py-1 border-t border-t-border/40">
+                            <Skeleton className="h-3 w-12 ml-auto mt-1" />
+                          </div>
+                          <div className="h-14 relative border-t border-t-border/40">
+                            {i % 3 === 1 && (
+                              <Skeleton 
+                                className="absolute h-12 w-[95%] top-1 left-[2.5%] rounded-md"
+                              />
+                            )}
+                          </div>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <div className="h-full overflow-y-auto">
+                {view === 'month' && renderMonthView()}
+                {view === 'week' && renderWeekView()}
+                {view === 'day' && renderDayView()}
+              </div>
+            )}
           </div>
         </div>
       </div>
