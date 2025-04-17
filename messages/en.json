@@ -663,7 +663,22 @@
     "noTasksFound": "No tasks found",
     "overview": "Overview",
     "addNewSection": "Add Section",
-    "enterSectionName": "Enter section name..."
+    "enterSectionName": "Enter section name...",
+    "Hours": "Hours",
+    "Days": "Days",
+    "Weeks": "Weeks",
+    "Months": "Months",
+    "Years": "Years",
+    "confirmDeleteLink": "Confirm Delete Link",
+    "link": "Link",
+    "willBeDeleted": "will be deleted",
+    "pleaseFillInTheFollowingInformationToCreateANewTask": "Please fill in the following information to create a new task",
+    "add": "Add",
+    "startDate": "Start Date",
+    "duration": "Duration",
+    "endDate": "End Date",
+    "description": "Description",
+    "addNewTask": "Add New Task"
   },
   "ChatDialog": {
     "privateMessages": "Private Messages",
@@ -1011,6 +1026,7 @@
     "descriptionMax": "Description cannot exceed 100 characters.",
     "descriptionMin": "Description must be at least 10 characters.",
     "addDescription": "Add description"
+
   },
   "notificationCenter": {
     "title": "Notification Center",
@@ -1208,5 +1224,16 @@
     "invitation": "Invitation",
     "update": "Update",
     "reminder": "Reminder"
+  },
+  "EditTask": {
+    "editTask": "Edit Task",
+    "modifyTaskInformationOrAdjustCompletionProgress": "Modify task information or adjust completion progress",
+    "taskName": "Task Name",
+    "startDate": "Start Date",
+    "duration": "Duration",
+    "completionProgress": "Completion Progress",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save"
   }
 }

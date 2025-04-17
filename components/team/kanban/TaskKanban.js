@@ -1,71 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { PlusIcon, MoreHorizontal , ThumbsUp, Pen, Trash2, Check, User} from 'lucide-react';
 import { Button } from '../../ui/button';
-
-// 创建伪数据
-const initialColumns = {
-  'doing': {
-    id: 'doing',
-    title: 'Doing',
-    taskIds: ['task-2', 'task-3']
-  },
-  'done': {
-    id: 'done',
-    title: 'Done',
-    taskIds: ['task-4', 'task-5', 'task-6']
-  },
-  'todo': {
-    id: 'todo',
-    title: 'To do',
-    taskIds: ['task-1']
-  }
-};
-
-const initialTasks = {
-  'task-1': {
-    id: 'task-1',
-    content: 'Meeting Report',
-    assignee: {
-      avatar: '/avatar-placeholder.png'
-    }
-  },
-  'task-2': {
-    id: 'task-2',
-    content: '设计首页UI',
-    assignee: null
-  },
-  'task-3': {
-    id: 'task-3',
-    content: '后端API开发',
-    assignee: null
-  },
-  'task-4': {
-    id: 'task-4',
-    content: '测试用户注册流程',
-    assignee: null
-  },
-  'task-5': {
-    id: 'task-5',
-    content: '修复登录Bug',
-    assignee: null
-  },
-  'task-6': {
-    id: 'task-6',
-    content: '优化数据库查询',
-    assignee: null
-  }
-};
-
-const initialColumnOrder = ['doing', 'done', 'todo'];
+import { useTranslations } from 'next-intl';
+import BodyContent from './BodyContent';
 
 export default function TaskKanban({ projectId, teamId, teamCFId }) {
+  const t = useTranslations('CreateTask');
+  const { initialColumns, initialTasks, initialColumnOrder } = BodyContent({ projectId, teamId, teamCFId });
   const [tasks, setTasks] = useState(initialTasks);
   const [columns, setColumns] = useState(initialColumns);
   const [columnOrder, setColumnOrder] = useState(initialColumnOrder);
-
+  
+  // 当数据变化时更新状态
+  useEffect(() => {
+    setTasks(initialTasks);
+    setColumns(initialColumns);
+    setColumnOrder(initialColumnOrder);
+  }, [initialTasks, initialColumns, initialColumnOrder]);
+  
   // 处理拖拽结束事件
   const onDragEnd = (result) => {
     const { destination, source, draggableId, type } = result;
@@ -177,10 +132,10 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
             >
               {columnOrder.map((columnId, index) => {
                 const column = columns[columnId];
-                const columnTasks = column.taskIds.map(taskId => tasks[taskId]);
+                const columnTasks = column?.taskIds?.map(taskId => tasks[taskId]) || [];
 
                 return (
-                  <Draggable key={column.id} draggableId={column.id} index={index}>
+                  <Draggable key={column?.id || index} draggableId={column?.id || `column-${index}`} index={index}>
                     {(provided) => (
                       <div
                         ref={provided.innerRef}
@@ -192,10 +147,10 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                             className="flex justify-between items-center mb-2 p-1"
                             {...provided.dragHandleProps}
                           >
-                            <h2 className="font-semibold text-muted-foreground">{column.title} <span className="text-gray-400 ml-1">{column.taskIds.length}</span></h2>
+                            <h2 className="font-semibold text-muted-foreground">{column?.title} <span className="text-gray-400 ml-1">{column?.taskIds?.length || 0}</span></h2>
                             <div className="flex">
                               <button 
-                                onClick={() => handleAddTask(column.id)}
+                                onClick={() => handleAddTask(column?.id)}
                                 className="p-1 hover:bg-gray-200 hover:dark:bg-gray-800 rounded-md"
                               >
                                 <PlusIcon size={16} className="text-gray-400" />
@@ -205,47 +160,49 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                               </button>
                             </div>
                           </div>
-                          <Droppable droppableId={column.id} type="task">
+                          <Droppable droppableId={column?.id || `column-${index}`} type="task">
                             {(provided) => (
                               <div
                                 {...provided.droppableProps}
                                 ref={provided.innerRef}
                                 className="max-h-[500px] bg-gray-100 rounded-lg dark:bg-gray-700 overflow-y-auto"
                               >
-                                {columnTasks.map((task, index) => (
-                                  <Draggable key={task.id} draggableId={task.id} index={index}>
-                                    {(provided) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        className="p-3 rounded-md hover:bg-gray-200 hover:dark:bg-gray-800 relative group"
-                                      >
-                                        {/* 顶部栏 */}
-                                        <div className="flex justify-between items-center">
-                                          <div className="flex items-center">
-                                            <button className="mr-2 h-5 w-5 rounded-full flex items-center justify-center border border-gray-300 hover:bg-gray-200">
-                                              <Check size={12} className="text-gray-500" />
+                                {columnTasks.map((task, taskIndex) => (
+                                  task ? (
+                                    <Draggable key={task.id} draggableId={task.id} index={taskIndex}>
+                                      {(provided) => (
+                                        <div
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          {...provided.dragHandleProps}
+                                          className="p-3 rounded-md hover:bg-gray-200 hover:dark:bg-gray-800 relative group"
+                                        >
+                                          {/* 顶部栏 */}
+                                          <div className="flex justify-between items-center">
+                                            <div className="flex items-center">
+                                              <button className="mr-2 h-5 w-5 rounded-full flex items-center justify-center border border-gray-300 hover:bg-gray-200">
+                                                <Check size={12} className="text-gray-500" />
+                                              </button>
+                                              <span className="text-sm text-black dark:text-white">{task.content}</span>
+                                            </div>
+                                            <button className="invisible group-hover:visible p-1 hover:bg-gray-200 hover:dark:bg-gray-700 rounded-md">
+                                              <Pen size={14} className="text-gray-500" />
                                             </button>
-                                            <span className="text-sm text-black dark:text-white">{task.content}</span>
                                           </div>
-                                          <button className="invisible group-hover:visible p-1 hover:bg-gray-200 hover:dark:bg-gray-700 rounded-md">
-                                            <Pen size={14} className="text-gray-500" />
-                                          </button>
-                                        </div>
-                                        
-                                        {/* 底部栏 */}
-                                        <div className="flex justify-between items-center mt-2">
-                                          <div>
-                                            <User size={14} className="text-gray-500" />
+                                          
+                                          {/* 底部栏 */}
+                                          <div className="flex justify-between items-center mt-2">
+                                            <div>
+                                              <User size={14} className="text-gray-500" />
+                                            </div>
+                                            <button className="invisible group-hover:visible p-1 hover:bg-gray-200 hover:dark:bg-gray-700 rounded-md">
+                                              <ThumbsUp size={14} className="text-gray-500" />
+                                            </button>
                                           </div>
-                                          <button className="invisible group-hover:visible p-1 hover:bg-gray-200 hover:dark:bg-gray-700 rounded-md">
-                                            <ThumbsUp size={14} className="text-gray-500" />
-                                          </button>
                                         </div>
-                                      </div>
-                                    )}
-                                  </Draggable>
+                                      )}
+                                    </Draggable>
+                                  ) : null
                                 ))}
                                 {provided.placeholder}
                               </div>
@@ -254,10 +211,10 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                           <Button 
                             variant="ghost"
                             className="w-full mt-1 text-gray-400 text-sm py-2 hover:bg-gray-100 hover:dark:bg-gray-700 rounded-md flex items-center justify-center"
-                            onClick={() => handleAddTask(column.id)}
+                            onClick={() => handleAddTask(column?.id)}
                           >
                             <PlusIcon size={14} className="mr-1 text-muted-foreground" />
-                            <span className="text-muted-foreground">添加任务</span>
+                            <span className="text-muted-foreground">{t('addTask')}</span>
                           </Button>
                         </div>
                       </div>
@@ -273,7 +230,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                   className="w-full p-4 text-gray-400 justify-start"
                 >
                   <PlusIcon size={20} className="text-muted-foreground mr-2" />
-                  <span className="text-muted-foreground">添加新分区</span>
+                  <span className="text-muted-foreground">{t('addNewSection')}</span>
                 </Button>
                 <div className="w-full min-h-[500px] mt-1 bg-gray-100 rounded-lg dark:bg-gray-700"></div>
               </div>
