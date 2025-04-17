@@ -1106,5 +1106,46 @@
     "error": "Pengy slipped on the ice. Let's try again!",
     "tips": "Penguin Pro Tips",
     "tipDetails": "For best results, include details like due dates, priorities, and task descriptions"
+  },
+  "auth": {
+    "password": {
+      "show": "Show password",
+      "hide": "Hide password",
+      "requirements": "Password requirements",
+      "requirementsTitle": "Password requirements:",
+      "minLength": "At least 8 characters",
+      "uppercase": "At least 1 uppercase letter",
+      "lowercase": "At least 1 lowercase letter",
+      "number": "At least 1 number",
+      "special": "At least 1 special character (e.g. @#$%)",
+      "match": "Passwords do not match",
+      "rememberMe": "Remember me"
+    },
+    "signup": {
+      "title": "Sign up",
+      "subtitle": "Create your free account",
+      "button": "Sign up",
+      "loading": "Signing up...",
+      "agree": "By signing up you agree to our",
+      "termsOfService": "Terms of Service",
+      "alreadyAccount": "Already have an account?",
+      "login": "Log In"
+    },
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Welcome back!",
+      "button": "Sign in",
+      "loading": "Signing in...",
+      "forgotPassword": "Forgot password?",
+      "noAccount": "Don't have an account?",
+      "signup": "Sign up",
+      "emailVerification": {
+        "title": "Check your email",
+        "description": "We've sent a verification link to",
+        "spam": "Didn't receive the email? Check your spam folder or",
+        "resend": "click here to resend",
+        "resending": "sending..."
+      }
+    }
   }
 }
