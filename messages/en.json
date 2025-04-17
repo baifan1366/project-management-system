@@ -261,7 +261,36 @@
     "canCheckTooltip": "Can check",
     "canViewTooltip": "Can view",
     "addTask":"Add task",
-    "openInTeams":"Open in teams"
+    "openInTeams":"Open in teams",
+    "teamActivity": "Team Activity",
+    "recentActivity": "Recent Activity",
+    "statistics": "Statistics",
+    "pendingTasks": "Pending Tasks",
+    "inProgressTasks": "In Progress",
+    "completedTasks": "Completed",
+    "completionRate": "Completion Rate",
+    "overview": "Overview",
+    "tasks": "Tasks",
+    "timeline": "Timeline",
+    "files": "Files",
+    "noActivity": "No recent activity",
+    "createTask": "Create Task",
+    "upcomingTasks": "Upcoming Tasks",
+    "allTasks": "All Tasks",
+    "addTask": "Add Task",
+    "activityLog": {
+      "title": "Activity Log",
+      "createdTask": "created task",
+      "updatedTask": "updated task",
+      "completedTask": "completed task",
+      "deletedTask": "deleted task",
+      "addedComment": "added comment on",
+      "assignedTask": "assigned task",
+      "createdTeam": "created team",
+      "updatedTeam": "updated team",
+      "joinedTeam": "joined team",
+      "leftTeam": "left team"
+    }
   },
   "tasks": {
     "title": "Tasks",
@@ -424,7 +453,10 @@
     "invalidFileType": "Invalid file type",
     "connectionFailed": "Failed to connect to server",
     "sessionInvalid": "Your session is invalid or expired",
-    "searchFailed": "Search failed, please try again later"
+    "searchFailed": "Search failed, please try again later",
+    "teamNotFound": "The team associated with this project was not found",
+    "noTeamsInProject": "This project has no associated teams",
+    "multipleTeamsFound": "Multiple teams were found for this project"
   },
   "Pricing": {
     "title": "Plans and Pricing",
@@ -1105,14 +1137,19 @@
   },
   "pengy": {
     "title": "Pengy Task Assistant",
+    "titleForProject": "Project Task Assistant",
     "description": "Your penguin-themed task management assistant",
     "greeting": "Hello! I'm Pengy, your task management assistant",
+    "greetingForProject": "I can help you add tasks or team members to this project",
     "prompt": "Tell me what project or tasks you want to create!",
+    "promptForProject": "Describe the tasks or team members you want to add...",
     "thinking": "Pengy is thinking...",
     "success": "Task waddle-fully created!",
     "error": "Pengy slipped on the ice. Let's try again!",
     "tips": "Penguin Pro Tips",
-    "tipDetails": "For best results, include details like due dates, priorities, and task descriptions"
+    "tipsForProject": "Project Operation Tips:",
+    "tipDetails": "For best results, include details like due dates, priorities, and task descriptions. For example: \"Create a website development project with design, development, and testing tasks\"",
+    "tipDetailsForProject": "You can say \"Add 5 high priority tasks: homepage design, user login feature, database design...\" or \"Invite team@example.com to join the team\""
   },
   "auth": {
     "password": {
