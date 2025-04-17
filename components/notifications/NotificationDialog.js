@@ -160,11 +160,6 @@ export function NotificationDialog({ open, onOpenChange }) {
                   {unreadCount}
                 </Badge>
               )}
-              {isSubscribed && (
-                <Badge variant="outline" className="ml-2 text-xs bg-green-50">
-                  {t('common.connected')}
-                </Badge>
-              )}
             </div>
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (

@@ -8,11 +8,13 @@ export async function parseInstruction(instruction) {
   console.log("正在调用AI解析指令...");
   const completion = await openai.chat.completions.create({
     model: "qwen/qwen2.5-vl-32b-instruct:free",
+    //model: "qwen/qwq-32b:free",
+    //model: "deepseek/deepseek-chat-v3-0324:free",
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: instruction }
     ],
-    temperature: 0.2,
+    temperature: 0.1,
     max_tokens: 1500,
     response_format: { type: "json_object" },
     // 添加明确指示，确保响应是纯JSON
@@ -76,6 +78,13 @@ export async function createProjectAndTasks(aiResponse, userId, existingProjectI
     // 添加用户到团队
     await dbService.addUserToTeam(userId, teamId);
     
+    // 添加团队成员（如果有）
+    if (aiResponse.team_members && aiResponse.team_members.length > 0) {
+      for (const member of aiResponse.team_members) {
+        await dbService.inviteTeamMember(teamId, member.email, member.role || 'member', userId);
+      }
+    }
+    
     // 创建默认分区
     const section = await dbService.createSection(teamId, userId);
     const sectionId = section.id;
@@ -95,22 +104,35 @@ export async function createProjectAndTasks(aiResponse, userId, existingProjectI
     }
   }
   // 仅创建任务（如果有现有项目ID）
-  else if (aiResponse.action === "create_tasks" && projectId) {
+  else if (projectId) {
     console.log("开始处理任务...");
     
     // 获取项目关联的团队
     const { data: teamData, error: teamError } = await supabase
       .from('team')
       .select('id')
-      .eq('project_id', projectId)
-      .single();
+      .eq('project_id', projectId);
       
     if (teamError) {
       console.error("获取团队失败:", teamError);
       throw new Error(`Failed to get team: ${teamError.message}`);
     }
     
-    const teamId = teamData.id;
+    if (!teamData || teamData.length === 0) {
+      console.error("项目没有关联的团队");
+      throw new Error("Project has no associated teams");
+    }
+    
+    // 使用第一个团队（如果有多个）
+    const teamId = teamData[0].id;
+    console.log(`找到 ${teamData.length} 个团队，使用第一个团队 ID: ${teamId}`);
+    
+    // 添加团队成员（如果有）
+    if (aiResponse.team_members && aiResponse.team_members.length > 0) {
+      for (const member of aiResponse.team_members) {
+        await dbService.inviteTeamMember(teamId, member.email, member.role || 'member', userId);
+      }
+    }
     
     // 获取团队的默认分区
     const { data: sectionData, error: sectionError } = await supabase

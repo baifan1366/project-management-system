@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 
-export default function TaskManagerAgent({ userId }) {
+export default function TaskManagerAgent({ userId, projectId }) {
   const [instruction, setInstruction] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null);
@@ -42,24 +42,40 @@ export default function TaskManagerAgent({ userId }) {
         },
         body: JSON.stringify({ 
           instruction,
-          userId // 传递用户ID到API
+          userId,
+          projectId // 传递项目ID到API
         }),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || t('errors.general'));
+        console.error("API错误响应:", data);
+        let errorMessage = data.error || t('errors.general');
+        
+        // 处理特定错误消息
+        if (data.message && data.message.includes('Failed to get team')) {
+          errorMessage = t('errors.teamNotFound');
+        } else if (data.message && data.message.includes('Project has no associated teams')) {
+          errorMessage = t('errors.noTeamsInProject');
+        }
+        
+        throw new Error(errorMessage);
       }
       
-      const data = await response.json();
       setResults(data);
       
       if (data.success) {
         toast.success(t('CreateTask.createSuccess'));
-        // 如果创建了项目，可以重定向到项目页面
-        if (data.projectId) {
+        // 如果在现有项目中添加任务，不需要重定向
+        if (data.projectId && !projectId) {
           setTimeout(() => {
             router.push(`/projects/${data.projectId}`);
+          }, 1500);
+        } else if (projectId) {
+          // 如果添加到现有项目，刷新页面以显示新任务
+          setTimeout(() => {
+            router.refresh();
           }, 1500);
         }
       }
@@ -86,10 +102,10 @@ export default function TaskManagerAgent({ userId }) {
           </div>
           <div>
             <CardTitle>
-              {t('pengy.title')}
+              {projectId ? t('pengy.titleForProject') : t('pengy.title')}
             </CardTitle>
             <CardDescription>
-              {t('pengy.greeting')}
+              {projectId ? t('pengy.greetingForProject') : t('pengy.greeting')}
             </CardDescription>
           </div>
         </div>
@@ -99,7 +115,7 @@ export default function TaskManagerAgent({ userId }) {
           <div className="grid w-full gap-4">
             <div className="relative">
               <Textarea
-                placeholder={t('pengy.prompt')}
+                placeholder={projectId ? t('pengy.promptForProject') : t('pengy.prompt')}
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 className="min-h-[120px] pr-10"
@@ -126,7 +142,7 @@ export default function TaskManagerAgent({ userId }) {
               </div>
             </div>
             
-            {results.projectId && (
+            {results.projectId && !projectId && (
               <div className="space-y-2">
                 <h3 className="font-medium">{t('Projects.projectID')}:</h3>
                 <p className="text-sm text-gray-500">{results.projectId}</p>
@@ -158,10 +174,10 @@ export default function TaskManagerAgent({ userId }) {
         
         <div className="mt-8 rounded-md bg-muted/30 p-4 text-sm border">
           <h4 className="font-medium mb-2">
-            {t('pengy.tips')}
+            {projectId ? t('pengy.tipsForProject') : t('pengy.tips')}
           </h4>
           <p className="text-muted-foreground">
-            {t('pengy.tipDetails')}
+            {projectId ? t('pengy.tipDetailsForProject') : t('pengy.tipDetails')}
           </p>
         </div>
       </CardContent>

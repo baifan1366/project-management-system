@@ -7,6 +7,7 @@ import SearchResults from '@/components/search/SearchResults';
 import RecentSearches from '@/components/search/RecentSearches';
 import SuggestedSearches from '@/components/search/SuggestedSearches';
 import { supabase } from '@/lib/supabase';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function SearchPage() {
   const t = useTranslations();
@@ -14,13 +15,18 @@ export default function SearchPage() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   // Load recent searches
   useEffect(() => {
     async function loadRecentSearches() {
+      setLoadingHistory(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        if (!session) {
+          setLoadingHistory(false);
+          return;
+        }
 
         const { data, error } = await supabase
           .from('search_history')
@@ -34,6 +40,8 @@ export default function SearchPage() {
         setRecentSearches(data.map(item => item.search_term));
       } catch (error) {
         console.error('Failed to load recent searches:', error);
+      } finally {
+        setLoadingHistory(false);
       }
     }
 
@@ -132,6 +140,62 @@ export default function SearchPage() {
     }
   };
 
+  // 搜索结果骨架屏组件
+  const SearchResultsSkeleton = () => (
+    <div className="mt-8">
+      <Skeleton className="h-7 w-48 mb-6" />
+      
+      <div className="space-y-4">
+        {[1, 2, 3, 4, 5].map((item) => (
+          <div key={item} className="p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-start">
+              <Skeleton className="h-5 w-5 mr-3 rounded-full" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-4 w-16 ml-2" />
+                </div>
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-5/6 mb-1" />
+                <div className="flex items-center mt-3 space-x-3">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // 最近搜索骨架屏组件
+  const RecentSearchesSkeleton = () => (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-3">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-4 w-16" />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {[1, 2, 3, 4, 5].map((item) => (
+          <Skeleton key={item} className="h-8 w-24 rounded-full" />
+        ))}
+      </div>
+    </div>
+  );
+
+  // 推荐搜索骨架屏组件
+  const SuggestedSearchesSkeleton = () => (
+    <div className="mt-8">
+      <Skeleton className="h-6 w-48 mb-3" />
+      <div className="flex flex-wrap gap-2">
+        {[1, 2, 3, 4, 5].map((item) => (
+          <Skeleton key={item} className="h-8 w-28 rounded-full" />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="container mx-auto py-6 px-4 max-w-5xl">
       <h1 className="text-2xl font-bold mb-6">{t('search.title')}</h1>
@@ -144,28 +208,40 @@ export default function SearchPage() {
       
       {!query && !results.length ? (
         <div className="mt-8 space-y-8">
-          <RecentSearches 
-            searches={recentSearches}
-            onSearch={(term) => {
-              setQuery(term);
-              handleSearch(term);
-            }}
-            onClear={handleClearRecent}
-          />
+          {loadingHistory ? (
+            <RecentSearchesSkeleton />
+          ) : (
+            <RecentSearches 
+              searches={recentSearches}
+              onSearch={(term) => {
+                setQuery(term);
+                handleSearch(term);
+              }}
+              onClear={handleClearRecent}
+            />
+          )}
           
-          <SuggestedSearches 
-            onSearch={(term) => {
-              setQuery(term);
-              handleSearch(term);
-            }} 
-          />
+          {loadingHistory ? (
+            <SuggestedSearchesSkeleton />
+          ) : (
+            <SuggestedSearches 
+              onSearch={(term) => {
+                setQuery(term);
+                handleSearch(term);
+              }} 
+            />
+          )}
         </div>
       ) : (
-        <SearchResults 
-          results={results} 
-          loading={loading}
-          query={query}
-        />
+        loading ? (
+          <SearchResultsSkeleton />
+        ) : (
+          <SearchResults 
+            results={results} 
+            loading={false}
+            query={query}
+          />
+        )
       )}
     </div>
   );
