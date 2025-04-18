@@ -185,13 +185,13 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
                   </DialogDescription>
               </DialogHeader>
           </div>
-          <div className="px-4 pt-2 pb-4">
+          <div className="px-4 pb-4">
             <div className="grid grid-cols-3 gap-4">
               {Array.isArray(availableFields) && availableFields.length > 0 ? (
                 availableFields.map(renderFieldItem)
               ) : (
                 <div className="text-center text-muted-foreground col-span-3 items-center justify-center">
-                  {t('no_available_fields')}
+                  {t('loading')}
                 </div>
               )}
             </div>

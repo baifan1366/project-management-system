@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
-import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users } from "lucide-react"
+import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users, Check, TextQuote, CircleCheck, FileUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useEffect, useState, useMemo } from 'react';
@@ -15,6 +15,7 @@ import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
 import TaskList from '@/components/team/list/TaskList';
 import TaskGantt from '@/components/team/gantt/TaskGantt';
 import TaskKanban from '@/components/team/kanban/TaskKanban';
+import TaskFile from '@/components/team/file/TaskFile';
 import { store } from '@/lib/redux/store';
 
 // 创建记忆化的选择器
@@ -48,6 +49,7 @@ export default function TeamCustomFieldPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentView, setCurrentView] = useState('list');
   const [open, setOpen] = useState(false);
+  const [addButtonText, setAddButtonText] = useState('addTask');
 
   useEffect(() => {
     let unsubscribe = null;
@@ -149,6 +151,9 @@ export default function TeamCustomFieldPage() {
     }
     if (fieldType === 'KANBAN') {
       return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
+    if (fieldType === 'FILES') {
+      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
     }
     
     return <div>暂不支持的字段类型: {fieldType}</div>;
@@ -271,10 +276,36 @@ export default function TeamCustomFieldPage() {
         <div className="w-full p-0">
           <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                {t('addTask')}
-              </Button>
+              <div className="flex">
+                <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
+                  <Plus className="h-4 w-4 mr-1" />
+                  {t(addButtonText)}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="rounded-l-none rounded-r-md px-1">
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setAddButtonText('addTask')} className="flex">
+                      <CircleCheck className="h-4 w-4 mr-1" />
+                      <span className="text-sm">{t('task')}</span>
+                      {addButtonText === 'addTask' && <Check className="h-4 w-4 ml-auto" />}                      
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setAddButtonText('addSection')} className="flex">
+                      <TextQuote className="h-4 w-4 mr-1" />
+                      <span className="text-sm">{t('section')}</span>
+                      {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
+                      <FileUp className="h-4 w-4 mr-1" />
+                      <span className="text-sm">{t('attachment')}</span>
+                      {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm">

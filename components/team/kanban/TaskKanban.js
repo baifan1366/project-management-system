@@ -140,7 +140,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                       <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
-                        className="flex-1 bg-background hover:border hover:border-border rounded-lg"
+                        className="flex-1 bg-background border border-transparent hover:border hover:border-border rounded-lg"
                       >
                         <div className="p-2">
                           <div 
@@ -224,7 +224,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
               })}
               
               {/* 添加新分区按钮 */}
-              <div className="w-64 flex flex-col bg-background hover:border hover:border-border rounded-lg p-2">
+              <div className="w-64 flex flex-col bg-background border border-transparent hover:border hover:border-border rounded-lg p-2">
                 <Button 
                   variant="ghost"
                   className="w-full p-4 text-gray-400 justify-start"
