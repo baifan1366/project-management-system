@@ -559,4 +559,34 @@ CREATE INDEX idx_admin_activity_log_created ON "admin_activity_log"("created_at"
 
 -- 管理员通知表索引
 CREATE INDEX idx_admin_notification_admin ON "admin_notification"("admin_id");
-CREATE INDEX idx_admin_notification_read ON "admin_notification"("is_read"); 
+CREATE INDEX idx_admin_notification_read ON "admin_notification"("is_read");
+
+-- 落地页章节表
+CREATE TABLE "landing_page_section" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "sort_order" INT NOT NULL DEFAULT 0
+);
+
+-- 落地页内容表
+CREATE TABLE "landing_page_content" (
+  "id" SERIAL PRIMARY KEY,
+  "section_id" INT NOT NULL REFERENCES "landing_page_section"("id") ON DELETE CASCADE,
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('h1', 'h2', 'span', 'video', 'image', 'solution_card')),
+  "content" TEXT NOT NULL, -- 文本内容或媒体URL
+  "sort_order" INT NOT NULL DEFAULT 0
+);
+
+-- 创建存储桶策略，允许公开访问媒体文件
+-- 注意：这需要在 Supabase Dashboard 中手动创建存储桶 'landing-page-media'
+-- 并配置以下策略：
+/*
+CREATE POLICY "Public Access"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'landing-page-media');
+*/
+
+-- 落地页相关索引
+CREATE INDEX idx_landing_page_section_sort ON "landing_page_section"("sort_order");
+CREATE INDEX idx_landing_page_content_section ON "landing_page_content"("section_id");
+CREATE INDEX idx_landing_page_content_sort ON "landing_page_content"("sort_order"); 

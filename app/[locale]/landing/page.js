@@ -1,466 +1,475 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import dynamic from "next/dynamic";
+import { supabase } from '@/lib/supabase';
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 // Dynamically import ReactPlayer to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
-export default function landingPage() {
-  // Create refs for the elements we want to observe
-  const h1Ref = useRef(null);
-  const tab1Ref = useRef(null);
-  const tab2Ref = useRef(null);
-  const section2Ref = useRef(null);
-  const section3Ref = useRef(null);
-  const carouselRef = useRef(null);
-  const carouselTrackRef = useRef(null);
-  const [activeSlide, setActiveSlide] = useState(1);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [slideDirection, setSlideDirection] = useState(null);
+export default function LandingPage() {
+  const [sections, setSections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const sectionsRef = useRef([]);
+  const solutionsRef = useRef(null);
+  const cardsRef = useRef([]);
+  const [activeCard, setActiveCard] = useState(1);  // Track active card index
   
-  // Define carousel content
-  const carouselContent = [
-    {
-      id: 1,
-      title: "AI Assistant",
-      content: "Powerful AI chatbots that integrate with your business systems.",
-      color: "from-purple-600 to-indigo-700"
-    },
-    {
-      id: 2,
-      title: "Workflow",
-      content: "Automate complex business processes with intelligent workflows.",
-      color: "from-blue-600 to-cyan-700"
-    },
-    {
-      id: 3,
-      title: "Analytics",
-      content: "Turn your data into actionable insights with AI-powered analytics.",
-      color: "from-emerald-600 to-teal-700"
-    },
-    {
-      id: 4,
-      title: "Content",
-      content: "Generate high-quality content at scale for marketing and communications.",
-      color: "from-rose-600 to-pink-700"
-    },
-    {
-      id: 5,
-      title: "Integration",
-      content: "Connect all your business tools with our seamless integration platform.",
-      color: "from-amber-600 to-orange-700"
-    }
-  ];
-
   useEffect(() => {
-    // Register ScrollTrigger plugin
-    gsap.registerPlugin(ScrollTrigger);
-
-    // GSAP animation for h1 element
-    gsap.fromTo(
-      h1Ref.current,
-      {
-        opacity: 0,
-        y: 40,
-      },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1,
-        ease: "power3.inOut",
-        scrollTrigger: {
-          trigger: h1Ref.current,
-          start: "top 50%",
-          toggleActions: "play reverse play",
-        },
-      }
-    );
-
-    // GSAP animation for tab elements
-    const tabs = [tab1Ref.current, tab2Ref.current];
-    gsap.fromTo(
-      tabs,
-      {
-        opacity: 0,
-        y: 30,
-      },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 0.7,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: tabs,
-          start: "top 90%",
-          toggleActions: "play reverse play",
-        },
-      }
-    );
-
-    // GSAP animation for section 2
-    if (section2Ref.current) {
-      gsap.fromTo(
-        section2Ref.current.querySelectorAll("h2, span"),
-        {
-          opacity: 0,
-        },
-        {
-          opacity: 1,
-          duration: 0.8,
-          stagger: 0.1,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: section2Ref.current,
-            start: "top 0%",
-            toggleActions: "play",
-          },
-        }
-      );
-    }
-
-    // GSAP animation for section 3
-    if (section3Ref.current) {
-      gsap.fromTo(
-        section3Ref.current.querySelectorAll("h2, span"),
-        {
-          opacity: 0,
-        },
-        {
-          opacity: 1,
-          duration: 0.8,
-          stagger: 0.1,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: section3Ref.current,
-            start: "top 50%",
-            toggleActions: "play",
-          },
-        }
-      );
-    }
-
-    // GSAP animation for carousel
-    if (carouselRef.current) {
-      gsap.fromTo(
-        carouselRef.current.querySelectorAll(".carousel-item"),
-        {
-          opacity: 0,
-          y: 30,
-        },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 1.0,
-          stagger: 0.2,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: carouselRef.current,
-            start: "top 70%",
-            toggleActions: "play",
-          },
-        }
-      );
-    }
-
-    // Cleanup function
-    return () => {
-      ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
-    };
+    fetchLandingPageContent();
   }, []);
-  
-  // Effect for carousel slide animations
+
+  // GSAP animations setup for general content
   useEffect(() => {
-    if (!carouselTrackRef.current || !slideDirection) return;
+    if (typeof window === "undefined" || loading || !sections.length) return;
+
+    // Register GSAP plugins
+    gsap.registerPlugin(ScrollTrigger);
     
-    setIsAnimating(true);
+    // Clear any existing ScrollTriggers to prevent memory leaks
+    ScrollTrigger.getAll().forEach(trigger => trigger.kill());
     
-    // Animate the track for slide transition with more fluid movement
-    gsap.to(
-      carouselTrackRef.current,
-      {
-        duration: 0.8,
-        ease: "power2.inOut",
-        onComplete: () => {
-          setIsAnimating(false);
-          setSlideDirection(null);
-        }
-      }
+    // Content animations
+    sectionsRef.current.forEach((sectionEl, index) => {
+      if (!sectionEl) return;
+      
+      const contents = sectionEl.querySelectorAll('.content-item');
+      if (contents.length === 0) return;
+      
+      // Create animation for each content item
+      contents.forEach((item, i) => {
+        gsap.fromTo(
+          item,
+          { opacity: 0, y: 50 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            delay: i * 0.1,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: item,
+              start: "top 80%", // Trigger when element reaches top 80% of viewport
+              end: "bottom 20%", // End when element bottom reaches 20% of viewport
+              toggleActions: "play none none reset", // play on enter, reset on exit
+              once: false, // Allow animation to replay when scrolling back up
+              markers: false // Set to true for debugging
+            }
+          }
+        );
+      });
+    });
+
+    // Solutions section special animation with improved scroll triggering
+    if (solutionsRef.current && cardsRef.current.length > 0) {
+      animateCards();
+    }
+
+    return () => {
+      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+    };
+  }, [sections, loading]);
+
+  const animateCards = () => {
+    const cards = cardsRef.current.filter(Boolean);
+    if (cards.length === 0) return;
+    
+    // Reset all cards first
+    gsap.set(cards, { 
+      opacity: 0.6,
+      scale: 0.9,
+      filter: 'blur(2px)',
+      zIndex: 0
+    });
+    
+    // Set the first card as center
+    gsap.set(cards[0], { 
+      x: '0%',
+      opacity: 1,
+      scale: 1,
+      filter: 'blur(0px)',
+      zIndex: 10
+    });
+    
+    // Position second card to the right (if exists)
+    if (cards.length >= 2) {
+      gsap.set(cards[1], { x: '100%' });
+    }
+    
+    // Position third card to the left (if exists)
+    if (cards.length >= 3) {
+      gsap.set(cards[2], { x: '-100%' });
+    }
+    
+    // Hide any additional cards off-screen
+    for (let i = 3; i < cards.length; i++) {
+      gsap.set(cards[i], { x: '-200%' });
+    }
+  };
+
+  const fetchLandingPageContent = async () => {
+    try {
+      const { data: sectionsData, error: sectionsError } = await supabase
+        .from('landing_page_section')
+        .select('*, landing_page_content(*)')
+        .order('sort_order');
+
+      if (sectionsError) throw sectionsError;
+
+      const sortedSections = sectionsData.map(section => ({
+        ...section,
+        landing_page_content: section.landing_page_content.sort((a, b) => a.sort_order - b.sort_order)
+      }));
+
+      setSections(sortedSections);
+    } catch (error) {
+      console.error('Error fetching landing page content:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrevCard = () => {
+    if (!cardsRef.current || cardsRef.current.length < 2) return;
+    
+    const cards = cardsRef.current.filter(Boolean);
+    
+    // For our logic where first card is in center:
+    // Take the last card and move it to the front
+    const lastCard = cards.pop();
+    cards.unshift(lastCard);
+    
+    // Reset positions for visual transition
+    gsap.to(cards, {
+      opacity: 0.6,
+      scale: 0.9,
+      filter: 'blur(2px)',
+      zIndex: 0,
+      duration: 0.3
+    });
+    
+    // Set the center card's styling
+    gsap.to(cards[0], {
+      x: '0%',
+      opacity: 1,
+      scale: 1,
+      filter: 'blur(0px)',
+      zIndex: 10,
+      duration: 0.5
+    });
+    
+    // Position cards correctly
+    if (cards.length >= 2) {
+      gsap.to(cards[1], { x: '100%', duration: 0.5 });
+    }
+    
+    if (cards.length >= 3) {
+      gsap.to(cards[2], { x: '-100%', duration: 0.5 });
+    }
+    
+    // Update our reference
+    cardsRef.current = cards;
+  };
+
+  const handleNextCard = () => {
+    if (!cardsRef.current || cardsRef.current.length < 2) return;
+    
+    const cards = cardsRef.current.filter(Boolean);
+    
+    // For our logic where first card is in center:
+    // Take the first card and move it to the end
+    const firstCard = cards.shift();
+    cards.push(firstCard);
+    
+    // Reset positions for visual transition
+    gsap.to(cards, {
+      opacity: 0.6,
+      scale: 0.9,
+      filter: 'blur(2px)',
+      zIndex: 0,
+      duration: 0.3
+    });
+    
+    // Set the center card's styling
+    gsap.to(cards[0], {
+      x: '0%',
+      opacity: 1,
+      scale: 1,
+      filter: 'blur(0px)',
+      zIndex: 10,
+      duration: 0.5
+    });
+    
+    // Position cards correctly
+    if (cards.length >= 2) {
+      gsap.to(cards[1], { x: '100%', duration: 0.5 });
+    }
+    
+    if (cards.length >= 3) {
+      gsap.to(cards[2], { x: '-100%', duration: 0.5 });
+    }
+    
+    // Update our reference
+    cardsRef.current = cards;
+  };
+
+  const renderSectionContent = (section) => {
+    const contents = section.landing_page_content;
+    
+    switch (section.name) {
+      case 'hero':
+        return (
+          <div className=" herooo flex flex-col items-center text-center ">
+            {contents.map((content) => (
+              <div key={content.id} className="w-1/2 flex justify-center">
+                {renderContent(content)}
+              </div>
+            ))}
+          </div>
+        );
+      
+      case 'features':
+        // Group features by pairs (heading+text with image/video)
+        const featurePairs = [];
+        const headers = contents.filter(c => c.type === 'h2');
+        const texts = contents.filter(c => c.type === 'span');
+        const media = contents.filter(c => c.type === 'video' || c.type === 'image');
+        
+        // Create pairs of content (assuming equal numbers or handling mismatches)
+        const maxPairs = Math.max(headers.length, texts.length, media.length);
+        
+        return (
+          <div className="flex flex-col gap-24">
+            {/* Render each feature as a full section with alternating layouts */}
+            {Array.from({ length: maxPairs }).map((_, index) => {
+              const header = headers[index];
+              const text = texts[index];
+              const mediaItem = media[index];
+              const isEven = index % 2 === 0;
+              
+              return (
+                <div key={`feature-${index}`} className="w-full flex flex-col md:flex-row items-center justify-between gap-12">
+                  {/* Text content */}
+                  <div className={`w-full md:w-1/2 flex flex-col ${isEven ? 'md:order-1' : 'md:order-2'}`}>
+                    {header && (
+                      <div className="content-item">
+                        {renderContent(header)}
+                      </div>
+                    )}
+                    {text && (
+                      <div className="content-item">
+                        {renderContent(text)}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Media content */}
+                  <div className={`w-full md:w-1/2 ${isEven ? 'md:order-2' : 'md:order-1'}`}>
+                    {mediaItem && (
+                      <div className="content-item">
+                        {renderContent(mediaItem)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      
+      case 'solutions':
+        const solutionCards = contents.filter(c => c.type === 'solution_card');
+        
+        // Reset cardsRef when cards change
+        cardsRef.current = [];
+        
+        return (
+          <div className="flex flex-col items-center" ref={solutionsRef}>
+            {contents.filter(c => c.type === 'h2').map(content => (
+              <div key={content.id} className="content-item mt-100 text-center">
+                {renderContent(content)}
+              </div>
+            ))}
+            
+            {solutionCards.length > 0 && (
+              <div className="w-full max-w-6xl mx-auto relative overflow-hidden py-8">
+                {/* Cards container */}
+                <div className="carousel-wrapper relative flex justify-center items-center min-h-[350px]">
+                  {solutionCards.map((content, index) => {
+                    // Position the first card in the center
+                    // For a single card, it should be in the center
+                    let position;
+                    if (solutionCards.length === 1) {
+                      position = 'center';
+                    } else if (solutionCards.length === 2) {
+                      // For two cards, place first in center, second on right
+                      position = index === 0 ? 'center' : 'right';
+                    } else {
+                      // For 3+ cards, position the first in center, second on right, last on left
+                      if (index === 0) {
+                        position = 'center';
+                      } else if (index === 1) {
+                        position = 'right';
+                      } else {
+                        position = 'left';
+                      }
+                    }
+                    
+                    const isCenter = position === 'center';
+                    
+                    // Apply appropriate styles based on position
+                    const baseStyles = "content-item absolute w-full max-w-md transition-all duration-300";
+                    const positionStyles = {
+                      left: "-translate-x-full opacity-60 scale-90 blur-[2px] z-0",
+                      center: "translate-x-0 opacity-100 scale-100 z-10",
+                      right: "translate-x-full opacity-60 scale-90 blur-[2px] z-0"
+                    };
+                    
+                    return (
+                      <div 
+                        key={content.id} 
+                        className={`${baseStyles} ${positionStyles[position]}`}
+                        ref={el => cardsRef.current[index] = el}
+                      >
+                        {renderContent(content)}
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {/* Navigation buttons */}
+                <button 
+                  onClick={handlePrevCard}
+                  className="absolute left-4 md:left-10 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 p-3 rounded-full z-20"
+                  aria-label="Previous slide"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                
+                <button 
+                  onClick={handleNextCard}
+                  className="absolute right-4 md:right-10 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 p-3 rounded-full z-20"
+                  aria-label="Next slide"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+                
+                {/* Slide indicators */}
+                {/* <div className="flex justify-center mt-6 space-x-2">
+                  {Array.from({ length: solutionCards.length }).map((_, i) => (
+                    <div 
+                      key={i} 
+                      className={`h-2 w-2 rounded-full transition-all ${i === 1 ? 'bg-white' : 'bg-white/30'}`}
+                    />
+                  ))}
+                </div> */}
+              </div>
+            )}
+          </div>
+        );
+      
+      default:
+        return (
+          <div className="flex flex-col items-center gap-8">
+            {contents.map((content) => (
+              <div key={content.id} className="content-item">
+                {renderContent(content)}
+              </div>
+            ))}
+          </div>
+        );
+    }
+  };
+
+  const renderContent = (content) => {
+    switch (content.type) {
+      case 'h1':
+        return (
+          <h1 className="text-5xl md:text-7xl font-bold py-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
+            {content.content}
+          </h1>
+        );
+      case 'h2':
+        return (
+          <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
+            {content.content}
+          </h2>
+        );
+      case 'span':
+        return (
+          <span className="text-gray-300 text-lg">
+            {content.content}
+          </span>
+        );
+      case 'video':
+        return (
+          <div className="relative aspect-video rounded-lg overflow-hidden shadow-2xl">
+            <ReactPlayer
+              url={content.content}
+              controls={false}  // 👈 disables all default controls
+              playing={true}     // autoplay if needed
+              loop={true}        // optional
+              muted={true}     
+              width="100%"
+              height="100%"
+              style={{ borderRadius: "12px" }}
+            />
+          </div>
+        );
+      case 'image':
+        return (
+          <div className="relative aspect-video rounded-lg overflow-hidden shadow-2xl">
+            <img 
+              src={content.content} 
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          </div>
+        );
+      case 'solution_card':
+        const cardData = JSON.parse(content.content);
+        return (
+          <div className="bg-gradient-to-b from-[#1e9e6a] to-[#0d8c5c] rounded-xl shadow-xl p-8 text-white h-full">
+            <h3 className="text-2xl font-bold mb-4 text-center">{cardData.title}</h3>
+            <p className="text-gray-100 text-center mb-6">{cardData.description}</p>
+            <div className="flex justify-center">
+              <button className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+                Learn More
+              </button>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
     );
-    
-    // Get all carousel cards
-    const cards = carouselTrackRef.current.querySelectorAll('.carousel-card');
-    
-    // More fluid, circular animation for each card
-    gsap.fromTo(
-      cards,
-      {
-        x: slideDirection === 'right' ? -50 : 50,
-        opacity: 0.7,
-        scale: 0.85
-      },
-      {
-        x: 0,
-        opacity: function(i) {
-          // Center card (index 1) has full opacity
-          return i === 1 ? 1 : 0.8;
-        },
-        scale: function(i) {
-          // Center card (index 1) has full scale
-          return i === 1 ? 1 : 0.95;
-        },
-        duration: 0.8,
-        stagger: {
-          each: 0.1,
-          from: slideDirection === 'right' ? 'start' : 'end'
-        },
-        ease: "power3.out"
-      }
-    );
-    
-  }, [activeSlide, slideDirection]);
-
-  const nextSlide = () => {
-    if (isAnimating) return;
-    setSlideDirection('right');
-    setActiveSlide((prev) => (prev === carouselContent.length ? 1 : prev + 1));
-  };
-
-  const prevSlide = () => {
-    if (isAnimating) return;
-    setSlideDirection('left');
-    setActiveSlide((prev) => (prev === 1 ? carouselContent.length : prev - 1));
-  };
-
-  const goToSlide = (slideNumber) => {
-    if (isAnimating || slideNumber === activeSlide) return;
-    setSlideDirection(slideNumber > activeSlide ? 'right' : 'left');
-    setActiveSlide(slideNumber);
-  };
-
-  // Helper function to get visible slides array with wrap around
-  const getVisibleSlides = () => {
-    const totalSlides = carouselContent.length;
-    
-    // Calculate previous and next slide indexes with wrap around
-    const prevSlide = activeSlide === 1 ? totalSlides : activeSlide - 1;
-    const nextSlide = activeSlide === totalSlides ? 1 : activeSlide + 1;
-    
-    // Return array of slide indexes to display
-    return [prevSlide, activeSlide, nextSlide];
-  };
+  }
 
   return (
-    // Update the big div to prevent horizontal overflow
     <div className="min-h-screen bg-black relative overflow-x-hidden">
-      {/*container*/}
-      <div className="container mx-auto px-4 z-10 flex flex-col items-center gap-10">
-        {/*section 1*/}
-        <section className="mb-20">
-          <div className="text-center mb-12">
-            <h1
-              ref={h1Ref}
-              className="text-5xl md:text-7xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400 mt-12"
-            >
-              Build Your Ultimate
-              <br />
-              AI Agent Workforce.
-            </h1>
-          </div>
-          <div className="flex flex-col items-center text-center">
-            {/*tabs conatainer*/}
-            <div className="flex flex-row gap-8 mb-10">
-              {/*tab item*/}
-              <div ref={tab1Ref} className="flex flex-col items-center">
-                <div className="h-10 w-10 bg-purple-900 rounded-full flex items-center justify-center mb-2">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5z" />
-                  </svg>
-                </div>
-                <span className="text-xs">AI Chat</span>
-              </div>
-
-              {/*tab item*/}
-              <div ref={tab2Ref} className="flex flex-col items-center">
-                <div className="h-10 w-10 bg-purple-900 rounded-full flex items-center justify-center mb-2">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5z" />
-                  </svg>
-                </div>
-                <span className="text-xs">AI Automation</span>
-              </div>
-            </div>
-            {/* Video Section */}
-            <div className="w-full max-w-4xl">
-              <div className="relative aspect-video rounded-lg overflow-hidden">
-                <ReactPlayer
-                  url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-                  width="100%"
-                  height="100%"
-                  style={{ borderRadius: "12px" }}
-                  controls
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/*section 2*/}
-        <section ref={section2Ref} className="w-full py-16">
-          <div className="flex flex-row items-center justify-between gap-8">
-            <div className="w-1/2 text-center flex flex-col justify-center">
-              <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
-                Advanced Features
-              </h2>
-              <span>Hey hey hey</span>
-            </div>
-
-            {/* Video Section */}
-            <div className="w-1/2">
-              <div className="relative aspect-video rounded-lg overflow-hidden">
-                <ReactPlayer
-                  url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-                  width="100%"
-                  height="100%"
-                  style={{ borderRadius: "12px" }}
-                  controls
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/*section 3*/}
-        <section ref={section3Ref} className="w-full py-16">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            {/* Video Left*/}
-            <div className="w-1/2">
-              <div className="relative aspect-video rounded-lg overflow-hidden shadow-2xl">
-                <ReactPlayer
-                  url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-                  width="100%"
-                  height="100%"
-                  style={{ borderRadius: "12px" }}
-                  controls
-                />
-              </div>
-            </div>
-
-            {/* Text Right*/}
-            <div className="w-1/2 text-center flex flex-col justify-center">
-              <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
-                Advanced Features
-              </h2>
-              <span>Hey hey hey</span>
-            </div>
-          </div>
-        </section>
-
-        {/*section 4*/}
-        <section ref={carouselRef} className="w-full py-16 mb-20">
-          <h2 className="text-4xl md:text-5xl font-bold mb-10 text-center bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
-            Our Solutions
-          </h2>
-
-          {/* Change w-screen to w-full to prevent overflow */}
-          <div className="relative w-full overflow-hidden py-16">
-            {/* Add absolute positioned nav buttons */}
-            <button
-              onClick={prevSlide}
-              disabled={isAnimating}
-              className="absolute left-8 top-1/2 -translate-y-1/2 z-30 p-3 focus:outline-none"
-              aria-label="Previous slide"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-white/70 hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            
-            <button
-              onClick={nextSlide}
-              disabled={isAnimating}
-              className="absolute right-8 top-1/2 -translate-y-1/2 z-30 p-3 focus:outline-none"
-              aria-label="Next slide"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-white/70 hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-            
-            <div ref={carouselTrackRef} className="flex justify-center items-center transition-all duration-800 ease-in-out">
-              {getVisibleSlides().map((slideIndex, i) => {
-                const slide = carouselContent[slideIndex - 1];
-                const isActive = slideIndex === activeSlide;
-                
-                // Position cards differently based on their position in carousel
-                let position = '';
-                if (i === 0) position = 'origin-right -translate-x-4';
-                if (i === 2) position = 'origin-left translate-x-4';
-                
-                return (
-                  <div
-                    key={slide.id}
-                    className={`carousel-card transform transition-all duration-1000 bg-gradient-to-b ${slide.color} rounded-xl shadow-xl mx-4 overflow-hidden ${position}
-                      ${isActive 
-                        ? 'w-[40%] h-96 z-10 opacity-100 scale-100' 
-                        : 'w-[25%] h-80 opacity-75 scale-90 blur-[2px]'
-                      }
-                    `}
-                  >
-                    {/* Show content in all cards (active and inactive) */}
-                    <div className="flex flex-col items-center justify-center h-full p-8 text-white">
-                      <h3 className={`${isActive ? 'text-3xl' : 'text-2xl'} font-bold mb-4 text-center`}>{slide.title}</h3>
-                      {isActive ? (
-                        <p className="text-center text-lg">{slide.content}</p>
-                      ) : (
-                        <p className="text-center text-sm opacity-90 overflow-hidden max-h-12">{slide.content.length > 60 ? `${slide.content.substring(0, 60)}...` : slide.content}</p>
-                      )}
-                      {isActive && (
-                        <button className="mt-8 px-6 py-2 bg-white text-gray-900 rounded-full hover:bg-gray-100 transition-colors font-medium">
-                          Learn More
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {/* Carousel Indicators */}
-            <div className="flex justify-center items-center mt-10">
-              <div className="flex gap-3">
-                {carouselContent.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => goToSlide(item.id)}
-                    className={`relative w-3 h-3 rounded-full transition-all duration-300 ease-in-out
-                      ${activeSlide === item.id 
-                        ? "bg-purple-500 scale-125" 
-                        : "bg-gray-400 hover:bg-gray-300"
-                      }
-                    `}
-                    aria-label={`Go to slide ${item.id}`}
-                    disabled={isAnimating}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+      <div className="container mx-auto px-4 z-10">
+        {sections.map((section, index) => (
+          <section
+            key={section.id}
+            ref={el => sectionsRef.current[index] = el}
+            className={`w-full py-16 ${section.name === 'hero'}`}
+          >
+            {renderSectionContent(section)}
+          </section>
+        ))}
       </div>
     </div>
   );
