@@ -30,8 +30,9 @@ export default function AdminSubscriptions() {
   const [currentModalPage, setCurrentModalPage] = useState(1);
   const [features, setFeatures] = useState([]);
   const [newFeature, setNewFeature] = useState('');
+  const [activeTab, setActiveTab] = useState("subscriptionPlans");
+  const [promoCodes, setPromoCodes] = useState([]);
 
-  // Move fetchSubscriptionPlans outside useEffect and make it a const function
   const fetchSubscriptionPlans = async () => {
     try {
       const { data, error } = await supabase
@@ -47,6 +48,24 @@ export default function AdminSubscriptions() {
       }    
     } catch (error) {
       console.error('Error in fetchSubscriptionPlans:', error);
+    }
+  };
+
+  const fetchPromoCodes = async () =>{
+    try{
+      const { data, error } = await supabase
+        .from('promo_code')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      
+      if(error){
+        console.error('Error fetching promo codes:', error);
+      } else {
+        console.log('Promo codes fetched successfully:', data);
+        setPromoCodes(data);
+      }
+    } catch (error) {
+      console.error('Error in fetchPromoCode:', error);
     }
   };
 
@@ -74,62 +93,11 @@ export default function AdminSubscriptions() {
     }
   };
 
-  // Use it in useEffect
+  // use useEffect to fetch subscription plans and promo codes
   useEffect(() => {
     fetchSubscriptionPlans();
+    fetchPromoCodes();  
   }, []);
-
-  // Sample promo codes data (static for now)
-  const promoCodes = [
-    {
-      id: 1,
-      code: 'WELCOME25',
-      description: 'Welcome discount for new users',
-      discount_type: 'PERCENTAGE',
-      discount_value: 25,
-      max_uses: 1000,
-      current_uses: 342,
-      start_date: '2023-01-01T00:00:00Z',
-      end_date: '2023-12-31T23:59:59Z',
-      is_active: true
-    },
-    {
-      id: 2,
-      code: 'SUMMER2023',
-      description: 'Summer promotion',
-      discount_type: 'PERCENTAGE',
-      discount_value: 15,
-      max_uses: 500,
-      current_uses: 213,
-      start_date: '2023-06-01T00:00:00Z',
-      end_date: '2023-08-31T23:59:59Z',
-      is_active: true
-    },
-    {
-      id: 3,
-      code: 'FLAT10',
-      description: 'Flat $10 off any plan',
-      discount_type: 'FIXED_AMOUNT',
-      discount_value: 10,
-      max_uses: 200,
-      current_uses: 87,
-      start_date: '2023-03-15T00:00:00Z',
-      end_date: '2023-12-15T23:59:59Z',
-      is_active: true
-    },
-    {
-      id: 4,
-      code: 'EXPIRED20',
-      description: 'Expired promotion',
-      discount_type: 'PERCENTAGE',
-      discount_value: 20,
-      max_uses: 300,
-      current_uses: 245,
-      start_date: '2023-01-01T00:00:00Z',
-      end_date: '2023-02-28T23:59:59Z',
-      is_active: false
-    }
-  ];
   
   // Verify admin session
   useEffect(() => {
@@ -270,21 +238,31 @@ export default function AdminSubscriptions() {
     }
   };
 
-  // deactivate or activate subscription plan
-  const toggleActive = async (planId, isActive) => {
+  // deactivate or activate subscription plan and promo code
+  //TODO: add toggle active for promo code
+  const toggleActive = async (id, isActive, type) => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
-        .from('subscription_plan')
-        .update({ is_active: isActive })
-        .eq('id', planId);
+      if(type === 'subscription_plan'){
+        const { data, error } = await supabase
+          .from('subscription_plan')
+          .update({ is_active: isActive })
+          .eq('id', id);
 
       if (error) {
         console.error('Error in toggleActive:', error);
       }
-      
+
+      } else if(type === 'promo_code'){
+        const { data, error } = await supabase
+          .from('promo_code')
+          .update({ is_active: isActive })
+          .eq('id', id);
+      }
+
       await fetchSubscriptionPlans();
+      await fetchPromoCodes();
     } catch (error) {
       console.error('Error in toggleActive:', error);
     } finally {
@@ -410,17 +388,23 @@ export default function AdminSubscriptions() {
           <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
             <ul className="flex flex-wrap -mb-px">
               <li className="mr-2">
-                <button className="inline-block py-2 px-4 text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400 font-medium">
+                <button className={`inline-block py-2 px-4 text-gray-500  dark:text-indigo-400 hover:text-gray-700 dark:hover:text-gray-300 dark:border-indigo-400 font-medium ${activeTab === "subscriptionPlans" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
+                  onClick={()=>setActiveTab("subscriptionPlans")}
+                >
                   Subscription Plans
                 </button>
               </li>
               <li className="mr-2">
-                <button className="inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium">
+                <button className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab == "promoCodes" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
+                onClick={() => setActiveTab("promoCodes")}
+                >
                   Promo Codes
                 </button>
               </li>
               <li className="mr-2">
-                <button className="inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium">
+                <button className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab == "userSubscriptions" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
+                onClick={() => setActiveTab("userSubscriptions")}
+                >
                   User Subscriptions
                 </button>
               </li>
@@ -445,7 +429,8 @@ export default function AdminSubscriptions() {
           </div>
           
           {/* Subscription Plans Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-8">
+          { activeTab === "subscriptionPlans" && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-8">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-700">
@@ -539,7 +524,7 @@ export default function AdminSubscriptions() {
                           </button>
                           {/* toggle active button */}
                           <button
-                            onClick={() => toggleActive(plan.id, !plan.is_active)}
+                            onClick={() => toggleActive(plan.id, !plan.is_active, 'subscription_plan')}
                             className={clsx(
                               'text-2xl transition-colors duration-200',
                               plan.is_active 
@@ -557,9 +542,11 @@ export default function AdminSubscriptions() {
               </table>
             </div>
           </div>
-          
+          )}
+
           {/* Promo Codes Section (Hidden by default) */}
-          <div className="hidden">
+          { activeTab === "promoCodes" && (
+            <div>
             <div className="mb-6 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Promo Codes</h3>
               
@@ -635,15 +622,18 @@ export default function AdminSubscriptions() {
                             <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
                               <FaEdit />
                             </button>
-                            {code.is_active ? (
-                              <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                                <FaTimes />
-                              </button>
-                            ) : (
-                              <button className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">
-                                <FaCheck />
-                              </button>
-                            )}
+                            {/* toggle active button */}
+                            <button
+                              onClick={() => toggleActive(code.id, !code.is_active, 'promo_code')}
+                              className={clsx(
+                                'text-2xl transition-colors duration-200',
+                                code.is_active 
+                                  ? 'text-indigo-600 hover:text-indigo-700'
+                                  : 'text-gray-400 hover:text-gray-500'
+                              )}
+                            >
+                              {code.is_active ? <FaToggleOn /> : <FaToggleOff />}
+                            </button>    
                           </div>
                         </td>
                       </tr>
@@ -653,6 +643,7 @@ export default function AdminSubscriptions() {
               </div>
             </div>
           </div>
+          )}
         </main>
       </div>
 
@@ -916,6 +907,7 @@ export default function AdminSubscriptions() {
           </div>
         </div>
       )}
+
       {/*subscription edit modal*/}
       {isModalOpen && modalType === 'edit' && selectedPlan && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>

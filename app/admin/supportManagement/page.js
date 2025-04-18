@@ -60,6 +60,13 @@ export default function AdminSupport() {
     checkAdminSession();
   }, []);
   
+  // Add useEffect to fetch tickets when filter changes
+  useEffect(() => {
+    if (adminData) {
+      fetchSupportTickets();
+    }
+  }, [filter]);
+  
   // Fetch support tickets
   const fetchSupportTickets = async () => {
     try {
@@ -134,9 +141,6 @@ export default function AdminSupport() {
         status: newStatus,
         updated_at: new Date().toISOString()
       });
-      
-      // Refresh ticket list
-      fetchSupportTickets();
       
       // Log activity
       if (adminData) {
