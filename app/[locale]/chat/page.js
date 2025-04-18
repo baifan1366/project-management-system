@@ -65,7 +65,8 @@ export default function ChatPage() {
     sendMessage, 
     chatMode,
     fetchChatSessions,
-    loading: messagesLoading
+    loading: messagesLoading,
+    fetchMessages
   } = useChat();
   
   // 使用增强的UserStatusContext
@@ -222,7 +223,8 @@ export default function ChatPage() {
         message_id: messageData.id,
         file_url: item.file_url,
         file_name: item.file_name,
-        uploaded_by: currentUser.id
+        uploaded_by: currentUser.id,
+        is_image: item.is_image || false // 添加图片标识
       }));
 
       if (attachmentsToInsert.length > 0) {
@@ -245,6 +247,47 @@ export default function ChatPage() {
       if (otherParticipantId) {
         getUserStatus(otherParticipantId);
       }
+      
+      // 立即获取该消息的完整信息（包括附件）并显示
+      setTimeout(async () => {
+        const { data: completeMessage, error: fetchError } = await supabase
+          .from('chat_message')
+          .select(`
+            *,
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            ),
+            attachments:chat_attachment (
+              id,
+              file_url,
+              file_name,
+              is_image
+            ),
+            replied_message:reply_to_message_id (
+              id,
+              content,
+              user:user_id (
+                id,
+                name,
+                avatar_url,
+                email
+              )
+            )
+          `)
+          .eq('id', messageData.id)
+          .single();
+          
+        if (fetchError) {
+          console.error('获取完整消息数据失败:', fetchError);
+        } else if (completeMessage) {
+          // 使用聊天上下文的功能重新获取消息列表
+          fetchMessages(currentSession.id);
+        }
+      }, 300); // 短暂延迟确保附件已处理完成
+      
     } catch (error) {
       console.error(t('errors.uploadFailed'), error);
       toast.error(`${t('errors.uploadFailed')}: ${error.message || t('errors.unknown')}`);
@@ -463,16 +506,27 @@ export default function ChatPage() {
                         {msg.attachments?.length > 0 && (
                           <div className="mt-2 space-y-1">
                             {msg.attachments.map((attachment) => (
-                              <a
-                                key={attachment.id}
-                                href={attachment.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
-                              >
-                                <Paperclip className="h-4 w-4" />
-                                {attachment.file_name}
-                              </a>
+                              attachment.is_image ? (
+                                <div key={attachment.id} className="mt-2">
+                                  <img 
+                                    src={attachment.file_url} 
+                                    alt={attachment.file_name}
+                                    className="max-h-80 rounded-lg object-cover cursor-pointer"
+                                    onClick={() => window.open(attachment.file_url, '_blank')}
+                                  />
+                                </div>
+                              ) : (
+                                <a
+                                  key={attachment.id}
+                                  href={attachment.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                                >
+                                  <Paperclip className="h-4 w-4" />
+                                  {attachment.file_name}
+                                </a>
+                              )
                             ))}
                           </div>
                         )}
@@ -510,32 +564,7 @@ export default function ChatPage() {
                     </button>
                   </div>
                 )}
-                <div className="flex items-center px-3 py-1 gap-1">
-                  <FileUploader 
-                    onUploadComplete={handleFileUploadComplete}
-                    sessionId={currentSession.id}
-                    userId={currentUser?.id}
-                    buttonOnly={true}
-                    isPending={isPending}
-                    buttonClassName="p-1 hover:bg-accent/50 rounded"
-                    title={t('attachFile')}
-                  >
-                    <Paperclip className="h-5 w-5 text-muted-foreground" />
-                  </FileUploader>
-                  <FileUploader 
-                    onUploadComplete={handleFileUploadComplete}
-                    sessionId={currentSession.id}
-                    userId={currentUser?.id}
-                    buttonOnly={true}
-                    fileTypes="image/*"
-                    isPending={isPending}
-                    buttonClassName="p-1 hover:bg-accent/50 rounded"
-                    title={t('attachImage')}
-                  >
-                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  </FileUploader>
-                </div>
-                <div className="px-3 pb-2">
+                <div className="px-3 p-1">
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
@@ -546,12 +575,23 @@ export default function ChatPage() {
                       }
                     }}
                     placeholder={t('inputPlaceholder')}
-                    className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm py-2 max-h-32"
+                    className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm p-2 max-h-60"
                     rows={1}
                   />
                 </div>
               </div>
               <div className="flex items-center gap-2 pb-2">
+                <FileUploader 
+                  onUploadComplete={handleFileUploadComplete}
+                  sessionId={currentSession.id}
+                  userId={currentUser?.id}
+                  buttonOnly={true}
+                  isPending={isPending}
+                  buttonClassName="p-1 hover:bg-accent/50 rounded"
+                  title={t('attachFile')}
+                >
+                  <Paperclip className="h-5 w-5 text-muted-foreground" />
+                </FileUploader>
                 <EmojiPicker
                   onEmojiSelect={handleEmojiSelect}
                   buttonClassName="p-2 hover:bg-accent rounded-lg"

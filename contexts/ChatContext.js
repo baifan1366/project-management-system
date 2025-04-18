@@ -667,7 +667,8 @@ export function ChatProvider({ children }) {
         attachments:chat_attachment (
           id,
           file_url,
-          file_name
+          file_name,
+          is_image
         ),
         replied_message:reply_to_message_id (
           id,
@@ -731,6 +732,60 @@ export function ChatProvider({ children }) {
       } : null
     }]);
     
+    // 如果发送的消息可能关联有附件（通过FileUploader组件上传的），
+    // 可能需要等待一小段时间再重新获取完整的消息数据（包括附件信息）
+    setTimeout(async () => {
+      // 重新获取完整的消息数据，确保包含最新的附件信息
+      const { data: refreshedData, error: refreshError } = await supabase
+        .from('chat_message')
+        .select(`
+          *,
+          user:user_id (
+            id,
+            name,
+            avatar_url,
+            email
+          ),
+          attachments:chat_attachment (
+            id,
+            file_url,
+            file_name,
+            is_image
+          ),
+          replied_message:reply_to_message_id (
+            id,
+            content,
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            )
+          )
+        `)
+        .eq('id', data.id)
+        .single();
+
+      if (!refreshError && refreshedData) {
+        // 更新本地消息列表
+        setMessages(prev => {
+          // 找到并替换之前添加的消息
+          return prev.map(msg => 
+            msg.id === refreshedData.id 
+              ? { 
+                  ...refreshedData, 
+                  user: processAvatarUrl(refreshedData.user),
+                  replied_message: refreshedData.replied_message ? {
+                    ...refreshedData.replied_message,
+                    user: processAvatarUrl(refreshedData.replied_message.user)
+                  } : null
+                } 
+              : msg
+          );
+        });
+      }
+    }, 500); // 等待500ms确保附件处理完成
+    
     return data;
   };
 
@@ -769,7 +824,8 @@ export function ChatProvider({ children }) {
             attachments:chat_attachment (
               id,
               file_url,
-              file_name
+              file_name,
+              is_image
             ),
             replied_message:reply_to_message_id (
               id,
@@ -914,7 +970,8 @@ export function ChatProvider({ children }) {
             attachments:chat_attachment (
               id,
               file_url,
-              file_name
+              file_name,
+              is_image
             ),
             replied_message:reply_to_message_id (
               id,
@@ -1143,7 +1200,8 @@ export function ChatProvider({ children }) {
       saveAIChatMessage,
       createAIChatSession,
       chatMode,
-      setChatMode
+      setChatMode,
+      fetchMessages
     }}>
       {children}
     </ChatContext.Provider>
