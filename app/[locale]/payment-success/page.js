@@ -49,6 +49,8 @@ export default function PaymentSuccess() {
         },
         body: JSON.stringify({
           to: email,
+          subject: 'Thank You for Your Purchase - Team Sync',
+          text: 'Thank you for your purchase. Your payment has been successfully processed.',
           orderDetails: {
             planName: orderDetails.planName,
             amount: orderDetails.amount,
