@@ -150,31 +150,31 @@ export default function TaskGantt({ projectId, teamId, teamCFId }) {
             variant={currentZoom === 'Hours' ? taskColor : 'outline'}
             onClick={() => handleZoomChange('Hours')}
           >
-            Hour
+            {t('Hours')}
           </Button>
           <Button 
             variant={currentZoom === 'Days' ? taskColor : 'outline'}
             onClick={() => handleZoomChange('Days')}
           >
-            Day
+            {t('Days')}
           </Button>
           <Button 
             variant={currentZoom === 'Weeks' ? taskColor : 'outline'}
             onClick={() => handleZoomChange('Weeks')}
           >
-            Week
+            {t('Weeks')}
           </Button>
           <Button 
             variant={currentZoom === 'Months' ? taskColor : 'outline'}
             onClick={() => handleZoomChange('Months')}
           >
-            Month
+            {t('Months')}
           </Button>
           <Button 
             variant={currentZoom === 'Years' ? taskColor : 'outline'}
             onClick={() => handleZoomChange('Years')}
           >
-            Year
+            {t('Years')}
           </Button>
         </div>
       </div>
@@ -236,8 +236,8 @@ export default function TaskGantt({ projectId, teamId, teamCFId }) {
       const targetTask = gantt.getTask(link.target);
       
       confirm({
-        title: '确认删除',
-        description: `Link ${sourceTask.text} – ${targetTask.text} will be deleted`,
+        title: t('confirmDeleteLink'),
+        description: `${t('link')} ${sourceTask.text} – ${targetTask.text} ${t('willBeDeleted')}`,
         variant: 'error',
         onConfirm: () => {
           gantt.deleteLink(id);

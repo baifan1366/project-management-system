@@ -2,8 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { useTranslations } from "next-intl";
 
 export default function AddTaskDialog({ taskColor, showTaskForm, setShowTaskForm, newTask, setNewTask, handleAddTask }) {
+  const t  = useTranslations('CreateTask');
   const handleTaskInputChange = (e) => {
     const { name, value } = e.target;
     setNewTask(prev => ({
@@ -16,15 +18,15 @@ export default function AddTaskDialog({ taskColor, showTaskForm, setShowTaskForm
     <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-black">添加新任务</DialogTitle>
+          <DialogTitle className="text-lg font-bold text-black">{t('addNewTask')}</DialogTitle>
           <DialogDescription>
-            请填写以下信息创建新任务
+            {t('pleaseFillInTheFollowingInformationToCreateANewTask')}
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
           <div>
-            <label className="block text-sm font-medium mb-1">任务名称</label>
+            <label className="block text-sm font-medium mb-1">{t('taskName')}</label>
             <input
               type="text"
               name="text"
@@ -34,7 +36,7 @@ export default function AddTaskDialog({ taskColor, showTaskForm, setShowTaskForm
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">开始日期</label>
+            <label className="block text-sm font-medium mb-1">{t('startDate')}</label>
             <input
               type="date"
               name="start_date"
@@ -46,7 +48,7 @@ export default function AddTaskDialog({ taskColor, showTaskForm, setShowTaskForm
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">持续天数</label>
+            <label className="block text-sm font-medium mb-1">{t('duration')}</label>
             <input
               type="number"
               name="duration"
@@ -63,13 +65,13 @@ export default function AddTaskDialog({ taskColor, showTaskForm, setShowTaskForm
             variant={taskColor}
             onClick={() => setShowTaskForm(false)}
           >
-            取消
+            {t('cancel')}
           </Button>
           <Button 
             onClick={handleAddTask}
             variant={taskColor}
           >
-            保存
+            {t('add')}
           </Button>
         </DialogFooter>
       </DialogContent>
