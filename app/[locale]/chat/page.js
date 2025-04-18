@@ -522,13 +522,6 @@ export default function ChatPage() {
                   >
                     <Paperclip className="h-5 w-5 text-muted-foreground" />
                   </FileUploader>
-                  <button 
-                    type="button" 
-                    className="p-1 hover:bg-accent/50 rounded"
-                    title={t('attachGift')}
-                  >
-                    <Gift className="h-5 w-5 text-muted-foreground" />
-                  </button>
                   <FileUploader 
                     onUploadComplete={handleFileUploadComplete}
                     sessionId={currentSession.id}

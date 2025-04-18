@@ -530,7 +530,8 @@ export function ChatProvider({ children }) {
         attachments:chat_attachment (
           id,
           file_url,
-          file_name
+          file_name,
+          is_image
         ),
         replied_message:reply_to_message_id (
           id,
