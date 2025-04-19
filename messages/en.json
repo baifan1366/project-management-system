@@ -828,7 +828,24 @@
     "copiedToClipboard": "Copied to clipboard",
     "translate": "Translate",
     "seeOriginal": "See original",
-    "translationFailed": "Translation failed"
+    "translationFailed": "Translation failed",
+    "hideChat": "Hide Chat",
+    "deleteChatConfirm": "Are you sure you want to hide this chat? You can unhide it later if needed.",
+    "chatDeleted": "Chat hidden successfully",
+    "muteNotifications": "Mute notifications",
+    "enableNotifications": "Enable notifications",
+    "notificationsMuted": "Notifications muted",
+    "notificationsEnabled": "Notifications enabled",
+    "hiddenChatsWithMessages": "Chats with new messages",
+    "activeChats": "Active chats",
+    "unhide": "Unhide",
+    "chatUnhidden": "Chat is now visible",
+    "errors": {
+      "deleteFailed": "Failed to hide chat",
+      "notLoggedIn": "You need to be logged in",
+      "muteFailed": "Failed to update notification settings",
+      "unhideFailed": "Failed to unhide chat"
+    }
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

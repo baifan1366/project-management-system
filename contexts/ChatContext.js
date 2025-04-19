@@ -347,9 +347,29 @@ export function ChatProvider({ children }) {
       console.error('Error fetching chat sessions:', sessionsError);
       return;
     }
+    
+    // 获取用户元数据中的隐藏会话
+    let hiddenSessions = {};
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (!userError && userData?.user?.user_metadata?.hidden_sessions) {
+        hiddenSessions = userData.user.user_metadata.hidden_sessions;
+      }
+    } catch (err) {
+      console.error('Error checking hidden sessions:', err);
+    }
 
     // 获取每个会话的最后一条消息
-    const sessionIds = sessionsData.map(item => item.chat_session.id);
+    const sessionIds = sessionsData
+      .filter(item => !hiddenSessions[item.chat_session.id])
+      .map(item => item.chat_session.id);
+      
+    if (sessionIds.length === 0) {
+      setSessions([]);
+      setLoading(false);
+      return;
+    }
+    
     const { data: lastMessages, error: messagesError } = await supabase
       .from('chat_message')
       .select(`
@@ -1052,30 +1072,52 @@ export function ChatProvider({ children }) {
         const isFromOtherUser = messageData.user_id !== authSession.user.id;
         const isNotCurrentSession = currentSession?.id !== payload.new.session_id;
         
+        // 获取用户元数据，检查该会话是否被隐藏
+        let isHiddenSession = false;
+        try {
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          if (!userError && userData?.user?.user_metadata?.hidden_sessions) {
+            isHiddenSession = !!userData.user.user_metadata.hidden_sessions[payload.new.session_id];
+          }
+        } catch (err) {
+          console.error('Error checking hidden sessions:', err);
+        }
+        
         // 更新会话列表中的最后一条消息和未读计数
         setSessions(prev => {
-          return prev.map(session => {
-            if (session.id === payload.new.session_id) {
-              // 如果是其他用户发送的消息，且不是当前打开的会话，增加未读计数
-              const newUnreadCount = isFromOtherUser && isNotCurrentSession 
-                ? (session.unreadCount || 0) + 1 
-                : session.unreadCount || 0;
-                
-              return {
-                ...session,
-                unreadCount: newUnreadCount,
-                lastMessage: {
-                  ...messageData,
-                  user: processAvatarUrl(messageData.user),
-                  replied_message: messageData.replied_message ? {
-                    ...messageData.replied_message,
-                    user: processAvatarUrl(messageData.replied_message.user)
-                  } : null
-                }
-              };
-            }
-            return session;
-          });
+          let newSessions = [...prev];
+          
+          // 找到对应的会话
+          const sessionIndex = newSessions.findIndex(s => s.id === payload.new.session_id);
+          
+          // 如果会话不存在且不是被隐藏的，可能需要重新获取会话列表
+          if (sessionIndex === -1 && !isHiddenSession) {
+            fetchChatSessions();
+            return prev;
+          }
+          
+          // 如果会话存在，更新它
+          if (sessionIndex !== -1) {
+            // 如果是其他用户发送的消息，且不是当前打开的会话，增加未读计数
+            const newUnreadCount = isFromOtherUser && isNotCurrentSession 
+              ? (newSessions[sessionIndex].unreadCount || 0) + 1 
+              : newSessions[sessionIndex].unreadCount || 0;
+              
+            newSessions[sessionIndex] = {
+              ...newSessions[sessionIndex],
+              unreadCount: newUnreadCount,
+              lastMessage: {
+                ...messageData,
+                user: processAvatarUrl(messageData.user),
+                replied_message: messageData.replied_message ? {
+                  ...messageData.replied_message,
+                  user: processAvatarUrl(messageData.replied_message.user)
+                } : null
+              }
+            };
+          }
+          
+          return newSessions;
         });
         
         // 如果是当前会话，且是当前用户打开的，立即标记为已读
