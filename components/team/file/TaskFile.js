@@ -117,11 +117,11 @@ export default function TaskFile() {
                 onClick={() => setShowFileTools(true)}
               >
                 <FileUp className="mr-2 h-4 w-4" />
-                {t('uploadFile')}
+                {t('file')}
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer text-gray-800 hover:text-black hover:font-medium transition-colors">
                 <FolderUp className="mr-2 h-4 w-4" />
-                {t('uploadFolder')}
+                {t('folder')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
