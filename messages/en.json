@@ -785,8 +785,6 @@
     "groupChat": "Group chat",
     "sentAttachment": "Sent an attachment",
     "unreadMessages": "{count} unread messages",
-    "translate": "Translate to English",
-    "seeOriginal": "See original",
     "uploadSuccess": "File upload successful",
     "uploadStarted": "File upload started",
     "uploadComplete": "File upload complete",
@@ -845,7 +843,20 @@
       "notLoggedIn": "You need to be logged in",
       "muteFailed": "Failed to update notification settings",
       "unhideFailed": "Failed to unhide chat"
-    }
+    },
+    "searchChat": "Search Chat",
+    "searchChatDescription": "Search for messages, media, files, and links in this conversation",
+    "enterSearchTerm": "Enter a search term",
+    "resultCount": "{current} of {total}",
+    "all": "All",
+    "media": "Media",
+    "files": "Files",
+    "links": "Links",
+    "searchFailed": "Search failed, please try again",
+    "clearChatHistory":"Clear chat history",
+    "clearChatHistoryConfirm":"Comfirm clear chat history?",
+    "clear":"Clear",
+    "chatHistoryCleared":"Chat history cleared"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

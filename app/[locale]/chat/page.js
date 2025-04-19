@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, createRef } from 'react';
-import { Send, Paperclip, Smile, Image as ImageIcon, Gift, ChevronDown, Bot, MessageSquare, Reply, Trash2, Languages, MoreVertical } from 'lucide-react';
+import { Send, Paperclip, Smile, Image as ImageIcon, Gift, ChevronDown, Bot, MessageSquare, Reply, Trash2, Languages, MoreVertical, Search, Link, FileText, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { useUserStatus } from '@/contexts/UserStatusContext';
@@ -24,8 +24,19 @@ import {
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ChatSearch from '@/components/chat/ChatSearch';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -92,6 +103,9 @@ export default function ChatPage() {
   const [isPending, setIsPending] = useState(false);
   // 添加回复消息状态
   const [replyToMessage, setReplyToMessage] = useState(null);
+  
+  // Chat search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   
   // 获取其他参与者ID
   const otherParticipantId = currentSession?.type === 'PRIVATE' ? currentSession?.participants?.[0]?.id : null;
@@ -440,6 +454,15 @@ export default function ChatPage() {
           </div>
         )}
         <div className="flex items-center gap-2">
+          {chatMode === 'normal' && (
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2 rounded-full hover:bg-accent text-muted-foreground hover:text-foreground"
+              title={t('searchChat')}
+            >
+              <Search className="h-5 w-5" />
+            </button>
+          )}
           {currentSession?.type !== 'PRIVATE' && chatMode === 'normal' && (
             <InviteUserPopover 
               sessionId={currentSession.id} 
@@ -452,6 +475,15 @@ export default function ChatPage() {
         </div>
       </div>
 
+      {/* Use the ChatSearch component */}
+      <ChatSearch 
+        isOpen={isSearchOpen}
+        onOpenChange={setIsSearchOpen}
+        messages={messages}
+        hourFormat={hourFormat}
+        adjustTimeByOffset={adjustTimeByOffset}
+      />
+      
       {/* 聊天内容区域 */}
       {chatMode === 'normal' ? (
         <>
@@ -485,8 +517,9 @@ export default function ChatPage() {
                   return (
                     <div
                       key={msg.id}
+                      id={`message-${msg.id}`}
                       className={cn(
-                        "flex items-start gap-2 max-w-2xl",
+                        "flex items-start gap-2 max-w-2xl transition-colors duration-300",
                         isMe ? "ml-auto flex-row-reverse" : ""
                       )}
                     >

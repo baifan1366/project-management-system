@@ -537,6 +537,15 @@ export function ChatProvider({ children }) {
       return;
     }
 
+    // Get user metadata for cleared chat history
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('Error fetching user data:', userError);
+    }
+    
+    // Get cleared history timestamp for this session
+    const clearedTimestamp = userData?.user?.user_metadata?.cleared_chat_history?.[sessionId];
+
     const { data, error } = await supabase
       .from('chat_message')
       .select(`
@@ -572,7 +581,15 @@ export function ChatProvider({ children }) {
       return;
     }
 
-    setMessages(data.map(msg => ({
+    // Filter messages based on cleared history timestamp if it exists
+    let filteredMessages = data;
+    if (clearedTimestamp) {
+      filteredMessages = data.filter(msg => 
+        new Date(msg.created_at) > new Date(clearedTimestamp)
+      );
+    }
+
+    setMessages(filteredMessages.map(msg => ({
       ...msg,
       user: processAvatarUrl(msg.user),
       replied_message: msg.replied_message ? {

@@ -39,7 +39,8 @@ function ChatLayout({ children }) {
     chatMode,
     setChatMode,
     loading: chatLoading,
-    fetchChatSessions
+    fetchChatSessions,
+    fetchMessages
   } = useChat();
   
   // Notification mute state
@@ -518,6 +519,76 @@ function ChatLayout({ children }) {
       );
   }, [sessions, hiddenSessions]);
 
+  // Add this function to handle clearing chat history
+  const handleClearChatHistory = async (sessionId) => {
+    try {
+      // Get current user
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error(t('errors.notLoggedIn'));
+        return;
+      }
+      
+      confirm({
+        title: t('clearChatHistory'),
+        description: t('clearChatHistoryConfirm'),
+        variant: 'warning',
+        confirmText: t('clear'),
+        cancelText: t('cancel'),
+        onConfirm: async () => {
+          try {
+            // Get user metadata
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+            
+            if (userError) {
+              console.error('Error getting user data:', userError);
+              toast.error(t('errors.clearHistoryFailed'));
+              return;
+            }
+            
+            // Get current metadata
+            const currentMetadata = userData.user.user_metadata || {};
+            const currentCleared = currentMetadata.cleared_chat_history || {};
+            
+            // Update cleared history in metadata
+            const updatedCleared = {
+              ...currentCleared,
+              [sessionId]: new Date().toISOString()
+            };
+            
+            // Update user metadata
+            const { error: updateError } = await supabase.auth.updateUser({
+              data: {
+                ...currentMetadata,
+                cleared_chat_history: updatedCleared
+              }
+            });
+            
+            if (updateError) {
+              console.error('Error updating user metadata:', updateError);
+              toast.error(t('errors.clearHistoryFailed'));
+              return;
+            }
+            
+            toast.success(t('chatHistoryCleared'));
+            
+            // If this is the current session, refresh messages
+            if (currentSession?.id === sessionId) {
+              // Refresh messages to apply the cleared history filter
+              fetchMessages(sessionId);
+            }
+          } catch (error) {
+            console.error('Error clearing chat history:', error);
+            toast.error(t('errors.clearHistoryFailed'));
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error in clear chat history:', error);
+      toast.error(t('errors.clearHistoryFailed'));
+    }
+  };
+
   return (
     <div className="flex h-screen">
       {/* 聊天列表侧边栏 */}
@@ -801,6 +872,22 @@ function ChatLayout({ children }) {
                                 <span>{t('muteNotifications')}</span>
                               </>
                             )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleClearChatHistory(session.id);
+                            }}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                              <path d="M3 6h18"></path>
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                              <line x1="10" y1="11" x2="10" y2="17"></line>
+                              <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                            <span>{t('clearChatHistory')}</span>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
