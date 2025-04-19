@@ -789,6 +789,62 @@ export function ChatProvider({ children }) {
     return data;
   };
 
+  // 删除消息的功能
+  const deleteMessage = async (messageId) => {
+    try {
+      // 获取当前用户会话信息
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        console.error('用户未登录，无法删除消息');
+        return { success: false, error: '未登录' };
+      }
+      
+      // 先获取消息以确认是自己的消息
+      const { data: message, error: fetchError } = await supabase
+        .from('chat_message')
+        .select('*')
+        .eq('id', messageId)
+        .single();
+        
+      if (fetchError) {
+        console.error('获取消息失败:', fetchError);
+        return { success: false, error: fetchError };
+      }
+      
+      // 确认消息属于当前用户
+      if (message.user_id !== session.user.id) {
+        console.error('无权删除他人消息');
+        return { success: false, error: '无权操作' };
+      }
+      
+      // 软删除消息 - 更新状态而不是删除
+      const { error: updateError } = await supabase
+        .from('chat_message')
+        .update({
+          is_deleted: true,
+          content: "[Message withdrawn]" // 同时清空内容以保护隐私
+        })
+        .eq('id', messageId);
+        
+      if (updateError) {
+        console.error('撤回消息失败:', updateError);
+        return { success: false, error: updateError };
+      }
+      
+      // 更新本地消息列表
+      setMessages(prevMessages => prevMessages.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, is_deleted: true, content: "[Message withdrawn]" } 
+          : msg
+      ));
+      
+      return { success: true };
+    } catch (error) {
+      console.error('删除消息过程中发生错误:', error);
+      return { success: false, error };
+    }
+  };
+
   // 实时消息订阅
   useEffect(() => {
     if (!currentSession) return;
@@ -1201,7 +1257,8 @@ export function ChatProvider({ children }) {
       createAIChatSession,
       chatMode,
       setChatMode,
-      fetchMessages
+      fetchMessages,
+      deleteMessage
     }}>
       {children}
     </ChatContext.Provider>

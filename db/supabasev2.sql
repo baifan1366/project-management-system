@@ -260,7 +260,8 @@ CREATE TABLE "chat_message" (
   "content" TEXT NOT NULL,
   "reply_to_message_id" INT REFERENCES "chat_message"("id") ON DELETE SET NULL,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "is_deleted" BOOLEAN DEFAULT FALSE,
 );
 
 -- 聊天消息已读状态表

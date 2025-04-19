@@ -563,7 +563,7 @@
     "attachImage": "图片",
     "attachGift": "礼物",
     "emoji": "表情",
-    "selectChat": "选择一个聊天开始",
+    "selectChat": "选择一个聊天开始对话",
     "searchUsers": "搜索用户",
     "searching": "搜索中",
     "noResults": "未找到结果",
@@ -610,7 +610,7 @@
     "groupChat": "群聊",
     "sentAttachment": "发送了附件",
     "unreadMessages": "{count}条未读消息",
-    "translate": "翻译成中文",
+    "translate": "翻译",
     "seeOriginal": "查看原文",
     "uploadSuccess": "文件上传成功",
     "uploadStarted": "文件上传开始",
@@ -626,7 +626,18 @@
     "sessionExpired": "会话已过期，请重新登录",
     "chatCreated": "聊天已创建",
     "groupCreated": "群组已创建",
-    "creating": "创建聊天中..."
+    "creating": "创建聊天中...",
+    "createChat": "创建聊天",
+    "createGroupChat": "创建群聊",
+    "newChatWithUser": "和 {username} 聊天",
+    "confirmDelete": "删除消息",
+    "confirmDeleteDesc": "确定要撤回此消息吗？此操作无法撤销，双方都将看到消息已被撤回。",
+    "messageDeleted": "消息已成功撤回",
+    "delete": "删除消息",
+    "messageWithdrawn": "此消息已被撤回",
+    "copy": "复制",
+    "copiedToClipboard": "已复制到剪贴板",
+    "translationFailed": "翻译失败"
   },
   "TeamInvitation": {
     "teamInvitation": "团队邀请",
@@ -930,5 +941,8 @@
       "missingSection": "缺少分区ID",
       "notFound": "未找到任务"
     }
+  },
+  "Errors": {
+    "deleteFailed": "撤回消息失败"
   }
 }

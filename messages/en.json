@@ -455,7 +455,8 @@
     "searchFailed": "Search failed, please try again later",
     "teamNotFound": "The team associated with this project was not found",
     "noTeamsInProject": "This project has no associated teams",
-    "multipleTeamsFound": "Multiple teams were found for this project"
+    "multipleTeamsFound": "Multiple teams were found for this project",
+    "deleteFailed": "Failed to delete message"
   },
   "Pricing": {
     "title": "Plans and Pricing",
@@ -771,7 +772,7 @@
     "readMore": "Read more",
     "showLess": "Show less",
     "reply": "Reply",
-    "replyTo": "Reply to",
+    "replyTo": "Replying to",
     "cancelReply": "Cancel reply",
     "online": "Online",
     "offline": "Offline",
@@ -816,7 +817,18 @@
       "clearAll": "Clear all",
       "searching": "Searching...",
       "matchesFound": "matching message(s)"
-    }
+    },
+    "confirmDelete": "Delete Message",
+    "confirmDeleteDesc": "Are you sure you want to withdraw this message? This action cannot be undone and both parties will see that the message was withdrawn.",
+    "messageDeleted": "Message withdrawn successfully",
+    "messageWithdrawn": "This message was withdrawn",
+    "delete": "Delete message",
+    "cancel": "Cancel",
+    "copy": "Copy",
+    "copiedToClipboard": "Copied to clipboard",
+    "translate": "Translate",
+    "seeOriginal": "See original",
+    "translationFailed": "Translation failed"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

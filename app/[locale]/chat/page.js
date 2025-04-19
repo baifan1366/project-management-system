@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Send, Paperclip, Smile, Image as ImageIcon, Gift, ChevronDown, Bot, MessageSquare } from 'lucide-react';
+import { useState, useEffect, useRef, createRef } from 'react';
+import { Send, Paperclip, Smile, Image as ImageIcon, Gift, ChevronDown, Bot, MessageSquare, Reply, Trash2, Languages, MoreVertical } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { useUserStatus } from '@/contexts/UserStatusContext';
@@ -18,6 +18,14 @@ import { useLastSeen } from '@/hooks/useLastSeen';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { useConfirm } from '@/hooks/use-confirm';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -59,6 +67,7 @@ export default function ChatPage() {
   const { formatLastSeen } = useLastSeen();
   const { userTimezone, hourFormat, adjustTimeByOffset } = useUserTimezone();
   const [message, setMessage] = useState('');
+  const { confirm } = useConfirm();
   const { 
     currentSession, 
     messages, 
@@ -66,7 +75,8 @@ export default function ChatPage() {
     chatMode,
     fetchChatSessions,
     loading: messagesLoading,
-    fetchMessages
+    fetchMessages,
+    deleteMessage
   } = useChat();
   
   // 使用增强的UserStatusContext
@@ -296,6 +306,50 @@ export default function ChatPage() {
     }
   };
 
+  // 处理删除消息
+  const handleDeleteMessage = async (messageId) => {
+    confirm({
+      title: t('confirmDelete'),
+      description: t('confirmDeleteDesc'),
+      variant: 'warning',
+      confirmText: t('delete'),
+      cancelText: t('cancel'),
+      onConfirm: async () => {
+        try {
+          const result = await deleteMessage(messageId);
+          if (result.success) {
+            toast.success(t('messageDeleted'));
+          } else {
+            toast.error(t('errors.deleteFailed') + ': ' + (result.error?.message || t('errors.unknown')));
+          }
+        } catch (error) {
+          console.error('Failed to delete message:', error);
+          toast.error(t('errors.deleteFailed'));
+        }
+      }
+    });
+  };
+
+  // 添加一个ref集合来存储每条消息的GoogleTranslator组件引用
+  const translatorRefs = useRef({});
+  // 跟踪哪些消息已被翻译
+  const [translatedMessages, setTranslatedMessages] = useState({});
+  
+  // 添加处理翻译的函数
+  const handleTranslateMessage = (msgId) => {
+    const translatorRef = translatorRefs.current[`translator-${msgId}`];
+    if (translatorRef && typeof translatorRef.translateText === 'function') {
+      translatorRef.translateText();
+      
+      // 更新翻译状态
+      setTranslatedMessages(prev => {
+        const newState = { ...prev };
+        newState[msgId] = !prev[msgId]; // 切换状态
+        return newState;
+      });
+    }
+  };
+
   if (!currentSession && chatMode === 'normal') {
     return (
       <div className="flex flex-col h-screen items-center justify-center text-muted-foreground">
@@ -426,6 +480,8 @@ export default function ChatPage() {
                 
                 return uniqueMessages.map((msg) => {    
                   const isMe = msg.user_id === currentUser?.id;
+                  const isDeleted = msg.is_deleted;
+                  
                   return (
                     <div
                       key={msg.id}
@@ -467,12 +523,14 @@ export default function ChatPage() {
                         </div>
                         <div className={cn(
                           "mt-1 rounded-lg p-3 text-sm break-words group relative",
-                          isMe 
-                            ? "bg-primary text-primary-foreground" 
-                            : "bg-accent"
+                          isDeleted ? "bg-muted text-muted-foreground italic" : (
+                            isMe 
+                              ? "bg-primary text-primary-foreground" 
+                              : "bg-accent"
+                          )
                         )}>
                           {/* 如果是回复的消息，显示被回复的内容 */}
-                          {msg.replied_message && (
+                          {msg.replied_message && !isDeleted && (
                             <div className="mb-2 p-2 rounded bg-background/50 text-xs line-clamp-2 border-l-2 border-blue-400">
                               <p className="font-medium text-blue-600 dark:text-blue-400">
                                 {t('replyTo')} {msg.replied_message.user?.name}:
@@ -482,28 +540,82 @@ export default function ChatPage() {
                               </p>
                             </div>
                           )}
-                          <GoogleTranslator 
-                            content={msg.content}
-                            targetLang="en"
-                          >
-                            {msg.content}
-                          </GoogleTranslator>
+                          
+                          {isDeleted ? (
+                            <span className="pr-7">{t('messageWithdrawn')}</span>
+                          ) : (
+                            <div className="pr-7">
+                              <GoogleTranslator 
+                                content={msg.content}
+                                targetLang="en"
+                                showButton={false}
+                                ref={ref => {
+                                  // 存储组件引用，以便在下拉菜单中调用
+                                  if (ref) translatorRefs.current[`translator-${msg.id}`] = ref;
+                                }}
+                              >
+                                {msg.content}
+                              </GoogleTranslator>
+                            </div>
+                          )}
                           
                           {/* 消息操作菜单 */}
-                          <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              className="p-1 rounded hover:bg-background/60 text-muted-foreground hover:text-foreground"
-                              onClick={() => handleReplyMessage(msg)}
-                              title={t('reply')}
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="9 17 4 12 9 7"></polyline>
-                                <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
-                              </svg>
-                            </button>
-                          </div>
+                          {!isDeleted && (
+                            <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="p-1 rounded-sm hover:bg-background/60 text-muted-foreground hover:text-foreground">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 bg-popover border border-border text-foreground dark:bg-gray-800">
+                                  <DropdownMenuItem 
+                                    onClick={() => handleReplyMessage(msg)}
+                                    className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
+                                  >
+                                    <Reply className="h-4 w-4" />
+                                    <span>{t('reply')}</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleTranslateMessage(msg.id)}
+                                    className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
+                                  >
+                                    <Languages className="h-4 w-4" />
+                                    <span>{translatedMessages[msg.id] ? t('seeOriginal') : t('translate')}</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      // 复制消息内容功能
+                                      navigator.clipboard.writeText(msg.content);
+                                      toast.success(t('copiedToClipboard'));
+                                    }}
+                                    className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                    </svg>
+                                    <span>{t('copy')}</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator className="dark:bg-slate-700" />
+                                  {isMe && (
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteMessage(msg.id);
+                                      }}
+                                      className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-destructive dark:hover:bg-gray-900"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      <span>{t('delete')}</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          )}
                         </div>
-                        {msg.attachments?.length > 0 && (
+                        {!isDeleted && msg.attachments?.length > 0 && (
                           <div className="mt-2 space-y-1">
                             {msg.attachments.map((attachment) => (
                               attachment.is_image ? (
