@@ -260,7 +260,8 @@ CREATE TABLE "chat_message" (
   "content" TEXT NOT NULL,
   "reply_to_message_id" INT REFERENCES "chat_message"("id") ON DELETE SET NULL,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "is_deleted" BOOLEAN DEFAULT FALSE,
 );
 
 -- 聊天消息已读状态表
@@ -295,6 +296,8 @@ CREATE TABLE "chat_attachment" (
   "message_id" INT NOT NULL REFERENCES "chat_message"("id") ON DELETE CASCADE,
   "file_url" VARCHAR(255) NOT NULL,
   "file_name" VARCHAR(255) NOT NULL,
+  "file_type" VARCHAR(100), -- 添加文件类型字段
+  "is_image" BOOLEAN DEFAULT FALSE, -- 添加是否为图片的标识
   "uploaded_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
