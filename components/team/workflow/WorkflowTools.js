@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useContext, memo } from 'react';
+import { useCallback, useState, useContext, memo, useEffect } from 'react';
 import { 
   ReactFlow, 
   Controls, 
@@ -19,10 +19,7 @@ import { WorkflowContext } from './TaskWorkflow';
 const TaskNode = memo(({ data, isConnectable }) => {
   const { 
     selectedTaskId, 
-    setSelectedTaskId,
-    projectId,
-    teamId,
-    teamCFId 
+    setSelectedTaskId
   } = useContext(WorkflowContext);
   const isSelected = selectedTaskId === data.id;
 
@@ -46,6 +43,9 @@ const TaskNode = memo(({ data, isConnectable }) => {
       {data.description && (
         <div className="mt-1 text-xs text-gray-600">{data.description}</div>
       )}
+      {data.assignee && (
+        <div className="mt-1 text-xs text-gray-500">负责人: {data.assignee}</div>
+      )}
       <Handle
         type="target"
         position={Position.Top}
@@ -66,72 +66,25 @@ const nodeTypes = {
   task: TaskNode,
 };
 
-const initialNodes = [
-  {
-    id: '1',
-    type: 'task',
-    data: { 
-      id: '1',
-      label: '开始任务', 
-      description: '项目初始化任务',
-      status: '待开始'
-    },
-    position: { x: 250, y: 5 },
-  },
-  {
-    id: '2',
-    type: 'task',
-    data: { 
-      id: '2',
-      label: '进行中', 
-      description: '开发功能模块',
-      status: '进行中'
-    },
-    position: { x: 100, y: 100 },
-  },
-  {
-    id: '3',
-    type: 'task',
-    data: { 
-      id: '3',
-      label: '审核', 
-      description: '代码审查和质量检测',
-      status: '待审核'
-    },
-    position: { x: 400, y: 100 },
-  },
-  {
-    id: '4',
-    type: 'task',
-    data: { 
-      id: '4',
-      label: '完成', 
-      description: '任务完成，准备发布',
-      status: '已完成'
-    },
-    position: { x: 250, y: 200 },
-  },
-];
-
-const initialEdges = [
-  { id: 'e1-2', source: '1', target: '2', animated: true },
-  { id: 'e1-3', source: '1', target: '3', animated: true },
-  { id: 'e2-4', source: '2', target: '4', animated: true },
-  { id: 'e3-4', source: '3', target: '4', animated: true },
-];
-
 export const WorkflowTools = () => {
   const { 
     selectedTaskId, 
     setSelectedTaskId, 
     workflowData, 
-    setWorkflowData,
-    projectId,
-    teamId,
-    teamCFId
+    setWorkflowData
   } = useContext(WorkflowContext);
-  const [nodes, setNodes] = useState(initialNodes);
-  const [edges, setEdges] = useState(initialEdges);
+  
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+
+  // 当workflowData更新时，更新节点和边
+  useEffect(() => {
+    if (workflowData && workflowData.nodes && workflowData.nodes.length > 0) {
+      setNodes(workflowData.nodes);
+      setEdges(workflowData.edges || []);
+      console.log('工作流图形数据已更新:', workflowData);
+    }
+  }, [workflowData]);
 
   const onNodesChange = useCallback(
     (changes) => {
@@ -173,6 +126,14 @@ export const WorkflowTools = () => {
 
   // 定义proOptions以移除水印
   const proOptions = { hideAttribution: true };
+
+  if (nodes.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-gray-500">Loading workflow data...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: '100%', height: '500px' }}>
