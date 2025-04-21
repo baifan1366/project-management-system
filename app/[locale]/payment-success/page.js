@@ -49,6 +49,8 @@ export default function PaymentSuccess() {
         },
         body: JSON.stringify({
           to: email,
+          subject: 'Thank You for Your Purchase - Team Sync',
+          text: 'Thank you for your purchase. Your payment has been successfully processed.',
           orderDetails: {
             planName: orderDetails.planName,
             amount: orderDetails.amount,
@@ -122,13 +124,14 @@ export default function PaymentSuccess() {
           .insert({ 
             user_id: userId, 
             plan_id: planId,
+            // TODO: add status: active, inactive, cancelled
             start_date: startDate,
             end_date: endDate,
             current_users: 0,
-            current_workspaces: 0,
             current_ai_agents: 0,
             current_automation_flows: 0,
             current_tasks_this_month: 0,
+            current_projects: 0,
             created_at: new Date(),
             updated_at: new Date()
           });

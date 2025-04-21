@@ -60,6 +60,13 @@ export default function AdminSupport() {
     checkAdminSession();
   }, []);
   
+  // Add useEffect to fetch tickets when filter changes
+  useEffect(() => {
+    if (adminData) {
+      fetchSupportTickets();
+    }
+  }, [filter]);
+  
   // Fetch support tickets
   const fetchSupportTickets = async () => {
     try {
@@ -135,9 +142,6 @@ export default function AdminSupport() {
         updated_at: new Date().toISOString()
       });
       
-      // Refresh ticket list
-      fetchSupportTickets();
-      
       // Log activity
       if (adminData) {
         supabase.from('admin_activity_log').insert({
@@ -157,19 +161,55 @@ export default function AdminSupport() {
   };
   
   // Handle reply submission
-  const handleReplySubmit = async (e) => {
+  const handleReplySendEmail = async (e) => {
     e.preventDefault();
     
     if (!selectedTicket || !replyText.trim()) return;
     
     try {
-      // In a real application, you would send an email here
-      // This is a placeholder for the email sending logic
-      console.log(`Sending reply to ${selectedTicket.email}:`, replyText);
+      // Send email using the API route
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: selectedTicket.email,
+          subject: `Re: Your Support Request #${selectedTicket.id}`,
+          text: replyText,
+          supportDetails: {
+            responseText: replyText,
+            originalMessage: selectedTicket.message || 'No message provided.',
+            ticketId: selectedTicket.id
+          }
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send email');
+      }
+      
+      console.log('Email sent successfully:', result);
       
       // Update ticket status to IN_PROGRESS if it's NEW
       if (selectedTicket.status === 'NEW') {
         await handleStatusChange('IN_PROGRESS');
+      }
+      
+      // Store the reply in the database (optional)
+      const { error: replyError } = await supabase
+        .from('support_replies')
+        .insert({
+          contact_id: selectedTicket.id,
+          admin_id: adminData.id,
+          message: replyText,
+          sent_at: new Date().toISOString()
+        });
+        
+      if (replyError) {
+        console.error('Error saving reply to database:', replyError);
       }
       
       // Log the reply activity
@@ -190,9 +230,12 @@ export default function AdminSupport() {
       
       // Show success message (in a real app, you'd use a toast notification)
       alert('Reply sent successfully!');
+      // toast.success('Reply sent successfully!');
       
     } catch (error) {
       console.error('Error sending reply:', error);
+      alert(`Error sending reply: ${error.message}`);
+      // toast.error('Error sending reply:', error);
     }
   };
   
@@ -527,7 +570,7 @@ export default function AdminSupport() {
                   
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Reply</h4>
-                    <form onSubmit={handleReplySubmit}>
+                    <form onSubmit={handleReplySendEmail}>
                       <textarea
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
