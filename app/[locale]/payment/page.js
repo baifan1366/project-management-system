@@ -18,11 +18,6 @@ export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // 其他状态
-  const [showWarning, setShowWarning] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
 
   // 获取 URL 参数
@@ -30,7 +25,6 @@ export default function PaymentPage() {
   const userId = searchParams.get('user_id');
 
   const [planDetails, setPlanDetails] = useState(null)
-  const [quantity, setQuantity] = useState(1)
   const [showPromoInput, setShowPromoInput] = useState(false)
   const [promoCode, setPromoCode] = useState('')
   const [clientSecret, setClientSecret] = useState('')
@@ -42,11 +36,17 @@ export default function PaymentPage() {
   const dispatch = useDispatch()
   const { status, error: reduxError, metadata } = useSelector(state => state.payment)
 
+  const [isPromoLoading, setIsPromoLoading] = useState(false);
+  const [discount, setDiscount] = useState(0);
+  const [validPromo, setValidPromo] = useState(false);
+  const [appliedPromoCode, setAppliedPromoCode] = useState('');
+  const [promoMessage, setPromoMessage] = useState('');
+  const [messageType, setMessageType] = useState(''); // 'success' or 'error'
+
   useEffect(() => {
     // 简单验证必要参数
     if (!planId || !userId) {
       console.error('Missing required parameters:', { planId, userId });
-      setError('Missing required parameters');
       router.push('/pricing');
       return;
     }
@@ -81,7 +81,7 @@ export default function PaymentPage() {
   useEffect(() => {
     const fetchPlanDetails = async () =>{
       if (!planId){
-        setError('No plan ID provided');
+        console.error('No plan ID provided');
         setLoading(false);
         return;
       }
@@ -117,7 +117,6 @@ export default function PaymentPage() {
         setPlanDetails(data);
       }catch (err) {
         console.error('Error fetching plan details:', err);
-        setError('Failed to load plan details: ' + err.message);
       } finally {
         setLoading(false);
       }
@@ -141,7 +140,7 @@ export default function PaymentPage() {
           userId,
           planName: planDetails?.name,
           amount: planDetails?.price,
-          quantity: quantity
+          quantity: 1
         };
 
         console.log('Setting payment metadata:', paymentMetadata);
@@ -150,7 +149,7 @@ export default function PaymentPage() {
         // 创建支付意向
         const result = await dispatch(createPaymentIntent({
           ...paymentMetadata,
-          amount: planDetails.price * quantity // 确保金额正确计算
+          amount: planDetails.price * 1 // 确保金额正确计算
         })).unwrap();
 
         console.log('Payment intent created:', result);
@@ -161,7 +160,6 @@ export default function PaymentPage() {
         }
       } catch (err) {
         console.error('Error creating payment intent:', err);
-        setError(err.message || 'Failed to create payment intent');
       }
     };
 
@@ -169,7 +167,7 @@ export default function PaymentPage() {
     if (planDetails && planId && userId) {
       initializePayment();
     }
-  }, [dispatch, planId, userId, planDetails, quantity]);
+  }, [dispatch, planId, userId, planDetails, 1]);
 
   // Stripe appearance configuration
   const appearance = {
@@ -190,14 +188,11 @@ export default function PaymentPage() {
     appearance,
   };
   
-  // Temporary promo code
-  const promoCodeExp = 'PROMOCODE'
-  
   // 首先定义计算小计的函数
   const calculateSubtotal = useCallback(() => {
     if (!planDetails || !planDetails.price) return 0;
-    return planDetails.price * quantity;
-  }, [planDetails, quantity]);
+    return planDetails.price * 1;
+  }, [planDetails]);
 
   // Callback function to receive the payment handler from CheckoutForm
   const onPaymentSubmit = useCallback((handler) => {
@@ -207,7 +202,7 @@ export default function PaymentPage() {
   // Update the handlePayment function
   const handlePayment = async () => {
     if (!metadata.amount || !metadata.userId) {
-      setError('Missing required payment information');
+      console.error('Missing required payment information');
       return;
     }
 
@@ -219,51 +214,13 @@ export default function PaymentPage() {
       }
     } catch (err) {
       console.error('Payment failed:', err);
-      setError(err.message || 'Payment failed');
     }
   };
-
-  // Handle increment/decrement
-  const handleQuantityChange = (action) => {
-    if (action === 'increase') {
-      setQuantity(prev => prev + 1)
-      setShowWarning(false) // Clear warning when increasing
-    } else if (action === 'decrease') {
-      if(quantity > 1){
-        setQuantity(prev => prev - 1)
-      setShowWarning(false) // Clear warning when valid decrease
-      }else{
-        setShowWarning(true)// Show warning when trying to go below 1
-      }
-    }
-  }
-
-  // Handle quantity input (direct)
-  const handleQuantityInput = (e) => {
-    const value = parseInt(e.target.value, 10);
-    if (!isNaN(value) && value >= 1) {
-      setQuantity(value);
-      setShowWarning(false);
-    } else if (!isNaN(value) && value < 1) {
-      setQuantity(1);
-      setShowWarning(true);
-    }
-  };
-
-  // Handle wheel event
-  const handleWheel = (e) => {
-    e.preventDefault();
-    if (e.deltaY < 0) {
-       setQuantity(prev => prev + 1);
-    } else {
-       setQuantity(prev => Math.max(1, prev - 1));
-    }
-  }
 
   const calculateSubTotal = () => {
     if(!planDetails) return 0;
 
-    return planDetails.price * quantity;
+    return planDetails.price * 1;
   }
 
   // Add this where your payment button is
@@ -280,12 +237,11 @@ export default function PaymentPage() {
 
   const handlePaymentMethodSelect = (method) => {
     setSelectedPaymentMethod(method);
-    setError('');
   };
 
   const handleAlipayPayment = async () => {
     if (!planDetails || !planDetails.price || !planDetails.name) {
-      setError('Plan details not available');
+      console.log('Plan details not available');
       return;
     }
     
@@ -299,7 +255,7 @@ export default function PaymentPage() {
         body: JSON.stringify({
           planName: planDetails.name,
           price: planDetails.price,
-          quantity: quantity,
+          quantity: 1,
           email: data.email
         }),
       });
@@ -325,7 +281,6 @@ export default function PaymentPage() {
       }
     } catch (error) {
       console.error('Alipay error:', error);
-      setError(error.message || 'Failed to process Alipay payment');
       setIsProcessing(false);
     }
   };
@@ -351,12 +306,84 @@ export default function PaymentPage() {
     return '';
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
+  const fetchPromoCodes = async () => {
+    const {data, error} = await supabase
+      .from('promo_code')
+      .select('*')
+      .eq('code', promoCode)
+      .single();
+
+    if(error){
+      console.error('Error fetching promo code:', error);
+      return null;
+    }
+
+    return data;
   }
 
-  if (error) {
-    return <div>Error: {error}</div>;
+  const handleApplyPromoCode = async () => {
+    if(promoCode.trim() === ''){
+      setPromoMessage('Please enter a promo code');
+      setMessageType('error');
+      return;
+    }
+
+    setIsPromoLoading(true);
+    setPromoMessage('');
+
+    try {
+      const promoCodeData = await fetchPromoCodes();
+      
+      if(!promoCodeData || !promoCodeData.is_active) {
+        setPromoMessage('Invalid or expired promo code');
+        setMessageType('error');
+        setValidPromo(false);
+        return;
+      }
+      
+      // Check if promo code is valid (active and within date range)
+      const now = new Date();
+      const startDate = new Date(promoCodeData.start_date);
+      const endDate = new Date(promoCodeData.end_date);
+      
+      if(now < startDate || now > endDate) {
+        setPromoMessage('Promo code is not valid at this time');
+        setMessageType('error');
+        setValidPromo(false);
+        return;
+      }
+      
+      // Apply discount
+      if(promoCodeData.discount_type === 'PERCENTAGE') {
+        setDiscount(calculateSubTotal() * (promoCodeData.discount_value / 100));
+      } else {
+        setDiscount(promoCodeData.discount_value);
+      }
+      
+      // Set the applied promo code
+      setAppliedPromoCode(promoCode);
+      setValidPromo(true);
+      setPromoMessage(`Promo code "${promoCode}" applied successfully!`);
+      setMessageType('success');
+      setShowPromoInput(false);
+    } catch (err) {
+      console.error('Error applying promo code:', err);
+      setPromoMessage('Failed to apply promo code');
+      setMessageType('error');
+      setValidPromo(false);
+    } finally {
+      setIsPromoLoading(false);
+    }
+  };
+
+  // Update calculateSubTotal to include discount
+  const calculateFinalTotal = () => {
+    const subtotal = calculateSubTotal();
+    return Math.max(0, subtotal - discount);
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
   }
 
   return (
@@ -371,78 +398,6 @@ export default function PaymentPage() {
           </div>
         </div>
       )}
-
-    {/*Quantity Modal */}
-    {isModalOpen && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-[400px] transition-all duration-300 ease-in-out">
-          <div className="flex justify-between items-center mb-4 ">
-            <h3 className="text-lg font-medium text-gray-800">Update Quantity</h3>
-            <button 
-              onClick={() => setIsModalOpen(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="border-t border-gray-300 pt-4">
-            {/* Quantity Input */}
-            <div className="flex items-center justify-center">
-              <div className="relative">
-                <div className="flex items-center gap-4">
-                  <button
-                    className={`text-gray-500 text-3xl hover:text-gray-700 ${
-                      quantity <= 1 ? 'text-gray-300': 'text-gray-500'
-                    }`}
-                    onClick={() => handleQuantityChange('decrease')}
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => {
-                      const value = Number(e.target.value)
-                      if (value >= 1) {
-                        setQuantity(value)
-                        setShowWarning(false)
-                      } else {
-                        setShowWarning(true)
-                      }
-                    }}
-                    onWheel={handleWheel}
-                    className="w-20 text-center text-xl border border-gray-200 focus:outline-none bg-white rounded-lg shadow-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&:--webkit-inner-spin-button]:appearance-none"
-                  />
-                  <button 
-                    className="text-gray-500 text-3xl hover:text-gray-700"
-                    onClick={() => handleQuantityChange('increase')}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            {/* Warning Message */}
-            <div className={`overflow-hidden transition-[height,opacity,margin] duration-300 ease-in-out ${
-              showWarning ? 'h-[60px] opacity-100 my-4' : 'h-0 opacity-0 my-0'
-            }`}>
-              <div className="text-red-500 text-sm bg-red-100 rounded-md p-2">
-                The item cannot be removed, it must be at least 1 to make a payment.
-              </div>
-            </div>
-          </div>
-          
-          {/* Update Button */}
-          <button 
-            className="w-full bg-pink-500 text-white py-3 rounded-md mt-4 hover:bg-pink-600"
-            onClick={() => setIsModalOpen(false)}
-          >
-            Update
-          </button>
-        </div>
-      </div>
-    )}
 
       {/* Left Side - Dark Background */}
       <div className="w-1/2 bg-black text-white p-8">
@@ -482,67 +437,83 @@ export default function PaymentPage() {
             {planDetails ? planDetails.description : 'Team Sync is a team collaboration tool that helps you manage your team and projects.'}
           </div>
 
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-                <div 
-                onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-4 rounded-md border border-gray-800 px-4 py-2 cursor-pointer hover:bg-gray-700 transition-all duration-200"
-                >
-                  <span>QTY</span>
-                  <span>{quantity}</span>
-                    <svg 
-                      className="w-4 h-4 text-gray-400 mr-2" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor"
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M19 9l-7 7-7-7" 
-                      />
-                    </svg>
-                </div>
-            </div>
+          <div className="flex justify-end">
             <span>{planDetails ? planDetails.billing_interval : 'Annually'}</span>
           </div>
 
           <div className="border-t border-gray-800 pt-4">
-            <div className={`transition-all duration-300 ease-in-out ${
-              showPromoInput ? 'h-[40px]' : 'h-[32px]'
-            }`}>
-              <div 
-                className={`transition-all duration-300 ease-in-out bg-gray-800 rounded
-                  ${showPromoInput ? 'w-full' : 'w-1/4'}`}
-              >
-                <button 
-                  onClick={() => {
-                    setShowPromoInput(true);
-                  }}
-                  className="w-full text-gray-400 py-2 hover:bg-gray-700 transition-colors duration-200"
-                >
-                  Add Promo Code
-                </button>
-              </div>
-              {showPromoInput && (
-                <div className="flex w-full bg-gray-800 text-white rounded-l">
-                  <input
-                    type="text"
-                    value={promoCode}
-                    onChange={(e) => {
-                      setPromoCode(e.target.value)
-                    }}
-                    placeholder="Add Promo Code"
-                    className="flex-1 bg-transparent placeholder-gray-400 px-3 py-2 focus:outline-none focus:bg-white focus:text-gray-900 
-                      transition-colors duration-200 rounded"
-                    autoFocus
-                    onBlur={() => {
-                      if (!promoCode.trim()) {
-                        setShowPromoInput(false);
-                      }
-                    }}
-                  />
+            <div className="flex w-full">
+              {!showPromoInput ? (
+                <div className="w-full">
+                  {validPromo && appliedPromoCode ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <span className="text-green-400 mr-2">✓</span>
+                        <span className="text-green-400">Applied Code: {appliedPromoCode}</span>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setValidPromo(false);
+                          setDiscount(0);
+                          setAppliedPromoCode('');
+                          setPromoCode('');
+                          setShowPromoInput(true);
+                        }}
+                        className="text-gray-400 text-sm hover:text-white"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => setShowPromoInput(true)}
+                      className="transition-all duration-300 ease-in-out bg-gray-800 w-1/4 text-gray-400 py-2 hover:bg-gray-700 rounded"
+                    >
+                      Add Promo Code
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex w-full flex-col">
+                  <div className="flex w-full">
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      placeholder="Add Promo Code"
+                      className="flex-1 bg-white text-gray-900 px-3 py-2 focus:outline-none rounded-l transition-all duration-300 ease-in-out"
+                      autoFocus
+                      disabled={isPromoLoading}
+                      onBlur={(e) => {
+                        if (!promoCode.trim()) {
+                          setShowPromoInput(false);
+                        }
+                      }}
+                    />
+                    <button 
+                      onClick={handleApplyPromoCode}
+                      disabled={isPromoLoading}
+                      className={`px-4 py-2 rounded-r transition-colors duration-300 flex items-center justify-center ${
+                        isPromoLoading 
+                          ? 'bg-gray-400 cursor-not-allowed' 
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      }`}
+                    >
+                      {isPromoLoading ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      ) : 'Apply'}
+                    </button>
+                  </div>
+                  
+                  {promoMessage && (
+                    <div className={`mt-2 p-2 text-sm rounded ${
+                      messageType === 'success' 
+                        ? 'bg-green-900 text-green-300' 
+                        : 'bg-red-900 text-red-300'
+                    }`}>
+                      {promoMessage}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -552,6 +523,20 @@ export default function PaymentPage() {
             <span>Today's Subtotal</span>
             <span>{formatPrice(calculateSubTotal())}</span>
           </div>
+
+          {validPromo && discount > 0 && (
+            <div className="flex justify-between text-green-400 pt-2">
+              <span>Discount ({appliedPromoCode})</span>
+              <span>-{formatPrice(discount)}</span>
+            </div>
+          )}
+
+          {validPromo && (
+            <div className="flex justify-between border-t border-gray-800 pt-4 font-bold">
+              <span>Total</span>
+              <span>{formatPrice(calculateFinalTotal())}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -682,11 +667,6 @@ export default function PaymentPage() {
               ) : getPaymentButtonText()}
             </button>
 
-            {error && (
-              <div className="mt-2 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md">
-                {error}
-              </div>
-            )}
           </div>
         </div>
       </div>
