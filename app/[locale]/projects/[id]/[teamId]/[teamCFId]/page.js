@@ -17,6 +17,7 @@ import TaskGantt from '@/components/team/gantt/TaskGantt';
 import TaskKanban from '@/components/team/kanban/TaskKanban';
 import TaskFile from '@/components/team/file/TaskFile';
 import TaskWorkflow from '@/components/team/workflow/TaskWorkflow';
+import TaskOverview from '@/components/team/overview/TaskOverview';
 import { store } from '@/lib/redux/store';
 
 // 创建记忆化的选择器
@@ -158,6 +159,9 @@ export default function TeamCustomFieldPage() {
     }
     if (fieldType === 'WORKFLOW') {
       return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
+    if (fieldType === 'OVERVIEW') {
+      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
     }
     
     return <div>暂不支持的字段类型: {fieldType}</div>;
