@@ -15,10 +15,20 @@ export default function CheckoutForm({ onPaymentSubmit }) {
     }
 
     try {
+      // Get the URL parameters (planId and userId) from the current URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const planId = urlParams.get('plan_id');
+      const userId = urlParams.get('user_id');
+
+      // Build the return URL with these parameters preserved
+      const returnUrl = `${window.location.origin}/payment-success?plan_id=${planId}&user_id=${userId}`;
+      
+      console.log('Confirming payment with return URL:', returnUrl);
+      
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/payment-success`,
+          return_url: returnUrl,
         },
       });
 
@@ -28,14 +38,14 @@ export default function CheckoutForm({ onPaymentSubmit }) {
       }
 
       if (paymentIntent.status === 'succeeded') {
-        window.location.href = `/payment-success`;
+        window.location.href = returnUrl;
         return true;
       }
 
       return false;
     } catch (err) {
       setErrorMessage('An unexpected error occurred.');
-      console.error(err);
+      console.error('CheckoutForm payment error:', err);
       return false;
     }
   };

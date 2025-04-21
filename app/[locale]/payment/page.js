@@ -7,9 +7,9 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import CheckoutForm from '@/components/CheckoutForm'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-//
+//react redux
 import { useSelector, useDispatch } from 'react-redux'
-import { createPaymentIntent, setPaymentMetadata } from '@/lib/redux/features/paymentSlice'
+import { createPaymentIntent, setPaymentMetadata, setFinalTotal } from '@/lib/redux/features/paymentSlice'
 
 // Initialize Stripe outside the component
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -128,18 +128,43 @@ export default function PaymentPage() {
   useEffect(() => {
     const initializePayment = async () => {
       try {
-        // 首先验证必需的参数
-        if (!planId || !userId || !planDetails?.price) {
-          console.error('Missing required parameters:', { planId, userId, price: planDetails?.price });
+        // Log the current values of all required parameters
+        console.log('Payment initialization parameters:', { 
+          planId, 
+          userId, 
+          planPrice: planDetails?.price 
+        });
+        
+        // Verify all required parameters are present
+        if (!planId) {
+          console.error('Missing planId');
           return;
         }
+        
+        if (!userId) {
+          console.error('Missing userId');
+          return;
+        }
+        
+        if (!planDetails?.price) {
+          console.error('Missing plan price');
+          return;
+        }
+
+        // Calculate the final total (with discount applied)
+        const finalAmount = calculateFinalTotal();
+        
+        // Store the final total in Redux
+        dispatch(setFinalTotal(finalAmount));
 
         // 设置支付元数据
         const paymentMetadata = {
           planId,
           userId,
           planName: planDetails?.name,
-          amount: planDetails?.price,
+          amount: finalAmount, // Use the final amount with discount
+          promoCode: appliedPromoCode,
+          discount: discount,
           quantity: 1
         };
 
@@ -149,7 +174,7 @@ export default function PaymentPage() {
         // 创建支付意向
         const result = await dispatch(createPaymentIntent({
           ...paymentMetadata,
-          amount: planDetails.price * 1 // 确保金额正确计算
+          amount: finalAmount // Use the final amount with discount
         })).unwrap();
 
         console.log('Payment intent created:', result);
@@ -167,7 +192,7 @@ export default function PaymentPage() {
     if (planDetails && planId && userId) {
       initializePayment();
     }
-  }, [dispatch, planId, userId, planDetails, 1]);
+  }, [dispatch, planId, userId, planDetails, discount]);
 
   // Stripe appearance configuration
   const appearance = {
@@ -188,12 +213,6 @@ export default function PaymentPage() {
     appearance,
   };
   
-  // 首先定义计算小计的函数
-  const calculateSubtotal = useCallback(() => {
-    if (!planDetails || !planDetails.price) return 0;
-    return planDetails.price * 1;
-  }, [planDetails]);
-
   // Callback function to receive the payment handler from CheckoutForm
   const onPaymentSubmit = useCallback((handler) => {
     setHandleCardPayment(handler);
@@ -201,13 +220,31 @@ export default function PaymentPage() {
 
   // Update the handlePayment function
   const handlePayment = async () => {
-    if (!metadata.amount || !metadata.userId) {
-      console.error('Missing required payment information');
+    // First verify that we have the userId
+    if (!userId) {
+      console.error('Missing required userId for payment');
       return;
     }
 
+    // Always use the most recent calculated final total
+    const finalAmount = calculateFinalTotal();
+    dispatch(setFinalTotal(finalAmount));
+
+    // Ensure we have all required metadata, using userId from props if not in metadata
+    const paymentData = {
+      userId: userId,
+      planId: planId,
+      planName: planDetails?.name,
+      amount: finalAmount,
+      quantity: 1,
+      ...metadata // Include any other metadata fields, but our explicit values take precedence
+    };
+
+    // Update metadata in Redux
+    dispatch(setPaymentMetadata(paymentData));
+
     try {
-      const result = await dispatch(createPaymentIntent(metadata)).unwrap();
+      const result = await dispatch(createPaymentIntent(paymentData)).unwrap();
       // 处理支付结果
       if (result.clientSecret) {
         // 处理成功
@@ -240,10 +277,14 @@ export default function PaymentPage() {
   };
 
   const handleAlipayPayment = async () => {
-    if (!planDetails || !planDetails.price || !planDetails.name) {
-      console.log('Plan details not available');
+    if (!planDetails || !planDetails.price || !planDetails.name || !userId) {
+      console.log('Missing required details for payment');
       return;
     }
+    
+    // Store the final total in Redux before proceeding with payment
+    const finalAmount = calculateFinalTotal();
+    dispatch(setFinalTotal(finalAmount));
     
     setIsProcessing(true);
     try {
@@ -254,9 +295,11 @@ export default function PaymentPage() {
         },
         body: JSON.stringify({
           planName: planDetails.name,
-          price: planDetails.price,
+          price: finalAmount, // Use the discounted amount
           quantity: 1,
-          email: data.email
+          email: email,
+          userId: userId, // Include userId
+          planId: planId  // Include planId
         }),
       });
       
@@ -380,6 +423,27 @@ export default function PaymentPage() {
   const calculateFinalTotal = () => {
     const subtotal = calculateSubTotal();
     return Math.max(0, subtotal - discount);
+  };
+
+  // Update the button click handler to use the appropriate payment function
+  const handlePaymentButtonClick = async () => {
+    // First, log the current state
+    console.log('Payment button clicked with method:', selectedPaymentMethod);
+    console.log('Current userId:', userId);
+    console.log('Current planId:', planId);
+    console.log('Current metadata:', metadata);
+    
+    if (selectedPaymentMethod === 'card' && handleCardPayment) {
+      // Use the Stripe card payment handler provided by CheckoutForm
+      console.log('Using card payment handler');
+      await handleCardPayment();
+    } else if (selectedPaymentMethod === 'alipay') {
+      // Use the Alipay payment handler
+      console.log('Using Alipay payment handler');
+      await handleAlipayPayment();
+    } else {
+      console.error('No valid payment method selected or handler available');
+    }
   };
 
   if (loading) {
@@ -649,17 +713,17 @@ export default function PaymentPage() {
 
             {/* Payment Button */}
             <button
-              onClick={handlePayment}
-              disabled={!selectedPaymentMethod || paymentStatus === 'processing'}
+              onClick={handlePaymentButtonClick}
+              disabled={!selectedPaymentMethod || paymentStatus === 'processing' || isProcessing}
               className={`w-full py-3 rounded-md mt-6 ${
                 !selectedPaymentMethod 
                   ? 'bg-gray-400 cursor-not-allowed' 
-                  : paymentStatus === 'processing'
+                  : paymentStatus === 'processing' || isProcessing
                   ? 'bg-indigo-400 cursor-wait'
                   : 'bg-indigo-600 hover:bg-indigo-700'
               } text-white`}
             >
-              {paymentStatus === 'processing' ? (
+              {paymentStatus === 'processing' || isProcessing ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                   Processing...
