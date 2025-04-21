@@ -6,11 +6,11 @@ import {
   DialogContent, 
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Upload, File, X, FileText, Sheet, Film, Music, Eye, ChevronLeft } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
@@ -170,7 +170,7 @@ export default function FileTools({ isOpen, onClose }) {
               previewFile.type.includes('html') || 
               previewFile.type.includes('css')) {
       // 为文本文件创建预览
-      const [textContent, setTextContent] = useState('加载中...')
+      const [textContent, setTextContent] = useState(t('loading'))
       
       // 读取文本内容
       useEffect(() => {
@@ -179,7 +179,7 @@ export default function FileTools({ isOpen, onClose }) {
           setTextContent(e.target.result)
         }
         reader.onerror = () => {
-          setTextContent('无法读取文件内容')
+          setTextContent(t('cannotReadFile'))
         }
         reader.readAsText(previewFile.file)
       }, [previewFile])
@@ -200,7 +200,7 @@ export default function FileTools({ isOpen, onClose }) {
           </div>
           <h3 className="text-xl font-medium mb-2">{previewFile.name}</h3>
           <p className="text-gray-500 mb-4">{formatFileSize(previewFile.size)}</p>
-          <p className="text-gray-500">无法预览此类型的文件，请下载后查看</p>
+          <p className="text-gray-500">{t('cannotPreview')}</p>
           <Button
             className="mt-4"
             onClick={() => {
@@ -212,7 +212,7 @@ export default function FileTools({ isOpen, onClose }) {
               document.body.removeChild(a)
             }}
           >
-            下载文件
+            {t('download')}
           </Button>
         </div>
       )
@@ -248,7 +248,11 @@ export default function FileTools({ isOpen, onClose }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={`sm:max-w-${previewFile ? '4xl' : '600px'}`}>
+      <DialogContent 
+        className={`sm:max-w-${previewFile ? '4xl' : '600px'}`}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         {previewFile ? (
           <>
             <div className="flex items-center mb-4">
@@ -270,6 +274,7 @@ export default function FileTools({ isOpen, onClose }) {
           <>
             <DialogHeader>
               <DialogTitle>{t('uploadFile')}</DialogTitle>
+              <DialogDescription>{t('uploadFileDescription')}</DialogDescription>
             </DialogHeader>
             
             <div 
@@ -331,7 +336,7 @@ export default function FileTools({ isOpen, onClose }) {
                           size="icon"
                           className="h-7 w-7 mr-1"
                           onClick={() => openPreview(file)}
-                          title="预览"
+                          title={t('preview')}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -340,7 +345,7 @@ export default function FileTools({ isOpen, onClose }) {
                           size="icon"
                           className="h-7 w-7"
                           onClick={() => removeFile(file.id)}
-                          title="删除"
+                          title={t('delete')}
                         >
                           <X className="h-4 w-4" />
                         </Button>
