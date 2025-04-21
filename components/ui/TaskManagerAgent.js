@@ -35,16 +35,23 @@ export default function TaskManagerAgent({ userId, projectId }) {
     setResults(null);
     
     try {
+      // Prepare request body based on whether a projectId is provided
+      const requestBody = { 
+        instruction,
+        userId
+      };
+      
+      // Only add projectId if it exists and we're in "add to existing project" mode
+      if (projectId) {
+        requestBody.projectId = projectId;
+      }
+      
       const response = await fetch('/api/ai/task-manager-agent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          instruction,
-          userId,
-          projectId // 传递项目ID到API
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       const data = await response.json();
@@ -66,7 +73,13 @@ export default function TaskManagerAgent({ userId, projectId }) {
       setResults(data);
       
       if (data.success) {
-        toast.success(t('CreateTask.createSuccess'));
+        // Different success messages based on operation
+        const successMessage = projectId 
+          ? (t('CreateTask.tasksAddedSuccess') || "Tasks added successfully") 
+          : (t('CreateTask.projectCreatedSuccess') || "Project created successfully");
+        
+        toast.success(successMessage);
+        
         // 如果在现有项目中添加任务，不需要重定向
         if (data.projectId && !projectId) {
           setTimeout(() => {
@@ -102,9 +115,13 @@ export default function TaskManagerAgent({ userId, projectId }) {
           </div>
           <div>
             <CardTitle>
-              {projectId ? t('pengy.titleForProject') : t('pengy.title')}
+              {projectId ? t('pengy.titleForProject') : t('pengy.title') || "Project & Task Creator"}
             </CardTitle>
             <CardDescription>
+              {!projectId && (
+                <span className="font-semibold text-primary">Create new projects with tasks</span>
+              )}
+              {" "}
               {projectId ? t('pengy.greetingForProject') : t('pengy.greeting')}
             </CardDescription>
           </div>
@@ -115,7 +132,9 @@ export default function TaskManagerAgent({ userId, projectId }) {
           <div className="grid w-full gap-4">
             <div className="relative">
               <Textarea
-                placeholder={projectId ? t('pengy.promptForProject') : t('pengy.prompt')}
+                placeholder={projectId ? 
+                  t('pengy.promptForProject') : 
+                  t('pengy.prompt') || "Describe a new project and tasks to create..."}
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 className="min-h-[120px] pr-10"
@@ -128,7 +147,11 @@ export default function TaskManagerAgent({ userId, projectId }) {
               className="w-full"
             >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? t('pengy.thinking') : t('common.create')}
+              {isLoading ? 
+                t('pengy.thinking') : 
+                projectId ? 
+                  t('common.create') : 
+                  t('common.createProject') || "Create Project & Tasks"}
             </Button>
           </div>
         </form>

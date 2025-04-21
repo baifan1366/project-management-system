@@ -53,7 +53,7 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
     }
     
     if (!projectId) {
-      toast.error(t('errors.general'));
+      toast.error(t('errors.projectRequired') || "Project ID is required");
       return;
     }
     
@@ -65,16 +65,28 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
     setIsLoading(true);
     
     try {
+      // Prepare request body with all necessary data
+      const requestBody = {
+        instruction,
+        projectId,
+        userId
+      };
+      
+      // Only add teamId and sectionId if they exist
+      if (teamId) {
+        requestBody.teamId = teamId;
+      }
+      
+      if (sectionId) {
+        requestBody.sectionId = sectionId;
+      }
+      
       const response = await fetch('/api/ai/task-manager-agent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          instruction,
-          projectId, // 提供现有项目ID
-          userId // 传递用户ID
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {
@@ -85,7 +97,7 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
       const data = await response.json();
       
       if (data.success) {
-        toast.success(t('CreateTask.createSuccess'));
+        toast.success(t('CreateTask.tasksAddedSuccess') || "Tasks added successfully");
         setIsOpen(false);
         setInstruction('');
         
@@ -115,12 +127,13 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
           <DialogTitle>{t('nav.taskAssistant')}</DialogTitle>
           <DialogDescription>
             {t('CreateTask.description')}
+            Add new tasks to this existing project using AI assistance.
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <Textarea
-            placeholder={t('Chat.inputPlaceholder')}
+            placeholder={t('Chat.inputPlaceholder') || "Describe the tasks you want to add to this project..."}
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             className="min-h-[120px]"
@@ -132,7 +145,7 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
               disabled={isLoading || !instruction.trim() || !userId}
             >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? t('CreateTask.creating') : t('CreateTask.create')}
+              {isLoading ? t('CreateTask.creating') : t('CreateTask.createForProject') || "Add Tasks"}
             </Button>
           </DialogFooter>
         </form>
