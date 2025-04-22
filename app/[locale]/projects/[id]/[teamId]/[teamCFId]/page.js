@@ -279,7 +279,17 @@ export default function TeamCustomFieldPage() {
               </Button>
             </div>
           </div>
-          <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
+          <div className="overflow-x-auto" style={{ 
+            scrollbarWidth: 'none', 
+            msOverflowStyle: 'none' 
+          }}>
+            <style jsx>{`
+              div::-webkit-scrollbar {
+                display: none;
+              }
+            `}</style>
+            <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
+          </div>
         </div>
         <div className="w-full p-0">
           <div className="w-full border-b py-2 flex items-center justify-between">
@@ -341,7 +351,7 @@ export default function TeamCustomFieldPage() {
             </div>
           </div>
         </div>
-        <div className="overflow-y-auto flex-grow h-0 mb-2" data-rbd-scroll-container-style="true">
+        <div className="overflow-y-auto flex-grow h-0 mb-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0" data-rbd-scroll-container-style="true">
           {customFieldContent}
         </div>
       </div>
