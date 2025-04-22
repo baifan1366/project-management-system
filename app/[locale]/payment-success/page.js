@@ -147,6 +147,46 @@ export default function PaymentSuccess() {
     }
   };
 
+  // 创建支付记录
+  const createPaymentRecord = async (paymentData) => {
+    try {
+      console.log('Creating payment record:', paymentData);
+      
+      // 构建支付记录数据
+      const paymentRecord = {
+        user_id: paymentData.userId,
+        amount: paymentData.amount / 100, // Stripe金额是以分为单位，转换为元
+        currency: paymentData.currency || 'USD',
+        payment_method: 'stripe',
+        status: paymentData.status === 'succeeded' ? 'COMPLETED' : 
+                paymentData.status === 'processing' ? 'PENDING' : 'FAILED',
+        transaction_id: paymentData.id,
+        stripe_payment_id: paymentData.id,
+        discount_amount: paymentData.metadata?.discount ? parseFloat(paymentData.metadata.discount) : 0,
+        applied_promo_code: paymentData.metadata?.promoCode || null,
+        metadata: {
+          planId: paymentData.metadata?.planId,
+          planName: paymentData.metadata?.planName,
+        },
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+      
+      // 插入支付记录
+      const { data, error } = await supabase
+        .from('payment')
+        .insert(paymentRecord);
+        
+      if (error) throw error;
+      
+      console.log('Payment record created successfully');
+      return true;
+    } catch (err) {
+      console.error('Error creating payment record:', err);
+      return false;
+    }
+  };
+
   useEffect(() => {
     const initializePaymentSuccess = async () => {
       try {
@@ -172,6 +212,12 @@ export default function PaymentSuccess() {
           if (result.metadata?.planId) {
             await updateUserSubscription(result.metadata.userId, result.metadata.planId);
           }
+          
+          // 创建支付记录
+          await createPaymentRecord({
+            ...result,
+            userId: result.metadata.userId
+          });
           
           if (email) {
             await sendEmail(email, {
