@@ -1211,7 +1211,7 @@ export default function AdminSubscriptions() {
                     >
                       <option value=''>Select discount type</option>
                       <option value='PERCENTAGE'>Percentage</option>
-                      <option value='FIXED'>Fixed Amount</option>
+                      <option value='FIXED_AMOUNT'>Fixed Amount</option>
                     </select>
                   </div>
                   
