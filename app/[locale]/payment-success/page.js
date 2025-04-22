@@ -157,7 +157,7 @@ export default function PaymentSuccess() {
         user_id: paymentData.userId,
         amount: paymentData.amount / 100, // Stripe金额是以分为单位，转换为元
         currency: paymentData.currency || 'USD',
-        payment_method: 'stripe',
+        payment_method: paymentData.metadata?.payment_method || 'stripe',
         status: paymentData.status === 'succeeded' ? 'COMPLETED' : 
                 paymentData.status === 'processing' ? 'PENDING' : 'FAILED',
         transaction_id: paymentData.id,

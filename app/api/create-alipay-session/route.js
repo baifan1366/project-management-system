@@ -12,7 +12,7 @@ export async function POST(req) {
     }
     
     // 从请求中获取数据
-    const { planName, price, quantity, email } = await req.json();
+    const { planName, price, quantity, email, userId, planId, payment_method } = await req.json();
     
     // 验证必要参数
     if (!price || price <= 0) {
@@ -49,7 +49,10 @@ export async function POST(req) {
       customer_email: email,
       metadata: {
         planName: planName,
-        quantity: quantity.toString()
+        quantity: quantity.toString(),
+        userId: userId,
+        planId: planId,
+        payment_method: payment_method || 'alipay'
       },
     });
     
