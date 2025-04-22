@@ -333,23 +333,9 @@ CREATE TABLE "subscription_plan" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 团队订阅表
-CREATE TABLE "team_subscription" (
-  "id" SERIAL PRIMARY KEY,
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
-  "status" TEXT NOT NULL CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED')),
-  "start_date" TIMESTAMP NOT NULL,
-  "end_date" TIMESTAMP NOT NULL,
-  "cancel_at_period_end" BOOLEAN DEFAULT FALSE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- 订阅付款历史表
 CREATE TABLE "subscription_payment" (
   "id" SERIAL PRIMARY KEY,
-  "team_subscription_id" INT NOT NULL REFERENCES "team_subscription"("id") ON DELETE CASCADE,
   "amount" DECIMAL(10, 2) NOT NULL,
   "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
   "payment_method" TEXT NOT NULL,
@@ -592,4 +578,25 @@ USING (bucket_id = 'landing-page-media');
 -- 落地页相关索引
 CREATE INDEX idx_landing_page_section_sort ON "landing_page_section"("sort_order");
 CREATE INDEX idx_landing_page_content_section ON "landing_page_content"("section_id");
-CREATE INDEX idx_landing_page_content_sort ON "landing_page_content"("sort_order"); 
+CREATE INDEX idx_landing_page_content_sort ON "landing_page_content"("sort_order");
+
+-- Payment table for Stripe integration
+CREATE TABLE "payment" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "amount" DECIMAL(10, 2) NOT NULL,
+  "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
+  "payment_method" TEXT NOT NULL,
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
+  "transaction_id" VARCHAR(255),
+  "discount_amount" DECIMAL(10, 2) DEFAULT 0,
+  "discount_percentage" DECIMAL(5, 2) DEFAULT 0,
+  "applied_promo_code" VARCHAR(50),
+  "stripe_payment_id" VARCHAR(255),
+  "metadata" JSONB,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- For better performance when querying payment by user
+CREATE INDEX idx_payment_user_id ON "payment"("user_id");
