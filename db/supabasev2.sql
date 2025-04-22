@@ -330,17 +330,6 @@ CREATE TABLE "subscription_plan" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 订阅付款历史表
-CREATE TABLE "subscription_payment" (
-  "id" SERIAL PRIMARY KEY,
-  "amount" DECIMAL(10, 2) NOT NULL,
-  "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
-  "payment_method" TEXT NOT NULL,
-  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
-  "transaction_id" VARCHAR(255),
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- 用户订阅计划表
 CREATE TABLE "user_subscription_plan" (
   "id" SERIAL PRIMARY KEY,

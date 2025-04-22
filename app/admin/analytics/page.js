@@ -374,7 +374,7 @@ export default function AdminAnalytics() {
       const { count: payingUsers } = await supabase
         .from('user_subscription_plan')
         .select('id', { count: 'exact', head: true })
-        .eq('status', 'ACTIVE')
+        .neq('plan_id', '1')// paid user
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
       

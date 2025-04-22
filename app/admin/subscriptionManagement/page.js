@@ -1017,8 +1017,9 @@ export default function AdminSubscriptions() {
                                   ${parseFloat(payment.amount).toFixed(2)} {payment.currency}
                                 </div>
                                 {payment.discount_amount > 0 && (
-                                  <div className="text-xs text-green-600 dark:text-green-400">
-                                    Discount: ${parseFloat(payment.discount_amount).toFixed(2)}
+                                  <div className="text-xs text-green-600 dark:text-green-400 flex flex-col">
+                                    <span>Discount: ${parseFloat(payment.discount_amount).toFixed(2)}</span> 
+                                    <span>Promo Code: {payment.applied_promo_code}</span> 
                                   </div>
                                 )}
                               </td>
