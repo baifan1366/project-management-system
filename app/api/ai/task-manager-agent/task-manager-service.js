@@ -7,9 +7,11 @@ import { supabase } from '@/lib/supabase';
 export async function parseInstruction(instruction) {
   console.log("正在调用AI解析指令...");
   const completion = await openai.chat.completions.create({
-    model: "qwen/qwen2.5-vl-32b-instruct:free",
+    model: "google/gemini-2.0-flash-exp:free",
+    //model: "qwen/qwen2.5-vl-32b-instruct:free",
     //model: "qwen/qwq-32b:free",
     //model: "deepseek/deepseek-chat-v3-0324:free",
+    //model="deepseek/deepseek-r1:free",
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: instruction }
@@ -36,12 +38,19 @@ export async function parseInstruction(instruction) {
 }
 
 // 处理创建项目和任务
-export async function createProjectAndTasks(aiResponse, userId, existingProjectId = null) {
+export async function createProjectAndTasks(
+  aiResponse, 
+  userId, 
+  existingProjectId = null,
+  providedTeamId = null,
+  providedSectionId = null
+) {
   let projectId = existingProjectId;
   let tasksResults = [];
   
   // 创建项目（如果需要）
-  if (aiResponse.action === "create_project_and_tasks" && aiResponse.project) {
+  if (!existingProjectId && aiResponse.action === "create_project_and_tasks" && aiResponse.project) {
+    console.log("创建新项目和任务流程");
     const createdProject = await dbService.createProject(aiResponse.project, userId);
     projectId = createdProject.id;
     
@@ -79,15 +88,34 @@ export async function createProjectAndTasks(aiResponse, userId, existingProjectI
     await dbService.addUserToTeam(userId, teamId);
     
     // 添加团队成员（如果有）
-    if (aiResponse.team_members && aiResponse.team_members.length > 0) {
+    if (aiResponse.team_members && Array.isArray(aiResponse.team_members) && aiResponse.team_members.length > 0) {
       for (const member of aiResponse.team_members) {
-        await dbService.inviteTeamMember(teamId, member.email, member.role || 'member', userId);
+        if (member && member.email) {
+          await dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId);
+        }
       }
     }
     
-    // 创建默认分区
-    const section = await dbService.createSection(teamId, userId);
-    const sectionId = section.id;
+    // 获取团队的默认分区
+    const { data: sectionData, error: sectionError } = await supabase
+      .from('section')
+      .select('id')
+      .eq('team_id', teamId);
+      
+    if (sectionError) {
+      console.error("获取分区失败:", sectionError);
+      throw new Error(`Failed to get section: ${sectionError.message}`);
+    }
+    
+    if (!sectionData || sectionData.length === 0) {
+      console.log("未找到现有分区，创建新分区");
+      // 创建默认分区
+      const newSection = await dbService.createSection(teamId, userId);
+      var sectionId = newSection.id;
+    } else {
+      console.log(`找到 ${sectionData.length} 个分区，使用第一个分区`);
+      var sectionId = sectionData[0].id;
+    }
     
     // 处理任务
     if (aiResponse.tasks && aiResponse.tasks.length > 0) {
@@ -104,49 +132,73 @@ export async function createProjectAndTasks(aiResponse, userId, existingProjectI
     }
   }
   // 仅创建任务（如果有现有项目ID）
-  else if (projectId) {
-    console.log("开始处理任务...");
+  else if (existingProjectId) {
+    console.log("向现有项目添加任务流程");
     
-    // 获取项目关联的团队
-    const { data: teamData, error: teamError } = await supabase
-      .from('team')
-      .select('id')
-      .eq('project_id', projectId);
+    // 使用提供的团队ID，或者查询项目关联的团队
+    let teamId = providedTeamId;
+    
+    if (!teamId) {
+      console.log("未提供团队ID，尝试查询项目关联的团队");
+      const { data: teamData, error: teamError } = await supabase
+        .from('team')
+        .select('id')
+        .eq('project_id', existingProjectId);
+        
+      if (teamError) {
+        console.error("获取团队失败:", teamError);
+        throw new Error(`Failed to get team: ${teamError.message}`);
+      }
       
-    if (teamError) {
-      console.error("获取团队失败:", teamError);
-      throw new Error(`Failed to get team: ${teamError.message}`);
+      if (!teamData || teamData.length === 0) {
+        console.error("项目没有关联的团队");
+        throw new Error("Project has no associated teams");
+      }
+      
+      // 使用第一个团队（如果有多个）
+      teamId = teamData[0].id;
+      console.log(`找到 ${teamData.length} 个团队，使用第一个团队 ID: ${teamId}`);
+    } else {
+      console.log(`使用提供的团队 ID: ${teamId}`);
     }
-    
-    if (!teamData || teamData.length === 0) {
-      console.error("项目没有关联的团队");
-      throw new Error("Project has no associated teams");
-    }
-    
-    // 使用第一个团队（如果有多个）
-    const teamId = teamData[0].id;
-    console.log(`找到 ${teamData.length} 个团队，使用第一个团队 ID: ${teamId}`);
     
     // 添加团队成员（如果有）
-    if (aiResponse.team_members && aiResponse.team_members.length > 0) {
+    if (aiResponse.team_members && Array.isArray(aiResponse.team_members) && aiResponse.team_members.length > 0) {
       for (const member of aiResponse.team_members) {
-        await dbService.inviteTeamMember(teamId, member.email, member.role || 'member', userId);
+        if (member && member.email) {
+          await dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId);
+        }
       }
     }
     
-    // 获取团队的默认分区
-    const { data: sectionData, error: sectionError } = await supabase
-      .from('section')
-      .select('id')
-      .eq('team_id', teamId)
-      .single();
-      
-    if (sectionError) {
-      console.error("获取分区失败:", sectionError);
-      throw new Error(`Failed to get section: ${sectionError.message}`);
-    }
+    // 使用提供的分区ID，或者查询/创建分区
+    let sectionId = providedSectionId;
     
-    const sectionId = sectionData.id;
+    if (!sectionId) {
+      console.log("未提供分区ID，尝试查询团队分区");
+      // 获取团队的默认分区
+      const { data: sectionData, error: sectionError } = await supabase
+        .from('section')
+        .select('id')
+        .eq('team_id', teamId);
+        
+      if (sectionError) {
+        console.error("获取分区失败:", sectionError);
+        throw new Error(`Failed to get section: ${sectionError.message}`);
+      }
+      
+      if (!sectionData || sectionData.length === 0) {
+        console.log("未找到现有分区，创建新分区");
+        // 创建默认分区
+        const newSection = await dbService.createSection(teamId, userId);
+        sectionId = newSection.id;
+      } else {
+        console.log(`找到 ${sectionData.length} 个分区，使用第一个分区`);
+        sectionId = sectionData[0].id;
+      }
+    } else {
+      console.log(`使用提供的分区 ID: ${sectionId}`);
+    }
     
     // 处理任务
     if (aiResponse.tasks && aiResponse.tasks.length > 0) {

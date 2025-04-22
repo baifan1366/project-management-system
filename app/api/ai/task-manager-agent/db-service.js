@@ -240,6 +240,61 @@ export async function addUserToTeam(userId, teamId) {
   }
 }
 
+// 邀请团队成员
+export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invitedBy) {
+  console.log(`正在邀请成员 ${email} 加入团队 ${teamId}，角色: ${role}...`);
+  
+  // 首先检查用户是否已存在
+  const { data: existingUsers, error: userQueryError } = await supabase
+    .from('user')
+    .select('id')
+    .eq('email', email)
+    .limit(1);
+    
+  if (userQueryError) {
+    console.error("查询用户失败:", userQueryError);
+    throw new Error(`Failed to query user: ${userQueryError.message}`);
+  }
+  
+  if (existingUsers && existingUsers.length > 0) {
+    // 如果用户已存在，直接添加到团队
+    const userId = existingUsers[0].id;
+    
+    const { error: addMemberError } = await supabase
+      .from('user_team')
+      .insert([{
+        user_id: userId,
+        team_id: teamId,
+        role: role.toUpperCase(),
+        created_by: invitedBy
+      }]);
+      
+    if (addMemberError) {
+      console.error("将用户添加到团队失败:", addMemberError);
+      throw new Error(`Failed to add member to team: ${addMemberError.message}`);
+    }
+    
+    console.log(`成功将用户 ${email} 添加到团队`);
+  } else {
+    // 如果用户不存在，创建邀请记录
+    const { error: inviteError } = await supabase
+      .from('user_team_invitation')
+      .insert([{
+        team_id: teamId,
+        user_email: email,
+        role: role.toUpperCase(),
+        created_by: invitedBy
+      }]);
+      
+    if (inviteError) {
+      console.error("创建团队邀请失败:", inviteError);
+      throw new Error(`Failed to create team invitation: ${inviteError.message}`);
+    }
+    
+    console.log(`已为 ${email} 创建团队邀请`);
+  }
+}
+
 // 创建默认分区
 export async function createSection(teamId, userId) {
   console.log("正在创建默认分区...");
@@ -264,17 +319,24 @@ export async function createSection(teamId, userId) {
 // 创建任务
 export async function createTask(taskInfo, userId) {
   console.log("正在创建任务:", taskInfo.title);
+  
+  // 构建标准化的tag_values对象
+  const tagValues = {
+    title: taskInfo.title,
+    description: taskInfo.description || '',
+    due_date: taskInfo.due_date || null,
+    priority: taskInfo.priority || 'MEDIUM',
+    status: 'TODO'
+  };
+  
+  // 调试输出
+  console.log("任务数据:", JSON.stringify(tagValues, null, 2));
+  
   const { data: taskData, error: taskError } = await supabase
     .from('task')
     .insert([{
       created_by: userId,
-      tag_values: {
-        1: taskInfo.title,
-        1: taskInfo.description || '',
-        3: taskInfo.due_date || null,
-        6: taskInfo.priority || 'MEDIUM',
-        12: 'TODO'
-      }
+      tag_values: tagValues
     }])
     .select();
     
