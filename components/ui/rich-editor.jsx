@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -9,75 +9,156 @@ import TextStyle from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
-import Heading from '@tiptap/extension-heading';
-import ListItem from '@tiptap/extension-list-item';
-import OrderedList from '@tiptap/extension-ordered-list';
-import BulletList from '@tiptap/extension-bullet-list';
 import Image from '@tiptap/extension-image';
-import Blockquote from '@tiptap/extension-blockquote';
 import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Link as LinkIcon, Heading1, Heading2, Type, Highlighter, Quote, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// 自定义样式扩展，通过editor.setOptions来动态添加
+// Custom style extensions
 const customStyles = `
+/* Editor base styles */
 .ProseMirror {
-  @apply outline-none min-h-[100px] h-full break-words overflow-y-auto max-h-[500px];
+  outline: none;
+  min-height: 100px;
+  height: auto;
+  word-break: break-word;
+  overflow-y: auto;
+  max-height: 500px;
+  color: var(--primary);
+  background-color: var(--background);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
+.dark .ProseMirror {
+  background-color: var(--dark-background);
+  color: hsl(210 40% 98%);
+}
+
+/* Editor placeholder */
 .ProseMirror p.is-editor-empty:first-child::before {
-  @apply text-muted-foreground h-0 pointer-events-none;
+  color: var(--muted-foreground);
+  height: 0;
+  pointer-events: none;
   content: attr(data-placeholder);
 }
 
-.ProseMirror ul,
-.ProseMirror ol {
-  @apply pl-4;
+/* Paragraph styles */
+.ProseMirror p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
-.ProseMirror ul li {
-  @apply list-disc ml-4;
-}
-
-.ProseMirror ol li {
-  @apply list-decimal ml-4;
-}
-
+/* Heading styles */
 .ProseMirror h1 {
-  @apply text-xl font-bold mt-3 mb-1;
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
 }
 
 .ProseMirror h2 {
-  @apply text-lg font-bold mt-3 mb-1;
+  font-size: 1.125rem;
+  font-weight: bold;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
 }
 
+/* Link styles */
 .ProseMirror a {
-  @apply text-blue-500 underline dark:text-blue-400;
+  color: #3b82f6;
+  text-decoration: underline;
 }
 
+.dark .ProseMirror a {
+  color: #60a5fa;
+}
+
+/* Highlight styles */
 .ProseMirror mark {
-  @apply bg-yellow-100 dark:bg-yellow-500/20 rounded-sm py-0 px-0.5;
+  background-color: #fef9c3;
+  border-radius: 0.125rem;
+  padding: 0 0.125rem;
 }
 
+.dark .ProseMirror mark {
+  background-color: rgba(234, 179, 8, 0.2);
+}
+
+/* Blockquote styles */
 .ProseMirror blockquote {
-  @apply pl-4 border-l-4 border-muted my-3 italic;
+  padding-left: 1rem;
+  border-left-width: 4px;
+  border-color: var(--border);
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-style: italic;
 }
 
+/* Image styles */
 .ProseMirror img {
-  @apply max-w-full h-auto rounded-md;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
 }
 
-.ProseMirror p {
-  @apply my-2;
+/* List styles */
+.ProseMirror ul {
+  padding-left: 1rem;
+  list-style-type: disc;
+  margin-left: 1rem;
 }
 
-.bullet-list li {
-  @apply list-disc ml-4;
+.ProseMirror ol {
+  padding-left: 1rem;
+  list-style-type: decimal;
+  margin-left: 1rem;
+  counter-reset: item;
 }
 
-.ordered-list li {
-  @apply list-decimal ml-4;
+.ProseMirror ol li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+  display: block;
+  counter-increment: item;
+}
+
+.ProseMirror ol li:before {
+  content: counter(item) ". ";
+  margin-right: 0.25rem;
+  color: var(--muted-foreground);
+}
+
+.ProseMirror li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.ProseMirror li p {
+  margin-top: 0;
+  margin-bottom: 0;
+  display: inline;
+}
+
+/* Nested list styles */
+.ProseMirror li ul,
+.ProseMirror li ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Active button styles */
+.is-active {
+  background-color: rgba(0, 0, 0, 0.2);
 }
 `;
+
+// 添加一个变量来处理CSS的编译问题
+const cssVariables = {
+  primary: 'hsl(215.4 16.3% 46.9%)',
+  mutedForeground: 'hsl(215.4 16.3% 56.9%)',
+  border: 'hsl(214.3 31.8% 91.4%)',
+  background: 'hsl(0 0% 100%)',
+  darkBackground: 'hsl(240 10% 3.9%)',
+};
 
 const RichEditor = ({ 
   value, 
@@ -90,32 +171,44 @@ const RichEditor = ({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: false,
-        blockquote: false,
-        bulletList: false,
-        orderedList: false,
+        heading: {
+          levels: [1, 2],
+          HTMLAttributes: {
+            class: 'editor-heading',
+          },
+        },
+        paragraph: {
+          HTMLAttributes: {
+            class: 'editor-paragraph',
+          },
+        },
+        blockquote: {
+          HTMLAttributes: {
+            class: 'editor-blockquote',
+          },
+        },
+        bulletList: {
+          HTMLAttributes: {
+            class: 'editor-bullet-list',
+          },
+        },
+        orderedList: {
+          HTMLAttributes: {
+            class: 'editor-ordered-list',
+          },
+        },
+        listItem: {
+          HTMLAttributes: {
+            class: 'editor-list-item',
+          },
+        },
       }),
       Underline,
       TextStyle,
       Color,
-      Blockquote,
-      ListItem,
-      OrderedList.configure({
-        HTMLAttributes: {
-          class: 'ordered-list',
-        },
-      }),
-      BulletList.configure({
-        HTMLAttributes: {
-          class: 'bullet-list',
-        },
-      }),
       Image.configure({
         inline: true,
         allowBase64: true,
-      }),
-      Heading.configure({
-        levels: [1, 2],
       }),
       Highlight.configure({ multicolor: true }),
       Link.configure({
@@ -133,10 +226,11 @@ const RichEditor = ({
     },
     editorProps: {
       attributes: {
-        class: 'focus:outline-none px-3 py-2',
+        class: 'focus:outline-none px-3 py-2 prose max-w-none bg-background',
         style: `min-height: ${minHeight};`,
       },
-    }
+    },
+    immediatelyRender: false
   });
 
   useEffect(() => {
@@ -145,14 +239,21 @@ const RichEditor = ({
     }
   }, [value, editor]);
 
-  // 添加样式到DOM
+  // Add styles to DOM
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const styleId = 'tiptap-custom-styles';
       if (!document.getElementById(styleId)) {
         const styleElement = document.createElement('style');
         styleElement.id = styleId;
-        styleElement.textContent = customStyles;
+        let processedStyles = customStyles
+          .replace(/var\(--muted-foreground\)/g, cssVariables.mutedForeground)
+          .replace(/var\(--border\)/g, cssVariables.border)
+          .replace(/var\(--primary\)/g, cssVariables.primary)
+          .replace(/var\(--background\)/g, cssVariables.background)
+          .replace(/var\(--dark-background\)/g, cssVariables.darkBackground);
+        
+        styleElement.textContent = processedStyles;
         document.head.appendChild(styleElement);
       }
     }
