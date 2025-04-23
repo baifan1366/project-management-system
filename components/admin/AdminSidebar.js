@@ -44,6 +44,12 @@ export default function AdminSidebar({ activePage, adminData, onLogout }) {
       icon: <FaCog className="mr-3" />,
       href: '/admin/adminSettings',
       isSettings: true
+    },
+    {
+      id: 'analytics',
+      label: 'Analytics',
+      icon: <FaChartLine className="mr-3" />,
+      href: '/admin/analytics'
     }
   ];
   

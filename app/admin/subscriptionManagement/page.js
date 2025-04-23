@@ -42,6 +42,15 @@ export default function AdminSubscriptions() {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]);
   const [maxUses, setMaxUses] = useState('100');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
+  const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
+  const [isPaymentLoading, setIsPaymentLoading] = useState(true);
+  const [paymentError, setPaymentError] = useState(null);
+  const [payments, setPayments] = useState([]);
+  const [currentPaymentPage, setCurrentPaymentPage] = useState(1);
+  const [totalPayments, setTotalPayments] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const fetchSubscriptionPlans = async () => {
     try {
@@ -436,6 +445,139 @@ export default function AdminSubscriptions() {
     }
   };
 
+  const fetchPaymentHistory = async () => {
+    try {
+      setIsPaymentLoading(true);
+      setPaymentError(null);
+
+      // 构建查询，第一步从payment表查询并连接user表获取用户信息
+      let query = supabase
+        .from('payment')
+        .select(`
+          *,
+          user:user_id (email, name)
+        `)
+        .order('created_at', { ascending: false });
+      
+      // 添加状态过滤条件
+      if (paymentStatusFilter !== 'all') {
+        query = query.eq('status', paymentStatusFilter);
+      }
+      
+      // 添加搜索过滤条件
+      if (paymentSearchQuery) {
+        query = query.or(`user.email.ilike.%${paymentSearchQuery}%,transaction_id.ilike.%${paymentSearchQuery}%`);
+      }
+      
+      // 添加分页
+      const from = (currentPaymentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
+      
+      // 获取总数进行分页处理
+      const { count } = await supabase
+        .from('payment')
+        .select('*', { count: 'exact', head: true });
+      
+      // 设置总数和总页数
+      setTotalPayments(count || 0);
+      setTotalPages(Math.ceil((count || 0) / itemsPerPage));
+      
+      // 执行分页查询  
+      query = query.range(from, to);
+      
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching payment history:', error);
+        setPaymentError('An error occurred while fetching payment history.');
+      } else {
+        // 处理并格式化数据，添加用户名和邮箱
+        const formattedPayments = data.map(payment => ({
+          ...payment,
+          userName: payment.user?.name || 'Unknown',
+          userEmail: payment.user?.email || 'No email'
+        }));
+        
+        console.log('Payment history fetched successfully:', formattedPayments);
+        setPayments(formattedPayments);
+      }
+    } catch (error) {
+      console.error('Error in fetchPaymentHistory:', error);
+      setPaymentError('An error occurred while fetching payment history.');
+    } finally {
+      setIsPaymentLoading(false);
+    }
+  };
+
+  // 添加useEffect来在组件加载时和过滤/分页参数变化时获取数据
+  useEffect(() => {
+    if (activeTab === 'paymentHistory') {
+      fetchPaymentHistory();
+    }
+  }, [activeTab, paymentStatusFilter, paymentSearchQuery, currentPaymentPage]);
+
+  // 添加一个导出CSV功能
+  const exportPaymentsToCSV = async () => {
+    try {
+      // 显示加载状态
+      setIsPaymentLoading(true);
+      
+      // 获取所有支付记录，不分页
+      const { data, error } = await supabase
+        .from('payment')
+        .select(`
+          *,
+          user:user_id (email, name)
+        `)
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        throw error;
+      }
+      
+      // 格式化数据
+      const formattedData = data.map(payment => ({
+        'User Name': payment.user?.name || 'Unknown',
+        'User Email': payment.user?.email || 'No email',
+        'Amount': parseFloat(payment.amount).toFixed(2),
+        'Currency': payment.currency,
+        'Discount Amount': parseFloat(payment.discount_amount || 0).toFixed(2),
+        'Status': payment.status,
+        'Payment Method': payment.payment_method,
+        'Transaction ID': payment.transaction_id,
+        'Created At': new Date(payment.created_at).toLocaleString(),
+        'Promo Code': payment.applied_promo_code || 'None'
+      }));
+      
+      // 创建CSV内容
+      const headers = Object.keys(formattedData[0]).join(',');
+      const csvRows = formattedData.map(row => 
+        Object.values(row).map(value => 
+          typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value
+        ).join(',')
+      );
+      
+      const csvContent = [headers, ...csvRows].join('\n');
+      
+      // 创建Blob和下载链接
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `payment_history_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('Error exporting payments:', error);
+      setPaymentError('An error occurred while exporting payment history.');
+    } finally {
+      setIsPaymentLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -778,10 +920,219 @@ export default function AdminSubscriptions() {
             <>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Payment History</h3>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={exportPaymentsToCSV}
+                    className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm flex items-center"
+                    disabled={isPaymentLoading}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export CSV
+                  </button>
+                  <select 
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                    value={paymentStatusFilter}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="FAILED">Failed</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Search user or transaction"
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={paymentSearchQuery}
+                    onChange={(e) => setPaymentSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
               
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 text-center">
-                <p className="text-gray-500 dark:text-gray-400">Payment history records coming soon.</p>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+                {isPaymentLoading ? (
+                  <div className="p-10 text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+                    <p className="mt-4 text-gray-500">Loading payment records...</p>
+                  </div>
+                ) : paymentError ? (
+                  <div className="p-10 text-center">
+                    <p className="text-red-500">{paymentError}</p>
+                    <button 
+                      onClick={fetchPaymentHistory}
+                      className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : payments.length === 0 ? (
+                  <div className="p-10 text-center">
+                    <p className="text-gray-500 dark:text-gray-400">No payment records found.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-900">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              User
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Amount
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Date
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Payment Method
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Transaction ID
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                          {payments.map((payment) => (
+                            <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {payment.userName || 'Unknown'}
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                      {payment.userEmail || 'No email'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white">
+                                  ${parseFloat(payment.amount).toFixed(2)} {payment.currency}
+                                </div>
+                                {payment.discount_amount > 0 && (
+                                  <div className="text-xs text-green-600 dark:text-green-400 flex flex-col">
+                                    <span>Discount: ${parseFloat(payment.discount_amount).toFixed(2)}</span> 
+                                    <span>Promo Code: {payment.applied_promo_code}</span> 
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                  ${payment.status === 'COMPLETED' 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' 
+                                    : payment.status === 'PENDING'
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
+                                    : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+                                  }`}
+                                >
+                                  {payment.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {new Date(payment.created_at).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                <span className="capitalize">{payment.payment_method}</span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                <div className="truncate max-w-xs" title={payment.transaction_id}>
+                                  {payment.transaction_id}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex-1 flex justify-between sm:hidden">
+                        <button
+                          onClick={() => setCurrentPaymentPage(currentPaymentPage > 1 ? currentPaymentPage - 1 : 1)}
+                          disabled={currentPaymentPage === 1}
+                          className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                            currentPaymentPage === 1 
+                              ? 'text-gray-400 bg-gray-100' 
+                              : 'text-gray-700 bg-white hover:bg-gray-50'
+                          }`}
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => setCurrentPaymentPage(currentPaymentPage + 1)}
+                          disabled={payments.length < itemsPerPage}
+                          className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                            payments.length < itemsPerPage
+                              ? 'text-gray-400 bg-gray-100'
+                              : 'text-gray-700 bg-white hover:bg-gray-50'
+                          }`}
+                        >
+                          Next
+                        </button>
+                      </div>
+                      <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-400">
+                            Showing <span className="font-medium">{payments.length > 0 ? (currentPaymentPage - 1) * itemsPerPage + 1 : 0}</span> to{' '}
+                            <span className="font-medium">{Math.min(currentPaymentPage * itemsPerPage, totalPayments)}</span> of{' '}
+                            <span className="font-medium">{totalPayments}</span> results
+                          </p>
+                        </div>
+                        <div>
+                          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button
+                              onClick={() => setCurrentPaymentPage(currentPaymentPage > 1 ? currentPaymentPage - 1 : 1)}
+                              disabled={currentPaymentPage === 1}
+                              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white dark:bg-gray-800 text-sm font-medium ${
+                                currentPaymentPage === 1
+                                  ? 'text-gray-400 dark:text-gray-600'
+                                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                              }`}
+                            >
+                              <span className="sr-only">Previous</span>
+                              <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                            {Array.from({ length: totalPages }).map((_, index) => (
+                              <button
+                                key={index}
+                                onClick={() => setCurrentPaymentPage(index + 1)}
+                                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium ${
+                                  currentPaymentPage === index + 1
+                                    ? 'z-10 bg-indigo-50 dark:bg-indigo-900 border-indigo-500 text-indigo-600 dark:text-indigo-200'
+                                    : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                }`}
+                              >
+                                {index + 1}
+                              </button>
+                            ))}
+                            <button
+                              onClick={() => setCurrentPaymentPage(currentPaymentPage + 1)}
+                              disabled={currentPaymentPage >= totalPages}
+                              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white dark:bg-gray-800 text-sm font-medium ${
+                                currentPaymentPage >= totalPages
+                                  ? 'text-gray-400 dark:text-gray-600'
+                                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                              }`}
+                            >
+                              <span className="sr-only">Next</span>
+                              <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </nav>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -860,7 +1211,7 @@ export default function AdminSubscriptions() {
                     >
                       <option value=''>Select discount type</option>
                       <option value='PERCENTAGE'>Percentage</option>
-                      <option value='FIXED'>Fixed Amount</option>
+                      <option value='FIXED_AMOUNT'>Fixed Amount</option>
                     </select>
                   </div>
                   
