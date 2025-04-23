@@ -6,6 +6,9 @@ import { geistSans, geistMono } from "@/lib/fonts";
 import "@/app/globals.css";
 import { supabase } from '@/lib/supabase';
 import AdminSidebar from '@/components/admin/AdminSidebar';
+import { Provider } from 'react-redux';
+import { store } from '@/lib/redux/store';
+import { ThemeProvider } from 'next-themes';
 
 export default function AdminLayout({ children }) {
   const router = useRouter();
@@ -95,37 +98,52 @@ export default function AdminLayout({ children }) {
     }
   };
   
+  // Common providers wrapper for all admin pages
+  const AdminProviders = ({ children }) => (
+    <Provider store={store}>
+      <ThemeProvider attribute="class">
+        {children}
+      </ThemeProvider>
+    </Provider>
+  );
+  
   // Show loading state
   if (loading && !isLoginPage) {
     return (
-      <div className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center`}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading admin panel...</p>
+      <AdminProviders>
+        <div className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center`}>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading admin panel...</p>
+          </div>
         </div>
-      </div>
+      </AdminProviders>
     );
   }
   
   // Don't show sidebar on login page
   if (isLoginPage) {
     return (
-      <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
-      </div>
+      <AdminProviders>
+        <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+          {children}
+        </div>
+      </AdminProviders>
     );
   }
   
   return (
-    <div className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50 dark:bg-gray-900 flex`}>
-      <AdminSidebar 
-        activePage={getActivePage()} 
-        adminData={adminData} 
-        onLogout={handleLogout} 
-      />
-      <div className="flex-1 overflow-auto">
-        {children}
+    <AdminProviders>
+      <div className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50 dark:bg-gray-900 flex`}>
+        <AdminSidebar 
+          activePage={getActivePage()} 
+          adminData={adminData} 
+          onLogout={handleLogout} 
+        />
+        <div className="flex-1 overflow-auto">
+          {children}
+        </div>
       </div>
-    </div>
+    </AdminProviders>
   );
 }

@@ -35,23 +35,6 @@ ChartJS.register(
 );
 
 export default function AdminAnalytics() {
-  const router = useRouter();
-  const params = useParams();
-  
-  // 状态变量
-  const [adminData, setAdminData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState('30');  // 默认30天
-  const [revenueData, setRevenueData] = useState({ labels: [], datasets: [] });
-  const [userGrowthData, setUserGrowthData] = useState({ labels: [], datasets: [] });
-  const [paymentMethodData, setPaymentMethodData] = useState({ labels: [], datasets: [] });
-  const [planDistributionData, setPlanDistributionData] = useState({ labels: [], datasets: [] });
-  const [summaryStats, setSummaryStats] = useState({
-    totalRevenue: 0,
-    averageOrderValue: 0,
-    conversionRate: 0,
-    successRate: 0
-  });
 
   // 验证管理员会话并获取数据
   useEffect(() => {
@@ -94,6 +77,24 @@ export default function AdminAnalytics() {
     
     checkAdminSession();
   }, []);
+
+  const router = useRouter();
+  const params = useParams();
+  
+  // 状态变量
+  const [adminData, setAdminData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState('30');  // 默认30天
+  const [revenueData, setRevenueData] = useState({ labels: [], datasets: [] });
+  const [userGrowthData, setUserGrowthData] = useState({ labels: [], datasets: [] });
+  const [paymentMethodData, setPaymentMethodData] = useState({ labels: [], datasets: [] });
+  const [planDistributionData, setPlanDistributionData] = useState({ labels: [], datasets: [] });
+  const [summaryStats, setSummaryStats] = useState({
+    totalRevenue: 0,
+    averageOrderValue: 0,
+    conversionRate: 0,
+    successRate: 0
+  });
   
   // 当日期范围变化时获取新数据
   useEffect(() => {

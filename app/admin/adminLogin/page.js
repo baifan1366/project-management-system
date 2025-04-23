@@ -4,12 +4,17 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { supabase } from '@/lib/supabase';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginAdmin, checkAdminSession, clearError } from '@/lib/redux/features/adminSlice';
 import LogoImage from '../../../public/logo.png';
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const params = useParams();
+  const dispatch = useDispatch();
+  
+  // Get admin state from Redux store
+  const { admin, isAuthenticated, loading, error } = useSelector(state => state.admin);
   
   // Get current locale
   const locale = params.locale || 'en';
@@ -18,32 +23,25 @@ export default function AdminLoginPage() {
     email: '',
     password: '',
   });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   // Check if admin is already logged in
   useEffect(() => {
-    const checkAdmin = async () => {
-      // Check for existing session
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (!error && data.session && data.session.user) {
-        // Check if user has admin role
-        const { data: adminData, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', data.session.user.email)
-          .single();
-          
-        if (!adminError && adminData && adminData.is_active) {
+    dispatch(checkAdminSession())
+      .unwrap()
+      .then(adminData => {
+        if (adminData) {
           console.log('Admin already logged in, redirecting to dashboard');
           router.replace(`/admin/adminDashboard`);
         }
-      }
+      });
+  }, [dispatch, locale, router]);
+
+  // Clear error on unmount
+  useEffect(() => {
+    return () => {
+      dispatch(clearError());
     };
-    
-    checkAdmin();
-  }, [locale, router]);
+  }, [dispatch]);
 
   const handleChange = (e) => {
     setFormData({
@@ -54,69 +52,24 @@ export default function AdminLoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-
+    
     try {
-      // Authenticate with Supabase Auth
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      // Dispatch login action
+      const adminData = await dispatch(loginAdmin({
         email: formData.email,
         password: formData.password,
-      });
-
-      if (signInError) throw signInError;
-
-      if (data?.user) {
-        // Check if user is an admin
-        const { data: adminData, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', data.user.email)
-          .single();
-          
-        if (adminError || !adminData) {
-          throw new Error('Unauthorized access. This area is restricted to administrators only.');
-        }
-        
-        if (!adminData.is_active) {
-          throw new Error('Your admin account has been deactivated. Please contact the system administrator.');
-        }
-        
-        // Log admin activity
-        await supabase.from('admin_activity_log').insert({
-          admin_id: adminData.id,
-          action: 'login',
-          entity_type: 'admin',
-          entity_id: adminData.id.toString(),
-          ip_address: '127.0.0.1', // In a real app, you would get the actual IP
-          user_agent: navigator.userAgent
-        });
-        
-        // Update last login time
-        await supabase
-          .from('admin_user')
-          .update({ 
-            last_login: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', adminData.id);
-        
-        // Store admin info in local storage for easy access
-        localStorage.setItem('adminData', JSON.stringify({
-          id: adminData.id,
-          email: adminData.email,
-          role: adminData.role,
-          name: adminData.full_name || adminData.username
-        }));
+      })).unwrap();
+      
+      if (adminData) {
+        // Store admin info in local storage for easy access (optional)
+        localStorage.setItem('adminData', JSON.stringify(adminData));
         
         // Redirect to admin dashboard
-        router.replace(`/${locale}/adminDashboard`);
+        router.replace(`/admin/adminDashboard`);
       }
     } catch (err) {
       console.error('Admin login error:', err);
-      setError(err.message || 'Failed to sign in. Please check your credentials and try again.');
-    } finally {
-      setLoading(false);
+      // Error handling is done in the Redux slice
     }
   };
 
@@ -179,7 +132,7 @@ export default function AdminLoginPage() {
                 </label>
               </div>
 
-              <Link href={`/${locale}/admin/forgot-password`} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+              <Link href={`/admin/forgot-password`} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
                 Forgot password?
               </Link>
             </div>

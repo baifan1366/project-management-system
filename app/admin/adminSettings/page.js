@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState , useEffect} from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +11,46 @@ import ThemeSettings from '@/components/admin/settings/ThemeSettings';
 import LandingPageSettings from '@/components/admin/settings/LandingPageSettings';
 
 export default function AdminSettings() {
+
+  // Verify admin session
+  useEffect(() => {
+    const checkAdminSession = async () => {
+      try {
+        setLoading(true);
+        
+        // Get current session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !sessionData.session) {
+          throw new Error('No active session found');
+        }
+        
+        // Check if user is an admin
+        const { data: admin, error: adminError } = await supabase
+          .from('admin_user')
+          .select('*')
+          .eq('email', sessionData.session.user.email)
+          .eq('is_active', true)
+          .single();
+          
+        if (adminError || !admin) {
+          throw new Error('Unauthorized access');
+        }
+        
+        setAdminData(admin);
+        
+      } catch (error) {
+        console.error('Admin session check failed:', error);
+        // Redirect to admin login
+        router.replace(`/admin/adminLogin`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAdminSession();
+  }, []);
+
   const [activeTab, setActiveTab] = useState('website');
 
   return (

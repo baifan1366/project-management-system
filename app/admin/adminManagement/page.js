@@ -6,31 +6,6 @@ import { supabase } from '@/lib/supabase';
 import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserShield, FaUserCog } from 'react-icons/fa';
 
 export default function AdminUserManagement() {
-  const router = useRouter();
-  const params = useParams();
-  const locale = params.locale || 'en';
-  
-  const [adminData, setAdminData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [admins, setAdmins] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [adminsPerPage] = useState(10);
-  const [selectedAdmin, setSelectedAdmin] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalType, setModalType] = useState('');
-  const [roles, setRoles] = useState([]);
-  const [username, setUsername] = useState('');
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('');
-  const [selectedRole, setSelectedRole] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  
-  const [isPasswordValid, setIsPasswordValid] = useState(false)
-  const [isPasswordMatch, setIsPasswordMatch] = useState(false)
-  const [isEmailValid, setIsEmailValid] = useState(false)
 
   // Verify super admin session and fetch admin data
   useEffect(() => {
@@ -78,8 +53,33 @@ export default function AdminUserManagement() {
     
     checkAdminSession();
   }, []);
+
+  const router = useRouter();
+  const params = useParams();
+  const locale = params.locale || 'en';
   
+  const [adminData, setAdminData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [admins, setAdmins] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [adminsPerPage] = useState(10);
+  const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalType, setModalType] = useState('');
+  const [roles, setRoles] = useState([]);
+  const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('');
+  const [selectedRole, setSelectedRole] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   
+  const [isPasswordValid, setIsPasswordValid] = useState(false)
+  const [isPasswordMatch, setIsPasswordMatch] = useState(false)
+  const [isEmailValid, setIsEmailValid] = useState(false)
+
   // Fetch admin users from database
   const fetchAdminUsers = async () => {
     try {
