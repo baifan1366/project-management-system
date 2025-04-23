@@ -1352,6 +1352,7 @@
       "api_request": "API Request",
       "data_analysis": "Data Analysis"
     }
+  },
   "TeamOverview": {
     "teamDescription": "Team Description",
     "description": "What's the team about?",
