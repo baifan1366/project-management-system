@@ -23,7 +23,8 @@
     "mytasks": "My Tasks",
     "calendar": "Calendar",
     "chat": "Chat",
-    "taskAssistant": "Task Assistant"
+    "taskAssistant": "Task Assistant",
+    "aiWorkFlow": "Ai WorkFlow"
   },
   "common": {
     "save": "Save",
@@ -1306,5 +1307,50 @@
     "delete": "Delete",
     "cancel": "Cancel",
     "save": "Save"
+  },
+  "AI_Workflow": {
+    "title": "AI Workflow",
+    "description": "Create and manage automated AI workflows",
+    "myWorkflows": "My Workflows",
+    "newWorkflow": "New Workflow",
+    "workflowName": "Workflow Name",
+    "workflowDescription": "Workflow Description",
+    "promptTemplate": "Prompt Template",
+    "inputVariables": "Input Variables",
+    "addInput": "Add Input",
+    "variableName": "Variable name",
+    "displayLabel": "Display Label",
+    "type": "Type",
+    "required": "Required",
+    "text": "Text",
+    "textarea": "Text Area",
+    "number": "Number",
+    "save": "Save",
+    "run": "Run",
+    "cancel": "Cancel",
+    "close": "Close",
+    "download": "Download",
+    "workflowSaved": "Workflow saved successfully",
+    "workflowDeleted": "Workflow deleted successfully",
+    "workflowLoaded": "Workflow loaded successfully",
+    "workflowExecuted": "Workflow executed successfully",
+    "deleteConfirm": "Delete Workflow",
+    "deleteConfirmDesc": "Are you sure you want to delete this workflow? This action cannot be undone.",
+    "executeWorkflow": "Execute Workflow",
+    "workflowInputs": "Enter the required inputs for the workflow",
+    "running": "Running...",
+    "workflowResult": "Workflow Result",
+    "executedWith": "Executed with",
+    "variablePlaceholder": "Use {variableSyntax} to include input variables in your prompt",
+    "noWorkflows": "No workflows yet",
+    "createFirstWorkflow": "Create your first workflow to get started",
+    "missingRequiredFields": "Please fill in all required fields",
+    "selectModel": "Select Model",
+    "workflowTypes": {
+      "ppt_generation": "PowerPoint Generation",
+      "document_generation": "Document Generation",
+      "api_request": "API Request",
+      "data_analysis": "Data Analysis"
+    }
   }
 }

@@ -316,6 +316,60 @@ CREATE TABLE "action_log" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create the workflows table
+CREATE TABLE IF NOT EXISTS workflows (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(50) NOT NULL,
+    prompt TEXT NOT NULL,
+    input_schema JSONB NOT NULL DEFAULT '{}',
+    flow_data JSONB,
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    icon VARCHAR(10),
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_workflows_created_by ON workflows (created_by);
+CREATE INDEX IF NOT EXISTS idx_workflows_type ON workflows (type);
+CREATE INDEX IF NOT EXISTS idx_workflows_is_public ON workflows (is_public);
+CREATE INDEX IF NOT EXISTS idx_workflows_is_deleted ON workflows (is_deleted);
+
+-- Create the workflow_executions table to track execution history
+CREATE TABLE IF NOT EXISTS workflow_executions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workflow_id UUID REFERENCES workflows(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    model_id VARCHAR(255),
+    inputs JSONB,
+    result JSONB,
+    status VARCHAR(50) NOT NULL,
+    output_formats TEXT[] DEFAULT '{}'::text[],
+    document_urls JSONB DEFAULT '{}'::jsonb,
+    executed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_workflow_id ON workflow_executions (workflow_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_user_id ON workflow_executions (user_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions (status);
+
+-- Function to check if a user can access a workflow
+CREATE OR REPLACE FUNCTION can_access_workflow(workflow_id UUID, user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM workflows
+        WHERE id = workflow_id 
+        AND (created_by = user_id OR is_public)
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER; 
+
 -- 订阅计划表
 CREATE TABLE "subscription_plan" (
   "id" SERIAL PRIMARY KEY,
