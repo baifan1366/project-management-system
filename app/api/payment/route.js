@@ -23,7 +23,7 @@ export async function POST(request) {
     console.log('Received payment request body:', body);
 
     // 解构参数并验证
-    const { planId, amount, quantity = 1, userId, planName, promoCode, discount } = body;
+    const { planId, amount, quantity = 1, userId, planName, promoCode, discount, payment_method } = body;
 
     // 详细的参数验证
     if (!userId) {
@@ -51,7 +51,8 @@ export async function POST(request) {
         planName: planName || '',
         quantity: quantity.toString(),
         promoCode: promoCode || '',
-        discount: discount ? discount.toString() : '0'
+        discount: discount ? discount.toString() : '0',
+        payment_method: payment_method || 'card'
       }
     });
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { parseInstruction, createProjectAndTasks } from './task-manager-service';
-import { createErrorResponse, createSuccessResponse } from './utils';
+import { parseInstruction, createProjectAndTasks, handleInvitation } from './task-manager-service';
+import { isInvitationInstruction } from './utils';
 
 export async function POST(request) {
   try {
@@ -31,7 +31,32 @@ export async function POST(request) {
       );
     }
     
-    // 调用AI解析指令
+    // 检查是否是邀请指令
+    if (isInvitationInstruction(instruction)) {
+      console.log("检测到邀请指令，直接处理邀请");
+      
+      try {
+        // 使用专门的邀请处理函数
+        const invitationResult = await handleInvitation(instruction, userId, projectId, teamId, sectionId);
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Team invitations processed successfully',
+          invitations: invitationResult.invitations,
+          projectId: invitationResult.projectId,
+          teamId: invitationResult.teamId
+        });
+      } catch (inviteError) {
+        console.error("处理邀请失败:", inviteError);
+        return NextResponse.json(
+          { error: 'Failed to process invitation', message: inviteError.message },
+          { status: 500 }
+        );
+      }
+    }
+    
+    // 如果不是邀请指令，调用AI解析指令
+    console.log("使用AI解析指令");
     const aiResponse = await parseInstruction(instruction);
     
     // 根据是否提供projectId决定操作类型

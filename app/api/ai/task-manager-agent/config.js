@@ -58,7 +58,7 @@ Respond ONLY with the JSON object matching this format:
       "description": "string",
       "due_date": "YYYY-MM-DD", // or null if not specified
       "priority": "MEDIUM", // LOW, MEDIUM, HIGH, URGENT
-      "assignees": [] // array of user IDs or emails
+      "assignees": [] // array of user IDs
     }
   ],
   "recommended_views": [
@@ -70,30 +70,3 @@ Respond ONLY with the JSON object matching this format:
   ]
 }
 `;
-
-// 标签ID映射辅助函数
-export function getDefaultTagIdsForField(fieldId) {
-  // 根据视图类型分配适当的标签ID
-  switch (fieldId) {
-    case 1: // List视图
-      return [1, 2, 3, 4, 6]; // 名称、负责人、截止日期、状态、优先级
-    case 2: // Dashboard视图
-      return [1, 4, 6]; // 名称、状态、优先级
-    case 3: // File视图
-      return [1, 2]; // 名称、负责人
-    case 4: // Gantt视图
-      return [1, 2, 3, 4]; // 名称、负责人、截止日期、状态
-    case 5: // Board视图
-      return [1, 2, 3, 4, 6]; // 名称、负责人、截止日期、状态、优先级
-    case 6: // Calendar视图
-      return [1, 3, 6]; // 名称、截止日期、优先级
-    case 7: // Note视图
-      return [1, 2]; // 名称、负责人
-    case 8: // Timeline视图
-      return [1, 2, 3, 4]; // 名称、负责人、截止日期、状态
-    case 9: // Overview视图
-      return [1, 2, 3, 4, 6]; // 名称、负责人、截止日期、状态、优先级
-    default:
-      return []; // 默认返回空数组
-  }
-} 

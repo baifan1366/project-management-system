@@ -10,6 +10,7 @@ import { Loader2, MessageSquare, CheckCircle2 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
+import { Badge } from "@/components/ui/badge";
 
 export default function TaskManagerAgent({ userId, projectId }) {
   const [instruction, setInstruction] = useState('');
@@ -17,6 +18,44 @@ export default function TaskManagerAgent({ userId, projectId }) {
   const [results, setResults] = useState(null);
   const router = useRouter();
   const t = useTranslations();
+  
+  // Predefined prompt templates
+  const promptTemplates = [
+    {
+      id: 'feature',
+      label: 'Feature Task',
+      template: 'Create a new feature task for [feature name] with priority [high/medium/low] assigned to [username/email]',
+    },
+    {
+      id: 'bug',
+      label: 'Bug Fix',
+      template: 'Create a bug fix task for [describe bug] with priority [high/medium/low] assigned to [username/email]',
+    },
+    {
+      id: 'milestone',
+      label: 'Milestone',
+      template: 'Create a milestone task for [milestone name] due on [date] with subtasks: [task1, task2]',
+    },
+    {
+      id: 'sprint',
+      label: 'Sprint Planning',
+      template: 'Plan a sprint with [number] tasks focused on [feature area] with team members [name1, name2]',
+    },
+    {
+      id: 'assignee',
+      label: 'Assign Multiple Tasks',
+      template: 'Create 3 tasks: [task1], [task2], [task3] and assign them to [username/email]',
+    },
+    {
+      id: 'multipleAssignees',
+      label: 'Different Assignees',
+      template: 'Create a task for [task1] assigned to [name1] and another task for [task2] assigned to [name2]',
+    }
+  ];
+  
+  const applyTemplate = (template) => {
+    setInstruction(template);
+  };
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -128,6 +167,22 @@ export default function TaskManagerAgent({ userId, projectId }) {
         </div>
       </CardHeader>
       <CardContent className="pt-6 max-h-[calc(100vh-220px)] overflow-y-auto">
+        <div className="mb-4">
+          <p className="text-sm mb-2 font-medium">Choose a prompt template:</p>
+          <div className="flex flex-wrap gap-2">
+            {promptTemplates.map((template) => (
+              <Badge 
+                key={template.id}
+                variant="outline" 
+                className="cursor-pointer hover:bg-primary/10"
+                onClick={() => applyTemplate(template.template)}
+              >
+                {template.label}
+              </Badge>
+            ))}
+          </div>
+        </div>
+        
         <form onSubmit={handleSubmit}>
           <div className="grid w-full gap-4">
             <div className="relative">
@@ -202,6 +257,14 @@ export default function TaskManagerAgent({ userId, projectId }) {
           <p className="text-muted-foreground">
             {projectId ? t('pengy.tipDetailsForProject') : t('pengy.tipDetails')}
           </p>
+          <div className="mt-2 text-muted-foreground">
+            <p className="font-medium mb-1">Usage Examples:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Create a new feature task for user authentication with priority high assigned to john@example.com</li>
+              <li>Create a bug fix task for login page crash with priority high assigned to Sarah</li>
+              <li>Create a project for website redesign with 4 tasks: wireframes, design, frontend development, and testing assigned to different team members</li>
+            </ul>
+          </div>
         </div>
       </CardContent>
     </Card>

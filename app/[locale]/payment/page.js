@@ -364,6 +364,59 @@ export default function PaymentPage() {
     return data;
   }
 
+
+  const increasePromoCodeUsage = async (code) => {
+    // First fetch the current promo code data
+    const { data: promoData, error: fetchError } = await supabase
+      .from('promo_code')
+      .select('current_uses')
+      .eq('code', code)
+      .single();
+
+    if(fetchError) {
+      console.error('Error fetching promo code data for update:', fetchError);
+      return;
+    }
+
+    // Now update with the incremented value
+    const { error } = await supabase
+      .from('promo_code')
+      .update({ current_uses: promoData.current_uses + 1 })
+      .eq('code', code);
+
+    if(error) {
+      console.error('Error updating promo code usage:', error);
+    }
+  }
+
+  const decreasePromoCodeUsage = async (code) => {
+    if (!code) return;
+    
+    // First fetch the current promo code data
+    const { data: promoData, error: fetchError } = await supabase
+      .from('promo_code')
+      .select('current_uses')
+      .eq('code', code)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching promo code data for decreasing:', fetchError);
+      return;
+    }
+
+    // Only decrease if the current_uses is greater than 0
+    if (promoData.current_uses > 0) {
+      const { error } = await supabase
+        .from('promo_code')
+        .update({ current_uses: promoData.current_uses - 1 })
+        .eq('code', code);
+
+      if (error) {
+        console.error('Error decreasing promo code usage:', error);
+      }
+    }
+  }
+
   const handleApplyPromoCode = async () => {
     if(promoCode.trim() === ''){
       setPromoMessage('Please enter a promo code');
@@ -395,6 +448,14 @@ export default function PaymentPage() {
         setValidPromo(false);
         return;
       }
+
+      //check if the promo code usage limit is reached
+      if(promoCodeData.current_uses >= promoCodeData.max_uses){
+        setPromoMessage('Promo code usage limit reached');
+        setMessageType('error');
+        setValidPromo(false);
+        return;
+      }
       
       // Apply discount
       if(promoCodeData.discount_type === 'PERCENTAGE') {
@@ -406,9 +467,11 @@ export default function PaymentPage() {
       // Set the applied promo code
       setAppliedPromoCode(promoCode);
       setValidPromo(true);
-      setPromoMessage(`Promo code "${promoCode}" applied successfully!`);
       setMessageType('success');
       setShowPromoInput(false);
+
+      //increment the promo code usage count
+      await increasePromoCodeUsage(promoCode);
     } catch (err) {
       console.error('Error applying promo code:', err);
       setPromoMessage('Failed to apply promo code');
@@ -516,12 +579,21 @@ export default function PaymentPage() {
                         <span className="text-green-400">Applied Code: {appliedPromoCode}</span>
                       </div>
                       <button 
-                        onClick={() => {
+                        onClick={async () => {
+                          // Keep track of the code being removed
+                          const codeToRemove = appliedPromoCode;
+                          
+                          // Reset the UI state first
                           setValidPromo(false);
                           setDiscount(0);
                           setAppliedPromoCode('');
                           setPromoCode('');
                           setShowPromoInput(true);
+                          
+                          // Then decrease the usage count
+                          if (codeToRemove) {
+                            await decreasePromoCodeUsage(codeToRemove);
+                          }
                         }}
                         className="text-gray-400 text-sm hover:text-white"
                       >
