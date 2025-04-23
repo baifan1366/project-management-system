@@ -143,12 +143,12 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
   };
 
   return (
-    <Tabs value={activeTab} onValueChange={handleTabChange}>
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full shadow-sm rounded-md bg-background">
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="tabs" direction="horizontal">
           {(provided) => (
             <TabsList 
-              className="border-b-0 w-full" 
+              className="border-b-0 w-full flex-wrap overflow-x-auto min-h-10 max-h-16 p-1 gap-1 items-center" 
               ref={provided.innerRef}
               {...provided.droppableProps}
             >
@@ -163,7 +163,7 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
                         value={`${field.id}`}
-                        className="flex items-center gap-1 hover:text-accent-foreground"
+                        className="flex items-center gap-1 hover:text-accent-foreground whitespace-nowrap h-8 px-3"
                         title={fieldValue?.value || field.custom_field?.default_value || ''}
                       >
                         {(() => {
@@ -185,7 +185,7 @@ export default function TaskTab({ onViewChange, teamId, projectId }) {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="ml-1 hover:bg-accent hover:text-accent-foreground"
+                className="ml-1 flex-shrink-0 hover:bg-accent hover:text-accent-foreground h-8 w-8"
                 onClick={() => setIsDialogOpen(true)}
               >
                 <Icons.Plus className="h-4 w-4" />

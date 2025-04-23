@@ -17,6 +17,7 @@ import TaskGantt from '@/components/team/gantt/TaskGantt';
 import TaskKanban from '@/components/team/kanban/TaskKanban';
 import TaskFile from '@/components/team/file/TaskFile';
 import TaskWorkflow from '@/components/team/workflow/TaskWorkflow';
+import TaskOverview from '@/components/team/overview/TaskOverview';
 import { store } from '@/lib/redux/store';
 
 // 创建记忆化的选择器
@@ -159,6 +160,9 @@ export default function TeamCustomFieldPage() {
     if (fieldType === 'WORKFLOW') {
       return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
     }
+    if (fieldType === 'OVERVIEW') {
+      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
     
     return <div>暂不支持的字段类型: {fieldType}</div>;
   }, [currentItem]);
@@ -275,7 +279,17 @@ export default function TeamCustomFieldPage() {
               </Button>
             </div>
           </div>
-          <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
+          <div className="overflow-x-auto" style={{ 
+            scrollbarWidth: 'none', 
+            msOverflowStyle: 'none' 
+          }}>
+            <style jsx>{`
+              div::-webkit-scrollbar {
+                display: none;
+              }
+            `}</style>
+            <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
+          </div>
         </div>
         <div className="w-full p-0">
           <div className="w-full border-b py-2 flex items-center justify-between">
@@ -337,7 +351,7 @@ export default function TeamCustomFieldPage() {
             </div>
           </div>
         </div>
-        <div className="overflow-y-auto flex-grow h-0 mb-2" data-rbd-scroll-container-style="true">
+        <div className="overflow-y-auto flex-grow h-0 mb-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0" data-rbd-scroll-container-style="true">
           {customFieldContent}
         </div>
       </div>
