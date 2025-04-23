@@ -52,6 +52,45 @@ export default function AdminSubscriptions() {
   const [totalPages, setTotalPages] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  // Verify admin session
+  useEffect(() => {
+    const checkAdminSession = async () => {
+      try {
+        setLoading(true);
+        
+        // Get current session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !sessionData.session) {
+          throw new Error('No active session found');
+        }
+        
+        // Check if user is an admin
+        const { data: admin, error: adminError } = await supabase
+          .from('admin_user')
+          .select('*')
+          .eq('email', sessionData.session.user.email)
+          .eq('is_active', true)
+          .single();
+          
+        if (adminError || !admin) {
+          throw new Error('Unauthorized access');
+        }
+        
+        setAdminData(admin);
+        
+      } catch (error) {
+        console.error('Admin session check failed:', error);
+        // Redirect to admin login
+        router.replace(`/admin/adminLogin`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAdminSession();
+  }, []);
+
   const fetchSubscriptionPlans = async () => {
     try {
       const { data, error } = await supabase
@@ -118,45 +157,6 @@ export default function AdminSubscriptions() {
     fetchPromoCodes();  
   }, []);
   
-  // Verify admin session
-  useEffect(() => {
-    const checkAdminSession = async () => {
-      try {
-        setLoading(true);
-        
-        // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
-          throw new Error('No active session found');
-        }
-        
-        // Check if user is an admin
-        const { data: admin, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', sessionData.session.user.email)
-          .eq('is_active', true)
-          .single();
-          
-        if (adminError || !admin) {
-          throw new Error('Unauthorized access');
-        }
-        
-        setAdminData(admin);
-        
-      } catch (error) {
-        console.error('Admin session check failed:', error);
-        // Redirect to admin login
-        router.replace(`/admin/adminLogin`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    checkAdminSession();
-  }, []);
-
   // Open modal
   const openModal = ({type, plan = null, code = null}) => {
     setModalType(type);
