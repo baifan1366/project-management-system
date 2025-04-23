@@ -52,6 +52,50 @@ export function safeParseJSON(jsonString) {
   }
 }
 
+
+// 标签ID映射辅助函数
+export function getDefaultTagIdsForField(fieldId) {
+  // 根据视图类型分配适当的标签ID
+  switch (fieldId) {
+    case 1: // List视图
+      return [1, 2, 3, 4, 6]; // 名称、负责人、截止日期、状态、优先级
+    case 2: // Dashboard视图
+      return [1, 4, 6]; // 名称、状态、优先级
+    case 3: // File视图
+      return [1, 2]; // 名称、负责人
+    case 4: // Gantt视图
+      return [1, 2, 3, 4]; // 名称、负责人、截止日期、状态
+    case 5: // Board视图
+      return [1, 2, 3, 4, 6]; // 名称、负责人、截止日期、状态、优先级
+    case 6: // Calendar视图
+      return [1, 3, 6]; // 名称、截止日期、优先级
+    case 7: // Note视图
+      return [1, 2]; // 名称、负责人
+    case 8: // Timeline视图
+      return [1, 2, 3, 4]; // 名称、负责人、截止日期、状态
+    case 9: // Overview视图
+      return [1, 2, 3, 4, 6]; // 名称、负责人、截止日期、状态、优先级
+    default:
+      return []; // 默认返回空数组
+  }
+} 
+
+// 检查是否是邀请指令
+export function isInvitationInstruction(instruction) {
+  const lowerInstruction = instruction.toLowerCase();
+  const inviteTerms = ['invite', 'add user', 'add member', 'join team'];
+  
+  // 检查是否包含邀请相关术语
+  const containsInviteTerm = inviteTerms.some(term => lowerInstruction.includes(term));
+  
+  // 检查是否包含邮箱
+  const containsEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g.test(lowerInstruction);
+  
+  const result = containsInviteTerm && containsEmail;
+  console.log(`Checking if instruction is invitation: ${result}`);
+  return result;
+} 
+
 // 创建错误响应
 export function createErrorResponse(status, errorType, message) {
   return new Response(

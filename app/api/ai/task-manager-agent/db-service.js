@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { getDefaultTagIdsForField } from './config';
+import { getDefaultTagIdsForField } from './utils';
 
 // 创建项目
 export async function createProject(projectData, userId) {
@@ -244,6 +244,18 @@ export async function addUserToTeam(userId, teamId) {
 export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invitedBy) {
   console.log(`正在邀请成员 ${email} 加入团队 ${teamId}，角色: ${role}...`);
   
+  // 首先获取团队信息
+  const { data: teamData, error: teamError } = await supabase
+    .from('team')
+    .select('name, project_id')
+    .eq('id', teamId)
+    .single();
+    
+  if (teamError) {
+    console.error("获取团队信息失败:", teamError);
+    throw new Error(`Failed to get team info: ${teamError.message}`);
+  }
+  
   // 首先检查用户是否已存在
   const { data: existingUsers, error: userQueryError } = await supabase
     .from('user')
@@ -275,13 +287,23 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
     }
     
     console.log(`成功将用户 ${email} 添加到团队`);
+    
+    // 给用户发送通知
+    await createTeamNotification(
+      userId, 
+      'TEAM_INVITATION',
+      `Added to team: ${teamData.name}`,
+      `You have been added to the team "${teamData.name}"`,
+      teamId,
+      'team'
+    );
   } else {
     // 如果用户不存在，创建邀请记录
     const { error: inviteError } = await supabase
       .from('user_team_invitation')
       .insert([{
-        team_id: teamId,
         user_email: email,
+        team_id: teamId,
         role: role.toUpperCase(),
         created_by: invitedBy
       }]);
@@ -291,7 +313,101 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
       throw new Error(`Failed to create team invitation: ${inviteError.message}`);
     }
     
-    console.log(`已为 ${email} 创建团队邀请`);
+    console.log(`已为 ${email} 创建团队邀请记录`);
+    
+    // 发送邀请邮件
+    try {
+      console.log("正在发送邀请邮件...");
+      const invitationDetails = {
+        teamId: teamId,
+        teamName: teamData.name,
+        permission: role.toUpperCase(),
+        projectId: teamData.project_id
+      };
+      
+      // 调用邮件发送API
+      const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/send-team-invitation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: email,
+          subject: `You're invited to join ${teamData.name} on Team Sync`,
+          invitationDetails: invitationDetails
+        }),
+      });
+      
+      if (!emailResponse.ok) {
+        const errorData = await emailResponse.json();
+        throw new Error(errorData.error || "Failed to send invitation email");
+      }
+      
+      console.log(`邀请邮件发送成功 to ${email}`);
+    } catch (emailError) {
+      console.error("发送邀请邮件失败:", emailError);
+      // 即使邮件发送失败，我们仍然保留邀请记录，但记录错误
+      // 这里不抛出异常，避免中断流程
+    }
+  }
+  
+  // 通知邀请者
+  if (invitedBy) {
+    await createTeamNotification(
+      invitedBy,
+      'SYSTEM',
+      `Invitation sent to ${email}`,
+      `You invited ${email} to join the team "${teamData.name}"`,
+      teamId,
+      'team'
+    );
+  }
+  
+  return { success: true, email, teamId, role };
+}
+
+// 创建团队相关通知
+async function createTeamNotification(
+  userId,
+  type,
+  title,
+  content,
+  relatedEntityId,
+  relatedEntityType = 'team'
+) {
+  try {
+    console.log(`为用户 ${userId} 创建通知: ${title}`);
+    
+    const notificationData = {
+      user_id: userId,
+      title: title,
+      content: content,
+      type: type,
+      related_entity_id: relatedEntityId ? relatedEntityId.toString() : null,
+      related_entity_type: relatedEntityType,
+      is_read: false
+    };
+    
+    // 调用通知API
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(notificationData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Failed to create notification: ${errorData.error || response.statusText}`);
+    }
+    
+    console.log('通知创建成功');
+    return true;
+  } catch (error) {
+    console.error('创建通知失败:', error);
+    // 不抛出异常，继续处理后续逻辑
+    return false;
   }
 }
 
@@ -316,17 +432,82 @@ export async function createSection(teamId, userId) {
   return sectionData[0];
 }
 
+// 查找用户ID通过名称或邮箱
+export async function getUserIdByNameOrEmail(nameOrEmail) {
+  console.log(`正在查找用户: ${nameOrEmail}`);
+  
+  if (!nameOrEmail) {
+    return null;
+  }
+  
+  // 先尝试按邮箱匹配
+  if (nameOrEmail.includes('@')) {
+    const { data: userData, error: userError } = await supabase
+      .from('user')
+      .select('id')
+      .eq('email', nameOrEmail.trim().toLowerCase())
+      .limit(1);
+      
+    if (userError) {
+      console.error("查询用户失败:", userError);
+      return null;
+    }
+    
+    if (userData && userData.length > 0) {
+      console.log(`找到用户邮箱匹配: ${nameOrEmail}, ID: ${userData[0].id}`);
+      return userData[0].id;
+    }
+  }
+  
+  // 然后尝试按名称匹配
+  const { data: userData, error: userError } = await supabase
+    .from('user')
+    .select('id')
+    .ilike('name', `%${nameOrEmail.trim()}%`)
+    .limit(1);
+    
+  if (userError) {
+    console.error("查询用户失败:", userError);
+    return null;
+  }
+  
+  if (userData && userData.length > 0) {
+    console.log(`找到用户名称匹配: ${nameOrEmail}, ID: ${userData[0].id}`);
+    return userData[0].id;
+  }
+  
+  console.log(`未找到用户: ${nameOrEmail}`);
+  return null;
+}
+
 // 创建任务
 export async function createTask(taskInfo, userId) {
   console.log("正在创建任务:", taskInfo.title);
   
+  // 处理指派给用户的逻辑
+  let assigneeId = null;
+  
+  // 检查任务信息中是否有指定的assignees
+  if (taskInfo.assignees && taskInfo.assignees.length > 0) {
+    // 从AI响应中获取第一个指定的用户名或邮箱
+    const assigneeName = taskInfo.assignees[0];
+    assigneeId = await getUserIdByNameOrEmail(assigneeName);
+    
+    if (assigneeId) {
+      console.log(`任务将分配给用户: ${assigneeName} (ID: ${assigneeId})`);
+    } else {
+      console.log(`未找到用户 ${assigneeName}, 任务将不分配`);
+    }
+  }
+  
   // 构建标准化的tag_values对象
   const tagValues = {
-    title: taskInfo.title,
-    description: taskInfo.description || '',
-    due_date: taskInfo.due_date || null,
-    priority: taskInfo.priority || 'MEDIUM',
-    status: 'TODO'
+    1: taskInfo.title,
+    1: taskInfo.description || '',
+    3: taskInfo.due_date || null,
+    4: taskInfo.priority || 'MEDIUM',
+    12: 'TODO',
+    2: assigneeId || ''
   };
   
   // 调试输出

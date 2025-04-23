@@ -11,7 +11,7 @@ export async function parseInstruction(instruction) {
     //model: "qwen/qwen2.5-vl-32b-instruct:free",
     //model: "qwen/qwq-32b:free",
     //model: "deepseek/deepseek-chat-v3-0324:free",
-    //model="deepseek/deepseek-r1:free",
+    //model: "deepseek/deepseek-r1:free",
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: instruction }
@@ -20,7 +20,7 @@ export async function parseInstruction(instruction) {
     max_tokens: 1500,
     response_format: { type: "json_object" },
     // 添加明确指示，确保响应是纯JSON
-    user: "IMPORTANT: Respond with valid JSON only. Do not add any text before or after the JSON object."
+    //user: "IMPORTANT: Respond with valid JSON only. Do not add any text before or after the JSON object."
   });
   
   // 提取并安全解析AI的响应
@@ -119,8 +119,12 @@ export async function createProjectAndTasks(
     
     // 处理任务
     if (aiResponse.tasks && aiResponse.tasks.length > 0) {
+      console.log(`正在处理 ${aiResponse.tasks.length} 个任务`);
+      
       for (const taskInfo of aiResponse.tasks) {
-        // 创建任务
+        console.log(`处理任务: ${JSON.stringify(taskInfo)}`);
+        
+        // 常规任务处理流程
         const taskData = await dbService.createTask(taskInfo, userId);
         const taskId = taskData.id;
         
@@ -202,8 +206,12 @@ export async function createProjectAndTasks(
     
     // 处理任务
     if (aiResponse.tasks && aiResponse.tasks.length > 0) {
+      console.log(`正在处理 ${aiResponse.tasks.length} 个任务`);
+      
       for (const taskInfo of aiResponse.tasks) {
-        // 创建任务
+        console.log(`处理任务: ${JSON.stringify(taskInfo)}`);
+        
+        // 常规任务处理流程
         const taskData = await dbService.createTask(taskInfo, userId);
         const taskId = taskData.id;
         
@@ -218,5 +226,71 @@ export async function createProjectAndTasks(
   return {
     projectId,
     tasks: tasksResults
+  };
+}
+
+// 直接处理邀请指令
+export async function handleInvitation(instruction, userId, projectId, teamId, sectionId) {
+  console.log("直接处理邀请指令");
+  
+  // 提取邮箱
+  const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  const emails = instruction.match(emailPattern);
+  
+  if (!emails || emails.length === 0) {
+    console.log("邀请指令中未找到邮箱");
+    throw new Error("No email addresses found in invitation instruction");
+  }
+  
+  console.log(`找到以下邮箱: ${emails.join(', ')}`);
+  
+  // 获取或查询团队ID
+  let targetTeamId = teamId;
+  if (!targetTeamId && projectId) {
+    console.log("未提供团队ID，尝试查询项目关联的团队");
+    const { data: teamData, error: teamError } = await supabase
+      .from('team')
+      .select('id')
+      .eq('project_id', projectId);
+      
+    if (teamError) {
+      console.error("获取团队失败:", teamError);
+      throw new Error(`Failed to get team: ${teamError.message}`);
+    }
+    
+    if (!teamData || teamData.length === 0) {
+      console.error("项目没有关联的团队");
+      throw new Error("Project has no associated teams");
+    }
+    
+    // 使用第一个团队
+    targetTeamId = teamData[0].id;
+    console.log(`找到 ${teamData.length} 个团队，使用第一个团队 ID: ${targetTeamId}`);
+  }
+  
+  if (!targetTeamId) {
+    console.error("无法确定要邀请加入的团队");
+    throw new Error("No team specified for invitation");
+  }
+  
+  // 处理每个邮箱的邀请
+  const results = [];
+  
+  for (const email of emails) {
+    try {
+      console.log(`正在邀请 ${email} 加入团队 ${targetTeamId}`);
+      const inviteResult = await dbService.inviteTeamMember(targetTeamId, email, 'CAN_VIEW', userId);
+      results.push({ email, success: true });
+    } catch (error) {
+      console.error(`邀请 ${email} 失败:`, error);
+      results.push({ email, success: false, error: error.message });
+    }
+  }
+  
+  return {
+    success: results.some(r => r.success),
+    invitations: results,
+    projectId,
+    teamId: targetTeamId
   };
 } 
