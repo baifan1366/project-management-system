@@ -35,10 +35,14 @@ const customStyles = `
 
 /* Editor placeholder */
 .ProseMirror p.is-editor-empty:first-child::before {
-  color: var(--muted-foreground);
+  color: #000000;
   height: 0;
   pointer-events: none;
   content: attr(data-placeholder);
+}
+
+.dark .ProseMirror p.is-editor-empty:first-child::before {
+  color: #ffffff;
 }
 
 /* Paragraph styles */
@@ -153,7 +157,7 @@ const customStyles = `
 
 // 添加一个变量来处理CSS的编译问题
 const cssVariables = {
-  primary: 'hsl(215.4 16.3% 46.9%)',
+  primary: '#000000',
   mutedForeground: 'hsl(215.4 16.3% 56.9%)',
   border: 'hsl(214.3 31.8% 91.4%)',
   background: 'hsl(0 0% 100%)',
@@ -226,7 +230,7 @@ const RichEditor = ({
     },
     editorProps: {
       attributes: {
-        class: 'focus:outline-none px-3 py-2 prose max-w-none bg-background',
+        class: 'focus:outline-none px-3 prose max-w-none bg-background',
         style: `min-height: ${minHeight};`,
       },
     },
