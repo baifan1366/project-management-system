@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/lib/supabase';
 
 // 任务看板视图组件
 export default function MyTasksPage() {
@@ -35,123 +36,182 @@ export default function MyTasksPage() {
   const [selectedType, setSelectedType] = useState('upcoming');
   const [selectedAssignee, setSelectedAssignee] = useState('me');
   const [selectedWorkspace, setSelectedWorkspace] = useState('workspace');
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  // 获取当前用户
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('获取当前用户会话失败:', error);
+          return;
+        }
+        
+        if (session && session.user) {
+          setCurrentUserId(session.user.id);
+        }
+      } catch (error) {
+        console.error('获取用户信息时出错:', error);
+      }
+    };
+    
+    fetchCurrentUser();
+  }, []);
 
   // 获取所有任务
   useEffect(() => {
-    // 使用'current'标识符让API获取当前用户的任务
-    dispatch(fetchTasksByUserId('current'));
-  }, [dispatch]);
+    if (currentUserId) {
+      // 使用实际的用户ID而不是'current'标识符
+      dispatch(fetchTasksByUserId(currentUserId));
+    }
+  }, [dispatch, currentUserId]);
+
+  // 在前端过滤出分配给当前用户的任务
+  useEffect(() => {
+    if (tasks && tasks.length > 0 && currentUserId) {
+      // 找出分配给当前用户的任务
+      const userTasks = tasks.filter(task => 
+        // 用户创建的任务或分配给用户的任务
+        task.created_by === currentUserId || 
+        (task.tag_values && task.tag_values.assignee_id === currentUserId)
+      );
+      
+      setFilteredTasks(userTasks);
+    }
+  }, [tasks, currentUserId]);
 
   // 任务数据处理和分列
   useEffect(() => {
-    if (tasks && tasks.length > 0) {
-      const filteredBySearch = searchQuery 
-        ? tasks.filter(task => 
-            task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    if (filteredTasks && filteredTasks.length > 0) {
+      // 应用搜索过滤
+      const tasksAfterSearch = searchQuery 
+        ? filteredTasks.filter(task => 
+            task.tag_values && 
+            Object.values(task.tag_values).some(value => 
+              value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())
+            )
           )
-        : tasks;
-      
-      setFilteredTasks(filteredBySearch);
+        : filteredTasks;
       
       // 根据状态将任务分组到不同列
       const newColumns = {
         unassigned: {
           id: 'unassigned',
           title: t_tasks('assignedTo.unassigned'),
-          tasks: filteredBySearch.filter(task => !task.assignee_id)
+          tasks: tasksAfterSearch.filter(task => !task.tag_values?.assignee_id)
         },
         todo: {
           id: 'todo',
           title: t_tasks('status.todo'),
-          tasks: filteredBySearch.filter(task => task.status === 'TODO' && task.assignee_id)
+          tasks: tasksAfterSearch.filter(task => task.tag_values?.status === 'TODO' && task.tag_values?.assignee_id)
         },
         in_progress: {
           id: 'in_progress',
           title: t_tasks('status.in_progress'),
-          tasks: filteredBySearch.filter(task => task.status === 'IN_PROGRESS' && task.assignee_id)
+          tasks: tasksAfterSearch.filter(task => task.tag_values?.status === 'IN_PROGRESS' && task.tag_values?.assignee_id)
         },
         in_review: {
           id: 'in_review',
           title: t_tasks('status.in_review'),
-          tasks: filteredBySearch.filter(task => task.status === 'IN_REVIEW' && task.assignee_id)
+          tasks: tasksAfterSearch.filter(task => task.tag_values?.status === 'IN_REVIEW' && task.tag_values?.assignee_id)
         },
         done: {
           id: 'done',
           title: t_tasks('status.done'),
-          tasks: filteredBySearch.filter(task => task.status === 'DONE' && task.assignee_id)
+          tasks: tasksAfterSearch.filter(task => task.tag_values?.status === 'DONE' && task.tag_values?.assignee_id)
         }
       };
       
       setColumns(newColumns);
     }
-  }, [tasks, searchQuery, t_tasks]);
+  }, [filteredTasks, searchQuery, t_tasks]);
 
   // 处理拖放结束事件
   const onDragEnd = (result) => {
-    const { destination, source, draggableId } = result;
+    try {
+      const { destination, source, draggableId } = result;
 
-    // 如果没有放到有效目的地，不做任何操作
-    if (!destination) return;
+      // 如果没有放到有效目的地，不做任何操作
+      if (!destination) return;
 
-    // 如果放回原处，不做任何操作
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) return;
+      // 如果放回原处，不做任何操作
+      if (
+        destination.droppableId === source.droppableId &&
+        destination.index === source.index
+      ) return;
 
-    // 获取源列和目标列
-    const sourceColumn = columns[source.droppableId];
-    const destColumn = columns[destination.droppableId];
+      // 获取源列和目标列
+      const sourceColumn = columns[source.droppableId];
+      const destColumn = columns[destination.droppableId];
 
-    // 找到被拖拽的任务
-    const task = sourceColumn.tasks.find(task => String(task.id) === draggableId);
-    
-    if (!task) return;
+      // 找到被拖拽的任务
+      const task = sourceColumn.tasks.find(task => String(task.id) === draggableId);
+      
+      if (!task) return;
 
-    // 从源列中移除任务
-    const sourceTasks = [...sourceColumn.tasks];
-    sourceTasks.splice(source.index, 1);
+      // 从源列中移除任务
+      const sourceTasks = [...sourceColumn.tasks];
+      sourceTasks.splice(source.index, 1);
 
-    let destTasks = [];
+      let destTasks = [];
 
-    if (source.droppableId === destination.droppableId) {
-      // 在同一列中移动
-      destTasks = sourceTasks;
-      destTasks.splice(destination.index, 0, task);
-    } else {
-      // 跨列移动
-      destTasks = [...destColumn.tasks];
-      destTasks.splice(destination.index, 0, task);
+      if (source.droppableId === destination.droppableId) {
+        // 在同一列中移动
+        destTasks = sourceTasks;
+        destTasks.splice(destination.index, 0, task);
+      } else {
+        // 跨列移动
+        destTasks = [...destColumn.tasks];
+        destTasks.splice(destination.index, 0, task);
 
-      // 更新任务状态
-      const newStatus = getStatusFromColumnId(destination.droppableId);
-      if (newStatus && task.status !== newStatus) {
-        // 更新Redux中的任务状态
-        dispatch(updateTask({
-          taskId: task.id,
-          taskData: { status: newStatus }
-        }));
+        // 更新任务状态
+        const newStatus = getStatusFromColumnId(destination.droppableId);
+        if (newStatus && task.tag_values?.status !== newStatus) {
+          // 获取当前任务的tag_values或创建一个新的对象
+          const currentTagValues = task.tag_values || {};
+          const section_id = currentTagValues.section_id;
+          
+          if (!section_id) {
+            console.error('无法更新任务状态：缺少section_id', task);
+            return;
+          }
+          
+          // 创建一个新的tag_values对象，更新status
+          const newTagValues = {
+            ...currentTagValues,
+            status: newStatus
+          };
+          
+          // 更新Redux中的任务状态
+          dispatch(updateTask({
+            sectionId: section_id,
+            taskId: task.id,
+            taskData: { tag_values: newTagValues }
+          }));
+        }
+
+        // 处理任务分配状态的变化
+        if (source.droppableId === 'unassigned' || destination.droppableId === 'unassigned') {
+          handleTaskAssignment(task.id, destination.droppableId);
+        }
       }
 
-      // 处理任务分配状态的变化
-      if (source.droppableId === 'unassigned' || destination.droppableId === 'unassigned') {
-        handleTaskAssignment(task.id, destination.droppableId);
-      }
+      // 更新列状态
+      setColumns({
+        ...columns,
+        [source.droppableId]: {
+          ...sourceColumn,
+          tasks: sourceTasks
+        },
+        [destination.droppableId]: {
+          ...destColumn,
+          tasks: destTasks
+        }
+      });
+    } catch (error) {
+      console.error('拖放操作出错:', error);
     }
-
-    // 更新列状态
-    setColumns({
-      ...columns,
-      [source.droppableId]: {
-        ...sourceColumn,
-        tasks: sourceTasks
-      },
-      [destination.droppableId]: {
-        ...destColumn,
-        tasks: destTasks
-      }
-    });
   };
 
   // 从列ID获取对应的任务状态
@@ -168,19 +228,53 @@ export default function MyTasksPage() {
 
   // 更新任务分配状态
   const handleTaskAssignment = (taskId, destinationColumnId) => {
+    const allTasks = tasks; // 使用来自Redux的任务数组
+    const task = allTasks.find(t => t.id === taskId);
+    
+    if (!task) {
+      console.error('无法更新任务分配：找不到任务', taskId);
+      return;
+    }
+    
+    // 获取当前任务的tag_values或创建一个新的对象
+    const currentTagValues = task.tag_values || {};
+    const section_id = currentTagValues.section_id;
+    
+    if (!section_id) {
+      console.error('无法更新任务分配：缺少section_id', taskId);
+      return;
+    }
+    
     // 如果拖动到未分配列，则移除任务的assignee_id
     if (destinationColumnId === 'unassigned') {
+      // 创建一个新的tag_values对象，移除assignee_id
+      const newTagValues = { ...currentTagValues };
+      delete newTagValues.assignee_id;
+      
       dispatch(updateTask({
+        sectionId: section_id,
         taskId: taskId,
-        taskData: { assignee_id: null }
+        taskData: { tag_values: newTagValues }
       }));
     } 
     // 如果从未分配列拖到其他列，则分配给当前用户
     else {
-      // 使用'current'标识符，API会使用当前登录用户的ID
+      // 使用实际的用户ID而不是'current'标识符
+      if (!currentUserId) {
+        console.error('无法分配任务：找不到当前用户ID');
+        return;
+      }
+      
+      // 创建一个新的tag_values对象，添加或更新assignee_id
+      const newTagValues = { 
+        ...currentTagValues,
+        assignee_id: currentUserId
+      };
+      
       dispatch(updateTask({
+        sectionId: section_id,
         taskId: taskId,
-        taskData: { assignee_id: 'current' }
+        taskData: { tag_values: newTagValues }
       }));
     }
   };
@@ -249,7 +343,7 @@ export default function MyTasksPage() {
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">加载任务时出错</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <Button onClick={() => dispatch(fetchTasksByUserId('current'))}>重试</Button>
+          <Button onClick={() => dispatch(fetchTasksByUserId(currentUserId))}>重试</Button>
         </div>
       </div>
     );
@@ -352,30 +446,30 @@ export default function MyTasksPage() {
                                 >
                                   <div className="mb-2 flex justify-between">
                                     <h3 className="font-medium text-sm">
-                                      {task.title}
+                                      {task.tag_values?.title || t_tasks('noTitle')}
                                     </h3>
-                                    <Badge variant={getPriorityVariant(task.priority)}>
-                                      {task.priority.toLowerCase()}
+                                    <Badge variant={getPriorityVariant(task.tag_values?.priority)}>
+                                      {task.tag_values?.priority?.toLowerCase() || 'low'}
                                     </Badge>
                                   </div>
-                                  {task.description && (
+                                  {task.tag_values?.description && (
                                     <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                                      {task.description}
+                                      {task.tag_values.description}
                                     </p>
                                   )}
                                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                                     <div className="flex items-center gap-2">
-                                      {task.project_id && (
+                                      {task.tag_values?.project_id && (
                                         <div className="text-xs">
-                                          #{task.project_id}
+                                          #{task.tag_values.project_id}
                                         </div>
                                       )}
                                     </div>
                                     <div className="flex items-center gap-3">
-                                      {task.due_date && (
+                                      {task.tag_values?.due_date && (
                                         <div className="flex items-center gap-1">
                                           <Calendar className="w-3 h-3" />
-                                          <span>{format(new Date(task.due_date), 'yyyy-MM-dd')}</span>
+                                          <span>{format(new Date(task.tag_values.due_date), 'yyyy-MM-dd')}</span>
                                         </div>
                                       )}
                                     </div>

@@ -5,9 +5,19 @@ export default {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/admin/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
   	extend: {
+  		keyframes: {
+  			"ping-once": {
+  				"0%": { transform: "scale(0.5)", opacity: "1" },
+  				"100%": { transform: "scale(2)", opacity: "0" },
+  			},
+  		},
+  		animation: {
+  			"ping-once": "ping-once 0.5s ease-in-out forwards",
+  		},
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
@@ -57,7 +67,8 @@ export default {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate"), 
-	// require('@tailwindcss/typography')
-],
+  plugins: [
+    require("tailwindcss-animate"), 
+    // require('@tailwindcss/typography')
+  ],
 };

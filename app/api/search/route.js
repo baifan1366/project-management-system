@@ -116,7 +116,7 @@ async function searchTasks(query) {
         *,
         project:project_id (project_name)
       `)
-      .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+      .or(`tag_values::text.ilike.%${query}%`)
       .order('updated_at', { ascending: false })
       .limit(10);
     

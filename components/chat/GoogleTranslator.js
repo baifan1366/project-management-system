@@ -1,21 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useImperativeHandle, forwardRef } from 'react';
 import { Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
 
 /**
  * GoogleTranslator 组件
  * 包装消息内容，并在右下角显示翻译按钮
  * 当用户点击翻译按钮时，调用Google Translate API翻译内容
  */
-export default function GoogleTranslator({ 
+const GoogleTranslator = forwardRef(({ 
   children, 
   content,
   targetLang = 'en', // 默认翻译目标语言为英文
   className,
-  buttonClassName
-}) {
+  buttonClassName,
+  showButton = true // 添加显示按钮属性，默认为true
+}, ref) => {
+  const t = useTranslations('Chat');
   const [translatedText, setTranslatedText] = useState(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState(null);
@@ -58,24 +61,32 @@ export default function GoogleTranslator({
     }
   };
 
+  // 暴露translateText方法给父组件
+  useImperativeHandle(ref, () => ({
+    translateText,
+    isTranslated: translatedText !== null
+  }));
+
   return (
     <div className={cn("relative w-full", className)}>
       {/* 显示原始内容或翻译后的内容 */}
       {translatedText !== null ? translatedText : children}
       
-      {/* 翻译按钮 - 修改样式与回复按钮保持一致 */}
-      <button
-        onClick={translateText}
-        disabled={isTranslating}
-        className={cn(
-          "absolute right-5 p-1 rounded hover:bg-background/60 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity",
-          isTranslating && "cursor-wait",
-          buttonClassName
-        )}
-        title={translatedText ? "see original" : "translate"}
-      >
-        <Languages size={16} />
-      </button>
+      {/* 翻译按钮 - 根据showButton属性决定是否显示 */}
+      {showButton && (
+        <button
+          onClick={translateText}
+          disabled={isTranslating}
+          className={cn(
+            "absolute right-5 p-1 rounded hover:bg-background/60 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity",
+            isTranslating && "cursor-wait",
+            buttonClassName
+          )}
+          title={translatedText ? t('seeOriginal') : t('translate')}
+        >
+          <Languages size={16} />
+        </button>
+      )}
       
       {/* 错误提示 */}
       {error && (
@@ -85,4 +96,8 @@ export default function GoogleTranslator({
       )}
     </div>
   );
-} 
+});
+
+GoogleTranslator.displayName = 'GoogleTranslator';
+
+export default GoogleTranslator; 

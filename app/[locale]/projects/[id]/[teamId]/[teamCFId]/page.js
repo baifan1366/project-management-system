@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
-import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users } from "lucide-react"
+import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users, Check, TextQuote, CircleCheck, FileUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useEffect, useState, useMemo } from 'react';
@@ -12,7 +12,12 @@ import { createSelector } from '@reduxjs/toolkit';
 import TaskTab from "@/components/team/TaskTab"
 import InvitationDialog from '@/components/team/InvitationDialog';
 import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
-import TaskList from '@/components/team/TaskList';
+import TaskList from '@/components/team/list/TaskList';
+import TaskGantt from '@/components/team/gantt/TaskGantt';
+import TaskKanban from '@/components/team/kanban/TaskKanban';
+import TaskFile from '@/components/team/file/TaskFile';
+import TaskWorkflow from '@/components/team/workflow/TaskWorkflow';
+import TaskOverview from '@/components/team/overview/TaskOverview';
 import { store } from '@/lib/redux/store';
 
 // 创建记忆化的选择器
@@ -46,6 +51,7 @@ export default function TeamCustomFieldPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentView, setCurrentView] = useState('list');
   const [open, setOpen] = useState(false);
+  const [addButtonText, setAddButtonText] = useState('addTask');
 
   useEffect(() => {
     let unsubscribe = null;
@@ -142,6 +148,21 @@ export default function TeamCustomFieldPage() {
     if (fieldType === 'LIST') {
       return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} />;
     }
+    if (fieldType === 'GANTT') {
+      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
+    if (fieldType === 'KANBAN') {
+      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
+    if (fieldType === 'FILES') {
+      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
+    if (fieldType === 'WORKFLOW') {
+      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
+    if (fieldType === 'OVERVIEW') {
+      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
     
     return <div>暂不支持的字段类型: {fieldType}</div>;
   }, [currentItem]);
@@ -188,9 +209,9 @@ export default function TeamCustomFieldPage() {
   };
 
   return (
-    <div className="w-full px-0 max-w-none overflow-hidden">
-      <div className="w-full max-w-none border-0 bg-background text-foreground">
-        <div className="w-full">
+    <div className="w-full h-full flex flex-col">
+      <div className="max-w-none border-0 bg-background text-foreground flex flex-col flex-grow">
+        <div>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-semibold">{selectedTeam?.name}</h2>
@@ -258,15 +279,51 @@ export default function TeamCustomFieldPage() {
               </Button>
             </div>
           </div>
-          <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
+          <div className="overflow-x-auto" style={{ 
+            scrollbarWidth: 'none', 
+            msOverflowStyle: 'none' 
+          }}>
+            <style jsx>{`
+              div::-webkit-scrollbar {
+                display: none;
+              }
+            `}</style>
+            <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
+          </div>
         </div>
         <div className="w-full p-0">
           <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                {t('addTask')}
-              </Button>
+              <div className="flex">
+                <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
+                  <Plus className="h-4 w-4 mr-1" />
+                  {t(addButtonText)}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="rounded-l-none rounded-r-md px-1">
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setAddButtonText('addTask')} className="flex">
+                      <CircleCheck className="h-4 w-4 mr-1" />
+                      <span className="text-sm">{t('task')}</span>
+                      {addButtonText === 'addTask' && <Check className="h-4 w-4 ml-auto" />}                      
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setAddButtonText('addSection')} className="flex">
+                      <TextQuote className="h-4 w-4 mr-1" />
+                      <span className="text-sm">{t('section')}</span>
+                      {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
+                      <FileUp className="h-4 w-4 mr-1" />
+                      <span className="text-sm">{t('attachment')}</span>
+                      {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm">
@@ -294,7 +351,7 @@ export default function TeamCustomFieldPage() {
             </div>
           </div>
         </div>
-        <div className="w-full max-w-none">
+        <div className="overflow-y-auto flex-grow h-0 mb-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0" data-rbd-scroll-container-style="true">
           {customFieldContent}
         </div>
       </div>

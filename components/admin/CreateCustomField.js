@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDispatch } from 'react-redux';
 import { createCustomField } from '@/lib/redux/features/customFieldSlice';
@@ -28,13 +28,20 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                 throw new Error('User not authenticated');
             }
             
-            const resultAction = await dispatch(createCustomField({
+            const fieldData = {
                 name: formData.name,
                 type: formData.type,
                 description: formData.description,
                 icon: formData.icon,
                 created_by: userData.user.id,
-            }));
+            };
+            
+            // If editing existing field, pass its ID
+            if (field?.id) {
+                fieldData.id = field.id;
+            }
+            
+            const resultAction = await dispatch(createCustomField(fieldData));
             
             if(createCustomField.fulfilled.match(resultAction)) {
                 console.log('Custom field created successfully');
@@ -71,12 +78,24 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
     const form = useForm({
         resolver: zodResolver(FormSchema),
         defaultValues: {
-            name: '',
-            type: '',
-            description: '',
-            icon: '',
+            name: field?.name || '',
+            type: field?.type || '',
+            description: field?.description || '',
+            icon: field?.icon || '',
         },
     });
+
+    // Reset form when field changes
+    useEffect(() => {
+        if (field) {
+            form.reset({
+                name: field.name || '',
+                type: field.type || '',
+                description: field.description || '',
+                icon: field.icon || '',
+            });
+        }
+    }, [field, form]);
     
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>

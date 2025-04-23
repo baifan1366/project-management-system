@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Loader2, Sparkles } from "lucide-react";
 import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
+import { Badge } from "@/components/ui/badge";
 
 export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTasksCreated }) {
   const [instruction, setInstruction] = useState('');
@@ -23,6 +24,44 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState(null);
   const t = useTranslations();
+  
+  // Predefined prompt templates
+  const promptTemplates = [
+    {
+      id: 'taskWithAssignee',
+      label: 'Task + Assignee',
+      template: 'Create a task for [task description] and assign it to [team member email/name]'
+    },
+    {
+      id: 'priorityTask',
+      label: 'Priority Task',
+      template: 'Create a high priority task for [task description] due by [date]'
+    },
+    {
+      id: 'multipleSubtasks',
+      label: 'Multiple Subtasks',
+      template: 'Create multiple subtasks for [main task]: 1. [subtask1], 2. [subtask2], 3. [subtask3]'
+    },
+    {
+      id: 'bugReport',
+      label: 'Bug Report',
+      template: 'Create a bug report task: [describe the bug], steps to reproduce: [steps], assigned to [team member email/name]'
+    },
+    {
+      id: 'multiAssign',
+      label: 'Multiple Assignees',
+      template: 'Create a task for [task1] assigned to [name1] and a task for [task2] assigned to [name2]'
+    },
+    {
+      id: 'teamAssign',
+      label: 'Team Tasks',
+      template: 'Create 3 tasks for our team: [task1], [task2], [task3] and assign them to the appropriate team members'
+    }
+  ];
+  
+  const applyTemplate = (template) => {
+    setInstruction(template);
+  };
   
   // 获取当前用户ID
   useEffect(() => {
@@ -53,7 +92,7 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
     }
     
     if (!projectId) {
-      toast.error(t('errors.general'));
+      toast.error(t('errors.projectRequired') || "Project ID is required");
       return;
     }
     
@@ -65,16 +104,28 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
     setIsLoading(true);
     
     try {
+      // Prepare request body with all necessary data
+      const requestBody = {
+        instruction,
+        projectId,
+        userId
+      };
+      
+      // Only add teamId and sectionId if they exist
+      if (teamId) {
+        requestBody.teamId = teamId;
+      }
+      
+      if (sectionId) {
+        requestBody.sectionId = sectionId;
+      }
+      
       const response = await fetch('/api/ai/task-manager-agent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          instruction,
-          projectId, // 提供现有项目ID
-          userId // 传递用户ID
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {
@@ -85,7 +136,7 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
       const data = await response.json();
       
       if (data.success) {
-        toast.success(t('CreateTask.createSuccess'));
+        toast.success(t('CreateTask.tasksAddedSuccess') || "Tasks added successfully");
         setIsOpen(false);
         setInstruction('');
         
@@ -115,16 +166,42 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
           <DialogTitle>{t('nav.taskAssistant')}</DialogTitle>
           <DialogDescription>
             {t('CreateTask.description')}
+            Add new tasks to this existing project using AI assistance.
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          <div className="mb-3">
+            <p className="text-sm font-medium mb-2">Quick templates:</p>
+            <div className="flex flex-wrap gap-2">
+              {promptTemplates.map((template) => (
+                <Badge 
+                  key={template.id}
+                  variant="outline" 
+                  className="cursor-pointer hover:bg-primary/10"
+                  onClick={() => applyTemplate(template.template)}
+                >
+                  {template.label}
+                </Badge>
+              ))}
+            </div>
+          </div>
+          
           <Textarea
-            placeholder={t('Chat.inputPlaceholder')}
+            placeholder={t('Chat.inputPlaceholder') || "Describe the tasks you want to add to this project..."}
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             className="min-h-[120px]"
           />
+          
+          <div className="text-xs text-muted-foreground">
+            <p className="font-medium mb-1">Tip: Try these formats</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Create a task for UI redesign and assign it to alex@example.com</li>
+              <li>Create a high priority task for security update due by next Friday</li>
+              <li>Create three tasks: database optimization, API testing, and frontend fixes assigned to Sarah</li>
+            </ul>
+          </div>
           
           <DialogFooter>
             <Button 
@@ -132,7 +209,7 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
               disabled={isLoading || !instruction.trim() || !userId}
             >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? t('CreateTask.creating') : t('CreateTask.create')}
+              {isLoading ? t('CreateTask.creating') : t('CreateTask.createForProject') || "Add Tasks"}
             </Button>
           </DialogFooter>
         </form>

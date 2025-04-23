@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { to, subject, text, html, orderDetails } = body;
+    const { to, subject, text, html, orderDetails, supportDetails } = body;
     
     if (!to) {
       return NextResponse.json(
@@ -25,17 +25,71 @@ export async function POST(request) {
       },
     });
     
-    // 打印 SMTP 配置（不包含密码）
-    console.log('SMTP Config:', {
-      host: process.env.NEXT_PUBLIC_SMTP_HOSTNAME,
-      port: process.env.NEXT_PUBLIC_SMTP_PORT,
-      user: process.env.NEXT_PUBLIC_SMTP_USERNAME,
-      from: process.env.NEXT_PUBLIC_SMTP_FROM || process.env.NEXT_PUBLIC_SMTP_USERNAME,
-    });
-    
-    // 如果没有提供 HTML，但提供了订单详情，则创建默认模板
+    // 如果没有提供 HTML，但提供了订单详情或支持详情，则创建默认模板
     let emailHtml = html;
-    if (!emailHtml && orderDetails) {
+    
+    if (!emailHtml && supportDetails) {
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Support Response</title>
+          </head>
+          <body>
+            <div style="background-color: #f5f5f5; padding: 40px 0; font-family: Arial, sans-serif;">
+              <div style="max-width: 480px; margin: 0 auto">
+                <!-- Logo and Brand Name -->
+                <div style="display: flex; align-items: center; margin-bottom: 16px">
+                  <img
+                    src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/logo.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvbG9nby5wbmciLCJpYXQiOjE3NDI1Mjk1ODIsImV4cCI6MTgzNzEzNzU4Mn0.qDeS69M-0yTevXDoiuDc0rO_v_tsvxs0Z59C_snMRsE"
+                    alt="Team Sync"
+                    style="height: 30px; width: 30px; margin-right: 8px"
+                  />
+                  <span style="color: #111827; font-size: 16px; font-weight: 600">Team Sync</span>
+                </div>
+        
+                <!-- White Card -->
+                <div style="background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); padding: 32px;">
+                  <!-- Title -->
+                  <h1 style="color: #111827; font-size: 24px; font-weight: 800; margin: 0 0 16px 0; text-align: left; letter-spacing: -0.02em;">
+                    Support Response
+                  </h1>
+        
+                <!-- Divider -->
+                <hr style="border: none; height: 1px; background-color: #e5e7eb; margin: 16px 0;" />
+        
+                <!-- Message -->
+                <p style="color: #6b7280; font-size: 16px; line-height: 24px; margin: 0 0 24px 0;">
+                  Thank you for contacting Team Sync support. Here is our response to your inquiry:
+                </p>
+        
+                <!-- Response -->
+                <div style="background-color: #f9f9f9; padding: 16px; border-radius: 5px; margin-bottom: 20px; white-space: pre-line;">
+                  ${supportDetails.responseText}
+                </div>
+        
+                <!-- Original Message Reference -->
+                <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+                  <p style="color: #6b7280; font-size: 14px; margin-bottom: 8px;">Your original message:</p>
+                  <div style="color: #6b7280; font-size: 14px; line-height: 20px; padding-left: 12px; border-left: 3px solid #e5e7eb;">
+                    ${supportDetails.originalMessage || 'No message provided.'}
+                  </div>
+                </div>
+        
+                <!-- Footer -->
+                <div style="margin-top: 32px; color: #6b7280; font-size: 14px; line-height: 20px;">
+                  <p>If you have any further questions, please reply to this email or contact our support team.</p>
+                  <p style="margin-top: 16px;">Thank you,<br />Team Sync Support</p>
+                </div>
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+    }
+    else if (!emailHtml && orderDetails) {
       emailHtml = `
         <!DOCTYPE html>
 <html>
@@ -215,8 +269,8 @@ export async function POST(request) {
     const info = await transporter.sendMail({
       from: `"Team Sync" <${process.env.NEXT_PUBLIC_SMTP_FROM || process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
       to: to,
-      subject: subject || 'Thank You for Your Purchase - Team Sync',
-      text: text || 'Thank you for your purchase. Your payment has been successfully processed.',
+      subject: subject,
+      text: text,
       html: emailHtml,
     });
     

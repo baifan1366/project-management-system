@@ -347,9 +347,29 @@ export function ChatProvider({ children }) {
       console.error('Error fetching chat sessions:', sessionsError);
       return;
     }
+    
+    // 获取用户元数据中的隐藏会话
+    let hiddenSessions = {};
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (!userError && userData?.user?.user_metadata?.hidden_sessions) {
+        hiddenSessions = userData.user.user_metadata.hidden_sessions;
+      }
+    } catch (err) {
+      console.error('Error checking hidden sessions:', err);
+    }
 
     // 获取每个会话的最后一条消息
-    const sessionIds = sessionsData.map(item => item.chat_session.id);
+    const sessionIds = sessionsData
+      .filter(item => !hiddenSessions[item.chat_session.id])
+      .map(item => item.chat_session.id);
+      
+    if (sessionIds.length === 0) {
+      setSessions([]);
+      setLoading(false);
+      return;
+    }
+    
     const { data: lastMessages, error: messagesError } = await supabase
       .from('chat_message')
       .select(`
@@ -517,6 +537,15 @@ export function ChatProvider({ children }) {
       return;
     }
 
+    // Get user metadata for cleared chat history
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('Error fetching user data:', userError);
+    }
+    
+    // Get cleared history timestamp for this session
+    const clearedTimestamp = userData?.user?.user_metadata?.cleared_chat_history?.[sessionId];
+
     const { data, error } = await supabase
       .from('chat_message')
       .select(`
@@ -530,7 +559,8 @@ export function ChatProvider({ children }) {
         attachments:chat_attachment (
           id,
           file_url,
-          file_name
+          file_name,
+          is_image
         ),
         replied_message:reply_to_message_id (
           id,
@@ -551,7 +581,15 @@ export function ChatProvider({ children }) {
       return;
     }
 
-    setMessages(data.map(msg => ({
+    // Filter messages based on cleared history timestamp if it exists
+    let filteredMessages = data;
+    if (clearedTimestamp) {
+      filteredMessages = data.filter(msg => 
+        new Date(msg.created_at) > new Date(clearedTimestamp)
+      );
+    }
+
+    setMessages(filteredMessages.map(msg => ({
       ...msg,
       user: processAvatarUrl(msg.user),
       replied_message: msg.replied_message ? {
@@ -666,7 +704,8 @@ export function ChatProvider({ children }) {
         attachments:chat_attachment (
           id,
           file_url,
-          file_name
+          file_name,
+          is_image
         ),
         replied_message:reply_to_message_id (
           id,
@@ -730,7 +769,117 @@ export function ChatProvider({ children }) {
       } : null
     }]);
     
+    // 如果发送的消息可能关联有附件（通过FileUploader组件上传的），
+    // 可能需要等待一小段时间再重新获取完整的消息数据（包括附件信息）
+    setTimeout(async () => {
+      // 重新获取完整的消息数据，确保包含最新的附件信息
+      const { data: refreshedData, error: refreshError } = await supabase
+        .from('chat_message')
+        .select(`
+          *,
+          user:user_id (
+            id,
+            name,
+            avatar_url,
+            email
+          ),
+          attachments:chat_attachment (
+            id,
+            file_url,
+            file_name,
+            is_image
+          ),
+          replied_message:reply_to_message_id (
+            id,
+            content,
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email
+            )
+          )
+        `)
+        .eq('id', data.id)
+        .single();
+
+      if (!refreshError && refreshedData) {
+        // 更新本地消息列表
+        setMessages(prev => {
+          // 找到并替换之前添加的消息
+          return prev.map(msg => 
+            msg.id === refreshedData.id 
+              ? { 
+                  ...refreshedData, 
+                  user: processAvatarUrl(refreshedData.user),
+                  replied_message: refreshedData.replied_message ? {
+                    ...refreshedData.replied_message,
+                    user: processAvatarUrl(refreshedData.replied_message.user)
+                  } : null
+                } 
+              : msg
+          );
+        });
+      }
+    }, 500); // 等待500ms确保附件处理完成
+    
     return data;
+  };
+
+  // 删除消息的功能
+  const deleteMessage = async (messageId) => {
+    try {
+      // 获取当前用户会话信息
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        console.error('用户未登录，无法删除消息');
+        return { success: false, error: '未登录' };
+      }
+      
+      // 先获取消息以确认是自己的消息
+      const { data: message, error: fetchError } = await supabase
+        .from('chat_message')
+        .select('*')
+        .eq('id', messageId)
+        .single();
+        
+      if (fetchError) {
+        console.error('获取消息失败:', fetchError);
+        return { success: false, error: fetchError };
+      }
+      
+      // 确认消息属于当前用户
+      if (message.user_id !== session.user.id) {
+        console.error('无权删除他人消息');
+        return { success: false, error: '无权操作' };
+      }
+      
+      // 软删除消息 - 更新状态而不是删除
+      const { error: updateError } = await supabase
+        .from('chat_message')
+        .update({
+          is_deleted: true,
+          content: "[Message withdrawn]" // 同时清空内容以保护隐私
+        })
+        .eq('id', messageId);
+        
+      if (updateError) {
+        console.error('撤回消息失败:', updateError);
+        return { success: false, error: updateError };
+      }
+      
+      // 更新本地消息列表
+      setMessages(prevMessages => prevMessages.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, is_deleted: true, content: "[Message withdrawn]" } 
+          : msg
+      ));
+      
+      return { success: true };
+    } catch (error) {
+      console.error('删除消息过程中发生错误:', error);
+      return { success: false, error };
+    }
   };
 
   // 实时消息订阅
@@ -768,7 +917,8 @@ export function ChatProvider({ children }) {
             attachments:chat_attachment (
               id,
               file_url,
-              file_name
+              file_name,
+              is_image
             ),
             replied_message:reply_to_message_id (
               id,
@@ -913,7 +1063,8 @@ export function ChatProvider({ children }) {
             attachments:chat_attachment (
               id,
               file_url,
-              file_name
+              file_name,
+              is_image
             ),
             replied_message:reply_to_message_id (
               id,
@@ -938,30 +1089,52 @@ export function ChatProvider({ children }) {
         const isFromOtherUser = messageData.user_id !== authSession.user.id;
         const isNotCurrentSession = currentSession?.id !== payload.new.session_id;
         
+        // 获取用户元数据，检查该会话是否被隐藏
+        let isHiddenSession = false;
+        try {
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          if (!userError && userData?.user?.user_metadata?.hidden_sessions) {
+            isHiddenSession = !!userData.user.user_metadata.hidden_sessions[payload.new.session_id];
+          }
+        } catch (err) {
+          console.error('Error checking hidden sessions:', err);
+        }
+        
         // 更新会话列表中的最后一条消息和未读计数
         setSessions(prev => {
-          return prev.map(session => {
-            if (session.id === payload.new.session_id) {
-              // 如果是其他用户发送的消息，且不是当前打开的会话，增加未读计数
-              const newUnreadCount = isFromOtherUser && isNotCurrentSession 
-                ? (session.unreadCount || 0) + 1 
-                : session.unreadCount || 0;
-                
-              return {
-                ...session,
-                unreadCount: newUnreadCount,
-                lastMessage: {
-                  ...messageData,
-                  user: processAvatarUrl(messageData.user),
-                  replied_message: messageData.replied_message ? {
-                    ...messageData.replied_message,
-                    user: processAvatarUrl(messageData.replied_message.user)
-                  } : null
-                }
-              };
-            }
-            return session;
-          });
+          let newSessions = [...prev];
+          
+          // 找到对应的会话
+          const sessionIndex = newSessions.findIndex(s => s.id === payload.new.session_id);
+          
+          // 如果会话不存在且不是被隐藏的，可能需要重新获取会话列表
+          if (sessionIndex === -1 && !isHiddenSession) {
+            fetchChatSessions();
+            return prev;
+          }
+          
+          // 如果会话存在，更新它
+          if (sessionIndex !== -1) {
+            // 如果是其他用户发送的消息，且不是当前打开的会话，增加未读计数
+            const newUnreadCount = isFromOtherUser && isNotCurrentSession 
+              ? (newSessions[sessionIndex].unreadCount || 0) + 1 
+              : newSessions[sessionIndex].unreadCount || 0;
+              
+            newSessions[sessionIndex] = {
+              ...newSessions[sessionIndex],
+              unreadCount: newUnreadCount,
+              lastMessage: {
+                ...messageData,
+                user: processAvatarUrl(messageData.user),
+                replied_message: messageData.replied_message ? {
+                  ...messageData.replied_message,
+                  user: processAvatarUrl(messageData.replied_message.user)
+                } : null
+              }
+            };
+          }
+          
+          return newSessions;
         });
         
         // 如果是当前会话，且是当前用户打开的，立即标记为已读
@@ -1142,7 +1315,9 @@ export function ChatProvider({ children }) {
       saveAIChatMessage,
       createAIChatSession,
       chatMode,
-      setChatMode
+      setChatMode,
+      fetchMessages,
+      deleteMessage
     }}>
       {children}
     </ChatContext.Provider>

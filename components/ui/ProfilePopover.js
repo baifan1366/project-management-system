@@ -1,7 +1,7 @@
 import { PopoverContent } from '@/components/ui/popover';
 import { useTranslations } from 'next-intl';
 import { Button } from './button';
-import { ChevronRight, Settings, User, Zap, LogOut, Sparkles } from 'lucide-react';
+import { ChevronRight, Settings, User, Zap, LogOut, Sparkles, Workflow } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -76,6 +76,16 @@ export function ProfilePopover({ onClose }) {
       icon: <Settings className="w-4 h-4" />,
       label: t('profile.settings'),
       href: '/settings'
+    },
+    {
+      icon: <Sparkles className="w-4 h-4" />,
+      label: t('nav.taskAssistant'),
+      href: '/task-assistant'
+    },
+    {
+      icon: <Workflow className="w-4 h-4" />,
+      label: t('nav.aiWorkFlow'),
+      href: '/ai-workflow'
     }
   ];
 
@@ -118,19 +128,7 @@ export function ProfilePopover({ onClose }) {
                 <ChevronRight className="w-4 h-4" />
               </Button>
             ))}
-            
-            <Button
-              variant="ghost"
-              className="w-full justify-between px-4 py-2 h-auto font-normal"
-              onClick={() => router.push(`/${locale}/task-assistant`)}
-            >
-              <div className="flex items-center gap-3">
-                <Sparkles className="w-4 h-4" />
-                <span>{t('nav.taskAssistant')}</span>
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            
+
             <LanguageSwitcher/>
             <ThemeToggle/>
           </div>

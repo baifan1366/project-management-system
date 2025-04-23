@@ -24,6 +24,7 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
+    --glow-color: rgba(255, 105, 180, 0.6);
   }
 
   .dark {
@@ -46,6 +47,7 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+    --glow-color: rgba(255, 105, 180, 0.6);
   }
 }
 
@@ -56,7 +58,18 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    position: relative;
+    background-color: #121212;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 30px 30px;
   }
+}
+
+.dotted-bg {
+  position: relative;
+  background-color: #121212;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+  background-size: 30px 30px;
 }
 
 @keyframes fadeIn {
@@ -84,8 +97,6 @@
 .animate-heightIn {
   animation: heightIn 0.5s ease-in-out forwards;
 }
-
-
 
 @layer base {
   * {

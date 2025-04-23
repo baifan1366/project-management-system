@@ -23,7 +23,7 @@ export async function POST(request) {
     console.log('Received payment request body:', body);
 
     // 解构参数并验证
-    const { planId, amount, quantity = 1, userId, planName } = body;
+    const { planId, amount, quantity = 1, userId, planName, promoCode, discount, payment_method } = body;
 
     // 详细的参数验证
     if (!userId) {
@@ -36,7 +36,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'planId is required' }, { status: 400 });
     }
 
-    if (!amount && amount !== 0) {
+    if (amount === undefined || amount === null) {
       console.error('Missing amount in request body');
       return NextResponse.json({ error: 'amount is required' }, { status: 400 });
     }
@@ -49,7 +49,10 @@ export async function POST(request) {
         planId,
         userId,
         planName: planName || '',
-        quantity: quantity.toString()
+        quantity: quantity.toString(),
+        promoCode: promoCode || '',
+        discount: discount ? discount.toString() : '0',
+        payment_method: payment_method || 'card'
       }
     });
 
@@ -58,6 +61,7 @@ export async function POST(request) {
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret
     });
+    
   } catch (error) {
     console.error('Payment route error:', error);
     return NextResponse.json(

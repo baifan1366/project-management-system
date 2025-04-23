@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
 
 /**
  * DeepLTranslator 组件
@@ -16,6 +17,7 @@ export default function DeepLTranslator({
   className,
   buttonClassName
 }) {
+  const t = useTranslations('Chat');
   const [translatedText, setTranslatedText] = useState(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState(null);
@@ -72,7 +74,7 @@ export default function DeepLTranslator({
           isTranslating && "cursor-wait",
           buttonClassName
         )}
-        title={translatedText ? "查看原文" : "翻译"}
+        title={translatedText ? t('seeOriginal') : t('translate')}
       >
         <Languages size={16} />
       </button>

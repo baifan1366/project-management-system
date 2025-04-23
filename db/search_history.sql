@@ -96,8 +96,7 @@ ALTER TABLE IF EXISTS "task" ADD COLUMN IF NOT EXISTS tsv_searchable TSVECTOR;
 CREATE OR REPLACE FUNCTION task_search_update() RETURNS TRIGGER AS $$
 BEGIN
   NEW.tsv_searchable := to_tsvector('english', 
-    COALESCE(NEW.title, '') || ' ' || 
-    COALESCE(NEW.description, '')
+    COALESCE(NEW.tag_values::text, '')
   );
   RETURN NEW;
 END;
@@ -112,8 +111,7 @@ CREATE TRIGGER task_search_trigger
 
 -- 为已存在的任务数据更新全文搜索向量
 UPDATE "task" SET tsv_searchable = to_tsvector('english', 
-  COALESCE(title, '') || ' ' || 
-  COALESCE(description, '')
+  COALESCE(tag_values::text, '')
 );
 
 -- 创建任务搜索索引

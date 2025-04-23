@@ -107,7 +107,7 @@ CREATE TABLE "tag" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "description" TEXT,
-  "type" TEXT NOT NULL CHECK ("type" IN ('NAME','ASIGNEE', 'DUE-DATE', 'PRIORITY', 'STATUS', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'FORMULA', 'ID', 'TIME-TRACKING', 'PROJECTS', 'TAGS', 'COMPLETED-ON', 'LAST-MODIFIED-ON', 'CREATED-ON', 'CREATED-BY')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('NAME','ASIGNEE', 'DUE-DATE', 'PRIORITY', 'STATUS', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'FORMULA', 'ID', 'TIME-TRACKING', 'PROJECTS', 'TAGS', 'COMPLETED-ON', 'LAST-MODIFIED-ON', 'CREATED-AT', 'CREATED-BY')),
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -129,7 +129,7 @@ CREATE TABLE "time_entry" (
 CREATE TABLE "custom_field" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'DASHBOARD', 'NOTE', 'GANTT', 'CALENDAR', 'BOARD', 'FILES')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'DASHBOARD', 'NOTE', 'GANTT', 'CALENDAR', 'WORKFLOW', 'KANBAN', 'AGILE', 'FILES')),
   "description" TEXT,
   "icon" VARCHAR(255),
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -260,7 +260,8 @@ CREATE TABLE "chat_message" (
   "content" TEXT NOT NULL,
   "reply_to_message_id" INT REFERENCES "chat_message"("id") ON DELETE SET NULL,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "is_deleted" BOOLEAN DEFAULT FALSE,
 );
 
 -- 聊天消息已读状态表
@@ -295,6 +296,8 @@ CREATE TABLE "chat_attachment" (
   "message_id" INT NOT NULL REFERENCES "chat_message"("id") ON DELETE CASCADE,
   "file_url" VARCHAR(255) NOT NULL,
   "file_name" VARCHAR(255) NOT NULL,
+  "file_type" VARCHAR(100), -- 添加文件类型字段
+  "is_image" BOOLEAN DEFAULT FALSE, -- 添加是否为图片的标识
   "uploaded_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -313,6 +316,60 @@ CREATE TABLE "action_log" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create the workflows table
+CREATE TABLE IF NOT EXISTS workflows (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(50) NOT NULL,
+    prompt TEXT NOT NULL,
+    input_schema JSONB NOT NULL DEFAULT '{}',
+    flow_data JSONB,
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    icon VARCHAR(10),
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_workflows_created_by ON workflows (created_by);
+CREATE INDEX IF NOT EXISTS idx_workflows_type ON workflows (type);
+CREATE INDEX IF NOT EXISTS idx_workflows_is_public ON workflows (is_public);
+CREATE INDEX IF NOT EXISTS idx_workflows_is_deleted ON workflows (is_deleted);
+
+-- Create the workflow_executions table to track execution history
+CREATE TABLE IF NOT EXISTS workflow_executions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workflow_id UUID REFERENCES workflows(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    model_id VARCHAR(255),
+    inputs JSONB,
+    result JSONB,
+    status VARCHAR(50) NOT NULL,
+    output_formats TEXT[] DEFAULT '{}'::text[],
+    document_urls JSONB DEFAULT '{}'::jsonb,
+    executed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_workflow_id ON workflow_executions (workflow_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_user_id ON workflow_executions (user_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions (status);
+
+-- Function to check if a user can access a workflow
+CREATE OR REPLACE FUNCTION can_access_workflow(workflow_id UUID, user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM workflows
+        WHERE id = workflow_id 
+        AND (created_by = user_id OR is_public)
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER; 
+
 -- 订阅计划表
 CREATE TABLE "subscription_plan" (
   "id" SERIAL PRIMARY KEY,
@@ -328,31 +385,6 @@ CREATE TABLE "subscription_plan" (
   "is_active" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 团队订阅表
-CREATE TABLE "team_subscription" (
-  "id" SERIAL PRIMARY KEY,
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
-  "status" TEXT NOT NULL CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED')),
-  "start_date" TIMESTAMP NOT NULL,
-  "end_date" TIMESTAMP NOT NULL,
-  "cancel_at_period_end" BOOLEAN DEFAULT FALSE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 订阅付款历史表
-CREATE TABLE "subscription_payment" (
-  "id" SERIAL PRIMARY KEY,
-  "team_subscription_id" INT NOT NULL REFERENCES "team_subscription"("id") ON DELETE CASCADE,
-  "amount" DECIMAL(10, 2) NOT NULL,
-  "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
-  "payment_method" TEXT NOT NULL,
-  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
-  "transaction_id" VARCHAR(255),
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 用户订阅计划表
@@ -416,7 +448,8 @@ CREATE TABLE "admin_user" (
   "password_hash" VARCHAR(255) NOT NULL,
   "full_name" VARCHAR(255),
   "avatar_url" VARCHAR(255),
-  "role" VARCHAR(50) CHECK ("role" IN ('SUPER_ADMIN', 'ADMIN', 'MODERATOR')) DEFAULT 'ADMIN',
+  "role" VARCHAR(50) CHECK ("role" IN ('SUPER_ADMIN', 'ADMIN')) DEFAULT 'ADMIN',
+  "supabase_user_id" UUID UNIQUE,
   "is_active" BOOLEAN DEFAULT TRUE,
   "last_login" TIMESTAMP,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -559,4 +592,55 @@ CREATE INDEX idx_admin_activity_log_created ON "admin_activity_log"("created_at"
 
 -- 管理员通知表索引
 CREATE INDEX idx_admin_notification_admin ON "admin_notification"("admin_id");
-CREATE INDEX idx_admin_notification_read ON "admin_notification"("is_read"); 
+CREATE INDEX idx_admin_notification_read ON "admin_notification"("is_read");
+
+-- 落地页章节表
+CREATE TABLE "landing_page_section" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "sort_order" INT NOT NULL DEFAULT 0
+);
+
+-- 落地页内容表
+CREATE TABLE "landing_page_content" (
+  "id" SERIAL PRIMARY KEY,
+  "section_id" INT NOT NULL REFERENCES "landing_page_section"("id") ON DELETE CASCADE,
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('h1', 'h2', 'span', 'video', 'image', 'solution_card')),
+  "content" TEXT NOT NULL, -- 文本内容或媒体URL
+  "sort_order" INT NOT NULL DEFAULT 0
+);
+
+-- 创建存储桶策略，允许公开访问媒体文件
+-- 注意：这需要在 Supabase Dashboard 中手动创建存储桶 'landing-page-media'
+-- 并配置以下策略：
+/*
+CREATE POLICY "Public Access"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'landing-page-media');
+*/
+
+-- 落地页相关索引
+CREATE INDEX idx_landing_page_section_sort ON "landing_page_section"("sort_order");
+CREATE INDEX idx_landing_page_content_section ON "landing_page_content"("section_id");
+CREATE INDEX idx_landing_page_content_sort ON "landing_page_content"("sort_order");
+
+-- Payment table for Stripe integration
+CREATE TABLE "payment" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "amount" DECIMAL(10, 2) NOT NULL,
+  "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
+  "payment_method" TEXT NOT NULL,
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
+  "transaction_id" VARCHAR(255),
+  "discount_amount" DECIMAL(10, 2) DEFAULT 0,
+  "discount_percentage" DECIMAL(5, 2) DEFAULT 0,
+  "applied_promo_code" VARCHAR(50),
+  "stripe_payment_id" VARCHAR(255),
+  "metadata" JSONB,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- For better performance when querying payment by user
+CREATE INDEX idx_payment_user_id ON "payment"("user_id");
