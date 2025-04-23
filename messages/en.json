@@ -1352,5 +1352,33 @@
       "api_request": "API Request",
       "data_analysis": "Data Analysis"
     }
+  "TeamOverview": {
+    "teamDescription": "Team Description",
+    "description": "What's the team about?",
+    "membersRole": "Members Role",
+    "projectManager": "Project Manager",
+    "productManager": "Product Manager",
+    "developer": "Developer",
+    "designer": "Designer",
+    "qualityAssurance": "Quality Assurance",
+    "addMember": "Add Member",
+    "announcements": "Announcements",
+    "discussions": "Discussions",
+    "startedBy": "Started By",
+    "lastPost": "Last Post",
+    "likes": "Likes",
+    "replies": "Replies",
+    "unpin": "Unpin",
+    "delete": "Delete",
+    "save": "Save",
+    "saving": "Saving...",
+    "saveSuccess": "Save Success",
+    "saveError": "Save Error",
+    "failedToUpdateDescription": "Failed to update description",
+    "owner": "Owner",
+    "editor": "Editor",
+    "checker": "Checker",
+    "viewer": "Viewer",
+    "teamDescriptionUpdated": "Team description updated"
   }
 }

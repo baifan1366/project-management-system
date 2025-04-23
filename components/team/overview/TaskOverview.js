@@ -1,25 +1,69 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RichEditor } from '@/components/ui/rich-editor';
-import { Circle, CheckCircle2, Plus, CircleHelp, MoreHorizontal, ChevronDown, EllipsisVertical, Pin } from 'lucide-react';
+import { Circle, CheckCircle2, Plus, CircleHelp, MoreHorizontal, ChevronDown, EllipsisVertical, Pin, Save } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useTranslations } from 'next-intl';
+import TeamDescription from './TeamDescription';
+import { useToast } from '@/hooks/use-toast';
 
 export default function TaskOverview({ projectId, teamId, teamCFId }) {
+    const t = useTranslations('TeamOverview');
     const [description, setDescription] = useState('');
     const [expandedSections, setExpandedSections] = useState({
         description: true,
         members: true,
         announcements: true
     });
+    const [isEditing, setIsEditing] = useState(false);
+    const [pendingDescription, setPendingDescription] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const { toast } = useToast();
+    
+    const { updateTeamDescription } = TeamDescription({ teamId });
 
     const handleDescriptionChange = (html) => {
-        setDescription(html);
-        // 这里可以添加保存到数据库的逻辑
+        setPendingDescription(html);
+        setIsEditing(true);
+    };
+    
+    const handleSaveDescription = async () => {
+        try {
+            setIsLoading(true);            
+            // 确保传入的是完整的HTML字符串以保留所有格式
+            const result = await updateTeamDescription({ description: pendingDescription });
+            
+            if (result) {
+                // 更新成功后更新本地状态
+                setDescription(pendingDescription);
+                setIsEditing(false);
+                toast({
+                    title: t('saveSuccess'),
+                    description: t('teamDescriptionUpdated'),
+                    variant: "success",
+                });
+            } else {
+                toast({
+                    title: t('saveError'),
+                    description: t('failedToUpdateDescription'),
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            console.error('保存团队描述时出错:', error);
+            toast({
+                title: t('saveError'),
+                description: t('failedToUpdateDescription'),
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const toggleSection = (section) => {
@@ -41,16 +85,28 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
                     >
                         <ChevronDown className={`h-4 w-4 text-muted-foreground pb-0 ${!expandedSections.description ? 'transform rotate-[-90deg]' : ''}`} />
                     </Button>
-                    <CardTitle className="text-lg font-medium mr-2 pb-[3px]">Team Description</CardTitle>
+                    <CardTitle className="text-lg font-medium mr-2 pb-[3px]">{t('teamDescription')}</CardTitle>
                     <CircleHelp className="h-5 w-5 text-muted-foreground pb-[3px]" />
+                    {isEditing && (
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="ml-auto" 
+                            onClick={handleSaveDescription}
+                            disabled={isLoading}
+                        >
+                            <Save className="h-4 w-4 mr-1" />
+                            {isLoading ? t('saving') : t('save')}
+                        </Button>
+                    )}
                 </CardHeader>
                 {expandedSections.description && (
                     <CardContent className="px-2 py-0">
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 p-0">
                             <RichEditor 
-                                id="task-description" 
-                                placeholder="What's the team about?" 
-                                className="py-2 px-3 border-transparent shadow-none hover:border-border focus-visible:border-border text-muted-background"
+                                id="team-description" 
+                                placeholder={t('description')} 
+                                className="py-2 px-4 border-transparent shadow-none hover:border-border focus-visible:border-border text-muted-background"
                                 value={description}
                                 onChange={handleDescriptionChange}
                                 minHeight="100px"
@@ -70,7 +126,7 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
                     >
                         <ChevronDown className={`h-4 w-4 text-muted-foreground pb-0 ${!expandedSections.members ? 'transform rotate-[-90deg]' : ''}`} />
                     </Button>
-                    <CardTitle className="text-lg font-medium mr-2 pb-[3px]">Members Role</CardTitle>
+                    <CardTitle className="text-lg font-medium mr-2 pb-[3px]">{t('membersRole')}</CardTitle>
                 </CardHeader>
                 {expandedSections.members && (
                     <CardContent className="px-2 py-1 ">
@@ -85,7 +141,7 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
                                         <span className="text-sm font-medium">John Doe</span>
                                     </div>                            
                                     <div className='flex items-center gap-2 mt-0'>
-                                        <span className="text-sm text-muted-foreground">Project Manager</span>
+                                        <span className="text-sm text-muted-foreground">{t('owner')}</span>
                                         <DropdownMenu className="hidden hover:visible">
                                             <DropdownMenuTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-6 w-6 -mt-0.5">
@@ -93,11 +149,10 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent>
-                                            <DropdownMenuItem>Project Manager</DropdownMenuItem>
-                                            <DropdownMenuItem>Product Manager</DropdownMenuItem>
-                                            <DropdownMenuItem>Developer</DropdownMenuItem>
-                                            <DropdownMenuItem>Designer</DropdownMenuItem>
-                                            <DropdownMenuItem>Quality Assurance</DropdownMenuItem> 
+                                            <DropdownMenuItem>{t('owner')}</DropdownMenuItem>
+                                            <DropdownMenuItem>{t('editor')}</DropdownMenuItem>
+                                            <DropdownMenuItem>{t('checker')}</DropdownMenuItem>
+                                            <DropdownMenuItem>{t('viewer')}</DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
@@ -108,7 +163,7 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
                                     <Plus className="h-4 w-4 text-muted-foreground" />
                                 </Avatar>
                                 <div className="flex flex-col gap-0 justify-center">
-                                    <span className="text-sm font-medium text-muted-foreground">Add Member</span>
+                                    <span className="text-sm font-medium text-muted-foreground">{t('addMember')}</span>
                                 </div>
                             </div>
                         </div>
@@ -126,7 +181,7 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
                     >
                         <ChevronDown className={`h-4 w-4 text-muted-foreground pb-0 ${!expandedSections.announcements ? 'transform rotate-[-90deg]' : ''}`} />
                     </Button>
-                    <CardTitle className="text-lg font-medium mr-2 pb-[3px]">Announcements</CardTitle>
+                    <CardTitle className="text-lg font-medium mr-2 pb-[3px]">{t('announcements')}</CardTitle>
                 </CardHeader>
                 {expandedSections.announcements && (
                     <CardContent className="px-2 py-1">
@@ -134,12 +189,11 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead></TableHead>
-                                        <TableHead>Discussions</TableHead>
-                                        <TableHead>Started By</TableHead>
-                                        <TableHead>Last Post</TableHead>
-                                        <TableHead className="text-center">Likes</TableHead>
-                                        <TableHead className="text-center">Replies</TableHead>
+                                        <TableHead>{t('discussions')}</TableHead>
+                                        <TableHead>{t('startedBy')}</TableHead>
+                                        <TableHead>{t('lastPost')}</TableHead>
+                                        <TableHead className="text-center">{t('likes')}</TableHead>
+                                        <TableHead className="text-center">{t('replies')}</TableHead>
                                         <TableHead></TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -180,8 +234,8 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem>Unpin</DropdownMenuItem>
-                                                        <DropdownMenuItem>Delete</DropdownMenuItem>
+                                                        <DropdownMenuItem>{t('unpin')}</DropdownMenuItem>
+                                                        <DropdownMenuItem>{t('delete')}</DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>

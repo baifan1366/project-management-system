@@ -9,20 +9,6 @@ import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine
 
 
 export default function AdminDashboard() {
-  const router = useRouter();
-  const params = useParams();
-  const locale = params.locale || 'en';
-  
-  const [adminData, setAdminData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeSubscriptions: 0,
-    pendingSupport: 0,
-    revenueThisMonth: 0
-  });
-  const [recentActivity, setRecentActivity] = useState([]);
-  
   // Verify admin session and fetch admin data
   useEffect(() => {
     const checkAdminSession = async () => {
@@ -67,6 +53,20 @@ export default function AdminDashboard() {
     
     checkAdminSession();
   }, []);
+
+  const router = useRouter();
+  const params = useParams();
+  const locale = params.locale || 'en';
+  
+  const [adminData, setAdminData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeSubscriptions: 0,
+    pendingSupport: 0,
+    revenueThisMonth: 0
+  });
+  const [recentActivity, setRecentActivity] = useState([]);
   
   // Fetch dashboard statistics
   const fetchDashboardStats = async () => {
