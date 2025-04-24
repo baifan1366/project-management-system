@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useTranslations } from 'next-intl';
 import TeamDescription from './TeamDescription';
 import { useToast } from '@/hooks/use-toast';
+import { fetchTeamById } from '@/lib/redux/features/teamSlice';
+import { useDispatch } from 'react-redux';
 
 export default function TaskOverview({ projectId, teamId, teamCFId }) {
     const t = useTranslations('TeamOverview');
@@ -24,6 +26,7 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
     const [pendingDescription, setPendingDescription] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
+    const dispatch = useDispatch();
     
     const { updateTeamDescription } = TeamDescription({ teamId });
 
@@ -72,6 +75,21 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
             [section]: !prev[section]
         }));
     };
+
+    useEffect(() => {
+        const fetchTeam = async () => {
+            const team = await dispatch(fetchTeamById(teamId)).unwrap();
+            // 确保描述内容适合富文本编辑器格式
+            // 如果描述为空或不是HTML格式，进行适当处理
+            const description = team[0].description || '';
+            
+            // 设置描述到状态
+            setDescription(description);
+            setPendingDescription(description);
+            console.log(team[0].description);
+        };
+        fetchTeam();
+    }, [teamId, dispatch]);
 
     return (
         <div className="flex flex-col gap-1 p-0">
