@@ -712,7 +712,17 @@
     "downloadFailed": "Download failed",
     "downloadStarted": "Download started",
     "uploadFileDescription": "Upload a file to the task.",
-    "workflow": "Workflow"
+    "workflow": "Workflow",
+    "editSection": "Edit Section",
+    "renameSection": "Rename Section",
+    "deleteSection": "Delete Section",
+    "sectionCollapsed": "Section Collapsed",
+    "input": "Input",
+    "newTask": "New Task",
+    "pending": "Pending",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "noAvailableTaskData": "No available task data"
   },
   "ChatDialog": {
     "privateMessages": "Private Messages",

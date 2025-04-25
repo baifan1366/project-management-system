@@ -7,9 +7,11 @@ import { updateTaskIds } from '@/lib/redux/features/sectionSlice';
 import { supabase } from '@/lib/supabase';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslations } from 'next-intl';
 
 export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks }) {
   const dispatch = useDispatch();
+  const t = useTranslations('CreateTask');
   // 存储编辑中的任务状态
   const [editingTask, setEditingTask] = useState(null);
   // 存储编辑中的任务内容
@@ -73,7 +75,7 @@ export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks }
       // 确保至少有一个值，如果第一个标签值是空的，设置默认值
       const tagValues = { ...editingTaskValues };
       if (!tagValues['1'] || tagValues['1'].trim() === '') {
-        tagValues['1'] = 'New Task';
+        tagValues['1'] = t('newTask');
       }
       
       // 准备任务数据

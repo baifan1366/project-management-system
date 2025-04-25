@@ -322,11 +322,11 @@ export default function TeamCustomFieldPage() {
                       <span className="text-sm">{t('section')}</span>
                       {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
+                    {/* <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
                       <FileUp className="h-4 w-4 mr-1" />
                       <span className="text-sm">{t('attachment')}</span>
                       {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
-                    </DropdownMenuItem>
+                    </DropdownMenuItem> */}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
