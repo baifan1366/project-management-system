@@ -42,14 +42,14 @@ export default function InputForm({ fields, onSubmit, isLoading }) {
       case 'textarea':
         return (
           <div key={index} className="mb-4">
-            <Label className={field.required ? 'after:content-["*"] after:text-red-500 after:ml-1' : ''}>
+            <Label className={`dark:text-gray-200 ${field.required ? 'after:content-["*"] after:text-red-500 after:ml-1' : ''}`}>
               {field.label}
             </Label>
             <Textarea
               value={values[field.name] || ''}
               onChange={(e) => handleInputChange(field, e.target.value)}
               placeholder={field.label}
-              className="mt-1"
+              className="mt-1 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
               rows={5}
             />
           </div>
@@ -58,7 +58,7 @@ export default function InputForm({ fields, onSubmit, isLoading }) {
       case 'number':
         return (
           <div key={index} className="mb-4">
-            <Label className={field.required ? 'after:content-["*"] after:text-red-500 after:ml-1' : ''}>
+            <Label className={`dark:text-gray-200 ${field.required ? 'after:content-["*"] after:text-red-500 after:ml-1' : ''}`}>
               {field.label}
             </Label>
             <Input
@@ -66,7 +66,7 @@ export default function InputForm({ fields, onSubmit, isLoading }) {
               value={values[field.name] || ''}
               onChange={(e) => handleInputChange(field, e.target.value)}
               placeholder={field.label}
-              className="mt-1"
+              className="mt-1 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
           </div>
         );
@@ -74,7 +74,7 @@ export default function InputForm({ fields, onSubmit, isLoading }) {
       default: // text
         return (
           <div key={index} className="mb-4">
-            <Label className={field.required ? 'after:content-["*"] after:text-red-500 after:ml-1' : ''}>
+            <Label className={`dark:text-gray-200 ${field.required ? 'after:content-["*"] after:text-red-500 after:ml-1' : ''}`}>
               {field.label}
             </Label>
             <Input
@@ -82,7 +82,7 @@ export default function InputForm({ fields, onSubmit, isLoading }) {
               value={values[field.name] || ''}
               onChange={(e) => handleInputChange(field, e.target.value)}
               placeholder={field.label}
-              className="mt-1"
+              className="mt-1 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
           </div>
         );
@@ -90,7 +90,7 @@ export default function InputForm({ fields, onSubmit, isLoading }) {
   };
   
   return (
-    <form onSubmit={handleSubmit} className="p-4">
+    <form onSubmit={handleSubmit} className="p-4 dark:text-gray-200">
       <div className="space-y-2">
         {fields.map((field, index) => renderField(field, index))}
       </div>
@@ -99,7 +99,7 @@ export default function InputForm({ fields, onSubmit, isLoading }) {
         <Button 
           type="submit" 
           disabled={isLoading}
-          className="w-full"
+          className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
         >
           <PlayCircle className="mr-2 h-4 w-4" />
           {isLoading ? t('running') : t('executeWorkflow')}

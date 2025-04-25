@@ -44,9 +44,9 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
           description: "Fast response time with excellent quality"
         },
         { 
-          id: "deepseek/deepseek-chat-v3-0324:free", 
-          name: "DeepSeek Chat V3",
-          description: "Advanced reasoning capabilities" 
+          id: "deepseek/deepseek-r1:free", 
+          name: "DeepSeek R1",
+          description: "671B parameters with open reasoning tokens" 
         }
       ]);
       
@@ -64,20 +64,20 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
   };
   
   if (isLoading) {
-    return <Skeleton className="h-10 w-40" />;
+    return <Skeleton className="h-10 w-40 dark:bg-gray-700" />;
   }
   
   return (
     <Select value={selectedModel} onValueChange={handleModelChange}>
-      <SelectTrigger className="w-[220px]">
+      <SelectTrigger className="w-[220px] dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">
         <SelectValue placeholder={t('selectModel')} />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">
         {models.map((model) => (
-          <SelectItem key={model.id} value={model.id}>
+          <SelectItem key={model.id} value={model.id} className="dark:hover:bg-gray-700">
             <div className="flex flex-col">
-              <span className="font-medium">{model.name}</span>
-              <span className="text-xs text-gray-500 truncate max-w-[200px]">
+              <span className="text-s">{model.name}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
                 {model.description}
               </span>
             </div>
