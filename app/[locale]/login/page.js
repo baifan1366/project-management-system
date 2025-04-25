@@ -8,6 +8,7 @@ import { FaGoogle, FaGithub, FaEye, FaEyeSlash, FaQuestionCircle } from 'react-i
 import { supabase } from '@/lib/supabase';
 import LogoImage from '../../../public/logo.png';
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,6 +33,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
+
+  // Use our custom auth hook
+  const { login, error: authError } = useAuth();
 
   // 处理重定向逻辑
   const handleRedirect = (user) => {
@@ -94,38 +98,19 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // 如果选择了记住我，设置表单的autocomplete属性为"on"
+      // If remember me is checked, set form's autocomplete attribute to "on"
       if (rememberMe && rememberMeRef.current) {
         rememberMeRef.current.setAttribute('autocomplete', 'on');
       }
 
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+      // Use our custom login function
+      const result = await login(formData);
 
-      if (signInError) throw signInError;
-
-      if (data?.user) {
-        // 检查 session 状态
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Current session:', session);
-
-        // 同步 email_verified 状态
-        const { error: updateError } = await supabase
-          .from('user')
-          .update({
-            email_verified: data.user.email_verified,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', data.user.id);
-
-        if (updateError) {
-          console.error('Failed to update email verification status:', updateError);
-        }
-
-        // 使用重定向处理函数
-        handleRedirect(data.user);
+      if (result.success) {
+        // Use redirect handling function
+        handleRedirect(result.data.user);
+      } else {
+        setError(result.error || 'Failed to sign in. Please check your credentials and try again.');
       }
     } catch (err) {
       console.error('Login error:', err);

@@ -22,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { useSelector } from 'react-redux';
 
 function ChatLayout({ children }) {
   const t = useTranslations('Chat');
@@ -76,7 +77,7 @@ function ChatLayout({ children }) {
     setIsSearching(true);
     try {
       // 获取当前用户会话信息
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = useSelector((state) => state.users.currentUser);
       if (!session) {
         setIsSearching(false);
         return;
@@ -86,7 +87,7 @@ function ChatLayout({ children }) {
       const { data: userSessions, error: sessionError } = await supabase
         .from('chat_participant')
         .select('session_id')
-        .eq('user_id', session.user.id);
+        .eq('user_id', session.id);
         
       if (sessionError) {
         console.error('搜索聊天错误:', sessionError);

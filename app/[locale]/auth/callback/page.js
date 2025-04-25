@@ -1,23 +1,39 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // 1. 获取当前会话信息
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // 1. Get current session information
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         
-        if (sessionError) throw sessionError;
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setError('Failed to get session');
+          return;
+        }
 
-        const user = session.user;
+        // Handle case when no session exists
+        if (!sessionData || !sessionData.session) {
+          console.error('No session found');
+          // Redirect to login page after delay
+          setTimeout(() => {
+            const locale = window.location.pathname.split('/')[1];
+            router.push(`/${locale}/login?error=${encodeURIComponent('Authentication failed')}`);
+          }, 2000);
+          return;
+        }
 
-        // 2. 检查用户是否已经存在
+        const user = sessionData.session.user;
+
+        // 2. Check if user already exists
         const { data: existingProfile, error: profileError } = await supabase
           .from('user')
           .select('*')
@@ -25,7 +41,7 @@ export default function AuthCallbackPage() {
           .maybeSingle();
 
         if (existingProfile) {
-          // 如果用户存在，更新 email_verified 状态
+          // If user exists, update email_verified status
           const { error: updateError } = await supabase
             .from('user')
             .update({
@@ -36,7 +52,7 @@ export default function AuthCallbackPage() {
 
           if (updateError) throw updateError;
         } else {
-          // 3. 如果用户不存在，创建新用户配置文件
+          // 3. If user doesn't exist, create new profile
           const provider = user.app_metadata.provider;
           let userData = {
             id: user.id,
@@ -46,7 +62,7 @@ export default function AuthCallbackPage() {
             provider_id: user.identities?.[0]?.identity_data?.sub || user.id,
           };
 
-          // 根据提供商设置名称和头像
+          // Set name and avatar based on provider
           if (provider === 'google') {
             userData = {
               ...userData,
@@ -54,7 +70,7 @@ export default function AuthCallbackPage() {
               avatar_url: user.identities?.[0]?.identity_data?.avatar_url,
             };
             
-            // 保存Google令牌到用户元数据
+            // Save Google tokens to user metadata
             if (user.provider_token || user.provider_refresh_token) {
               try {
                 await supabase.auth.updateUser({
@@ -66,9 +82,9 @@ export default function AuthCallbackPage() {
                     }
                   }
                 });
-                console.log('成功保存Google令牌到用户元数据');
+                console.log('Successfully saved Google tokens to user metadata');
               } catch (error) {
-                console.error('保存Google令牌到用户元数据失败:', error);
+                console.error('Failed to save Google tokens to user metadata:', error);
               }
             }
           } else if (provider === 'github') {
@@ -84,7 +100,7 @@ export default function AuthCallbackPage() {
               avatar_url: user.identities?.[0]?.identity_data?.avatar_url,
             };
           } else {
-            // 本地注册用户
+            // Local signup user
             userData = {
               ...userData,
               name: user.user_metadata.name || user.email.split('@')[0],
@@ -98,7 +114,7 @@ export default function AuthCallbackPage() {
 
           if (insertError) throw insertError;
           
-          // 4. 为新用户创建免费订阅计划
+          // 4. Create free subscription plan for new user
           const now = new Date();
           const oneYearFromNow = new Date(now);
           oneYearFromNow.setFullYear(now.getFullYear() + 1);
@@ -108,7 +124,7 @@ export default function AuthCallbackPage() {
             .insert([
               {
                 user_id: user.id,
-                plan_id: 1, // 免费计划ID
+                plan_id: 1, // Free plan ID
                 status: 'active',
                 start_date: now.toISOString(),
                 end_date: oneYearFromNow.toISOString()
@@ -117,13 +133,13 @@ export default function AuthCallbackPage() {
 
           if (subscriptionError) {
             console.error('Failed to create subscription:', subscriptionError);
-            // 继续处理，即使订阅创建失败
+            // Continue processing even if subscription creation fails
           } else {
             console.log('Free subscription created for user:', user.id);
           }
         }
 
-        // 5. 检查用户是否已有订阅计划
+        // 5. Check if user already has subscription plan
         const { data: existingSubscription, error: subscriptionCheckError } = await supabase
           .from('user_subscription_plan')
           .select('*')
@@ -131,7 +147,7 @@ export default function AuthCallbackPage() {
           .order('created_at', { ascending: false })
           .limit(1);
           
-        // 如果没有订阅，创建一个免费订阅
+        // If no subscription exists, create a free one
         if ((!existingSubscription || existingSubscription.length === 0) && !subscriptionCheckError) {
           const now = new Date();
           const oneYearFromNow = new Date(now);
@@ -142,7 +158,7 @@ export default function AuthCallbackPage() {
             .insert([
               {
                 user_id: user.id,
-                plan_id: 1, // 免费计划ID
+                plan_id: 1, // Free plan ID
                 status: 'active',
                 start_date: now.toISOString(),
                 end_date: oneYearFromNow.toISOString()
@@ -156,21 +172,26 @@ export default function AuthCallbackPage() {
           }
         }
 
-        // 6. 获取URL参数
+        // 6. Get URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const planId = urlParams.get('plan_id');
         const redirect = urlParams.get('redirect');
 
-        // 如果URL中有plan_id参数并且redirect=payment，则跳转到payment页面
+        // If URL has plan_id parameter and redirect=payment, redirect to payment page
         if (planId && redirect === 'payment') {
           router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/payment?plan_id=${planId}&user_id=${user.id}`);
         } else {
-          // 否则重定向到仪表板
+          // Otherwise redirect to dashboard
           router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/projects`);
         }
       } catch (error) {
         console.error('Auth callback error:', error);
-        router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/login`);
+        setError('Authentication failed');
+        
+        // Redirect to login after a delay to avoid potential redirect loops
+        setTimeout(() => {
+          router.push(`${process.env.NEXT_PUBLIC_SITE_URL}/${window.location.pathname.split('/')[1]}/login?error=${encodeURIComponent('Authentication failed')}`);
+        }, 2000);
       }
     };
 
@@ -180,8 +201,17 @@ export default function AuthCallbackPage() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
-        <h2 className="text-2xl font-semibold mb-4">Authenticating...</h2>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <h2 className="text-2xl font-semibold mb-4">
+          {error ? 'Authentication Failed' : 'Authenticating...'}
+        </h2>
+        {error ? (
+          <p className="text-red-500 mb-4">{error}</p>
+        ) : (
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        )}
+        {error && (
+          <p className="text-gray-500">Redirecting to login page...</p>
+        )}
       </div>
     </div>
   );

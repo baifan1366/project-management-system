@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import Cookies from 'js-cookie';
 
 const PUBLIC_PATHS = [
   '/login',
@@ -14,7 +14,7 @@ const PUBLIC_PATHS = [
   '/privacy',
   '/adminLogin',
 ];
-const SPECIAL_PATHS = ['/auth', '/reset-password', '/pricing', '/payment', '/adminLogin' ]; // 特殊路径，即使用户已登录也允许访问
+const SPECIAL_PATHS = ['/auth', '/reset-password', '/pricing', '/payment', '/adminLogin' ]; // Special paths that can be accessed even when logged in
 
 export default function RouteGuard({ children }) {
   const router = useRouter();
@@ -22,34 +22,44 @@ export default function RouteGuard({ children }) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      // 获取 session 状态
-      const { data: { session } } = await supabase.auth.getSession();
+      // Check for user logged in flag (non-httpOnly cookie)
+      const isLoggedIn = Cookies.get('user_logged_in') === 'true';
       
-      // 检查是否是公开路径
+      // Legacy check for auth_token (will only work if not httpOnly)
+      const authToken = Cookies.get('auth_token');
+      
+      // Debug: List all cookies
+      const allCookies = Cookies.get();
+      console.log('🍪 All Cookies:', allCookies);
+      
+      // Check if current path is public
       const isPublicPath = PUBLIC_PATHS.some(path => pathname.includes(path));
       
-      // 检查是否是特殊路径（如重置密码）
+      // Check if current path is special (like reset password)
       const isSpecialPath = SPECIAL_PATHS.some(path => pathname.includes(path));
       
-      // 获取当前语言
+      // Get current locale
       const locale = pathname.split('/')[1] || 'en';
 
-      console.log('🔒 Session check:', { 
+      console.log('🔒 Auth check:', { 
         path: pathname,
-        hasSession: Boolean(session),
+        isLoggedIn,
+        hasAuthToken: Boolean(authToken),
+        authTokenPrefix: authToken ? `${authToken.substring(0, 10)}...` : null,
         isPublicPath,
-        isSpecialPath,
-        userId: session?.user?.id
+        isSpecialPath
       });
 
-      // 如果用户未登录且访问的不是公开路径或特殊路径，重定向到登录页面
-      if (!session && !isPublicPath && !isSpecialPath) {
+      // If user is not logged in and not accessing public or special paths, redirect to login
+      if (!isLoggedIn && !isPublicPath && !isSpecialPath) {
+        console.log('⚠️ Not logged in, redirecting to login');
         router.replace(`/${locale}/login`);
         return;
       }
 
-      // 如果用户已登录且访问登录/注册页面（但不是特殊路径），重定向到项目页面
-      if (session && isPublicPath && !isSpecialPath && pathname !== '/') {
+      // If user is logged in and accessing login/signup pages (but not special paths), redirect to projects
+      if (isLoggedIn && isPublicPath && !isSpecialPath && pathname !== '/') {
+        console.log('⚠️ Already logged in, redirecting to projects');
         router.replace(`/${locale}/projects`);
         return;
       }

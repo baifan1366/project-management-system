@@ -1245,29 +1245,6 @@
     "tipDetailsForProject": "You can say \"Add 5 high priority tasks: homepage design, user login feature, database design...\" or \"Invite team@example.com to join the team\""
   },
   "auth": {
-    "password": {
-      "show": "Show password",
-      "hide": "Hide password",
-      "requirements": "Password requirements",
-      "requirementsTitle": "Password requirements:",
-      "minLength": "At least 8 characters",
-      "uppercase": "At least 1 uppercase letter",
-      "lowercase": "At least 1 lowercase letter",
-      "number": "At least 1 number",
-      "special": "At least 1 special character (e.g. @#$%)",
-      "match": "Passwords do not match",
-      "rememberMe": "Remember me"
-    },
-    "signup": {
-      "title": "Sign up",
-      "subtitle": "Create your free account",
-      "button": "Sign up",
-      "loading": "Signing up...",
-      "agree": "By signing up you agree to our",
-      "termsOfService": "Terms of Service",
-      "alreadyAccount": "Already have an account?",
-      "login": "Log In"
-    },
     "login": {
       "title": "Sign in",
       "subtitle": "Welcome back!",
@@ -1283,6 +1260,61 @@
         "resend": "click here to resend",
         "resending": "sending..."
       }
+    },
+    "signup": {
+      "title": "Sign up",
+      "subtitle": "Create your free account",
+      "button": "Sign up",
+      "loading": "Signing up...",
+      "agree": "By signing up you agree to our",
+      "termsOfService": "Terms of Service",
+      "alreadyAccount": "Already have an account?",
+      "login": "Log In"
+    },
+    "logout": "Logout",
+    "email": "Email",
+    "password": {
+      "show": "Show password",
+      "hide": "Hide password",
+      "requirements": "Password requirements",
+      "requirementsTitle": "Password requirements:",
+      "minLength": "At least 8 characters",
+      "uppercase": "At least 1 uppercase letter",
+      "lowercase": "At least 1 lowercase letter",
+      "number": "At least 1 number",
+      "special": "At least 1 special character (e.g. @#$%)",
+      "match": "Passwords do not match",
+      "rememberMe": "Remember me"
+    },
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": {
+      "title": "Forgot Password?",
+      "subtitle": "Please enter the email you used when signing up to receive reset instructions.",
+      "emailPlaceholder": "Email Address",
+      "button": "Reset Password",
+      "sending": "Sending...",
+      "emailSent": "Reset Link Sent",
+      "checkInbox": "Please check your email for a password reset link.",
+      "backToLogin": "Back to Login",
+      "remembered": "Remember your password?",
+      "login": "Back to login",
+      "invalidEmail": "Please enter a valid email address"
+    },
+    "resetPassword": {
+      "title": "Reset Password",
+      "subtitle": "Please create a new password for your account.",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm Password",
+      "button": "Reset Password",
+      "resetting": "Resetting...",
+      "successTitle": "Password Reset Successfully",
+      "successMessage": "Your password has been reset successfully.",
+      "redirecting": "Redirecting to login page...",
+      "error": "Reset Error",
+      "missingToken": "Missing password reset token",
+      "invalidToken": "Invalid token format",
+      "requestNewLink": "Request a new reset link",
+      "passwordMismatch": "Passwords do not match"
     }
   },
   "notificationType": {
