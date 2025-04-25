@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserShield, FaUserCog } from 'react-icons/fa';
+import { hasPermission } from '@/lib/permissions';
+import { useSelector } from 'react-redux';
 
 export default function AdminUserManagement() {
 

@@ -19,6 +19,8 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar, Pie } from 'react-chartjs-2';
+import { hasPermission } from '@/lib/permissions';
+import { useSelector } from 'react-redux';
 
 // 注册Chart.js组件
 ChartJS.register(

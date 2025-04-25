@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaPlus, FaEdit, FaTrash, FaCheck, FaToggleOn, FaToggleOff, FaTimes } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import { clsx } from 'clsx';
+import { hasPermission } from '@/lib/permissions';
+import { useSelector } from 'react-redux';
 
 export default function AdminSubscriptions() {
   const router = useRouter();

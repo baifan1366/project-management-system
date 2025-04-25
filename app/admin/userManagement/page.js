@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck } from 'react-icons/fa';
+import { hasPermission } from '@/lib/permissions';
+import { useSelector } from 'react-redux';
 
 export default function UserManagement() {
   const router = useRouter();

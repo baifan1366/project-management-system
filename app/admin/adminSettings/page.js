@@ -9,6 +9,8 @@ import WebsiteSettings from '@/components/admin/settings/WebsiteSettings';
 import LocalizationSettings from '@/components/admin/settings/LocalizationSettings';
 import ThemeSettings from '@/components/admin/settings/ThemeSettings';  
 import LandingPageSettings from '@/components/admin/settings/LandingPageSettings';
+import { hasPermission } from '@/lib/permissions';
+import { useSelector } from 'react-redux';
 
 export default function AdminSettings() {
 

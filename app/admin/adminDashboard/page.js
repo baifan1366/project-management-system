@@ -6,35 +6,39 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell } from 'react-icons/fa';
-
+import { useDispatch } from 'react-redux';
+import { checkAdminSession, logoutAdmin } from '@/lib/redux/features/adminSlice';
 
 export default function AdminDashboard() {
+  const router = useRouter();
+  const params = useParams();
+  const locale = params.locale || 'en';
+  const dispatch = useDispatch();
+  
+  const [adminData, setAdminData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeSubscriptions: 0,
+    pendingSupport: 0,
+    revenueThisMonth: 0
+  });
+  const [recentActivity, setRecentActivity] = useState([]);
+  
   // Verify admin session and fetch admin data
   useEffect(() => {
-    const checkAdminSession = async () => {
+    const initDashboard = async () => {
       try {
         setLoading(true);
         
-        // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        // 使用 Redux 的 checkAdminSession
+        const adminData = await dispatch(checkAdminSession()).unwrap();
         
-        if (sessionError || !sessionData.session) {
-          throw new Error('No active session found');
+        if (!adminData) {
+          throw new Error('No active session found or unauthorized access');
         }
         
-        // Check if user is an admin
-        const { data: admin, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', sessionData.session.user.email)
-          .eq('is_active', true)
-          .single();
-          
-        if (adminError || !admin) {
-          throw new Error('Unauthorized access');
-        }
-        
-        setAdminData(admin);
+        setAdminData(adminData);
         
         // Fetch dashboard statistics
         await fetchDashboardStats();
@@ -51,23 +55,9 @@ export default function AdminDashboard() {
       }
     };
     
-    checkAdminSession();
-  }, []);
+    initDashboard();
+  }, [dispatch, router]);
 
-  const router = useRouter();
-  const params = useParams();
-  const locale = params.locale || 'en';
-  
-  const [adminData, setAdminData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeSubscriptions: 0,
-    pendingSupport: 0,
-    revenueThisMonth: 0
-  });
-  const [recentActivity, setRecentActivity] = useState([]);
-  
   // Fetch dashboard statistics
   const fetchDashboardStats = async () => {
     try {
@@ -143,16 +133,22 @@ export default function AdminDashboard() {
     try {
       // Log the logout action
       if (adminData) {
-        await supabase.from('admin_activity_log').insert({
-          admin_id: adminData.id,
-          action: 'logout',
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
+        try {
+          await supabase.from('admin_activity_log').insert({
+            admin_id: adminData.id,
+            action: 'logout',
+            // 暂时省略 entity_id 字段，避免 UUID 错误
+            ip_address: '127.0.0.1',
+            user_agent: navigator.userAgent
+          });
+        } catch (logError) {
+          console.error('Error logging logout activity:', logError);
+          // 即使日志失败也继续登出流程
+        }
       }
       
-      // Sign out
-      await supabase.auth.signOut();
+      // 使用 Redux 的 logoutAdmin
+      await dispatch(logoutAdmin()).unwrap();
       
       // Redirect to admin login
       router.replace(`/admin/adminLogin`);

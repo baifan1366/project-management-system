@@ -25,6 +25,7 @@ export default function AdminLoginPage() {
   });
 
   // Check if admin is already logged in
+  //can use in other pages
   useEffect(() => {
     dispatch(checkAdminSession())
       .unwrap()
@@ -54,6 +55,7 @@ export default function AdminLoginPage() {
     e.preventDefault();
     
     try {
+      console.log('Submitting login form...');
       // Dispatch login action
       const adminData = await dispatch(loginAdmin({
         email: formData.email,
@@ -61,8 +63,9 @@ export default function AdminLoginPage() {
       })).unwrap();
       
       if (adminData) {
-        // Store admin info in local storage for easy access (optional)
-        localStorage.setItem('adminData', JSON.stringify(adminData));
+        console.log('Login successful, redirecting to dashboard');
+        // 存储已经在 loginAdmin action 中完成，这里不需要重复
+        // localStorage.setItem('adminData', JSON.stringify(adminData));
         
         // Redirect to admin dashboard
         router.replace(`/admin/adminDashboard`);

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaFilter, FaSearch, FaEnvelope, FaBuilding, FaUser, FaClock, FaCheck, FaTimes, FaSpinner, FaReply } from 'react-icons/fa';
+import { hasPermission } from '@/lib/permissions';
+import { useSelector } from 'react-redux';
 
 export default function AdminSupport() {
   const router = useRouter();
