@@ -134,10 +134,10 @@ export async function POST(request) {
   try {
     const body = await request.json()
     
-    // Basic validation
-    if (!body || !body.title) {
+    // Basic validation - 修改验证逻辑，支持tag_values
+    if (!body || (!body.title && !body.tag_values)) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields. Need either title or tag_values' },
         { status: 400 }
       )
     }
