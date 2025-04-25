@@ -7,6 +7,8 @@ import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchAllTags } from '@/lib/redux/features/tagSlice';
 import { getTags } from '@/lib/redux/features/teamCFSlice';
+import { Plus } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 // 使用唯一键记录全局请求状态，避免重复请求
 const requestCache = {
@@ -22,6 +24,7 @@ const findTagById = (tagId, tags) => {
 
 export default function BodyContent() {
     const dispatch = useDispatch();
+    const t = useTranslations('CreateTask');
     const allTags = useSelector(state => state.tags.tags);
     const teamCFTags = useSelector(state => state.teamCF.tags);
     
@@ -126,9 +129,9 @@ export default function BodyContent() {
       const tagValues = task.tag_values || {};
       let taskInfo = {
         id: task.id,
-        name: `Task #${task.id}`,
+        name: `${t('task')} #${task.id}`,
         description: '',
-        status: '待开始',
+        status: t('pending'),
         assignee: '',
         dueDate: '',
         originalTask: task
@@ -145,7 +148,7 @@ export default function BodyContent() {
               taskInfo.description = String(value || '');
               break;
             case 'Status':
-              taskInfo.status = String(value || '待开始');
+              taskInfo.status = String(value || t('pending'));
               break;
             case 'Assignee':
               taskInfo.assignee = String(value || '');
@@ -177,6 +180,19 @@ export default function BodyContent() {
         }
       }
     }, [allTasks, tags, selectedTaskId, setSelectedTaskId, setWorkflowData]);
+    
+    // 监听selectedTaskId的变化
+    useEffect(() => {
+      console.log('BodyContent - 选中的任务ID已更新:', selectedTaskId);
+      
+      // 如果选中了任务，确保视图滚动到该任务
+      if (selectedTaskId) {
+        const taskElement = document.getElementById(`task-${selectedTaskId}`);
+        if (taskElement) {
+          taskElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }, [selectedTaskId]);
     
     // 更新工作流数据
     const updateWorkflowData = (tasks) => {
@@ -226,38 +242,38 @@ export default function BodyContent() {
     const selectedTask = processedTasks.find(task => task.id === selectedTaskId);
 
     if (loading) {
-      return <div className="p-4 text-center">Loading...</div>;
+      return <div className="p-4 text-center">{t('loading')}</div>;
     }
 
     return (
-        <div className="p-4">
+        <div className="p-1">
             {selectedTask && (
-                <div className="mb-6 p-4 border rounded-lg bg-blue-50">
+                <div className="mb-6 p-4 border rounded-lg">
                     <h3 className="text-lg font-semibold border-b pb-2 mb-3">{selectedTask.name}</h3>
                     <div className="space-y-2">
                         <div className="flex justify-between">
-                            <span className="font-medium">状态:</span>
+                            <span className="font-medium">{t('status')}:</span>
                             <span className={`px-2 py-1 rounded-full text-xs ${
-                                selectedTask.status === '已完成' ? 'bg-green-100 text-green-800' :
-                                selectedTask.status === '进行中' ? 'bg-blue-100 text-blue-800' :
-                                selectedTask.status === '待审核' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
+                                selectedTask.status === t('completed') ? 'bg-green-100 text-green-800' :
+                                selectedTask.status === t('inProgress') ? 'bg-blue-100 text-blue-800' :
+                                selectedTask.status === t('pending') ? 'bg-yellow-100 text-yellow-800' :
+                                'text-gray-800'
                             }`}>
                                 {selectedTask.status}
                             </span>
                         </div>
                         <div>
-                            <span className="font-medium">描述:</span>
-                            <p className="text-gray-700 mt-1">{selectedTask.description || '无描述'}</p>
+                            <span className="font-medium">{t('description')}:</span>
+                            <p className="text-gray-700 mt-1">{selectedTask.description || '-'}</p>
                         </div>
                         <div className="flex justify-between">
                             <div>
-                                <span className="font-medium">负责人:</span>
-                                <p className="text-gray-700">{selectedTask.assignee || '未分配'}</p>
+                                <span className="font-medium">{t('assignee')}:</span>
+                                <p className="text-gray-700">{selectedTask.assignee || '-'}</p>
                             </div>
                             <div>
-                                <span className="font-medium">截止日期:</span>
-                                <p className="text-gray-700">{selectedTask.dueDate || '无截止日期'}</p>
+                                <span className="font-medium">{t('dueDate')}:</span>
+                                <p className="text-gray-700">{selectedTask.dueDate || '-'}</p>
                             </div>
                         </div>
                     </div>
@@ -267,32 +283,44 @@ export default function BodyContent() {
             <div className="grid grid-cols-1 gap-4">
                 {processedTasks.length > 0 ? processedTasks.map((item) => (
                     <div 
-                        key={item.id} 
-                        className={`p-4 border rounded-md cursor-pointer hover:bg-gray-50 ${selectedTaskId === item.id ? 'bg-blue-50 border-blue-300' : ''}`}
+                        key={item.id}
+                        id={`task-${item.id}`} 
+                        className={`p-4 border rounded-md cursor-pointer hover:bg-accent transition-all duration-200 ${
+                            selectedTaskId === item.id 
+                                ? 'border-primary' 
+                                : 'border-border'
+                        }`}
                         onClick={() => setSelectedTaskId(item.id)}
                     >
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold">{item.name}</h3>
                             <span className={`px-2 py-1 rounded-full text-xs ${
-                                item.status === '已完成' ? 'bg-green-100 text-green-800' :
-                                item.status === '进行中' ? 'bg-blue-100 text-blue-800' :
-                                item.status === '待审核' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
+                                item.status === t('completed') ? 'bg-green-100 text-green-800' :
+                                item.status === t('inProgress') ? 'bg-blue-100 text-blue-800' :
+                                item.status === t('pending') ? 'bg-yellow-100 text-yellow-800' :
+                                'text-gray-800'
                             }`}>
                                 {item.status}
                             </span>
                         </div>
-                        <p className="text-gray-600 text-sm mt-1">{item.description || '无描述'}</p>
+                        <p className="text-gray-600 text-sm mt-1">{item.description || '-'}</p>
                         <div className="mt-2 text-sm text-gray-500 flex justify-between">
-                            <span>负责人: {item.assignee || '未分配'}</span>
-                            <span>截止日期: {item.dueDate || '无截止日期'}</span>
+                            <span>{t('assignee')}: {item.assignee || '-'}</span>
+                            <span>{t('dueDate')}: {item.dueDate || '-'}</span>
                         </div>
                     </div>
                 )) : (
                     <div className="text-center p-4 border rounded-md">
-                        <p className="text-gray-500">没有可用的任务数据</p>
+                        <p className="text-gray-500">{t('noAvailableTaskData')}</p>
                     </div>
                 )}
+            </div>
+
+            {/* add task */}
+            <div className="mt-4">
+              <div className="p-4 border rounded-md cursor-pointer hover:bg-accent flex items-center justify-center">
+                <Plus className="w-4 h-4 text-gray-500"/>
+              </div>
             </div>
         </div>
     );

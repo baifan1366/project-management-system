@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useContext, memo, useEffect } from 'react';
+import { useCallback, useState, useContext, useEffect } from 'react';
 import { 
   ReactFlow, 
   Controls, 
@@ -9,58 +9,12 @@ import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
-  Handle,
   Position
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { WorkflowContext } from './TaskWorkflow';
-
-// 自定义任务节点
-const TaskNode = memo(({ data, isConnectable }) => {
-  const { 
-    selectedTaskId, 
-    setSelectedTaskId
-  } = useContext(WorkflowContext);
-  const isSelected = selectedTaskId === data.id;
-
-  return (
-    <div 
-      className={`px-4 py-2 shadow-md rounded-md border ${
-        isSelected ? 'bg-blue-100 border-blue-400' : 'bg-white border-gray-300'
-      }`}
-      style={{ minWidth: 150 }}
-      onClick={() => setSelectedTaskId(data.id)}
-    >
-      <div className="flex items-center">
-        <div className={`w-3 h-3 rounded-full mr-2 ${
-          data.status === '已完成' ? 'bg-green-500' : 
-          data.status === '进行中' ? 'bg-blue-500' : 
-          data.status === '待审核' ? 'bg-yellow-500' : 
-          'bg-gray-500'
-        }`}></div>
-        <div className="font-bold">{data.label}</div>
-      </div>
-      {data.description && (
-        <div className="mt-1 text-xs text-gray-600">{data.description}</div>
-      )}
-      {data.assignee && (
-        <div className="mt-1 text-xs text-gray-500">负责人: {data.assignee}</div>
-      )}
-      <Handle
-        type="target"
-        position={Position.Top}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        isConnectable={isConnectable}
-      />
-    </div>
-  );
-});
-
-TaskNode.displayName = 'TaskNode';
+import TaskNode from './TaskNode';
+import { useTranslations } from 'next-intl';
 
 const nodeTypes = {
   task: TaskNode,
@@ -73,7 +27,7 @@ export const WorkflowTools = () => {
     workflowData, 
     setWorkflowData
   } = useContext(WorkflowContext);
-  
+  const t = useTranslations('CreateTask');
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
 
@@ -119,7 +73,10 @@ export const WorkflowTools = () => {
   // 当节点被选中时，更新上下文中的选中任务ID
   const onNodeClick = useCallback(
     (_, node) => {
-      setSelectedTaskId(node.data.id);
+      // 确保ID类型一致，如果任务ID存储为数字，则转换为数字类型
+      const taskId = parseInt(node.data.id) || node.data.id;
+      setSelectedTaskId(taskId);
+      console.log('选中任务ID:', taskId);
     },
     [setSelectedTaskId]
   );
@@ -130,7 +87,7 @@ export const WorkflowTools = () => {
   if (nodes.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">Loading workflow data...</p>
+        <p className="text-gray-500">{t('loading')}</p>
       </div>
     );
   }
@@ -149,8 +106,8 @@ export const WorkflowTools = () => {
         fitView
       >
         <Background />
-        <Controls />
-        <MiniMap />
+        <Controls className="dark:text-black" />
+        <MiniMap className="dark:bg-background" />
       </ReactFlow>
     </div>
   );
