@@ -1,5 +1,5 @@
 import { openai } from '../task-manager-agent/config';
-import { safeParseJSON } from '../task-manager-agent/utils';
+import { safeParseJSON, executeApiRequest, createDocxTemplate } from './utils';
 import { supabase } from '@/lib/supabase';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
@@ -26,11 +26,17 @@ export const getAvailableModels = () => {
 // Default system prompts for different workflow types
 const WORKFLOW_PROMPTS = {
   ppt: `You are a professional presentation creator. Your task is to generate a PowerPoint presentation based on the user's input.
-Please create a structured outline for a presentation with:
+Please create a structured outline for a visually appealing presentation with:
 1. A compelling title slide
 2. An agenda/overview slide
 3. Content slides with clear sections (at least 5-7 slides)
 4. A conclusion slide
+
+The presentation will be automatically styled with professional designs similar to SlideGo templates, including:
+- Color schemes with complementary accent colors
+- Visual elements like shapes, lines, and decorative accents
+- Consistent typography with appropriate font sizes for titles and content
+- Modern slide layouts with visual hierarchy
 
 Format your output EXACTLY as a JSON object with the following structure:
 {
@@ -69,7 +75,16 @@ IMPORTANT:
 - Content slides should have title, content, and optionally bullets
 - Conclusion slides should have title, content, and bullets with key takeaways
 
-Make the presentation professional, visually appealing, and well-structured with 5-10 slides total. Include specific and actionable information.`,
+Make the presentation professional, visually appealing, and well-structured with 5-10 slides total. 
+Include specific and actionable information and consider how the content will look when visualized with professional design elements.
+
+For best visual results:
+- Keep titles concise (3-8 words)
+- Keep bullet points short (1-2 lines each)
+- Use strong, impactful wording for titles
+- Include a balance of text and list content
+- Structure content to have clear visual hierarchy
+- Think about contrast between main points and supporting details`,
 
   document: `You are a professional document writer. Your task is to create a well-structured document based on the user's input.
 Please generate a document with:
@@ -78,13 +93,14 @@ Please generate a document with:
 3. Proper formatting for readability (bullet points, numbered lists, etc.)
 4. A conclusion section
 
-Format your output as a JSON object with the following structure:
+Format your output EXACTLY as a JSON object with the following structure:
 {
   "title": "Document Title",
   "sections": [
     {
       "heading": "Section Heading",
       "content": "Section content with paragraphs separated by newlines",
+      "bullets": ["Bullet point 1", "Bullet point 2", "Bullet point 3"],
       "subsections": [
         {
           "heading": "Subsection Heading",
@@ -95,6 +111,21 @@ Format your output as a JSON object with the following structure:
     }
   ]
 }
+
+Important details for creating a well-structured document:
+- Provide a descriptive title that clearly represents the document's content
+- Each section should have a clear heading and descriptive content
+- Use bullets to highlight key points, making them easier to read
+- Include subsections for more complex topics
+- Maintain a logical flow through the document with proper transitions
+- Include a conclusion that summarizes the key points
+
+The document will be styled professionally with:
+- Heading hierarchy and proper formatting
+- Bullet points rendered with proper indentation and bullet symbols
+- Consistent spacing and alignment
+- Blue headings with appropriate font sizes
+- Footer with generation date
 
 Make the document comprehensive, well-structured, and professional. Include specific details, examples, and actionable information.`,
 
@@ -143,7 +174,45 @@ Format your output as a JSON object with the following structure:
       "priority": "high|medium|low"
     }
   ]
-}`
+}`,
+
+  // 添加通用JSON格式
+  json: `You are a JSON data generator. Your task is to create well-structured JSON data based on the user's input.
+Please analyze the user's input and generate a structured JSON response that best represents that information.
+
+Format your output EXACTLY as a clean JSON object. The structure should be appropriate for the content but follow general best practices:
+- Use descriptive keys
+- Organize related data into nested objects or arrays
+- Use consistent naming conventions
+- Include appropriate data types for values
+
+Example structure (adapt to your specific content):
+{
+  "title": "Main title based on input",
+  "summary": "Brief summary of the content",
+  "createdAt": "2023-06-15T10:30:00Z",
+  "metadata": {
+    "source": "Generated from user input",
+    "version": "1.0"
+  },
+  "content": {
+    "main": "Primary content based on user input",
+    "sections": [
+      {
+        "heading": "First section heading",
+        "text": "First section content",
+        "items": ["Item 1", "Item 2", "Item 3"]
+      },
+      {
+        "heading": "Second section heading",
+        "text": "Second section content",
+        "items": ["Item A", "Item B", "Item C"]
+      }
+    ]
+  }
+}
+
+Make sure to generate high-quality, structured data that would be useful for further processing or display.`
 };
 
 // Get workflow by ID
@@ -197,6 +266,94 @@ async function generatePPTX(content, userId) {
     // Set presentation properties
     pres.layout = 'LAYOUT_16x9';
     
+    // Define design themes - SlideGo inspired designs
+    const designThemes = {
+      professional: {
+        title: { color: '0064D2', fontSize: 36, bold: true, fontFace: 'Arial' },
+        subtitle: { color: '404040', fontSize: 20, fontFace: 'Arial' },
+        content: { color: '333333', fontSize: 16, fontFace: 'Arial' },
+        bullets: { color: '333333', fontSize: 16, fontFace: 'Arial' },
+        background: { type: 'solid', color: 'FFFFFF' },
+        accent: { color: '0064D2' },
+        chartColors: ['0064D2', '00B050', 'FF6600', 'FFCC00', '9933CC']
+      },
+      creative: {
+        title: { color: 'FF5733', fontSize: 40, bold: true, fontFace: 'Calibri' },
+        subtitle: { color: '404040', fontSize: 22, fontFace: 'Calibri' },
+        content: { color: '333333', fontSize: 18, fontFace: 'Calibri' },
+        bullets: { color: '333333', fontSize: 18, fontFace: 'Calibri' },
+        background: { 
+          type: 'gradient', 
+          color1: 'FFFFFF',
+          color2: 'FFF5F0',
+          angle: 45
+        },
+        accent: { color: 'FF5733' },
+        chartColors: ['FF5733', '33A8FF', 'FFCC00', '33FF57', 'CC33FF']
+      },
+      minimal: {
+        title: { color: '202020', fontSize: 38, bold: true, fontFace: 'Helvetica' },
+        subtitle: { color: '606060', fontSize: 24, fontFace: 'Helvetica' },
+        content: { color: '404040', fontSize: 16, fontFace: 'Helvetica' },
+        bullets: { color: '404040', fontSize: 16, fontFace: 'Helvetica' },
+        background: { type: 'solid', color: 'FFFFFF' },
+        accent: { color: '202020' },
+        chartColors: ['202020', '606060', 'A0A0A0', 'D0D0D0', 'F0F0F0']
+      },
+      colorful: {
+        title: { color: '4A0D67', fontSize: 42, bold: true, fontFace: 'Trebuchet MS' },
+        subtitle: { color: '4A0D67', fontSize: 24, fontFace: 'Trebuchet MS' },
+        content: { color: '333333', fontSize: 18, fontFace: 'Trebuchet MS' },
+        bullets: { color: '333333', fontSize: 18, fontFace: 'Trebuchet MS' },
+        background: { 
+          type: 'gradient', 
+          color1: 'FFFFFF',
+          color2: 'F0E6F5',
+          angle: 90
+        },
+        accent: { color: '4A0D67' },
+        chartColors: ['4A0D67', '84E6F8', 'FFB677', 'ADFFBC', 'FF7777']
+      }
+    };
+    
+    // Choose a design theme (can be random or based on content type)
+    const designKeys = Object.keys(designThemes);
+    const designTheme = designThemes[designKeys[Math.floor(Math.random() * designKeys.length)]];
+    
+    // Apply theme to master slide
+    pres.defineSlideMaster({
+      title: 'MASTER_SLIDE',
+      background: designTheme.background,
+      objects: [
+        // Add accent line or shape based on theme
+        { 
+          rect: { 
+            x: 0, 
+            y: 0, 
+            w: '100%', 
+            h: 0.3, 
+            fill: { color: designTheme.accent.color } 
+          } 
+        },
+        // Add subtle footer
+        { 
+          text: { 
+            text: 'Generated with AI Workflow',  
+            options: { 
+              x: 0.5, 
+              y: '95%', 
+              w: '90%', 
+              h: 0.3, 
+              align: 'center',
+              fontSize: 10,
+              color: '808080'
+            } 
+          } 
+        }
+      ],
+      slideNumber: { x: '90%', y: '95%' }
+    });
+    
     // Check for ppt_generation specific structure or use content directly
     let pptContent = content;
     
@@ -206,289 +363,504 @@ async function generatePPTX(content, userId) {
       pptContent = content.ppt_generation;
     }
     
-    // Set title from the content
-    pres.title = pptContent.title || 'Presentation';
-    console.log(`Setting presentation title: "${pres.title}"`);
-    
-    // If no slides are found, create a default slide
-    if (!pptContent.slides || !Array.isArray(pptContent.slides) || pptContent.slides.length === 0) {
-      console.log("No slides found in content, creating default slide");
-      const defaultSlide = pres.addSlide();
+    // Check if content has error
+    if (pptContent.error) {
+      console.log("Content has error, using default presentation");
+      // Create a default presentation with error information
+      pres.title = 'Error in Presentation Generation';
       
-      // Add title to default slide
-      defaultSlide.addText(pptContent.title || "Presentation", {
-        x: 0.5,
-        y: 0.5,
-        w: '90%',
-        h: 1,
-        fontSize: 24,
-        bold: true,
-        color: '363636'
+      // Add title slide
+      const slide1 = pres.addSlide({ masterName: 'MASTER_SLIDE' });
+      slide1.addText('Error in Presentation Generation', {
+        x: 0.5, y: 0.5, w: '90%', h: 1, 
+        fontSize: designTheme.title.fontSize, 
+        bold: designTheme.title.bold,
+        color: 'FF0000',
+        fontFace: designTheme.title.fontFace
+      });
+      slide1.addText(`An error occurred: ${pptContent.error}`, {
+        x: 0.5, y: 1.7, w: '90%', h: 1,
+        fontSize: designTheme.subtitle.fontSize,
+        color: '666666',
+        fontFace: designTheme.subtitle.fontFace
       });
       
-      // Add explanation text
-      defaultSlide.addText("This is an automatically generated presentation.", {
-        x: 0.5,
-        y: 2,
-        w: '90%',
-        h: 1,
-        fontSize: 16,
-        color: '666666'
+      // Add information slide
+      const slide2 = pres.addSlide({ masterName: 'MASTER_SLIDE' });
+      slide2.addText('Troubleshooting', {
+        x: 0.5, y: 0.5, w: '90%', h: 1,
+        fontSize: designTheme.title.fontSize,
+        bold: designTheme.title.bold,
+        color: designTheme.title.color,
+        fontFace: designTheme.title.fontFace
       });
-      
-      // Add any content as text if available
-      if (typeof pptContent === 'object') {
-        const contentKeys = Object.keys(pptContent).filter(key => key !== 'title' && key !== 'slides');
-        if (contentKeys.length > 0) {
-          let contentText = "Content summary:\n";
-          contentKeys.forEach(key => {
-            if (typeof pptContent[key] === 'string') {
-              contentText += `• ${key}: ${pptContent[key].substring(0, 100)}...\n`;
-            } else if (Array.isArray(pptContent[key])) {
-              contentText += `• ${key}: ${pptContent[key].length} items\n`;
-            }
-          });
-          
-          defaultSlide.addText(contentText, {
-            x: 0.5,
-            y: 3,
-            w: '90%',
-            h: 3,
-            fontSize: 14,
-            color: '666666'
-          });
-        }
-      }
+      slide2.addText('Possible solutions:', {
+        x: 0.5, y: 1.5, w: '90%', h: 4,
+        fontSize: designTheme.subtitle.fontSize,
+        color: designTheme.subtitle.color,
+        fontFace: designTheme.subtitle.fontFace
+      });
+      const bullets = [
+        '• Try again with a different prompt',
+        '• Use a different AI model',
+        '• Check if your input is clear and specific',
+        '• Ensure the system has permissions to generate content'
+      ];
+      slide2.addText(bullets.join('\n'), {
+        x: 0.5, y: 2.5, w: '90%', h: 4,
+        fontSize: designTheme.bullets.fontSize,
+        color: designTheme.bullets.color,
+        fontFace: designTheme.bullets.fontFace
+      });
     } else {
-      // Process each slide
-      console.log(`Processing ${pptContent.slides.length} slides`);
-      pptContent.slides.forEach((slide, index) => {
-        console.log(`Creating slide ${index + 1}: ${slide.title || 'Untitled'}`);
+      // Set title from the content
+      pres.title = pptContent.title || 'Presentation';
+      console.log(`Setting presentation title: "${pres.title}"`);
+      
+      // If no slides are found, create a default slide
+      if (!pptContent.slides || !Array.isArray(pptContent.slides) || pptContent.slides.length === 0) {
+        console.log("No slides found in content, creating default slide");
+        const defaultSlide = pres.addSlide({ masterName: 'MASTER_SLIDE' });
         
-        // Add a new slide
-        const currentSlide = pres.addSlide();
+        // Add title to default slide
+        defaultSlide.addText(pptContent.title || "Presentation", {
+          x: 0.5,
+          y: 0.5,
+          w: '90%',
+          h: 1,
+          fontSize: designTheme.title.fontSize,
+          bold: designTheme.title.bold,
+          color: designTheme.title.color,
+          fontFace: designTheme.title.fontFace
+        });
         
-        // Set slide title
-        if (slide.title) {
-          currentSlide.addText(slide.title, { 
-            x: 0.5, 
-            y: 0.5, 
-            w: '90%', 
-            h: 1, 
-            fontSize: 24,
-            bold: true,
-            color: '363636'
-          });
+        // Add explanation text
+        defaultSlide.addText("This is an automatically generated presentation.", {
+          x: 0.5,
+          y: 2,
+          w: '90%',
+          h: 1,
+          fontSize: designTheme.subtitle.fontSize,
+          color: designTheme.subtitle.color,
+          fontFace: designTheme.subtitle.fontFace
+        });
+        
+        // Add any content as text if available
+        if (typeof pptContent === 'object') {
+          const contentKeys = Object.keys(pptContent).filter(key => key !== 'title' && key !== 'slides');
+          if (contentKeys.length > 0) {
+            let contentText = "Content summary:\n";
+            contentKeys.forEach(key => {
+              if (typeof pptContent[key] === 'string') {
+                contentText += `• ${key}: ${pptContent[key].substring(0, 100)}...\n`;
+              } else if (Array.isArray(pptContent[key])) {
+                contentText += `• ${key}: ${pptContent[key].length} items\n`;
+              }
+            });
+            
+            defaultSlide.addText(contentText, {
+              x: 0.5,
+              y: 3,
+              w: '90%',
+              h: 3,
+              fontSize: designTheme.content.fontSize,
+              color: designTheme.content.color,
+              fontFace: designTheme.content.fontFace
+            });
+          }
         }
-        
-        // Process content based on slide type
-        switch (slide.slide_type) {
-          case 'title_slide':
-            // Add subtitle if available
-            if (slide.content) {
-              currentSlide.addText(slide.content, { 
-                x: 0.5, 
-                y: 1.7, 
-                w: '90%', 
-                h: 1, 
-                fontSize: 18,
-                color: '666666'
+      } else {
+        // Process each slide
+        console.log(`Processing ${pptContent.slides.length} slides`);
+        pptContent.slides.forEach((slide, index) => {
+          console.log(`Creating slide ${index + 1}: ${slide.title || 'Untitled'}`);
+          
+          // Add a new slide with master
+          const currentSlide = pres.addSlide({ masterName: 'MASTER_SLIDE' });
+          
+          // Add visual design elements based on the slide type and theme
+          
+          // Add decorative element (varies by theme and slide position)
+          if (index === 0) {
+            // Title slide gets special treatment
+            currentSlide.addShape('RECTANGLE', { 
+              x: 0, 
+              y: 0, 
+              w: '100%', 
+              h: '100%', 
+              fill: { 
+                type: 'solid',
+                color: designTheme.background.type === 'gradient' 
+                  ? designTheme.background.color1 
+                  : designTheme.background.color
+              }
+            });
+            
+            // Add accent shapes based on design theme
+            if (designTheme === designThemes.professional) {
+              // Add blue accent bar
+              currentSlide.addShape('RECTANGLE', {
+                x: 0,
+                y: 0,
+                w: 2,
+                h: '100%',
+                fill: { color: designTheme.accent.color }
+              });
+            } else if (designTheme === designThemes.creative) {
+              // Add circular accents
+              for (let i = 0; i < 5; i++) {
+                currentSlide.addShape('OVAL', {
+                  x: 8 + (i * 0.5),
+                  y: 0.5 + (i * 0.8),
+                  w: 1,
+                  h: 1,
+                  fill: { color: designTheme.accent.color },
+                  opacity: 0.7 - (i * 0.1)
+                });
+              }
+            } else if (designTheme === designThemes.colorful) {
+              // Add gradient overlay
+              currentSlide.addShape('RECTANGLE', {
+                x: 0,
+                y: 0,
+                w: '30%',
+                h: '100%',
+                fill: { 
+                  type: 'gradient',
+                  color1: designTheme.accent.color,
+                  color2: 'FFFFFF',
+                  angle: 90
+                },
+                opacity: 0.2
               });
             }
-            break;
+          } else {
+            // Content slides get different decorative elements
+            if (designTheme === designThemes.professional) {
+              // Add header bar
+              currentSlide.addShape('RECTANGLE', {
+                x: 0,
+                y: 0,
+                w: '100%',
+                h: 0.8,
+                fill: { color: designTheme.accent.color },
+                opacity: 0.1
+              });
+            } else if (designTheme === designThemes.creative) {
+              // Add corner accent
+              currentSlide.addShape('OVAL', {
+                x: 9,
+                y: -1,
+                w: 3,
+                h: 3,
+                fill: { color: designTheme.accent.color },
+                opacity: 0.2
+              });
+            } else if (designTheme === designThemes.minimal) {
+              // Add subtle line
+              currentSlide.addShape('LINE', {
+                x: 0.5,
+                y: 1.3,
+                w: 9,
+                h: 0,
+                line: { color: designTheme.accent.color, width: 1 }
+              });
+            }
+          }
+          
+          // Set slide title
+          if (slide.title) {
+            let titleY = 0.5;
+            if (index === 0) {
+              // Title slide gets special title positioning
+              titleY = designTheme === designThemes.professional ? 2.5 : 
+                      designTheme === designThemes.creative ? 3 : 2;
+            }
             
-          case 'bullet_slide':
-            // Ensure bullets is an array
-            let bullets = [];
-            if (slide.bullets && Array.isArray(slide.bullets)) {
-              bullets = slide.bullets;
-            } else if (slide.bullets && typeof slide.bullets === 'string') {
-              // Try to convert string to array if it looks like JSON
-              try {
-                const parsed = JSON.parse(slide.bullets);
-                if (Array.isArray(parsed)) {
-                  bullets = parsed;
-                } else {
-                  // Split by newlines or commas if not valid JSON array
+            currentSlide.addText(slide.title, { 
+              x: index === 0 && designTheme === designThemes.colorful ? 3.5 : 0.5, 
+              y: titleY, 
+              w: '90%', 
+              h: 1, 
+              fontSize: index === 0 ? designTheme.title.fontSize + 4 : designTheme.title.fontSize,
+              bold: designTheme.title.bold,
+              color: designTheme.title.color,
+              fontFace: designTheme.title.fontFace
+            });
+          }
+          
+          // Process content based on slide type
+          switch (slide.slide_type) {
+            case 'title_slide':
+              // Add subtitle if available
+              if (slide.content) {
+                currentSlide.addText(slide.content, { 
+                  x: designTheme === designThemes.colorful ? 3.5 : 0.5, 
+                  y: designTheme === designThemes.professional ? 3.5 : 
+                     designTheme === designThemes.creative ? 4 : 3,
+                  w: '90%', 
+                  h: 1, 
+                  fontSize: designTheme.subtitle.fontSize,
+                  color: designTheme.subtitle.color,
+                  fontFace: designTheme.subtitle.fontFace
+                });
+              }
+              break;
+              
+            case 'bullet_slide':
+              // Ensure bullets is an array
+              let bullets = [];
+              if (slide.bullets && Array.isArray(slide.bullets)) {
+                bullets = slide.bullets;
+              } else if (slide.bullets && typeof slide.bullets === 'string') {
+                // Try to convert string to array if it looks like JSON
+                try {
+                  const parsed = JSON.parse(slide.bullets);
+                  if (Array.isArray(parsed)) {
+                    bullets = parsed;
+                  } else {
+                    // Split by newlines or commas if not valid JSON array
+                    bullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
+                  }
+                } catch (e) {
+                  // Split by newlines or commas if not valid JSON
                   bullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
                 }
-              } catch (e) {
-                // Split by newlines or commas if not valid JSON
-                bullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
               }
-            }
-            
-            // Ensure we have at least one bullet point
-            if (bullets.length === 0 && slide.content) {
-              bullets = [slide.content];
-            }
-            
-            // If we have bullets, add them to the slide
-            if (bullets.length > 0) {
-              const bulletText = bullets.map(bullet => `• ${bullet}`).join('\n');
-              currentSlide.addText(bulletText, { 
-                x: 0.5, 
-                y: 1.5, 
-                w: '90%', 
-                h: 4, 
-                fontSize: 16,
-                color: '363636'
-              });
-            } else if (slide.content) {
-              // If no bullets but content is available
-              currentSlide.addText(slide.content, { 
-                x: 0.5, 
-                y: 1.5, 
-                w: '90%', 
-                h: 4, 
-                fontSize: 16,
-                color: '363636'
-              });
-            } else {
-              // Add a default bullet if nothing else is available
-              currentSlide.addText("• No content available", { 
-                x: 0.5, 
-                y: 1.5, 
-                w: '90%', 
-                h: 4, 
-                fontSize: 16,
-                color: '363636'
-              });
-            }
-            break;
-            
-          case 'content_slide':
-          case 'conclusion_slide':
-          default:
-            // Add regular content
-            if (slide.content) {
-              currentSlide.addText(slide.content, { 
-                x: 0.5, 
-                y: 1.5, 
-                w: '90%', 
-                h: 4, 
-                fontSize: 16,
-                color: '363636'
-              });
-            }
-            
-            // Add bullets if available - with same validation as bullet slides
-            let contentBullets = [];
-            if (slide.bullets && Array.isArray(slide.bullets)) {
-              contentBullets = slide.bullets;
-            } else if (slide.bullets && typeof slide.bullets === 'string') {
-              // Try to convert string to array if it looks like JSON
-              try {
-                const parsed = JSON.parse(slide.bullets);
-                if (Array.isArray(parsed)) {
-                  contentBullets = parsed;
-                } else {
-                  // Split by newlines or commas if not valid JSON array
+              
+              // Ensure we have at least one bullet point
+              if (bullets.length === 0 && slide.content) {
+                bullets = [slide.content];
+              }
+              
+              // If we have bullets, add them to the slide with styling
+              if (bullets.length > 0) {
+                // Style bullets in a visually appealing way based on the theme
+                currentSlide.addText(bullets, { 
+                  x: 0.5, 
+                  y: 1.8, 
+                  w: '90%', 
+                  h: 5, 
+                  fontSize: designTheme.bullets.fontSize,
+                  color: designTheme.bullets.color,
+                  fontFace: designTheme.bullets.fontFace,
+                  bullet: true,
+                  bulletType: designTheme === designThemes.minimal ? 'DEFAULT' : 'BULLET',
+                  bulletColor: designTheme.accent.color
+                });
+              } else if (slide.content) {
+                // If no bullets but content is available
+                currentSlide.addText(slide.content, { 
+                  x: 0.5, 
+                  y: 1.8, 
+                  w: '90%', 
+                  h: 4, 
+                  fontSize: designTheme.content.fontSize,
+                  color: designTheme.content.color,
+                  fontFace: designTheme.content.fontFace
+                });
+              } else {
+                // Add a default bullet if nothing else is available
+                currentSlide.addText(["No content available"], { 
+                  x: 0.5, 
+                  y: 1.8, 
+                  w: '90%', 
+                  h: 4, 
+                  fontSize: designTheme.bullets.fontSize,
+                  color: designTheme.bullets.color,
+                  fontFace: designTheme.bullets.fontFace,
+                  bullet: true
+                });
+              }
+              break;
+              
+            case 'content_slide':
+            case 'conclusion_slide':
+            default:
+              // Add regular content with styling
+              if (slide.content) {
+                currentSlide.addText(slide.content, { 
+                  x: 0.5, 
+                  y: 1.8, 
+                  w: '90%', 
+                  h: 4, 
+                  fontSize: designTheme.content.fontSize,
+                  color: designTheme.content.color,
+                  fontFace: designTheme.content.fontFace
+                });
+              }
+              
+              // Add bullets if available - with same validation as bullet slides
+              let contentBullets = [];
+              if (slide.bullets && Array.isArray(slide.bullets)) {
+                contentBullets = slide.bullets;
+              } else if (slide.bullets && typeof slide.bullets === 'string') {
+                // Try to convert string to array if it looks like JSON
+                try {
+                  const parsed = JSON.parse(slide.bullets);
+                  if (Array.isArray(parsed)) {
+                    contentBullets = parsed;
+                  } else {
+                    // Split by newlines or commas if not valid JSON array
+                    contentBullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
+                  }
+                } catch (e) {
+                  // Split by newlines or commas if not valid JSON
                   contentBullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
                 }
-              } catch (e) {
-                // Split by newlines or commas if not valid JSON
-                contentBullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
               }
-            }
-            
-            // If we have bullets, add them to the slide
-            if (contentBullets.length > 0) {
-              const bulletText = contentBullets.map(bullet => `• ${bullet}`).join('\n');
-              currentSlide.addText(bulletText, { 
-                x: 0.5, 
-                y: slide.content ? 3 : 1.5, 
-                w: '90%', 
-                h: 4, 
-                fontSize: 16,
-                color: '363636'
-              });
-            }
-            break;
-        }
-        
-        // Add speaker notes if available
-        if (slide.notes) {
-          currentSlide.addNotes(slide.notes);
-        }
-      });
+              
+              // If we have bullets, add them to the slide with styling
+              if (contentBullets.length > 0) {
+                // Position bullets after content or at standard position if no content
+                const bulletY = slide.content ? 3 : 1.8;
+                
+                currentSlide.addText(contentBullets, { 
+                  x: 0.5, 
+                  y: bulletY, 
+                  w: '90%', 
+                  h: 5, 
+                  fontSize: designTheme.bullets.fontSize,
+                  color: designTheme.bullets.color,
+                  fontFace: designTheme.bullets.fontFace,
+                  bullet: true,
+                  bulletType: designTheme === designThemes.minimal ? 'DEFAULT' : 'BULLET',
+                  bulletColor: designTheme.accent.color
+                });
+              }
+              
+              // For conclusion slides, add a special footer or graphic
+              if (slide.slide_type === 'conclusion_slide') {
+                currentSlide.addText('Thank You!', {
+                  x: 0.5,
+                  y: 5,
+                  w: '90%',
+                  h: 1,
+                  fontSize: 28,
+                  bold: true,
+                  color: designTheme.accent.color,
+                  fontFace: designTheme.title.fontFace,
+                  align: 'center'
+                });
+              }
+              break;
+          }
+        });
+      }
     }
     
-    // Generate unique filename
-    const filename = `presentation_${uuidv4()}.pptx`;
+    // Generate a unique filename
+    const fileName = `presentation_${uuidv4()}.pptx`;
     
-    // 生成并获取PPT内容为buffer
-    let pptxBuffer;
-    console.log("Generating PPT buffer...");
-    await new Promise((resolve, reject) => {
-      pres.write('nodebuffer')
-        .then(buffer => {
-          console.log(`PPT buffer generated successfully, size: ${buffer.length} bytes`);
-          pptxBuffer = buffer;
-          resolve();
-        })
-        .catch(err => {
-          console.error("Error generating PPT buffer:", err);
-          reject(err);
-        });
-    });
+    // Write the PPT to a buffer
+    const pptBuffer = await pres.writeBuffer();
     
-    // 上传到Supabase Storage
-    console.log("Uploading PPT to storage...");
-    const fileUrl = await uploadFileToStorage(
-      pptxBuffer, 
-      filename, 
+    // Upload to Supabase Storage
+    const pptxUrl = await uploadFileToStorage(
+      pptBuffer,
+      fileName,
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       userId
     );
-    console.log("PPT uploaded successfully, URL:", fileUrl);
     
-    return fileUrl;
+    console.log(`PPTX uploaded to: ${pptxUrl}`);
+    
+    return pptxUrl;
   } catch (error) {
-    console.error('Error generating PPTX:', error);
-    throw new Error(`Failed to generate PowerPoint: ${error.message}`);
+    console.error(`Error generating PPTX: ${error.message}`);
+    throw new Error(`Failed to generate presentation: ${error.message}`);
   }
 }
 
 // Generate Word document from JSON content
 async function generateDOCX(content, userId) {
   try {
-    // Create a new docxtemplater instance with empty template
-    const zip = new PizZip();
+    console.log("Generating DOCX with content:", JSON.stringify(content, null, 2).substring(0, 500) + "...");
     
-    // Create a simple Word document
-    zip.file('word/document.xml', `
-      <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-        <w:body>
-          <w:p>
-            <w:r>
-              <w:t>${content.title || 'Document'}</w:t>
-            </w:r>
-          </w:p>
-          ${content.sections ? content.sections.map(section => `
-            <w:p>
-              <w:r>
-                <w:t>${section.heading}</w:t>
-              </w:r>
-            </w:p>
-            <w:p>
-              <w:r>
-                <w:t>${section.content}</w:t>
-              </w:r>
-            </w:p>
-          `).join('') : ''}
-        </w:body>
-      </w:document>
-    `);
+    // Read the template file
+    const fs = require('fs');
+    const path = require('path');
+    const templatePath = path.resolve(process.cwd(), 'app/api/ai/workflow-agent/templates/document_template.docx');
     
-    // Generate output
-    const buffer = zip.generate({ type: 'nodebuffer' });
+    // Check if template exists, if not create it
+    if (!fs.existsSync(templatePath)) {
+      console.log('Document template not found, creating a new one...');
+      await createDocxTemplate();
+    }
+    
+    // Read the template
+    const content_buffer = fs.readFileSync(templatePath, 'binary');
+    const zip = new PizZip(content_buffer);
+    
+    // Create a new instance of Docxtemplater
+    const doc = new Docxtemplater();
+    doc.loadZip(zip);
+    
+    // Prepare document data
+    const title = content.title || "Document";
+    const documentSections = [];
+    
+    // Process sections if available
+    if (content.sections && Array.isArray(content.sections)) {
+      content.sections.forEach(section => {
+        let sectionContent = {
+          heading: section.heading || "",
+          content: section.content || "",
+          subsections: []
+        };
+        
+        // Process subsections if available
+        if (section.subsections && Array.isArray(section.subsections)) {
+          section.subsections.forEach(subsection => {
+            let subsectionContent = {
+              heading: subsection.heading || "",
+              content: subsection.content || "",
+              bullets: subsection.bullets || []
+            };
+            sectionContent.subsections.push(subsectionContent);
+          });
+        }
+        
+        // Process bullets if available at section level
+        if (section.bullets && Array.isArray(section.bullets)) {
+          sectionContent.bullets = section.bullets;
+        } else {
+          sectionContent.bullets = [];
+        }
+        
+        documentSections.push(sectionContent);
+      });
+    }
+    
+    // Prepare the template data
+    const templateData = {
+      title: title,
+      sections: documentSections,
+      current_date: new Date().toLocaleDateString(),
+      has_sections: documentSections.length > 0
+    };
+    
+    // Set the template variables
+    doc.setData(templateData);
+    
+    // Render the document
+    try {
+      doc.render();
+    } catch (error) {
+      console.error('Error rendering document:', error);
+      throw new Error(`Error rendering document: ${error.message}`);
+    }
+    
+    // Get the rendered content
+    const buffer = doc.getZip().generate({
+      type: 'nodebuffer',
+      compression: 'DEFLATE'
+    });
     
     // Generate unique filename
     const filename = `document_${uuidv4()}.docx`;
     
-    // 上传到Supabase Storage
+    // Upload to Supabase Storage
     const fileUrl = await uploadFileToStorage(
       buffer, 
       filename, 
@@ -496,6 +868,7 @@ async function generateDOCX(content, userId) {
       userId
     );
     
+    console.log('Document generated successfully:', fileUrl);
     return fileUrl;
   } catch (error) {
     console.error('Error generating DOCX:', error);
@@ -517,130 +890,242 @@ function normalizeFormatName(format) {
 
 // Execute a workflow
 export async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}) {
-  // Fetch the workflow
+  // 获取传入的选项
+  const { 
+    outputFormats = [], 
+    outputSettings = {},
+    nodeConnections = {},
+    connectionMap = {},
+    aiModels = []
+  } = options;
+  
+  // 获取工作流
   const workflow = await getWorkflow(workflowId);
   
-  // Extract options
-  const { outputFormats = [] } = options;
+  // 准备模型列表
+  // 如果aiModels列表有多个模型，我们将使用它们进行多模型处理
+  // 否则使用单个modelId
+  const models = aiModels.length > 1 ? aiModels : [modelId || 'google/gemini-2.0-flash-exp:free'];
   
-  // Select model (default to Gemini Flash 2.0 if not specified)
-  const model = modelId || 'google/gemini-2.0-flash-exp:free';
-  
-  // Prepare the user prompt with inputs
+  // 准备用户提示，替换输入占位符
   let userPrompt = workflow.prompt;
   
-  // Replace input placeholders in the prompt
+  // 替换提示中的输入占位符
   if (inputs && typeof inputs === 'object') {
     Object.keys(inputs).forEach(key => {
       userPrompt = userPrompt.replace(`{{${key}}}`, inputs[key]);
     });
   }
   
-  // Initialize results and document URLs
+  // 初始化结果和文档URL
   const results = {};
   const documentUrls = {};
+  const apiResponses = {};
+  const modelResults = {}; // 存储每个模型的结果
   
   try {
-    // If no specific output formats are specified, use the workflow type
+    // 如果未指定特定输出格式，则使用工作流类型
     if (outputFormats.length === 0) {
-      // Normalize the workflow type to the new format name
+      // 规范化工作流类型为新的格式名称
       outputFormats.push(normalizeFormatName(workflow.type));
     } else {
-      // Normalize all provided output formats
+      // 规范化所有提供的输出格式
       for (let i = 0; i < outputFormats.length; i++) {
         outputFormats[i] = normalizeFormatName(outputFormats[i]);
       }
     }
     
-    console.log(`Executing workflow with output formats: ${outputFormats.join(', ')}`);
+    console.log(`执行工作流，输出格式: ${outputFormats.join(', ')}`);
+    console.log('节点连接:', JSON.stringify(nodeConnections));
+    console.log('连接图:', JSON.stringify(connectionMap));
+    console.log('使用模型:', models.join(', '));
     
-    // Execute a separate AI request for each output format
-    for (const format of outputFormats) {
-      // Get the appropriate system prompt for this format
-      const formatPrompt = WORKFLOW_PROMPTS[format];
+    // 为每个模型执行处理
+    for (const model of models) {
+      console.log(`使用模型 ${model} 处理...`);
+      modelResults[model] = {};
       
-      if (!formatPrompt) {
-        console.warn(`No prompt template found for format: ${format}`);
-        continue;
-      }
-      
-      console.log(`Executing AI request for format: ${format}`);
-      
-      // Execute the AI request with the format-specific prompt
-      const completion = await openai.chat.completions.create({
-        model: model,
-        messages: [
-          { role: 'system', content: formatPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 2500,
-        response_format: { type: "json_object" }
-      });
-      
-      // Extract and parse the AI response
-      const aiContent = completion.choices[0]?.message?.content || "";
-      const { data: formatResult, error: parseError } = safeParseJSON(aiContent);
-      
-      if (parseError || !formatResult) {
-        console.error(`AI response parsing failed for format ${format}:`, parseError, "Original content:", aiContent);
-        results[format] = { error: `Failed to parse AI response: ${parseError || 'Invalid response format'}` };
-        continue;
-      }
-      
-      // Log the structure of the result for debugging
-      console.log(`AI response structure for ${format}:`, JSON.stringify({
-        hasTitle: !!formatResult.title,
-        hasSlides: !!formatResult.slides,
-        hasSections: !!formatResult.sections,
-        resultKeys: Object.keys(formatResult)
-      }));
-      
-      // Store the result for this format
-      results[format] = formatResult;
-      
-      // Generate documents based on the format
-      if (format === 'ppt') {
-        try {
-          documentUrls.pptxUrl = await generatePPTX(formatResult, userId);
-        } catch (docError) {
-          console.error(`Error generating PowerPoint for format ${format}:`, docError);
+      // 为每个输出格式执行单独的AI请求
+      for (const format of outputFormats) {
+        // 获取此格式的合适系统提示
+        const formatPrompt = WORKFLOW_PROMPTS[format];
+        
+        if (!formatPrompt) {
+          console.warn(`未找到格式的提示模板: ${format}`);
+          
+          // 即使没有特定的提示模板，也使用通用JSON格式
+          // 这样API节点也能够接收数据
+          if (format === 'api') {
+            // API格式不需要实际执行，它只是接收数据的节点
+            continue;
+          } else {
+            // 对于其他未知格式，使用JSON格式的提示
+            console.log(`使用通用JSON格式的提示代替: ${format}`);
+            const jsonPrompt = WORKFLOW_PROMPTS['json'];
+            
+            if (jsonPrompt) {
+              // 执行AI请求使用JSON格式提示
+              const formatResult = await processAIRequest(model, jsonPrompt, userPrompt, format, results);
+              modelResults[model][format] = formatResult;
+            }
+            continue;
+          }
         }
-      } else if (format === 'document') {
-        try {
-          documentUrls.docxUrl = await generateDOCX(formatResult, userId);
-        } catch (docError) {
-          console.error(`Error generating Word document for format ${format}:`, docError);
+        
+        console.log(`为格式执行AI请求: ${format} 使用模型: ${model}`);
+        
+        // 执行AI请求
+        const formatResult = await processAIRequest(model, formatPrompt, userPrompt, format, results);
+        modelResults[model][format] = formatResult;
+      }
+    }
+    
+    // 合并多个模型的结果
+    // 如果有多个模型处理相同格式，优先使用第二个模型的结果（假设第二个是更高质量的模型）
+    for (const format of outputFormats) {
+      for (const model of models) {
+        if (modelResults[model] && modelResults[model][format]) {
+          results[format] = modelResults[model][format];
         }
       }
     }
     
-    // Save the execution record with output formats
+    // 处理PPT生成
+    if (outputFormats.includes('ppt')) {
+      console.log('生成PPT文档...');
+      try {
+        // 检查是否有有效的PPT内容或错误内容
+        const pptContent = results['ppt'] || { error: "No valid presentation content generated" };
+        const pptUrl = await generatePPTX(pptContent, userId);
+        documentUrls['ppt'] = pptUrl;
+        console.log('PPT生成成功:', pptUrl);
+      } catch (error) {
+        console.error('生成PPT时出错:', error);
+        documentUrls['ppt_error'] = error.message;
+      }
+    }
+    
+    // 处理文档生成
+    if (outputFormats.includes('document')) {
+      console.log('生成Word文档...');
+      try {
+        const docContent = results['document'] || { error: "No valid document content generated" };
+        const docUrl = await generateDOCX(docContent, userId);
+        documentUrls['document'] = docUrl;
+        console.log('文档生成成功:', docUrl);
+      } catch (error) {
+        console.error('生成文档时出错:', error);
+        documentUrls['document_error'] = error.message;
+      }
+    }
+    
+    // 处理节点间的连接关系
+    if (Object.keys(connectionMap).length > 0) {
+      console.log('处理节点间的连接关系');
+      
+      // 检查是否有API节点需要处理
+      for (const nodeId in nodeConnections) {
+        // 获取节点的输出类型和设置
+        const apiSettings = outputSettings[nodeId];
+        
+        if (apiSettings && apiSettings.type === 'api') {
+          console.log(`处理API节点 ${nodeId}`);
+          
+          // 获取连接到此API节点的源节点
+          const sourceNodes = nodeConnections[nodeId]?.sourceNodes || [];
+          
+          if (sourceNodes.length > 0) {
+            console.log(`API节点 ${nodeId} 有 ${sourceNodes.length} 个源节点`);
+            
+            // 遍历所有源节点
+            for (const sourceId of sourceNodes) {
+              // 获取源节点的输出设置
+              const sourceSettings = outputSettings[sourceId];
+              
+              // 如果源节点是JSON输出，使用它作为API请求体
+              if (sourceSettings && sourceSettings.type === 'json') {
+                console.log(`使用JSON节点 ${sourceId} 作为API请求体`);
+                
+                // 修复获取JSON结果的方式 - 检查各种可能的结果格式
+                let jsonResult = null;
+                
+                // 检查流程节点生成的结果，通常保存在格式名称对应的键下
+                for (const format in results) {
+                  if (results[format]) {
+                    jsonResult = results[format];
+                    console.log(`找到结果格式: ${format}, 使用此结果作为API请求数据`);
+                    break;
+                  }
+                }
+                
+                if (!jsonResult) {
+                  console.error(`未找到可用于API请求的JSON结果，来自节点 ${sourceId}`);
+                  apiResponses[nodeId] = {
+                    success: false,
+                    error: '没有可用于API请求的JSON数据'
+                  };
+                  continue;
+                }
+                
+                // 执行API请求
+                console.log(`使用节点 ${nodeId} 的API设置执行请求`);
+                console.log(`请求URL: ${apiSettings.url}, 方法: ${apiSettings.method}`);
+                console.log(`请求数据:`, JSON.stringify(jsonResult).substring(0, 200) + '...');
+                
+                try {
+                  // 使用API设置和JSON结果执行请求
+                  const apiResponse = await executeApiRequest(
+                    apiSettings.url,
+                    apiSettings.method,
+                    jsonResult
+                  );
+                  
+                  // 存储API响应
+                  apiResponses[nodeId] = apiResponse;
+                  console.log(`API请求成功，状态码: ${apiResponse.status}`);
+                } catch (apiError) {
+                  console.error(`执行API请求时出错:`, apiError);
+                  apiResponses[nodeId] = {
+                    success: false,
+                    error: apiError.message || 'API请求失败'
+                  };
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // 保存执行记录
     await saveWorkflowExecution(
       workflowId, 
       userId, 
-      model, 
+      models.join(', '), // 使用所有模型ID
       inputs, 
       results, 
       outputFormats,
-      documentUrls
+      documentUrls,
+      apiResponses
     );
     
     return {
       workflowId,
       results,
-      model,
+      models, // 返回使用的所有模型
       outputFormats,
-      ...documentUrls // Include document URLs in the response
+      apiResponses,
+      // 将documentUrls中的属性分解到结果对象中，使其更容易在前端访问
+      ...documentUrls 
     };
   } catch (error) {
-    console.error("Error executing workflow:", error);
-    throw new Error(`Workflow execution failed: ${error.message}`);
+    console.error("执行工作流时出错:", error);
+    throw new Error(`工作流执行失败: ${error.message}`);
   }
 }
 
 // Save workflow execution record
-async function saveWorkflowExecution(workflowId, userId, model, inputs, results, outputFormats, documentUrls = {}) {
+async function saveWorkflowExecution(workflowId, userId, model, inputs, results, outputFormats, documentUrls = {}, apiResponses = {}) {
   try {
     const { data, error } = await supabase
       .from('workflow_executions')
@@ -653,15 +1138,16 @@ async function saveWorkflowExecution(workflowId, userId, model, inputs, results,
         status: 'completed',
         executed_at: new Date().toISOString(),
         output_formats: outputFormats,
-        document_urls: documentUrls
+        document_urls: documentUrls,
+        api_responses: apiResponses
       });
       
-    if (error) throw new Error(`Failed to save workflow execution: ${error.message}`);
+    if (error) throw new Error(`保存工作流执行失败: ${error.message}`);
     
     return data;
   } catch (error) {
-    console.error("Error saving workflow execution:", error);
-    // We don't want to fail the overall execution if just the recording fails
+    console.error("保存工作流执行时出错:", error);
+    // 我们不希望因为记录失败而导致整个执行失败
     return null;
   }
 }
@@ -730,4 +1216,85 @@ export async function getUserWorkflows(userId) {
   if (error) throw new Error(`Failed to fetch workflows: ${error.message}`);
   
   return data || [];
+}
+
+// 将AI请求处理逻辑提取为单独的函数
+async function processAIRequest(model, formatPrompt, userPrompt, format, results) {
+  try {
+    // 特殊处理deepseek模型，添加明确的JSON格式要求
+    let updatedPrompt = formatPrompt;
+    if (model.includes('deepseek')) {
+      updatedPrompt = formatPrompt + "\n\nVERY IMPORTANT: Your response MUST be valid JSON only. Do not include any explanation or commentary. Start your response with '{' and end with '}'. Do not include any text before or after the JSON object.";
+    }
+    
+    // 创建基本请求配置
+    const requestConfig = {
+      model: model,
+      messages: [
+        { role: 'system', content: updatedPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 2500
+    };
+    
+    // 根据模型提供者添加适当的response_format设置
+    // OpenAI和Anthropic支持response_format
+    if (model.includes('openai') || model.includes('gpt') || model.includes('claude')) {
+      requestConfig.response_format = { type: "json_object" };
+    }
+    // Gemini使用不同的参数名称
+    else if (model.includes('gemini')) {
+      requestConfig.response_format = { type: "json_object" };
+    }
+    // 其他模型可能不支持response_format，依赖于system prompt
+    
+    console.log(`向模型 ${model} 发送请求，格式: ${format}`);
+    
+    // 使用特定格式的提示执行AI请求
+    const completion = await openai.chat.completions.create(requestConfig);
+    
+    // 提取并解析AI响应
+    const aiContent = completion.choices[0]?.message?.content || "";
+    
+    // 尝试清理非JSON内容
+    let cleanedContent = aiContent;
+    
+    // 查找JSON内容的开始和结束
+    const jsonStart = cleanedContent.indexOf('{');
+    const jsonEnd = cleanedContent.lastIndexOf('}') + 1;
+    
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      // 提取JSON部分
+      cleanedContent = cleanedContent.substring(jsonStart, jsonEnd);
+    }
+    
+    // 解析JSON
+    const { data: formatResult, error: parseError } = safeParseJSON(cleanedContent);
+    
+    if (parseError || !formatResult) {
+      console.error(`格式${format}的AI响应解析失败:`, parseError, "原始内容:", aiContent);
+      console.log("尝试清理后的内容:", cleanedContent);
+      results[format] = { error: `解析AI响应失败: ${parseError || '无效的响应格式'}` };
+      return { error: `解析AI响应失败: ${parseError || '无效的响应格式'}` };
+    }
+    
+    // 记录结果结构以进行调试
+    console.log(`格式${format}的AI响应结构:`, JSON.stringify({
+      hasTitle: !!formatResult.title,
+      hasSlides: !!formatResult.slides,
+      hasSections: !!formatResult.sections,
+      resultKeys: Object.keys(formatResult)
+    }));
+    
+    // 存储此格式的结果
+    results[format] = formatResult;
+    
+    // 返回处理结果
+    return formatResult;
+  } catch (error) {
+    console.error(`处理AI请求时出错:`, error);
+    results[format] = { error: `处理AI请求时出错: ${error.message}` };
+    return { error: `处理AI请求时出错: ${error.message}` };
+  }
 }

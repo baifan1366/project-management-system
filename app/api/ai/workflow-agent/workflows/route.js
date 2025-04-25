@@ -57,6 +57,7 @@ export async function POST(request) {
       type: body.type,
       prompt: body.prompt,
       input_schema: body.input_schema || {},
+      flow_data: body.flow_data || null,
       is_public: !!body.is_public,
       icon: body.icon || '📄'
     };
@@ -95,6 +96,7 @@ export async function PUT(request) {
     if (body.type !== undefined) updates.type = body.type;
     if (body.prompt !== undefined) updates.prompt = body.prompt;
     if (body.input_schema !== undefined) updates.input_schema = body.input_schema;
+    if (body.flow_data !== undefined) updates.flow_data = body.flow_data;
     if (body.is_public !== undefined) updates.is_public = !!body.is_public;
     if (body.icon !== undefined) updates.icon = body.icon;
     

@@ -350,6 +350,7 @@ CREATE TABLE IF NOT EXISTS workflow_executions (
     status VARCHAR(50) NOT NULL,
     output_formats TEXT[] DEFAULT '{}'::text[],
     document_urls JSONB DEFAULT '{}'::jsonb,
+    api_responses JSONB DEFAULT '{}'::jsonb,
     executed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
