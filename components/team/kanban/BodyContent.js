@@ -14,62 +14,6 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
     const [tags, setTags] = useState([]);
     const [isLoaded, setIsLoaded] = useState(false);
 
-    // 默认数据（当API返回为空时使用）
-    const getDefaultColumns = () => ({
-        'doing': {
-            id: 'doing',
-            title: 'Doing',
-            taskIds: ['task-2', 'task-3']
-        },
-        'done': {
-            id: 'done',
-            title: 'Done',
-            taskIds: ['task-4', 'task-5', 'task-6']
-        },
-        'todo': {
-            id: 'todo',
-            title: 'To do',
-            taskIds: ['task-1']
-        }
-    });
-
-    const getDefaultTasks = () => ({
-        'task-1': {
-          id: 'task-1',
-          content: 'Meeting Report',
-          assignee: {
-            avatar: '/avatar-placeholder.png'
-          }
-        },
-        'task-2': {
-          id: 'task-2',
-          content: '设计首页UI',
-          assignee: null
-        },
-        'task-3': {
-          id: 'task-3',
-          content: '后端API开发',
-          assignee: null
-        },
-        'task-4': {
-          id: 'task-4',
-          content: '测试用户注册流程',
-          assignee: null
-        },
-        'task-5': {
-          id: 'task-5',
-          content: '修复登录Bug',
-          assignee: null
-        },
-        'task-6': {
-          id: 'task-6',
-          content: '优化数据库查询',
-          assignee: null
-        }
-    });
-
-    const getDefaultColumnOrder = () => ['doing', 'done', 'todo'];
-
     const loadData = async () => {
         if (!teamId || isLoaded) return;
         
@@ -137,23 +81,13 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
                 }
             }
             
-            // 如果没有部门数据，使用默认数据
-            if (tempColumnOrder.length === 0) {
-                setColumns(getDefaultColumns());
-                setTasks(getDefaultTasks());
-                setColumnOrder(getDefaultColumnOrder());
-            } else {
-                // 更新状态
-                setColumns(tempColumns);
-                setTasks(tempTasks);
-                setColumnOrder(tempColumnOrder);
-            }
+            
+            setColumns(tempColumns);
+            setTasks(tempTasks);
+            setColumnOrder(tempColumnOrder);
+            
         } catch (error) {
             console.error('加载数据失败:', error);
-            // 加载失败时使用默认数据
-            setColumns(getDefaultColumns());
-            setTasks(getDefaultTasks());
-            setColumnOrder(getDefaultColumnOrder());
         }
     };
 
@@ -166,9 +100,9 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
 
     return {
         loadData,
-        initialColumns: Object.keys(columns).length > 0 ? columns : getDefaultColumns(),
-        initialTasks: Object.keys(tasks).length > 0 ? tasks : getDefaultTasks(),
-        initialColumnOrder: columnOrder.length > 0 ? columnOrder : getDefaultColumnOrder()
+        initialColumns: Object.keys(columns).length > 0 ? columns : '',
+        initialTasks: Object.keys(tasks).length > 0 ? tasks : '',
+        initialColumnOrder: columnOrder.length > 0 ? columnOrder : []
     };
 }
 

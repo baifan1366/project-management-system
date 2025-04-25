@@ -147,17 +147,21 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                             className="flex justify-between items-center mb-2 p-1"
                             {...provided.dragHandleProps}
                           >
-                            <h2 className="font-semibold text-muted-foreground">{column?.title} <span className="text-gray-400 ml-1">{column?.taskIds?.length || 0}</span></h2>
+                            <h2 className="font-semibold text-black dark:text-white">{column?.title} <span className="text-black dark:text-white ml-1">{column?.taskIds?.length || 0}</span></h2>
                             <div className="flex">
-                              <button 
+                              <Button 
+                                variant="ghost"
                                 onClick={() => handleAddTask(column?.id)}
-                                className="p-1 hover:bg-gray-200 hover:dark:bg-gray-800 rounded-md"
+                                className="p-1"
                               >
                                 <PlusIcon size={16} className="text-gray-400" />
-                              </button>
-                              <button className="p-1 hover:bg-gray-200 hover:dark:bg-gray-800 rounded-md">
+                              </Button>
+                              <Button 
+                                variant="ghost"
+                                className="p-1"
+                              >
                                 <MoreHorizontal size={16} className="text-gray-400" />
-                              </button>
+                              </Button>
                             </div>
                           </div>
                           <Droppable droppableId={column?.id || `column-${index}`} type="task">
@@ -165,7 +169,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                               <div
                                 {...provided.droppableProps}
                                 ref={provided.innerRef}
-                                className="max-h-[500px] bg-gray-100 rounded-lg dark:bg-gray-700 overflow-y-auto"
+                                className="max-h-[500px] bg-gray-100 rounded-lg dark:bg-black overflow-y-auto"
                               >
                                 {columnTasks.map((task, taskIndex) => (
                                   task ? (
@@ -175,7 +179,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                           ref={provided.innerRef}
                                           {...provided.draggableProps}
                                           {...provided.dragHandleProps}
-                                          className="p-3 rounded-md hover:bg-gray-200 hover:dark:bg-gray-800 relative group"
+                                          className="p-3 rounded-md hover:bg-gray-200 hover:dark:bg-accent relative group"
                                         >
                                           {/* 顶部栏 */}
                                           <div className="flex justify-between items-center">
@@ -185,7 +189,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                               </button>
                                               <span className="text-sm text-black dark:text-white">{task.content}</span>
                                             </div>
-                                            <button className="invisible group-hover:visible p-1 hover:bg-gray-200 hover:dark:bg-gray-700 rounded-md">
+                                            <button className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black">
                                               <Pen size={14} className="text-gray-500" />
                                             </button>
                                           </div>
@@ -195,7 +199,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                             <div>
                                               <User size={14} className="text-gray-500" />
                                             </div>
-                                            <button className="invisible group-hover:visible p-1 hover:bg-gray-200 hover:dark:bg-gray-700 rounded-md">
+                                            <button className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black">
                                               <ThumbsUp size={14} className="text-gray-500" />
                                             </button>
                                           </div>
@@ -210,7 +214,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                           </Droppable>
                           <Button 
                             variant="ghost"
-                            className="w-full mt-1 text-gray-400 text-sm py-2 hover:bg-gray-100 hover:dark:bg-gray-700 rounded-md flex items-center justify-center"
+                            className="w-full mt-1 text-gray-400 text-sm py-2 rounded-md flex items-center justify-center"
                             onClick={() => handleAddTask(column?.id)}
                           >
                             <PlusIcon size={14} className="mr-1 text-muted-foreground" />
@@ -232,7 +236,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                   <PlusIcon size={20} className="text-muted-foreground mr-2" />
                   <span className="text-muted-foreground">{t('addNewSection')}</span>
                 </Button>
-                <div className="w-full min-h-[500px] mt-1 bg-gray-100 rounded-lg dark:bg-gray-700"></div>
+                <div className="w-full min-h-[500px] mt-1 bg-background rounded-lg dark:bg-background"></div>
               </div>
               
               {provided.placeholder}
