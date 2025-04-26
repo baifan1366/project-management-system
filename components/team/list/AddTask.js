@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { createTask } from '@/lib/redux/features/taskSlice';
 import { updateTaskIds } from '@/lib/redux/features/sectionSlice';
@@ -8,15 +8,16 @@ import { supabase } from '@/lib/supabase';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
+import { useEffect } from 'react';
 
-export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks }) {
+export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks, taskInputRef }) {
   const dispatch = useDispatch();
   const t = useTranslations('CreateTask');
   // 存储编辑中的任务状态
   const [editingTask, setEditingTask] = useState(null);
   // 存储编辑中的任务内容
   const [editingTaskValues, setEditingTaskValues] = useState({});
-
+  const checkTaskInputRef = useRef(null);
   // 添加新任务
   const handleAddTask = (sectionId) => {
     // 创建临时的任务ID
@@ -133,6 +134,39 @@ export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks }
     }
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // 使用从父组件传递的 taskInputRef 而不是本地的 checkTaskInputRef
+      if (editingTask && taskInputRef && taskInputRef.current && !taskInputRef.current.contains(event.target)) {
+        // 获取当前正在编辑的任务和它所属的部门
+        let currentTaskSection = null;
+        Object.keys(localTasks).forEach(sectionId => {
+          const taskInSection = localTasks[sectionId].find(task => task.id === editingTask);
+          if (taskInSection) {
+            currentTaskSection = sectionId;
+          }
+        });
+        
+        // 如果找到了任务所属的部门，完成任务编辑
+        if (currentTaskSection) {
+          handleTaskEditComplete(editingTask, currentTaskSection);
+        } else {
+          // 如果找不到部门，只清除编辑状态
+          setEditingTask(null);
+          setEditingTaskValues({});
+        }
+      }
+    };
+
+    // 添加点击事件监听器
+    document.addEventListener("mousedown", handleClickOutside);
+    
+    // 清理函数
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [editingTask, localTasks, taskInputRef]);
+
   // 渲染添加任务按钮
   const renderAddTaskButton = (sectionId) => {
     return (
@@ -153,6 +187,7 @@ export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks }
     handleTaskValueChange,
     handleTaskEditComplete,
     handleKeyDown,
-    renderAddTaskButton
+    renderAddTaskButton,
+    checkTaskInputRef
   };
 }

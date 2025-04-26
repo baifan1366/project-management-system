@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Check, AlertTriangle, Info, HelpCircle, XCircle } from "lucide-react";
+import { useTranslations } from 'next-intl';
 
 const CONFIRM_LIMIT = 5;
 
@@ -114,11 +115,16 @@ export function ConfirmDialog({
   description, 
   onConfirm, 
   onCancel, 
-  confirmText = "确认", 
-  cancelText = "取消",
+  confirmText, 
+  cancelText,
   variant = "info",
   id
 }) {
+  const tConfirm = useTranslations('confirmation');
+  
+  const finalConfirmText = confirmText || tConfirm('confirm');
+  const finalCancelText = cancelText || tConfirm('cancel');
+
   const handleConfirm = () => {
     if (onConfirm) onConfirm();
     dispatch({ type: "DISMISS_CONFIRM", confirmId: id });
@@ -154,13 +160,13 @@ export function ConfirmDialog({
             onClick={handleCancel}
             className="mt-0"
           >
-            {cancelText}
+            {finalCancelText}
           </AlertDialogCancel>
           <Button 
             onClick={handleConfirm}
             variant={variant === "error" ? "destructive" : "default"}
           >
-            {confirmText}
+            {finalConfirmText}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

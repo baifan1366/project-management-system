@@ -41,6 +41,10 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   const [isCreatingSection, setIsCreatingSection] = useState(false);
   // 新增：存储部门名称输入
   const [newSectionName, setNewSectionName] = useState('');
+  // 新增：创建部门输入框的引用
+  const sectionInputRef = useRef(null);
+  // 新增：创建任务输入框的引用
+  const taskInputRef = useRef(null);
 
   // 从Redux状态中获取标签数据
   const { tags: tagsData, tagsStatus } = useSelector((state) => state.teamCF);
@@ -261,12 +265,14 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     handleAddTask: originalHandleAddTask, 
     handleTaskValueChange, 
     handleTaskEditComplete: originalHandleTaskEditComplete, 
-    handleKeyDown 
+    handleKeyDown,
+    checkTaskInputRef
   } = AddTask({ 
     sectionId: '', 
     teamId, 
     localTasks, 
-    setLocalTasks 
+    setLocalTasks,
+    taskInputRef
   });
   
   // 包装handleAddTask以添加加载状态
@@ -319,7 +325,8 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     handleAddTask,
     handleTaskValueChange,
     handleTaskEditComplete,
-    handleKeyDown
+    handleKeyDown,
+    taskInputRef
   });
 
   // 在部门数据加载后加载任务
@@ -334,7 +341,7 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     if (teamId) {
       loadSections();
     }
-  }, [teamId, loadSections]);
+  }, [teamId]);
 
   // 新增：处理部门创建
   const handleAddSection = () => {
@@ -346,6 +353,24 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   const handleSectionNameChange = (e) => {
     setNewSectionName(e.target.value);
   };
+
+  // 新增：处理点击外部关闭输入框
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isCreatingSection && sectionInputRef.current && !sectionInputRef.current.contains(event.target)) {
+        setIsCreatingSection(false);
+        setNewSectionName('');
+      }
+    };
+
+    // 添加点击事件监听器
+    document.addEventListener("mousedown", handleClickOutside);
+    
+    // 清理函数
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isCreatingSection]);
 
   // 新增：处理部门创建提交
   const handleCreateSection = async (e) => {
@@ -460,12 +485,13 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
                 {isCreatingSection ? (
                   <div className="flex items-center space-x-2 p-1">
                     <Input
+                      ref={sectionInputRef}
                       autoFocus
                       placeholder={t('enterSectionName')}
                       value={newSectionName}
                       onChange={handleSectionNameChange}
                       onKeyDown={handleCreateSection}
-                      className="h-8"
+                      className="h-8 border-transparent"
                     />
                   </div>
                 ) : (

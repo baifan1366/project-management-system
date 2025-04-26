@@ -17,6 +17,7 @@ import { useGanttData, formatDateForGantt } from './BodyContent';
 export default function TaskGantt({ projectId, teamId, teamCFId }) {
   const ganttContainer = useRef(null);
   const t = useTranslations('CreateTask');
+  const tConfirm = useTranslations('confirmation');
   const { confirm } = useConfirm();
   const project = useSelector(state => 
     state.projects.projects.find(p => p.id.toString() === projectId.toString())
@@ -114,7 +115,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId }) {
 
   const handleDeleteTask = () => {
     confirm({
-      title: '确认删除',
+      title: tConfirm('confirmDeleteTask'),
       description: `Task "${editTask.text}" will be deleted`,
       variant: 'error',
       onConfirm: () => {
@@ -236,8 +237,8 @@ export default function TaskGantt({ projectId, teamId, teamCFId }) {
       const targetTask = gantt.getTask(link.target);
       
       confirm({
-        title: t('confirmDeleteLink'),
-        description: `${t('link')} ${sourceTask.text} – ${targetTask.text} ${t('willBeDeleted')}`,
+        title: tConfirm('confirmDeleteLink'),
+        description: `${tConfirm('link')} ${sourceTask.text} – ${targetTask.text} ${tConfirm('willBeDeleted')}`,
         variant: 'error',
         onConfirm: () => {
           gantt.deleteLink(id);
