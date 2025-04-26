@@ -8,9 +8,11 @@ import RecentSearches from '@/components/search/RecentSearches';
 import SuggestedSearches from '@/components/search/SuggestedSearches';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function SearchPage() {
   const t = useTranslations();
+  const { user: currentUser, isLoading: userLoading } = useGetUser();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,8 +24,7 @@ export default function SearchPage() {
     async function loadRecentSearches() {
       setLoadingHistory(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
+        if (!currentUser) {
           setLoadingHistory(false);
           return;
         }
@@ -31,7 +32,7 @@ export default function SearchPage() {
         const { data, error } = await supabase
           .from('search_history')
           .select('search_term')
-          .eq('user_id', session.user.id)
+          .eq('user_id', currentUser.id)
           .order('last_searched_at', { ascending: false })
           .limit(10);
 
@@ -45,8 +46,10 @@ export default function SearchPage() {
       }
     }
 
-    loadRecentSearches();
-  }, []);
+    if (!userLoading) {
+      loadRecentSearches();
+    }
+  }, [currentUser, userLoading]);
 
   // Handle search request
   const handleSearch = async (searchQuery = query) => {
@@ -64,14 +67,13 @@ export default function SearchPage() {
         setResults(data.results || []);
         
         // Update recent searches
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+        if (currentUser) {
           // First check if this search term already exists for this user
           const { data: existingSearch, error: fetchError } = await supabase
             .from('search_history')
             .select('id, count')
             .eq('search_term', searchQuery)
-            .eq('user_id', session.user.id)
+            .eq('user_id', currentUser.id)
             .maybeSingle();
           
           if (fetchError) {
@@ -93,7 +95,7 @@ export default function SearchPage() {
               .from('search_history')
               .insert({
                 search_term: searchQuery,
-                user_id: session.user.id,
+                user_id: currentUser.id,
                 count: 1
               });
               
@@ -104,7 +106,7 @@ export default function SearchPage() {
           const { data: recentData } = await supabase
             .from('search_history')
             .select('search_term')
-            .eq('user_id', session.user.id)
+            .eq('user_id', currentUser.id)
             .order('last_searched_at', { ascending: false })
             .limit(10);
           
@@ -124,13 +126,12 @@ export default function SearchPage() {
 
   const handleClearRecent = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!currentUser) return;
 
       const { error } = await supabase
         .from('search_history')
         .delete()
-        .eq('user_id', session.user.id);
+        .eq('user_id', currentUser.id);
 
       if (error) throw error;
       

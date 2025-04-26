@@ -17,7 +17,7 @@ import { NotificationDialog } from './notifications/NotificationDialog';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectUnreadCount, fetchNotifications } from '@/lib/redux/features/notificationSlice';
 import { Badge } from './ui/badge';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 
@@ -29,19 +29,18 @@ export function Header() {
   const [isProfileOpen, setProfileOpen] = useState(false);
   const [isNotificationOpen, setNotificationOpen] = useState(false);
   const unreadCount = useSelector(selectUnreadCount);
-  const [user, setUser] = useState(null);
+  const { user } = useGetUser();
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
+
+      if (user) {
         // 初始加载通知
-        dispatch(fetchNotifications(session.user.id));
+        dispatch(fetchNotifications(user.id));
         
         // 设置定时器，每5分钟刷新一次通知，减少请求频率
         const interval = setInterval(() => {
-          dispatch(fetchNotifications(session.user.id));
+          dispatch(fetchNotifications(user.id));
         }, 300000); // 从60000改为300000 (5分钟)
         
         return () => clearInterval(interval);

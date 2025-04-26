@@ -35,17 +35,14 @@ ChartJS.register(
 );
 
 export default function AdminAnalytics() {
-
+  const { user: sessionData, error: sessionError } = useGetUser();
   // 验证管理员会话并获取数据
   useEffect(() => {
     const checkAdminSession = async () => {
       try {
         setLoading(true);
         
-        // 获取当前会话
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
+        if (sessionError) {
           throw new Error('No active session found');
         }
         
@@ -53,7 +50,7 @@ export default function AdminAnalytics() {
         const { data: admin, error: adminError } = await supabase
           .from('admin_user')
           .select('*')
-          .eq('email', sessionData.session.user.email)
+          .eq('email', sessionData.user.email)
           .eq('is_active', true)
           .single();
           

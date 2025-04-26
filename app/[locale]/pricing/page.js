@@ -6,6 +6,7 @@ import { fetchPlans, setSelectedInterval, fetchCurrentUserPlan } from '@/lib/red
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import clsx from 'clsx'
+import useGetUser from '@/lib/hooks/useGetUser'
 
 export default function PricingPage() {
   const t = useTranslations('Pricing')
@@ -34,7 +35,7 @@ export default function PricingPage() {
 
     try {
       // 获取会话
-      const { data, error } = await supabase.auth.getSession();
+      const { user , error } = useGetUser();
       
       if (error) {
         console.error('获取会话错误:', error);
@@ -48,7 +49,7 @@ export default function PricingPage() {
       }
       
       // 检查会话是否存在且有用户
-      if (data && data.session && data.session.user) {
+      if (user) {
         // 检查是否是当前计划
         if (currentUserPlan && currentUserPlan.plan_id === plan.id) {
           console.log('用户点击了当前计划，重定向到仪表盘');
@@ -67,7 +68,7 @@ export default function PricingPage() {
         // 只传递必要的参数：plan_id 和 user_id
         const paymentParams = new URLSearchParams({
           plan_id: plan.id.toString(),
-          user_id: data.session.user.id
+          user_id: user.id
         }).toString();
         router.push(`/${locale}/payment?${paymentParams}`);
       } else {

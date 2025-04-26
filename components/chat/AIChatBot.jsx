@@ -9,6 +9,7 @@ import PengyImage from '../../public/pengy.webp';
 import { useChat } from '@/contexts/ChatContext';
 import { supabase } from '@/lib/supabase';
 import ChatMessage from '@/components/ui/chat-message';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 // 移除原SVG组件，改用Image组件
 const PenguinIcon = () => (
@@ -32,37 +33,8 @@ export default function AIChatBot() {
   const { saveAIChatMessage, createAIChatSession, currentSession, setCurrentSession, chatMode, sessions } = useChat();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [aiSession, setAiSession] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user: currentUser } = useGetUser();
   const chatContainerRef = useRef(null);
-  
-  // 获取当前用户信息
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
-        console.error('获取当前用户失败:', error);
-        return;
-      }
-      
-      if (user) {
-        // 获取用户详细信息
-        const { data: userData, error: userError } = await supabase
-          .from('user')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-          
-        if (userError) {
-          console.error('获取用户详情失败:', userError);
-          setCurrentUser(user);
-        } else {
-          setCurrentUser(userData);
-        }
-      }
-    };
-    
-    fetchCurrentUser();
-  }, []);
 
   // 自动滚动到底部
   useEffect(() => {

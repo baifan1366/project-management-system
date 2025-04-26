@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/lib/supabase';
 import { useChat } from '@/contexts/ChatContext';
 import { toast } from 'sonner';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function NewChatPopover() {
   const t = useTranslations('Chat');
@@ -22,18 +23,18 @@ export default function NewChatPopover() {
   const [searchResults, setSearchResults] = useState([]);
   const [recentContacts, setRecentContacts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { user: currentUser } = useGetUser();
 
   // 加载最近联系人
   useEffect(() => {
     const loadRecentContacts = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.log('未找到有效的会话，无法加载联系人');
+        if (!currentUser) {
+          console.log('未找到有效的用户，无法加载联系人');
           return;
         }
 
-        console.log('正在加载用户ID为', session.user.id, '的最近联系人');
+        console.log('正在加载用户ID为', currentUser.id, '的最近联系人');
 
         const { data, error } = await supabase
           .from('chat_participant')
@@ -47,7 +48,7 @@ export default function NewChatPopover() {
               )
             )
           `)
-          .eq('user_id', session.user.id)
+          .eq('user_id', currentUser.id)
           .eq('chat_session.type', 'PRIVATE')
           .order('joined_at', { ascending: false })
           .limit(5);
@@ -74,7 +75,7 @@ export default function NewChatPopover() {
             }
             
             const otherParticipants = item.chat_session.participants.filter(
-              p => p && p.user && p.user.id && p.user.id !== session.user.id
+              p => p && p.user && p.user.id && p.user.id !== currentUser.id
             );
             
             if (otherParticipants.length > 0) {
@@ -94,27 +95,24 @@ export default function NewChatPopover() {
       }
     };
 
-    if (isOpen) {
+    if (isOpen && currentUser) {
       loadRecentContacts();
     }
-  }, [isOpen]);
+  }, [isOpen, currentUser]);
 
   // 搜索用户
   const searchUsers = async (query) => {
-    if (!query.trim()) {
+    if (!query.trim() || !currentUser) {
       setSearchResults([]);
       return;
     }
 
     setIsLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       const { data, error } = await supabase
         .from('user')
         .select('*')
-        .neq('id', session.user.id)
+        .neq('id', currentUser.id)
         .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
         .limit(10);
 
@@ -148,16 +146,9 @@ export default function NewChatPopover() {
 
   // 创建新聊天
   const createChat = async () => {
-    if (selectedUsers.length === 0) return;
+    if (selectedUsers.length === 0 || !currentUser) return;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('用户未登录，无法创建聊天');
-        toast.error(t('errors.userNotLoggedIn'));
-        return;
-      }
-
       console.log('开始创建聊天，已选择的用户:', selectedUsers.map(u => u.name).join(', '));
 
       // 创建聊天会话
@@ -166,7 +157,7 @@ export default function NewChatPopover() {
         .insert([{
           type: selectedUsers.length === 1 ? 'PRIVATE' : 'GROUP',
           name: selectedUsers.length === 1 ? null : `${selectedUsers.map(u => u.name).join(', ')}`,
-          created_by: session.user.id
+          created_by: currentUser.id
         }])
         .select()
         .single();
@@ -181,7 +172,7 @@ export default function NewChatPopover() {
 
       // 添加参与者
       const participants = [
-        { session_id: chatSession.id, user_id: session.user.id },
+        { session_id: chatSession.id, user_id: currentUser.id },
         ...selectedUsers.map(user => ({
           session_id: chatSession.id,
           user_id: user.id
@@ -207,7 +198,7 @@ export default function NewChatPopover() {
       try {
         const chatType = selectedUsers.length === 1 ? 'private' : 'group';
         const chatName = selectedUsers.length === 1 
-          ? session.user.user_metadata?.name || session.user.email 
+          ? currentUser.name || currentUser.email 
           : `${selectedUsers.map(u => u.name).join(', ')}`;
           
         // 为每个参与者创建通知（除了自己）
@@ -218,16 +209,16 @@ export default function NewChatPopover() {
               user_id: user.id,
               title: selectedUsers.length === 1 ? t('newPrivateChat') : t('newGroupChat'),
               content: selectedUsers.length === 1 
-                ? `${session.user.user_metadata?.name || session.user.email} ${t('startedChatWithYou')}` 
-                : `${session.user.user_metadata?.name || session.user.email} ${t('addedYouToGroup')} "${chatName}"`,
+                ? `${currentUser.name || currentUser.email} ${t('startedChatWithYou')}` 
+                : `${currentUser.name || currentUser.email} ${t('addedYouToGroup')} "${chatName}"`,
               type: 'SYSTEM',
               related_entity_type: 'chat_session',
               related_entity_id: chatSession.id,
               data: {
                 chat_session_id: chatSession.id,
                 chat_type: chatType,
-                created_by: session.user.id,
-                creator_name: session.user.user_metadata?.name || session.user.email
+                created_by: currentUser.id,
+                creator_name: currentUser.name || currentUser.email
               },
               is_read: false
             });

@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AddTask from './AddTask';
 import BodyContent from './BodyContent';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { createSection } from '@/lib/redux/features/sectionSlice';
 
 export default function TaskList({ projectId, teamId, teamCFId }) {
@@ -353,8 +353,8 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
       try {
         // 开始创建，显示加载状态
         setIsCreatingSection(true);
-        const {data: userData} = await supabase.auth.getUser()
-        const userId = userData?.user?.id
+        const { user } = useGetUser();
+        const userId = user?.id
         // 准备创建部门的数据
         const sectionData = {
           teamId,

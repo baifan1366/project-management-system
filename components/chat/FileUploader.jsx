@@ -5,6 +5,7 @@ import { Toast } from "@/components/ui/toast";
 import { Upload, X, File, Paperclip, FileText, Sheet, Film, Music, Eye, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function FileUploader({ 
   onUploadComplete, 
@@ -30,6 +31,7 @@ export default function FileUploader({
   const [isDragging, setIsDragging] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);
   const [showDialog, setShowDialog] = useState(false); // 新增状态控制对话框显示
+  const { user: currentUser } = useGetUser();
 
   // 处理文件选择
   const handleFileSelect = (e) => {
@@ -272,13 +274,12 @@ export default function FileUploader({
         throw new Error('缺少用户ID或会话ID');
       }
 
-      // 获取当前用户身份以确认权限
-      const { data: { session: authSession }, error: authError } = await supabase.auth.getSession();
-      if (authError || !authSession?.user?.id) {
+      // 使用外部获取的currentUser
+      if (!currentUser) {
         throw new Error('用户未登录或会话已过期');
       }
       
-      if (authSession.user.id !== userId) {
+      if (currentUser.id !== userId) {
         throw new Error('用户ID不匹配，没有上传权限');
       }
       
@@ -287,9 +288,6 @@ export default function FileUploader({
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
         const filePath = `chat-${sessionId}/${fileName}`;
-        
-        // 获取JWT令牌
-        const token = authSession.access_token;
         
         // 上传到Supabase存储
         const { error: uploadError, data } = await supabase.storage

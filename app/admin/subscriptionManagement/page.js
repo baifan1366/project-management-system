@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaPlus, FaEdit, FaTrash, FaCheck, FaToggleOn, FaToggleOff, FaTimes } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import { clsx } from 'clsx';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function AdminSubscriptions() {
   const router = useRouter();
@@ -51,6 +52,7 @@ export default function AdminSubscriptions() {
   const [totalPayments, setTotalPayments] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const { user: sessionData, error: sessionError } = useGetUser();
 
   // Verify admin session
   useEffect(() => {
@@ -58,10 +60,7 @@ export default function AdminSubscriptions() {
       try {
         setLoading(true);
         
-        // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
+        if (sessionError) {
           throw new Error('No active session found');
         }
         
@@ -69,7 +68,7 @@ export default function AdminSubscriptions() {
         const { data: admin, error: adminError } = await supabase
           .from('admin_user')
           .select('*')
-          .eq('email', sessionData.session.user.email)
+          .eq('email', sessionData.user.email)
           .eq('is_active', true)
           .single();
           

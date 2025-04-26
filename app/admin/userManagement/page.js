@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck } from 'react-icons/fa';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function UserManagement() {
   const router = useRouter();
@@ -22,20 +23,18 @@ export default function UserManagement() {
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminData, setAdminData] = useState(null);
-  
+  const { user: sessionData } = useGetUser();
+
   // Fetch users on component mount
   useEffect(() => {
     const initialize = async () => {
       try {
-        // Get current session
-        const { data: sessionData } = await supabase.auth.getSession();
-        
-        if (sessionData.session) {
+        if (sessionData) {
           // Get admin data
           const { data: admin } = await supabase
             .from('admin_user')
             .select('*')
-            .eq('email', sessionData.session.user.email)
+            .eq('email', sessionData.user.email)
             .eq('is_active', true)
             .single();
             

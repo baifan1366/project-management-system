@@ -22,15 +22,8 @@ export default function RouteGuard({ children }) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      // Check for user logged in flag (non-httpOnly cookie)
-      const isLoggedIn = Cookies.get('user_logged_in') === 'true';
-      
-      // Legacy check for auth_token (will only work if not httpOnly)
-      const authToken = Cookies.get('auth_token');
-      
-      // Debug: List all cookies
-      const allCookies = Cookies.get();
-      console.log('🍪 All Cookies:', allCookies);
+      // check for auth_token (will only work if not httpOnly)
+      const isLoggedIn = Cookies.get('auth_token');
       
       // Check if current path is public
       const isPublicPath = PUBLIC_PATHS.some(path => pathname.includes(path));
@@ -44,8 +37,8 @@ export default function RouteGuard({ children }) {
       console.log('🔒 Auth check:', { 
         path: pathname,
         isLoggedIn,
-        hasAuthToken: Boolean(authToken),
-        authTokenPrefix: authToken ? `${authToken.substring(0, 10)}...` : null,
+        hasAuthToken: Boolean(isLoggedIn),
+        authTokenPrefix: isLoggedIn ? `${isLoggedIn.substring(0, 10)}...` : null,
         isPublicPath,
         isSpecialPath
       });

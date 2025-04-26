@@ -7,7 +7,14 @@ import { sendVerificationEmail } from '@/lib/email';
 import { v4 as uuidv4 } from 'uuid';
 
 // JWT secret key (should be in environment variables in production)
-const JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET || 'your-secret-key';
+// Try to use JWT_SECRET first, but fall back to NEXT_PUBLIC_JWT_SECRET if needed
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET;
+
+// For debugging
+if (!JWT_SECRET) {
+  console.warn('Neither JWT_SECRET nor NEXT_PUBLIC_JWT_SECRET is defined in environment variables');
+}
+
 const JWT_EXPIRY = '7d'; // Token expiry time
 
 // Email validation function
@@ -135,24 +142,15 @@ async function handleLogin(data) {
       sameSite: 'strict'
     });
     
-    // Set httpOnly cookie for backend security
+    // Set cookie
     await cookieStore.set('auth_token', token, { 
-      httpOnly: true, 
+      httpOnly: false , 
       secure: process.env.NODE_ENV === 'production',
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',
       sameSite: 'strict'
     });
 
-    // Set a non-httpOnly cookie for frontend client-side auth check
-    // This doesn't contain the actual token for security, just a flag
-    await cookieStore.set('user_logged_in', 'true', { 
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: '/',
-      sameSite: 'strict'
-    });
 
     // Log all cookies for debugging
     console.log('All cookies:', Object.fromEntries([...cookieStore.getAll()].map(c => [c.name, c.value])));

@@ -11,7 +11,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { Home, Search, Lock, Unlock, Eye, Pencil, Plus, Settings, Users, Bell, Archive, Zap, Edit, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { supabase } from '@/lib/supabase'
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { createSelector } from '@reduxjs/toolkit';
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
 
@@ -61,7 +61,7 @@ export default function ProjectSidebar({ projectId }) {
   // 获取用户加入的团队
   const fetchTeams = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { user } = useGetUser();
       if (!user) return;
 
       // 使用Redux action获取用户团队

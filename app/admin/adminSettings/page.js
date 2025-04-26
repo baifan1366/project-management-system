@@ -9,19 +9,17 @@ import WebsiteSettings from '@/components/admin/settings/WebsiteSettings';
 import LocalizationSettings from '@/components/admin/settings/LocalizationSettings';
 import ThemeSettings from '@/components/admin/settings/ThemeSettings';  
 import LandingPageSettings from '@/components/admin/settings/LandingPageSettings';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function AdminSettings() {
-
+  const { user: sessionData, error: sessionError } = useGetUser();
   // Verify admin session
   useEffect(() => {
     const checkAdminSession = async () => {
       try {
         setLoading(true);
         
-        // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
+        if (sessionError) {
           throw new Error('No active session found');
         }
         
@@ -29,7 +27,7 @@ export default function AdminSettings() {
         const { data: admin, error: adminError } = await supabase
           .from('admin_user')
           .select('*')
-          .eq('email', sessionData.session.user.email)
+          .eq('email', sessionData.user.email)
           .eq('is_active', true)
           .single();
           

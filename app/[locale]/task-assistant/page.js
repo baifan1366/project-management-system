@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import TaskManagerAgent from '@/components/ui/TaskManagerAgent';
 import { useTranslations } from 'next-intl';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -11,20 +11,20 @@ export default function TaskAssistantPage() {
   const t = useTranslations();
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { user:data, error } = useGetUser();
   
   useEffect(() => {
     async function getUserInfo() {
       try {
         setLoading(true);
-        const { data, error } = await supabase.auth.getUser();
         
         if (error) {
           console.error('Error getting user:', error);
           return;
         }
         
-        if (data?.user) {
-          setUserId(data.user.id);
+        if (data) {
+          setUserId(data.id);
         }
       } catch (error) {
         console.error('Failed to get user info:', error);

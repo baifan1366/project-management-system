@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase'
 //react redux
 import { useSelector, useDispatch } from 'react-redux'
 import { createPaymentIntent, setPaymentMetadata, setFinalTotal } from '@/lib/redux/features/paymentSlice'
+import useGetUser from '@/lib/hooks/useGetUser';
 
 // Initialize Stripe outside the component
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -88,15 +89,10 @@ export default function PaymentPage() {
 
       try{
         // 获取用户信息
-        const{data:{session},error:sessionError} = await supabase.auth.getSession();
-
-        // 如果获取用户会话失败，则抛出错误
-        if(sessionError){
-          throw new Error('Failed to get session');
-        }
+        const { user} = useGetUser();
 
         // 如果用户未登录，则重定向到登录页面
-        if(!session || !session.user){
+        if(!user){
           router.push('/login?redirect=payment&plan_id=' + planId);
           return;
         }

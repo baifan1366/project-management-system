@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import LogoImage from '../../../public/logo.png';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/hooks/useAuth';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,11 +58,11 @@ export default function LoginPage() {
   // 检查用户是否已登录
   useEffect(() => {
     const checkUser = async () => {
-      const { data, error } = await supabase.auth.getSession();
+      const { user, error } = useGetUser();
       
-      if (!error && data.session && data.session.user) {
+      if (!error && user) {
         console.log('用户已登录，处理重定向');
-        handleRedirect(data.session.user);
+        handleRedirect(user);
       }
     };
     

@@ -247,6 +247,50 @@ function ChatLayout({ children }) {
     </div>
   );
 
+  // Load hidden sessions from user metadata on component mount
+  useEffect(() => {
+    const loadHiddenSessions = async () => {
+      try {
+        // Load from localStorage
+        const savedHidden = JSON.parse(localStorage.getItem('hidden_sessions') || '{}');
+        setHiddenSessions(savedHidden);
+      } catch (error) {
+        console.error('Error loading hidden sessions:', error);
+      }
+    };
+    
+    loadHiddenSessions();
+  }, []);
+
+  // Function to unhide a previously hidden session
+  const handleUnhideSession = async (sessionId) => {
+    try {
+      // Remove the session from hidden sessions in state
+      setHiddenSessions(prev => {
+        const newState = { ...prev };
+        delete newState[sessionId];
+        return newState;
+      });
+      
+      // Update localStorage
+      try {
+        const savedHidden = JSON.parse(localStorage.getItem('hidden_sessions') || '{}');
+        delete savedHidden[sessionId];
+        localStorage.setItem('hidden_sessions', JSON.stringify(savedHidden));
+      } catch (error) {
+        console.error('Error updating hidden sessions in localStorage:', error);
+      }
+      
+      toast.success(t('chatUnhidden'));
+      
+      // Refresh sessions
+      fetchChatSessions();
+    } catch (error) {
+      console.error('Error unhiding chat session:', error);
+      toast.error(t('errors.unhideFailed'));
+    }
+  };
+
   // Function to delete chat session
   const handleDeleteSession = async (e, sessionId) => {
     e.stopPropagation();
@@ -259,51 +303,20 @@ function ChatLayout({ children }) {
       cancelText: t('cancel'),
       onConfirm: async () => {
         try {
-          // Get current user
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session) {
-            toast.error(t('errors.notLoggedIn'));
-            return;
-          }
-          
-          // Instead of deleting the participant record, store the session ID in user metadata
-          const { data: userData, error: userError } = await supabase.auth.getUser();
-          
-          if (userError) {
-            console.error('Error getting user data:', userError);
-            toast.error(t('errors.deleteFailed'));
-            return;
-          }
-          
-          // Get current metadata
-          const currentMetadata = userData.user.user_metadata || {};
-          const currentHidden = currentMetadata.hidden_sessions || {};
-          
-          // Update hidden sessions in metadata
-          const updatedHidden = {
-            ...currentHidden,
-            [sessionId]: true
-          };
-          
-          // Update user metadata
-          const { error: updateError } = await supabase.auth.updateUser({
-            data: {
-              ...currentMetadata,
-              hidden_sessions: updatedHidden
-            }
-          });
-          
-          if (updateError) {
-            console.error('Error updating user metadata:', updateError);
-            toast.error(t('errors.deleteFailed'));
-            return;
-          }
-          
-          // Update local state
+          // Update hidden sessions in state
           setHiddenSessions(prev => ({
             ...prev,
             [sessionId]: true
           }));
+          
+          // Update localStorage
+          try {
+            const savedHidden = JSON.parse(localStorage.getItem('hidden_sessions') || '{}');
+            savedHidden[sessionId] = true;
+            localStorage.setItem('hidden_sessions', JSON.stringify(savedHidden));
+          } catch (error) {
+            console.error('Error saving hidden sessions to localStorage:', error);
+          }
           
           // If this was the current session, clear it
           if (currentSession?.id === sessionId) {
@@ -323,18 +336,26 @@ function ChatLayout({ children }) {
     });
   };
   
+  // Load muted sessions from user metadata and localStorage on component mount
+  useEffect(() => {
+    const loadMutedSessions = async () => {
+      try {
+        // Load from localStorage
+        const savedMutes = JSON.parse(localStorage.getItem('muted_sessions') || '{}');
+        setMutedSessions(savedMutes);
+      } catch (error) {
+        console.error('Error loading muted sessions:', error);
+      }
+    };
+    
+    loadMutedSessions();
+  }, []);
+
   // Function to toggle mute for a session
   const handleToggleMute = async (e, sessionId) => {
     e.stopPropagation();
     
     try {
-      // Get current user
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error(t('errors.notLoggedIn'));
-        return;
-      }
-      
       // Toggle mute status in state
       const newMuteStatus = !mutedSessions[sessionId];
       
@@ -345,45 +366,7 @@ function ChatLayout({ children }) {
         return newState;
       });
       
-      // Store in user metadata via Supabase Auth
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        console.error('Error getting user data:', userError);
-        return;
-      }
-      
-      // Get current metadata
-      const currentMetadata = userData.user.user_metadata || {};
-      const currentMuted = currentMetadata.muted_sessions || {};
-      
-      // Update metadata with new mute status
-      const updatedMuted = {
-        ...currentMuted,
-        [sessionId]: newMuteStatus
-      };
-      
-      // Update user metadata
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: {
-          ...currentMetadata,
-          muted_sessions: updatedMuted
-        }
-      });
-      
-      if (updateError) {
-        console.error('Error updating user metadata:', updateError);
-        // Revert state change if update failed
-        setMutedSessions(prev => {
-          const newState = { ...prev };
-          newState[sessionId] = !newMuteStatus;
-          return newState;
-        });
-        toast.error(t('errors.muteFailed'));
-        return;
-      }
-      
-      // Also save to localStorage as fallback/cache
+      // Save to localStorage
       try {
         localStorage.setItem('muted_sessions', JSON.stringify({
           ...JSON.parse(localStorage.getItem('muted_sessions') || '{}'),
@@ -400,117 +383,6 @@ function ChatLayout({ children }) {
     }
   };
   
-  // Load muted sessions from user metadata and localStorage on component mount
-  useEffect(() => {
-    const loadMutedSessions = async () => {
-      try {
-        // First try to load from localStorage as a cache
-        const savedMutes = JSON.parse(localStorage.getItem('muted_sessions') || '{}');
-        setMutedSessions(savedMutes);
-        
-        // Then get the authoritative data from user metadata
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        
-        if (userError) {
-          console.error('Error getting user data:', userError);
-          return;
-        }
-        
-        if (userData?.user?.user_metadata?.muted_sessions) {
-          // Update state with the server data
-          setMutedSessions(userData.user.user_metadata.muted_sessions);
-          
-          // Also update localStorage to keep in sync
-          localStorage.setItem('muted_sessions', 
-            JSON.stringify(userData.user.user_metadata.muted_sessions));
-        }
-      } catch (error) {
-        console.error('Error loading muted sessions:', error);
-      }
-    };
-    
-    loadMutedSessions();
-  }, []);
-
-  // Load hidden sessions from user metadata on component mount
-  useEffect(() => {
-    const loadHiddenSessions = async () => {
-      try {
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        
-        if (userError) {
-          console.error('Error getting user data:', userError);
-          return;
-        }
-        
-        if (userData?.user?.user_metadata?.hidden_sessions) {
-          // Update state with the server data
-          setHiddenSessions(userData.user.user_metadata.hidden_sessions);
-        }
-      } catch (error) {
-        console.error('Error loading hidden sessions:', error);
-      }
-    };
-    
-    loadHiddenSessions();
-  }, []);
-
-  // Function to unhide a previously hidden session
-  const handleUnhideSession = async (sessionId) => {
-    try {
-      // Get current user
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error(t('errors.notLoggedIn'));
-        return;
-      }
-      
-      // Get user metadata
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        console.error('Error getting user data:', userError);
-        return;
-      }
-      
-      // Get current metadata
-      const currentMetadata = userData.user.user_metadata || {};
-      const currentHidden = { ...currentMetadata.hidden_sessions } || {};
-      
-      // Remove the session from hidden sessions
-      delete currentHidden[sessionId];
-      
-      // Update user metadata
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: {
-          ...currentMetadata,
-          hidden_sessions: currentHidden
-        }
-      });
-      
-      if (updateError) {
-        console.error('Error updating user metadata:', updateError);
-        toast.error(t('errors.unhideFailed'));
-        return;
-      }
-      
-      // Update local state
-      setHiddenSessions(prev => {
-        const newState = { ...prev };
-        delete newState[sessionId];
-        return newState;
-      });
-      
-      toast.success(t('chatUnhidden'));
-      
-      // Refresh sessions
-      fetchChatSessions();
-    } catch (error) {
-      console.error('Error unhiding chat session:', error);
-      toast.error(t('errors.unhideFailed'));
-    }
-  };
-  
   // Check if there are hidden sessions with new messages to show
   const hiddenSessionsWithMessages = useMemo(() => {
     return sessions
@@ -523,13 +395,6 @@ function ChatLayout({ children }) {
   // Add this function to handle clearing chat history
   const handleClearChatHistory = async (sessionId) => {
     try {
-      // Get current user
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error(t('errors.notLoggedIn'));
-        return;
-      }
-      
       confirm({
         title: t('clearChatHistory'),
         description: t('clearChatHistoryConfirm'),
@@ -538,38 +403,17 @@ function ChatLayout({ children }) {
         cancelText: t('cancel'),
         onConfirm: async () => {
           try {
-            // Get user metadata
-            const { data: userData, error: userError } = await supabase.auth.getUser();
+            // Store cleared chat history in localStorage
+            const currentCleared = JSON.parse(localStorage.getItem('cleared_chat_history') || '{}');
             
-            if (userError) {
-              console.error('Error getting user data:', userError);
-              toast.error(t('errors.clearHistoryFailed'));
-              return;
-            }
-            
-            // Get current metadata
-            const currentMetadata = userData.user.user_metadata || {};
-            const currentCleared = currentMetadata.cleared_chat_history || {};
-            
-            // Update cleared history in metadata
+            // Update cleared history with timestamp
             const updatedCleared = {
               ...currentCleared,
               [sessionId]: new Date().toISOString()
             };
             
-            // Update user metadata
-            const { error: updateError } = await supabase.auth.updateUser({
-              data: {
-                ...currentMetadata,
-                cleared_chat_history: updatedCleared
-              }
-            });
-            
-            if (updateError) {
-              console.error('Error updating user metadata:', updateError);
-              toast.error(t('errors.clearHistoryFailed'));
-              return;
-            }
+            // Save to localStorage
+            localStorage.setItem('cleared_chat_history', JSON.stringify(updatedCleared));
             
             toast.success(t('chatHistoryCleared'));
             

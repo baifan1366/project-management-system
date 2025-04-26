@@ -7,6 +7,8 @@ CREATE TABLE "user" (
   "avatar_url" VARCHAR(255),
   "language" VARCHAR(10) DEFAULT 'en',
   "theme" VARCHAR(50) CHECK ("theme" IN ('light', 'dark', 'system')) DEFAULT 'system',
+  "timezone" VARCHAR(50) DEFAULT 'UTC+0', -- User's timezone setting
+  "hour_format" VARCHAR(10) CHECK ("hour_format" IN ('12h', '24h')) DEFAULT '24h', -- User's hour format preference
   "provider" VARCHAR(50) CHECK ("provider" IN ('local', 'google', 'github')) DEFAULT 'local',
   "provider_id" VARCHAR(255) UNIQUE, -- 绑定 OAuth 的唯一 ID（如 Google/GitHub UID）
   "mfa_secret" VARCHAR(255), -- TOTP 秘钥

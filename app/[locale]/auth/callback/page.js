@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -12,7 +13,7 @@ export default function AuthCallbackPage() {
     const handleAuthCallback = async () => {
       try {
         // 1. Get current session information
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        const { user } = useGetUser();
         
         if (sessionError) {
           console.error('Session error:', sessionError);
@@ -21,7 +22,7 @@ export default function AuthCallbackPage() {
         }
 
         // Handle case when no session exists
-        if (!sessionData || !sessionData.session) {
+        if (!user) {
           console.error('No session found');
           // Redirect to login page after delay
           setTimeout(() => {
@@ -31,7 +32,6 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        const user = sessionData.session.user;
 
         // 2. Check if user already exists
         const { data: existingProfile, error: profileError } = await supabase

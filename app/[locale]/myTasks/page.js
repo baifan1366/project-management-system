@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabase';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 // 任务看板视图组件
 export default function MyTasksPage() {
@@ -37,19 +38,14 @@ export default function MyTasksPage() {
   const [selectedAssignee, setSelectedAssignee] = useState('me');
   const [selectedWorkspace, setSelectedWorkspace] = useState('workspace');
   const [currentUserId, setCurrentUserId] = useState(null);
+  const { user } = useGetUser();
 
   // 获取当前用户
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('获取当前用户会话失败:', error);
-          return;
-        }
-        
-        if (session && session.user) {
-          setCurrentUserId(session.user.id);
+        if (user) {
+          setCurrentUserId(user.id);
         }
       } catch (error) {
         console.error('获取用户信息时出错:', error);

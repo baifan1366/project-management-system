@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from '@/lib/supabase';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = new Date(), onSuccess, isGoogleConnected = false }) {
   const t = useTranslations('Calendar');
@@ -70,7 +71,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
   const fetchUsers = async () => {
     try {
       setIsLoadingUsers(true);
-      const { data: { session } } = await supabase.auth.getSession();
+      const { user: session } = useGetUser();
       
       if (!session) {
         throw new Error(t('notLoggedIn'));
@@ -79,7 +80,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
       const { data, error } = await supabase
         .from('user')
         .select('id, name, email, avatar_url')
-        .neq('id', session.user.id)
+        .neq('id', session.id)
         .limit(20);
       
       if (error) {
@@ -98,7 +99,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
   const searchUsers = async (query) => {
     try {
       setIsLoadingUsers(true);
-      const { data: { session } } = await supabase.auth.getSession();
+      const { user: session } = useGetUser();
       
       if (!session) {
         throw new Error(t('notLoggedIn'));
@@ -107,7 +108,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
       const { data, error } = await supabase
         .from('user')
         .select('id, name, email, avatar_url')
-        .neq('id', session.user.id)
+        .neq('id', session.id)
         .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
         .limit(10);
       
@@ -183,7 +184,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         }
       } else if (eventType === 'personal') {
         // 创建个人日历事件
-        const { data: { session } } = await supabase.auth.getSession();
+        const { user: session } = useGetUser();
         
         if (!session) {
           throw new Error('未登录状态');
@@ -205,7 +206,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
           is_all_day: formData.isAllDay,
           location: formData.location,
           color: formData.color,
-          user_id: session.user.id
+          user_id: session.id
         };
         
         const { error } = await supabase
@@ -227,7 +228,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
           : format(formData.endDate, 'yyyy-MM-dd') + 'T' + formData.endTime + ':00';
         
         // 获取当前会话信息
-        const { data: { session } } = await supabase.auth.getSession();
+        const { user: session } = useGetUser();
         const accessToken = session?.provider_token;
         const refreshToken = session?.provider_refresh_token;
         

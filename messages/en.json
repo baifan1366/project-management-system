@@ -51,6 +51,7 @@
     "status": "Status",
     "filters": "Filters",
     "settings": "Settings",
+    "createProject":"Create project",
     "confirmDialog": {
       "confirm": "Confirm",
       "cancel": "Cancel",

@@ -9,6 +9,7 @@ import AdminSidebar from '@/components/admin/AdminSidebar';
 import { Provider } from 'react-redux';
 import { store } from '@/lib/redux/store';
 import { ThemeProvider } from 'next-themes';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function AdminLayout({ children }) {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function AdminLayout({ children }) {
   
   // Skip auth check for login page
   const isLoginPage = pathname.includes('/adminLogin');
-  
+  const { user: sessionData , error: sessionError } = useGetUser();
   // Verify admin session and fetch admin data
   useEffect(() => {
     if (isLoginPage) {
@@ -41,11 +42,10 @@ export default function AdminLayout({ children }) {
     const checkAdminSession = async () => {
       try {
         setLoading(true);
+
+
         
-        // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
+        if (sessionError ) {
           throw new Error('No active session found');
         }
         
@@ -53,7 +53,7 @@ export default function AdminLayout({ children }) {
         const { data: admin, error: adminError } = await supabase
           .from('admin_user')
           .select('*')
-          .eq('email', sessionData.session.user.email)
+          .eq('email', sessionData.user.email)
           .eq('is_active', true)
           .single();
           

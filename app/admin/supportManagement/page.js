@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaFilter, FaSearch, FaEnvelope, FaBuilding, FaUser, FaClock, FaCheck, FaTimes, FaSpinner, FaReply } from 'react-icons/fa';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function AdminSupport() {
   const router = useRouter();
@@ -17,17 +18,16 @@ export default function AdminSupport() {
   const [replyText, setReplyText] = useState('');
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const { user: sessionData, error: sessionError } = useGetUser();
+
   // Verify admin session and fetch admin data
   useEffect(() => {
     const checkAdminSession = async () => {
       try {
         setLoading(true);
+
         
-        // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
+        if (sessionError) {
           throw new Error('No active session found');
         }
         
@@ -35,7 +35,7 @@ export default function AdminSupport() {
         const { data: admin, error: adminError } = await supabase
           .from('admin_user')
           .select('*')
-          .eq('email', sessionData.session.user.email)
+          .eq('email', sessionData.user.email)
           .eq('is_active', true)
           .single();
           

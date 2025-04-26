@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function CreateCustomField({ isOpen, onClose, field, setField }) {
     const t = useTranslations('CustomField');
@@ -23,8 +24,8 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
     const handleSave = async (formData) => {
         setIsSaving(true);
         try {
-            const { data: userData, error: userError } = await supabase.auth.getUser();
-            if (!userData?.user?.id) {
+            const { user } = useGetUser();
+            if (user?.id) {
                 throw new Error('User not authenticated');
             }
             
@@ -33,7 +34,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                 type: formData.type,
                 description: formData.description,
                 icon: formData.icon,
-                created_by: userData.user.id,
+                created_by: user.id,
             };
             
             // If editing existing field, pass its ID

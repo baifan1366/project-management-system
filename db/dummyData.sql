@@ -39,9 +39,9 @@ VALUES
     '2023-01-10T08:30:00Z'
   ),
   (
-    'a9d61763-843c-4c7b-894a-fd8d8a5fc254',
+    'a54364ef-1bd5-49a0-8787-7baaf4524a9c',
     'simpo',
-    'jane.smith@example.com',
+    'baifan1366@gmail.com',
     '+8613800138001',
     'https://randomuser.me/api/portraits/women/2.jpg',
     'en',

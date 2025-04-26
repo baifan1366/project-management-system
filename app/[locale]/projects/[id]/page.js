@@ -11,7 +11,7 @@ import ActivityLog from '@/components/ActivityLog';
 import { useTranslations } from 'use-intl';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchAllTasks } from '@/lib/redux/features/taskSlice';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import TaskManagerAgent from '@/components/ui/TaskManagerAgent';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 
@@ -44,7 +44,7 @@ export default function Home({ params }) {
   useEffect(() => {
     async function getCurrentUser() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { user } = useGetUser();
         if (user) {
           setUserId(user.id);
         }
