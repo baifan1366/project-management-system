@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { ChevronRight, ChevronDown, MoreHorizontal, Plus, Circle } from 'lucide-react';
+import { ChevronRight, ChevronDown, MoreHorizontal, Plus, Circle, Trash } from 'lucide-react';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useConfirm } from '@/hooks/use-confirm';
+import { deleteSection } from '@/lib/redux/features/sectionSlice';
 
 export default function BodyContent({ 
   teamId, 
@@ -30,15 +32,16 @@ export default function BodyContent({
   handleAddTask,
   handleTaskValueChange,
   handleTaskEditComplete,
-  handleKeyDown
+  handleKeyDown,
+  taskInputRef
 }) {
   const t = useTranslations('CreateTask');
+  const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
   const isSectionRequestInProgress = useRef(false);
   const isTaskRequestInProgress = useRef(false);
-  const hasLoadedSections = useRef(false);
-  const hasLoadedTasks = useRef(false);
+  const { confirm } = useConfirm();
   
   // 存储折叠状态的对象
   const [collapsedSections, setCollapsedSections] = useState({});
@@ -237,7 +240,7 @@ export default function BodyContent({
                   <DropdownMenuItem>{t('editSection')}</DropdownMenuItem>
                   <DropdownMenuItem>{t('renameSection')}</DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive">{t('deleteSection')}</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteSection(section.id)}>{t('deleteSection')}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -383,6 +386,7 @@ export default function BodyContent({
                                 {isEditing ? (
                                   <input
                                     type="text"
+                                    ref={tagIndex === 0 ? taskInputRef : null}
                                     value={editingTaskValues[tagId] || editingTaskValues[String(tagId)] || ''}
                                     onChange={(e) => handleTaskValueChange(task.id, tagId, e.target.value)}
                                     onKeyDown={(e) => handleKeyDown(e, task.id, task.sectionId)}
@@ -449,6 +453,19 @@ export default function BodyContent({
         )}
       </Droppable>
     );
+  };
+
+  const handleDeleteSection = (sectionId) => {
+    confirm({
+      title: tConfirm('confirmDeleteSection'),
+      description: `${tConfirm('section')} "${sectionInfo.find(section => section.id === sectionId)?.name}" ${tConfirm('willBeDeleted')}`,
+      variant: 'error',
+      onConfirm: () => {
+        // 删除部门
+        console.log('删除部门', sectionId);
+        dispatch(deleteSection({teamId, sectionId}));
+      }
+    });
   };
 
   return {

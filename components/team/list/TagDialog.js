@@ -32,7 +32,7 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
     const [themeColor, setThemeColor] = useState('#64748b')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [showDescription, setShowDescription] = useState(false)
-    const [tagTypes, setTagTypes] = useState(['TEXT', 'NUMBER', 'ID', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'FORMULA', 'TIME-TRACKING', 'PROJECTS', 'TAGS', 'COMPLETED-ON', 'LAST-MODIFIED-ON', 'CREATED-ON', 'CREATED-BY'])
+    const [tagTypes, setTagTypes] = useState(['TEXT', 'NUMBER', 'ID', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TAGS'])
 
     const FormSchema = z.object({
         name: z.string().trim().min(2, {
@@ -102,14 +102,7 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
             'MULTI-SELECT': <SquareCheck className="w-4 h-4 mr-2 text-gray-500" />,
             'DATE': <Calendar className="w-4 h-4 mr-2 text-gray-500" />,
             'PEOPLE': <User className="w-4 h-4 mr-2 text-gray-500" />,
-            'FORMULA': <Sigma className="w-4 h-4 mr-2 text-gray-500" />,
-            'TIME-TRACKING': <Timer className="w-4 h-4 mr-2 text-gray-500" />,
-            'PROJECTS': <ClipboardList className="w-4 h-4 mr-2 text-gray-500" />,
-            'TAGS': <Tag className="w-4 h-4 mr-2 text-gray-500" />,
-            'COMPLETED-ON': <Clock3 className="w-4 h-4 mr-2 text-gray-500" />,
-            'LAST-MODIFIED-ON': <Pen className="w-4 h-4 mr-2 text-gray-500" />,
-            'CREATED-AT': <Clock3 className="w-4 h-4 mr-2 text-gray-500" />,
-            'CREATED-BY': <User className="w-4 h-4 mr-2 text-gray-500" />
+            'TAGS': <Tag className="w-4 h-4 mr-2 text-gray-500" />
         }
         return iconMap[type] || null
     }
@@ -228,7 +221,7 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
                                                     <SelectItem 
                                                         key={type} 
                                                         value={type} 
-                                                        className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent"
+                                                        className="relative flex items-center py-2 px-3 hover:bg-gray-100 dark:hover:bg-accent"
                                                     >
                                                         <div className="flex items-center w-full">
                                                             {getTypeIcon(type)}

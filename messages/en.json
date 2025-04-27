@@ -664,13 +664,14 @@
     "noTasksFound": "No tasks found",
     "overview": "Overview",
     "addNewSection": "Add Section",
-    "enterSectionName": "Enter section name...",
+    "enterSectionName": "Enter section name",
     "Hours": "Hours",
     "Days": "Days",
     "Weeks": "Weeks",
     "Months": "Months",
     "Years": "Years",
     "confirmDeleteLink": "Confirm Delete Link",
+    "confirmDeleteTask": "Confirm Delete Task",
     "link": "Link",
     "willBeDeleted": "will be deleted",
     "pleaseFillInTheFollowingInformationToCreateANewTask": "Please fill in the following information to create a new task",
@@ -881,10 +882,10 @@
     "files": "Files",
     "links": "Links",
     "searchFailed": "Search failed, please try again",
-    "clearChatHistory":"Clear chat history",
-    "clearChatHistoryConfirm":"Comfirm clear chat history?",
-    "clear":"Clear",
-    "chatHistoryCleared":"Chat history cleared"
+    "clearChatHistory": "Clear chat history",
+    "clearChatHistoryConfirm": "Comfirm clear chat history?",
+    "clear": "Clear",
+    "chatHistoryCleared": "Chat history cleared"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
@@ -1483,5 +1484,24 @@
     "checker": "Checker",
     "viewer": "Viewer",
     "teamDescriptionUpdated": "Team description updated"
+  },
+  "confirmation": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "confirmDeleteTask": "Confirm Delete Task",
+    "confirmDeleteSection": "Confirm Delete Section",
+    "confirmDeleteProject": "Confirm Delete Project",
+    "confirmDeleteTeam": "Confirm Delete Team",
+    "confirmDeleteUser": "Confirm Delete User",
+    "confirmDeleteMeeting": "Confirm Delete Meeting",
+    "confirmDeleteAlert": "Confirm Delete Alert",
+    "confirmDeleteComment": "Confirm Delete Comment",
+    "confirmDeleteMention": "Confirm Delete Mention",
+    "confirmDeleteDeadline": "Confirm Delete Deadline",
+    "confirmDeleteWorkflow": "Confirm Delete Workflow",
+    "confirmDeleteLink": "Confirm Delete Link",
+    "link": "Link",
+    "section": "Section",
+    "willBeDeleted": "will be deleted."
   }
 }

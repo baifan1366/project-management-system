@@ -109,11 +109,12 @@ export async function PATCH(request) {
 
 export async function DELETE(request) {
     const body = await request.json();
-    const { sectionId } = body;
+    const { teamId, sectionId } = body;
     const { data: section, error } = await supabase
         .from('section')
         .delete()
         .eq('id', sectionId)
+        .eq('team_id', teamId)
         .select()
         .single();
     if (error) {
