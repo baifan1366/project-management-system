@@ -28,15 +28,8 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem
 } from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription
-} from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ChatSearch from '@/components/chat/ChatSearch';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -77,6 +70,7 @@ export default function ChatPage() {
   const t = useTranslations('Chat');
   const { formatLastSeen } = useLastSeen();
   const { userTimezone, hourFormat, adjustTimeByOffset } = useUserTimezone();
+  const { user: authUser, isLoading: isAuthLoading } = useGetUser();
   const [message, setMessage] = useState('');
   const { confirm } = useConfirm();
   const { 
@@ -156,15 +150,12 @@ export default function ChatPage() {
     }
   }, [messages]);
 
+  // Update currentUser when authUser changes
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setCurrentUser(session.user);
-      }
-    };
-    getUser();
-  }, []);
+    if (authUser) {
+      setCurrentUser(authUser);
+    }
+  }, [authUser]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();

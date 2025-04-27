@@ -34,7 +34,7 @@ function AdminLayoutInner({ children }) {
   
   // Skip auth check for login page
   const isLoginPage = pathname.includes('/adminLogin');
-  
+  const { user: sessionData , error: sessionError } = useGetUser();
   // Verify admin session and fetch admin data
   useEffect(() => {
     if (isLoginPage) {

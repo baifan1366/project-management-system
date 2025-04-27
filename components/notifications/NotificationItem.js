@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { formatDistanceToNow } from 'date-fns';
 import { Check, X, Bell, Calendar, User, MessageSquare, Video } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -113,7 +113,7 @@ export default function NotificationItem({ notification, onAction }) {
     
     try {
       // 获取当前用户信息
-      const { data: { user } } = await supabase.auth.getUser();
+      const { user } = useGetUser();
       if (!user) throw new Error('未获取到用户信息');
       
       // 准备通知数据
@@ -122,7 +122,7 @@ export default function NotificationItem({ notification, onAction }) {
         title: isAccepted 
           ? tNotif('meetingAccepted') 
           : tNotif('meetingDeclined'),
-        content: `${user.user_metadata?.name || user.email} ${isAccepted 
+        content: `${user.name || user.email} ${isAccepted 
           ? tNotif('acceptedYourMeeting') 
           : tNotif('declinedYourMeeting')} "${meetData.meetingTitle || '会议'}"`,
         type: 'SYSTEM',
@@ -131,7 +131,7 @@ export default function NotificationItem({ notification, onAction }) {
           responseToMeeting: true,
           meetingId: meetData.meetingId,
           meetingTitle: meetData.meetingTitle,
-          responderName: user.user_metadata?.name || user.email,
+          responderName: user.name || user.email,
           responderEmail: user.email,
           accepted: isAccepted,
           respondedAt: new Date().toISOString()

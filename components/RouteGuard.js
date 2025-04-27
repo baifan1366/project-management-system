@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import Cookies from 'js-cookie';
 
 const PUBLIC_PATHS = [
   '/login',
@@ -27,8 +27,8 @@ export default function RouteGuard({ children }) {
     }
 
     const checkAuth = async () => {
-      // 获取 session 状态
-      const { data: { session } } = await supabase.auth.getSession();
+      // check for auth_token (will only work if not httpOnly)
+      const isLoggedIn = Cookies.get('auth_token');
       
       // 检查是否是公开路径 - 使用更精确的匹配
       const isPublicPath = PUBLIC_PATHS.some(path => {
@@ -42,25 +42,28 @@ export default function RouteGuard({ children }) {
       // 检查是否是特殊路径（如重置密码）
       const isSpecialPath = SPECIAL_PATHS.some(path => pathname.startsWith(path));
       
-      // 获取当前语言
+      // Get current locale
       const locale = pathname.split('/')[1] || 'en';
 
-      console.log('🔒 Session check:', { 
+      console.log('🔒 Auth check:', { 
         path: pathname,
-        hasSession: Boolean(session),
+        isLoggedIn,
+        hasAuthToken: Boolean(isLoggedIn),
+        authTokenPrefix: isLoggedIn ? `${isLoggedIn.substring(0, 10)}...` : null,
         isPublicPath,
-        isSpecialPath,
-        userId: session?.user?.id
+        isSpecialPath
       });
 
-      // 如果用户未登录且访问的不是公开路径或特殊路径，重定向到登录页面
-      if (!session && !isPublicPath && !isSpecialPath) {
+      // If user is not logged in and not accessing public or special paths, redirect to login
+      if (!isLoggedIn && !isPublicPath && !isSpecialPath) {
+        console.log('⚠️ Not logged in, redirecting to login');
         router.replace(`/${locale}/login`);
         return;
       }
 
-      // 如果用户已登录且访问登录/注册页面（但不是特殊路径），重定向到项目页面
-      if (session && isPublicPath && !isSpecialPath && pathname !== '/') {
+      // If user is logged in and accessing login/signup pages (but not special paths), redirect to projects
+      if (isLoggedIn && isPublicPath && !isSpecialPath && pathname !== '/') {
+        console.log('⚠️ Already logged in, redirecting to projects');
         router.replace(`/${locale}/projects`);
         return;
       }

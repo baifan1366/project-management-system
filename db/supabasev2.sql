@@ -7,6 +7,8 @@ CREATE TABLE "user" (
   "avatar_url" VARCHAR(255),
   "language" VARCHAR(10) DEFAULT 'en',
   "theme" VARCHAR(50) CHECK ("theme" IN ('light', 'dark', 'system')) DEFAULT 'system',
+  "timezone" VARCHAR(50) DEFAULT 'UTC+0', -- User's timezone setting
+  "hour_format" VARCHAR(10) CHECK ("hour_format" IN ('12h', '24h')) DEFAULT '24h', -- User's hour format preference
   "provider" VARCHAR(50) CHECK ("provider" IN ('local', 'google', 'github')) DEFAULT 'local',
   "provider_id" VARCHAR(255) UNIQUE, -- 绑定 OAuth 的唯一 ID（如 Google/GitHub UID）
   "mfa_secret" VARCHAR(255), -- TOTP 秘钥
@@ -18,7 +20,10 @@ CREATE TABLE "user" (
   "verification_token" VARCHAR(255),
   "verification_token_expires" TIMESTAMP,
   "last_seen_at" TIMESTAMP,
-  "is_online" BOOLEAN DEFAULT FALSE
+  "is_online" BOOLEAN DEFAULT FALSE,
+  "reset_password_token" VARCHAR(255),
+  "reset_password_expires" TIMESTAMP,
+  "password_hash" VARCHAR(255)
 );
 
 -- 默认字段表
@@ -107,7 +112,7 @@ CREATE TABLE "tag" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "description" TEXT,
-  "type" TEXT NOT NULL CHECK ("type" IN ('NAME','ASIGNEE', 'DUE-DATE', 'PRIORITY', 'STATUS', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'FORMULA', 'ID', 'TIME-TRACKING', 'PROJECTS', 'TAGS', 'COMPLETED-ON', 'LAST-MODIFIED-ON', 'CREATED-AT', 'CREATED-BY')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'ID', 'TAGS')), 
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -261,7 +266,7 @@ CREATE TABLE "chat_message" (
   "reply_to_message_id" INT REFERENCES "chat_message"("id") ON DELETE SET NULL,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "is_deleted" BOOLEAN DEFAULT FALSE,
+  "is_deleted" BOOLEAN DEFAULT FALSE
 );
 
 -- 聊天消息已读状态表
@@ -350,7 +355,6 @@ CREATE TABLE IF NOT EXISTS workflow_executions (
     status VARCHAR(50) NOT NULL,
     output_formats TEXT[] DEFAULT '{}'::text[],
     document_urls JSONB DEFAULT '{}'::jsonb,
-    api_responses JSONB DEFAULT '{}'::jsonb,
     executed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
@@ -557,9 +561,6 @@ CREATE INDEX idx_action_log_created ON "action_log"("created_at");
 
 -- 为订阅相关表创建索引
 CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
-CREATE INDEX idx_team_subscription_team ON "team_subscription"("team_id");
-CREATE INDEX idx_team_subscription_status ON "team_subscription"("status");
-CREATE INDEX idx_subscription_payment_subscription ON "subscription_payment"("team_subscription_id");
 
 -- 为邀请表创建索引
 CREATE INDEX idx_team_invitation_email ON "user_team_invitation"("user_email");

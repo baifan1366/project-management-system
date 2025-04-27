@@ -39,9 +39,9 @@ VALUES
     '2023-01-10T08:30:00Z'
   ),
   (
-    'a9d61763-843c-4c7b-894a-fd8d8a5fc254',
+    'a54364ef-1bd5-49a0-8787-7baaf4524a9c',
     'simpo',
-    'jane.smith@example.com',
+    'baifan1366@gmail.com',
     '+8613800138001',
     'https://randomuser.me/api/portraits/women/2.jpg',
     'en',
@@ -90,8 +90,8 @@ VALUES
 -- Insert default data
 INSERT INTO "default" (id, name, qty, updated_at, edited_by)
 VALUES
-  (1, 'custom_field', 5, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 'tag', 8, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+  (1, 'custom_field', 7, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (2, 'tag', 4, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
   
 -- Insert section data
 INSERT INTO "section" (id, name, team_id, created_by, created_at, updated_at, task_ids)
@@ -105,23 +105,18 @@ VALUES
 INSERT INTO "tag" 
 ("id", "name", "description", "type", "created_by", "created_at", "updated_at") 
 VALUES 
-('1', 'Name', '用于标记缺陷', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('2', 'Description', '用于标记缺陷', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('3', 'Asignee', '用于标记新功能', 'PEOPLE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('4', 'Due Date', '用于标记增强功能', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('5', 'Duration', '', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('6', 'Progress', '', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('7', 'Status', '用于标记文档', 'SINGLE-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('8', 'Created At', '', 'CREATED-AT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('9', 'Projects', '用于标记用户界面', 'PROJECTS', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('10', 'Priority', '', 'MULTI-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('11', 'Formula', '', 'FORMULA', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('12', 'Time Tracking', '', 'TIME-TRACKING', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('13', 'Tags', '', 'TAGS', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('14', 'Completed On', '', 'COMPLETED-ON', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('15', 'Last Modified On', '', 'LAST-MODIFIED-ON', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('16', 'Created By', '', 'CREATED-BY', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('17', 'ID', '', 'ID', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00');
+('1', 'Name', '用于标记名字', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('2', 'Asignee', '用于标记负责人', 'PEOPLE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('3', 'Status', '用于标记状态', 'SINGLE-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('4', 'Due Date', '用于标记截至日期', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('5', 'Description', '用于标记描述', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('6', 'Start Date', '用于标记开始日期', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('7', 'Parent ID', '用于标记父级ID', 'ID', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'),
+('8', 'Duration', '用于标记时长', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('9', 'Progress', '用于标记进度值', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('10', 'Tags', '用于标记标签', 'TAGS', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('11', 'Completed On', '用于标记完成日期', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('12', 'Remarks', '用于标记备注', 'MULTI-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00');
 
 -- Insert task data
 INSERT INTO "task" (
@@ -172,16 +167,16 @@ VALUES
 -- Insert custom field data
 INSERT INTO "custom_field" (id, name, type, description, icon, created_at, updated_at, created_by)
 VALUES 
-  ('1', 'List', 'LIST', 'A simple list format for displaying tasks', 'List', '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('2', 'File', 'FILES', 'Manage task-related files, enabling users to upload and organize documents associated with tasks', 'Files', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('3', 'Gantt', 'GANTT', 'Project progress in Gantt chart format, providing a visual representation of project timelines and dependencies', 'GanttChart', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('4', 'Kanban Board', 'KANBAN', 'Display tasks in kanban board format', 'LayoutDashboard', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('5', 'Workflow', 'WORKFLOW', 'Display tasks in workflow format', 'LayoutDashboard', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  ('6', 'Calendar', 'CALENDAR', 'A calendar view for scheduling and tracking tasks', 'Calendar', '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('7', 'Notion', 'NOTE', 'A text field for adding notes related to tasks', 'Text', '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('8', 'Timeline', 'TIMELINE', 'Display tasks in timeline format, allowing users to visualize task progress over time', 'GanttChart', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('9', 'Overview', 'OVERVIEW', 'A high-level overview of project progress and key metrics', 'LayoutGrid', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  ('10', 'Agile', 'AGILE', 'Agile board for managing tasks in an agile workflow', 'LayoutDashboard', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+  ('1', 'Overview', 'OVERVIEW', 'A high-level overview of project progress and key metrics', 'LayoutGrid', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  ('2', 'List', 'LIST', 'A simple list format for displaying tasks', 'List', '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('3', 'Files', 'FILES', 'Manage task-related files, enabling users to upload and organize documents associated with tasks', 'Files', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('4', 'Timeline', 'TIMELINE', 'Display tasks in timeline format, allowing users to visualize task progress over time', 'SquareChartGantt', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('5', 'Gantt', 'GANTT', 'Project progress in Gantt chart format, providing a visual representation of project timelines and dependencies', 'ChartGantt', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('6', 'Kanban Board', 'KANBAN', 'Display tasks in kanban board format', 'LayoutDashboard', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('7', 'Workflow', 'WORKFLOW', 'Display tasks in workflow format', 'LayoutDashboard', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  ('8', 'Calendar', 'CALENDAR', 'A calendar view for scheduling and tracking tasks', 'CalendarRange', '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('9', 'Notion', 'NOTE', 'A text field for adding notes related to tasks', 'Text', '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('10', 'Agile', 'AGILE', 'Agile board for managing tasks in an agile workflow', 'Pen', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
 
 -- Insert team custom field association data
 INSERT INTO "team_custom_field" (id, team_id, custom_field_id, order_index, tag_ids, created_at, updated_at, created_by)
@@ -262,20 +257,6 @@ VALUES
 ('1', 'Free', 'FREE', '0.00', 'MONTHLY', 'Basic plan for small teams', '{"features": ["Up to 3 team members", "2 projects", "Basic task management", "1GB storage", "Community support"]}', '3', '2', '1073741824', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897'), 
 ('2', 'Pro', 'PRO', '29.00', 'MONTHLY', 'Perfect for growing teams', '{"features": ["Up to 10 team members", "Unlimited projects", "Advanced task management", "10GB storage", "Priority support", "Custom fields", "Time tracking"]}', '10', '2', '10737418240', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897'), 
 ('3', 'Enterprise', 'ENTERPRISE', '99.00', 'MONTHLY', 'For large organizations', '{"features": ["Unlimited team members", "Unlimited projects", "Enterprise security", "100GB storage", "24/7 dedicated support", "Custom branding", "API access"]}', '-1', '2', '107374182400', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897');  
-
--- Insert team subscription data
-INSERT INTO "team_subscription" (id, team_id, plan_id, status, start_date, end_date, cancel_at_period_end, created_at, updated_at)
-VALUES
-  (1, 1, 1, 'ACTIVE', '2023-02-01T00:00:00Z', '2023-03-01T00:00:00Z', FALSE, '2023-02-01T00:00:00Z', '2023-02-01T00:00:00Z'),
-  (2, 2, 2, 'ACTIVE', '2023-02-01T00:00:00Z', '2023-03-01T00:00:00Z', FALSE, '2023-02-01T00:00:00Z', '2023-02-01T00:00:00Z'),
-  (3, 3, 3, 'ACTIVE', '2023-02-06T00:00:00Z', '2024-02-06T00:00:00Z', FALSE, '2023-02-06T00:00:00Z', '2023-02-06T00:00:00Z');
-
--- Insert subscription payment history data
-INSERT INTO "subscription_payment" (id, team_subscription_id, amount, currency, payment_method, status, transaction_id, created_at)
-VALUES
-  (1, 1, 29.00, 'USD', 'credit_card', 'COMPLETED', 'txn_1234567890', '2023-02-01T00:00:00Z'),
-  (2, 2, 29.00, 'USD', 'credit_card', 'COMPLETED', 'txn_1234567891', '2023-02-01T00:00:00Z'),
-  (3, 3, 290.00, 'USD', 'credit_card', 'COMPLETED', 'txn_1234567892', '2023-02-06T00:00:00Z');
 
 -- Insert promo code data
 INSERT INTO "promo_code" (code, description, discount_type, discount_value, max_uses, start_date, end_date) VALUES

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 // GET /api/tasks
 export async function GET(request) {
@@ -15,15 +16,15 @@ export async function GET(request) {
     
     // 获取当前登录用户
     if (userId === 'current') {
-      const { data: userData, error: userError } = await supabase.auth.getUser()
+      const { user } = useGetUser();
       
       if (userError) throw userError
       
-      if (userData && userData.user) {
+      if (user) {
         const { data: tasksData, error: tasksError } = await supabase
           .from('task')
           .select('*')
-          .eq('assignee_id', userData.user.id)
+          .eq('assignee_id', user.id)
           
         if (tasksError) throw tasksError
         
@@ -134,10 +135,10 @@ export async function POST(request) {
   try {
     const body = await request.json()
     
-    // Basic validation
-    if (!body || !body.title) {
+    // Basic validation - 修改验证逻辑，支持tag_values
+    if (!body || (!body.title && !body.tag_values)) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields. Need either title or tag_values' },
         { status: 400 }
       )
     }

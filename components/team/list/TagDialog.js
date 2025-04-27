@@ -20,7 +20,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux'
 import { createTag, fetchAllTags } from '@/lib/redux/features/tagSlice'
 import { updateTagIds, getTags } from '@/lib/redux/features/teamCFSlice'
-import { supabase } from '@/lib/supabase'
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { Plus, Text, Calendar, User, Sigma, Fingerprint, SquareCheck, CircleCheck, Hash, ClipboardList, Clock3, Tag, Pen, Timer } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
@@ -119,8 +119,8 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
         setIsLoading(true);
         setIsSubmitting(true)
         try{
-            const {data: userData} = await supabase.auth.getUser()
-            const userId = userData?.user?.id
+            const { user } = useGetUser();
+            const userId = user?.id
             const newTag = await dispatch(createTag({
                 name: data.name,
                 type: data.type,

@@ -5,26 +5,16 @@ import { useChat } from './ChatContext';
 import { supabase } from '@/lib/supabase';
 import ChatDialog from '@/components/chat/ChatDialog';
 import { usePathname } from 'next/navigation';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 const ChatDialogContext = createContext();
 
 export function ChatDialogProvider({ children }) {
   const [openDialogs, setOpenDialogs] = useState(new Map());
   const { messages, sendMessage, currentSession, setCurrentSession } = useChat();
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user:currentUser } = useGetUser();
   const pathname = usePathname();
   
-  // 获取当前用户
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setCurrentUser(session.user);
-      }
-    };
-    getUser();
-  }, []);
-
   // 监听新消息
   useEffect(() => {
     if (!currentUser) return;

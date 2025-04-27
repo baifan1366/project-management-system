@@ -29,6 +29,7 @@ import { createProject } from '@/lib/redux/features/projectSlice';
 import { DialogFooter } from "@/components/ui/dialog"
 import { supabase } from '@/lib/supabase';
 import { getSubscriptionLimit, getSubscriptionUsage, DELTA_MAP } from '@/lib/subscriptionService';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function CreateProjectPage() {
   const t = useTranslations('CreateProject');
@@ -37,15 +38,15 @@ export default function CreateProjectPage() {
   const dispatch = useDispatch();
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { user, error } = useGetUser();
 
   useEffect(() => {
     async function checkSubscriptionLimit() {
       setIsLoading(true);
       try {
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user?.id) {
+        if (user.id) {
           // 检查用户的项目创建限制
-          const limitInfo = await getSubscriptionLimit(userData.user.id, 'create_project');
+          const limitInfo = await getSubscriptionLimit(user.id, 'create_project');
           setSubscriptionInfo(limitInfo);
           console.log('Subscription info:', limitInfo);
         }
@@ -99,16 +100,16 @@ export default function CreateProjectPage() {
     try {
       // 解构获取表单数据
       const { projectName, visibility, buttonVariant } = data;
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) {
+      const { user, error } = useGetUser();
+      if (error) {
         throw new Error('Failed to get user information');
       }
-      if (!userData?.user?.id) {
+      if (!user.id) {
         throw new Error('User not authenticated');
       }
 
       // 再次检查用户是否可以创建项目
-      const limitCheck = await getSubscriptionLimit(userData.user.id, 'create_project');
+      const limitCheck = await getSubscriptionLimit(user.id, 'create_project');
       if (!limitCheck.allowed) {
         toast({
           title: '超出订阅限制',

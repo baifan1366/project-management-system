@@ -18,6 +18,7 @@ import TaskKanban from '@/components/team/kanban/TaskKanban';
 import TaskFile from '@/components/team/file/TaskFile';
 import TaskWorkflow from '@/components/team/workflow/TaskWorkflow';
 import TaskOverview from '@/components/team/overview/TaskOverview';
+import TaskTimeline from '@/components/team/timeline/TaskTimeline';
 import { store } from '@/lib/redux/store';
 
 // 创建记忆化的选择器
@@ -163,7 +164,12 @@ export default function TeamCustomFieldPage() {
     if (fieldType === 'OVERVIEW') {
       return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
     }
-    
+    if (fieldType === 'TIMELINE') {
+      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
+    if (fieldType === 'CALENDAR') {
+      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+    }
     return <div>暂不支持的字段类型: {fieldType}</div>;
   }, [currentItem]);
 
@@ -316,11 +322,11 @@ export default function TeamCustomFieldPage() {
                       <span className="text-sm">{t('section')}</span>
                       {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
+                    {/* <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
                       <FileUp className="h-4 w-4 mr-1" />
                       <span className="text-sm">{t('attachment')}</span>
                       {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
-                    </DropdownMenuItem>
+                    </DropdownMenuItem> */}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

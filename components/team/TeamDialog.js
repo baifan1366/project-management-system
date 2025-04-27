@@ -23,6 +23,7 @@ import { createTeamUser, fetchTeamUsers } from '@/lib/redux/features/teamUserSli
 import { createTeamCustomField, getTags, updateTagIds } from '@/lib/redux/features/teamCFSlice'
 import { Lock, Eye, Pencil, Unlock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const t = useTranslations('CreateTeam')
@@ -87,8 +88,8 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
     
     try {
       // 获取当前用户信息
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const { user } = useGetUser();
+      const userId = user?.id;
       console.log('userId', userId)
       // 创建团队
       const team = await dispatch(createTeam({

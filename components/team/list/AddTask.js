@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { createTask } from '@/lib/redux/features/taskSlice';
 import { updateTaskIds } from '@/lib/redux/features/sectionSlice';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslations } from 'next-intl';
 
 export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks }) {
   const dispatch = useDispatch();
+  const t = useTranslations('CreateTask');
   // 存储编辑中的任务状态
   const [editingTask, setEditingTask] = useState(null);
   // 存储编辑中的任务内容
@@ -67,13 +69,13 @@ export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks }
     }
     
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const { user } = useGetUser();
+      const userId = user?.id;
       
       // 确保至少有一个值，如果第一个标签值是空的，设置默认值
       const tagValues = { ...editingTaskValues };
       if (!tagValues['1'] || tagValues['1'].trim() === '') {
-        tagValues['1'] = 'New Task';
+        tagValues['1'] = t('newTask');
       }
       
       // 准备任务数据

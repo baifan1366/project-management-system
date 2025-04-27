@@ -2,7 +2,7 @@
 
 import { updateTeam, fetchTeamById } from '@/lib/redux/features/teamSlice';
 import { useDispatch } from 'react-redux';
-import { supabase } from '@/lib/supabase'
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useEffect, useState } from 'react';
 
 export default function TeamDescription({ teamId }) {
@@ -58,8 +58,8 @@ export default function TeamDescription({ teamId }) {
                 ...teamData,
                 description: sanitizeHtmlForStorage(teamData.description)
             };
-            const { data: userData } = await supabase.auth.getUser();
-            const userId = userData?.user?.id;
+            const { user } = useGetUser();
+            const userId = user?.id;
             // 更新团队描述到数据库
             dispatch(updateTeam({ 
                 teamId, 

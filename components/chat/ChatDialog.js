@@ -5,6 +5,7 @@ import { X, Minus, Paperclip, Image, Smile, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChat } from '@/contexts/ChatContext';
 import { supabase } from '@/lib/supabase';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function ChatDialog({ 
   isOpen, 
@@ -19,18 +20,7 @@ export default function ChatDialog({
   const [sessionMessages, setSessionMessages] = useState([]);
   const { sendMessage } = useChat();
   const messagesEndRef = useRef(null);
-  const [currentUser, setCurrentUser] = useState(null);
-
-  // 获取当前用户
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setCurrentUser(session.user);
-      }
-    };
-    getUser();
-  }, []);
+  const { user: currentUser } = useGetUser();
 
   // 获取会话消息
   useEffect(() => {

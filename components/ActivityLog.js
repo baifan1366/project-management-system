@@ -7,7 +7,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN, enUS } from 'date-fns/locale';
 import { useParams } from 'next/navigation';
 import { Clock, FilePlus, FileText, MessageSquare, User, CheckCircle, XCircle, Edit, Trash2, Plus } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function ActivityLog() {
   const t = useTranslations('Projects');
@@ -23,7 +23,7 @@ export default function ActivityLog() {
   useEffect(() => {
     async function getCurrentUser() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { user } = useGetUser();
         if (user) {
           setUserId(user.id);
         }

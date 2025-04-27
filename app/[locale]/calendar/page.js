@@ -18,10 +18,12 @@ import { toast } from 'sonner';
 import { FaGoogle } from 'react-icons/fa';
 import { WeekView, DayView } from '@/components/calendar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function CalendarPage() {
   const t = useTranslations('Calendar');
   const dispatch = useDispatch();
+  const { user: currentUser, isLoading: userLoading } = useGetUser();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // month, week, day
   const [googleEvents, setGoogleEvents] = useState([]);
@@ -55,19 +57,18 @@ export default function CalendarPage() {
   useEffect(() => {
     async function checkGoogleConnection() {
       try {
-        // 获取当前会话
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        // 检查是否登录和provider是否为google
-        if (!session) {
+        // 使用自定义hook获取用户信息
+        if (!currentUser) {
           console.log('用户未登录');
           setIsGoogleConnected(false);
           setIsLoading(false); // 如果未登录，立即结束加载状态
           return;
         }
         
-        if (session?.user?.app_metadata?.provider === 'google') {
+        if (currentUser?.provider === 'google') {
           console.log('检测到Google提供商，正在检查令牌...');
+          // 需要在session中获取tokens
+          const { data: { session } } = await supabase.auth.getSession();
           const accessToken = session?.provider_token;
           const refreshToken = session?.provider_refresh_token;
           
@@ -128,8 +129,10 @@ export default function CalendarPage() {
       }
     }
     
-    checkGoogleConnection();
-  }, [t]);
+    if (!userLoading) {
+      checkGoogleConnection();
+    }
+  }, [currentUser, userLoading, t]);
 
   // 加载任务数据
   // useEffect(() => {
@@ -146,9 +149,7 @@ export default function CalendarPage() {
         const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
         const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
         
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
+        if (!currentUser) {
           console.error(t('notLoggedIn'));
           return;
         }
@@ -158,7 +159,7 @@ export default function CalendarPage() {
           .select('*')
           .gte('start_time', `${startDate}T00:00:00`)
           .lte('end_time', `${endDate}T23:59:59`)
-          .eq('user_id', session.user.id);
+          .eq('user_id', currentUser.id);
         
         if (error) {
           console.error(t('getPersonalEventsFailed'), error);
@@ -182,8 +183,10 @@ export default function CalendarPage() {
       }
     }
     
-    fetchPersonalEvents();
-  }, [currentDate, t, isViewLoading, isLoading, isGoogleConnected, isLoadingGoogle]);
+    if (currentUser && !userLoading) {
+      fetchPersonalEvents();
+    }
+  }, [currentDate, t, isViewLoading, isLoading, isGoogleConnected, isLoadingGoogle, currentUser, userLoading]);
 
   // 获取Google日历事件
   useEffect(() => {
@@ -364,9 +367,7 @@ export default function CalendarPage() {
         const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
         const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
         
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
+        if (!currentUser) {
           console.error(t('notLoggedIn'));
           return;
         }
@@ -376,7 +377,7 @@ export default function CalendarPage() {
           .select('*')
           .gte('start_time', `${startDate}T00:00:00`)
           .lte('end_time', `${endDate}T23:59:59`)
-          .eq('user_id', session.user.id);
+          .eq('user_id', currentUser.id);
         
         if (error) {
           console.error(t('getPersonalEventsFailed'), error);

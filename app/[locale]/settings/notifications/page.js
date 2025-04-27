@@ -6,14 +6,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useDispatch } from 'react-redux';
 import { updateUserPreference } from '@/lib/redux/features/usersSlice';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function NotificationsPage() {
   const t = useTranslations('profile');
   const dispatch = useDispatch();
+  const { user: currentUser, isLoading: userLoading } = useGetUser();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState({
@@ -28,51 +29,36 @@ export default function NotificationsPage() {
   });
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (session?.user) {
-        updateUserData(session);
-      }
-    };
-
-    getUser();
-  }, []);
+    if (currentUser) {
+      updateUserData(currentUser);
+    }
+  }, [currentUser]);
   
-  const updateUserData = async (session) => {
-    if (!session?.user) return;
+  const updateUserData = (user) => {
+    if (!user) return;
     
-    setUser(session.user);
-    setNotifications({
-      emailNotifications: session.user.user_metadata?.emailNotifications ?? true,
-      pushNotifications: session.user.user_metadata?.pushNotifications ?? true,
-      weeklyDigest: session.user.user_metadata?.weeklyDigest ?? true,
-      mentionNotifications: session.user.user_metadata?.mentionNotifications ?? true,
-      taskAssignments: session.user.user_metadata?.taskAssignments !== false,
-      taskComments: session.user.user_metadata?.taskComments !== false,
-      dueDates: session.user.user_metadata?.dueDates !== false,
-      teamInvitations: session.user.user_metadata?.teamInvitations !== false
-    });
+    setUser(user);
+    
+    // Load notification settings from localStorage
+    try {
+      const storedNotifications = localStorage.getItem(`notifications_${user.id}`);
+      if (storedNotifications) {
+        setNotifications(JSON.parse(storedNotifications));
+      }
+    } catch (error) {
+      console.error('Error loading notifications from localStorage:', error);
+      // Fallback to default values if localStorage fails
+    }
   };
 
   const handleSaveNotifications = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          emailNotifications: notifications.emailNotifications,
-          pushNotifications: notifications.pushNotifications,
-          weeklyDigest: notifications.weeklyDigest,
-          mentionNotifications: notifications.mentionNotifications,
-          taskAssignments: notifications.taskAssignments,
-          taskComments: notifications.taskComments,
-          dueDates: notifications.dueDates,
-          teamInvitations: notifications.teamInvitations
-        }
-      });
+      // Save to localStorage
+      localStorage.setItem(`notifications_${user.id}`, JSON.stringify(notifications));
       
-      if (error) throw error;
-      
+      // Update Redux store
       await dispatch(updateUserPreference({ 
         userId: user.id, 
         preferenceData: { 

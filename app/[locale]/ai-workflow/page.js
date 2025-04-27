@@ -57,7 +57,7 @@ import {
 import WorkflowNode from './components/WorkflowNode';
 import InputForm from './components/InputForm';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/lib/supabase';
+import useGetUser from '@/lib/hooks/useGetUser';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 // Node types for React Flow
@@ -193,17 +193,11 @@ export default function AIWorkflow() {
   
   // Create a node ID counter for unique node IDs
   const nodeIdRef = useRef(1);
-  
+  const { user } = useGetUser();
   // Get current user on component mount
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        
-        if (error) {
-          throw error;
-        }
-        
         if (user) {
           setUserId(user.id);
         }

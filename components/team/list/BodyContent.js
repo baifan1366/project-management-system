@@ -7,6 +7,7 @@ import { ChevronRight, ChevronDown, MoreHorizontal, Plus, Circle } from 'lucide-
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
 import { Button } from '@/components/ui/button';
+import { useTranslations } from 'next-intl';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ export default function BodyContent({
   handleTaskEditComplete,
   handleKeyDown
 }) {
+  const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
   const isSectionRequestInProgress = useRef(false);
@@ -214,7 +216,7 @@ export default function BodyContent({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    添加任务
+                    {t('addTask')}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -232,10 +234,10 @@ export default function BodyContent({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>编辑部门</DropdownMenuItem>
-                  <DropdownMenuItem>重命名</DropdownMenuItem>
+                  <DropdownMenuItem>{t('editSection')}</DropdownMenuItem>
+                  <DropdownMenuItem>{t('renameSection')}</DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive">删除部门</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive">{t('deleteSection')}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -258,7 +260,7 @@ export default function BodyContent({
     if (collapsedSections[sectionId]) {
       return (
         <div className="text-muted-foreground text-sm p-2 text-center">
-          部门已折叠
+          {t('sectionCollapsed')}
         </div>
       );
     }
@@ -386,7 +388,7 @@ export default function BodyContent({
                                     onKeyDown={(e) => handleKeyDown(e, task.id, task.sectionId)}
                                     autoFocus={tagIndex === 0}
                                     className="w-full bg-transparent border-none focus:outline-none h-10"
-                                    placeholder={`输入${tag}`}
+                                    placeholder={`${t('input')} ${tag}`}
                                   />
                                 ) : (
                                   tagValue

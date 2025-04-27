@@ -9,6 +9,7 @@ import { Search, UserPlus, X } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function InviteUserPopover({ sessionId, onInvite }) {
   const t = useTranslations('Chat');
@@ -27,8 +28,8 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
 
     setIsLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      const { user } = useGetUser();
+      if (!user) return;
 
       // 获取已经在会话中的用户ID
       const { data: existingParticipants } = await supabase
@@ -79,12 +80,6 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
     if (selectedUsers.length === 0) return;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error(t('errors.userNotLoggedIn'));
-        return;
-      }
-
       toast.loading(t('inviting'));
 
       // 添加新参与者

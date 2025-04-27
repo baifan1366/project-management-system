@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 const UserStatusContext = createContext();
 
@@ -11,28 +12,15 @@ export function UserStatusProvider({ children }) {
   const [lastSeen, setLastSeen] = useState(null);
   // 添加跟踪其他用户状态的状态
   const [usersStatus, setUsersStatus] = useState({});
+  const { user } = useGetUser();
 
   // 获取当前用户信息
   useEffect(() => {
-    const fetchCurrentUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // 获取用户的完整信息
-        const { data: userData, error } = await supabase
-          .from('user')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-          
-        if (!error && userData) {
-          setCurrentUser(userData);
-          setIsOnline(userData.is_online || false);
-          setLastSeen(userData.last_seen_at);
-        }
-      }
-    };
-    
-    fetchCurrentUser();
+    if (user) {
+      setCurrentUser(user);
+      setIsOnline(user.is_online || false);
+      setLastSeen(user.last_seen_at);
+    }
   }, []);
 
   // 更新当前用户的在线状态

@@ -272,17 +272,13 @@ export async function GET(request) {
   
   const searchTerm = query.trim();
   let allResults = [];
-  let session;
   
   try {
     // 获取当前用户ID（如果已登录）
-    const { data, error } = await supabase.auth.getSession();
-    if (!error && data.session) {
-      session = data.session;
-    }
+    const { user } = useGetUser();
     
     // 记录搜索历史
-    await recordSearchHistory(searchTerm, session?.user?.id);
+    await recordSearchHistory(searchTerm, user?.id);
     
     // 并行执行所有搜索
     const [projectResults, taskResults, userResults, teamResults, messageResults] = await Promise.all([
