@@ -1,46 +1,45 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
 
 export async function GET(request) {
   try {
-    // Create a server-side Supabase client
-    const supabase = createServerSupabaseClient();
-    
     const { searchParams } = new URL(request.url);
     const redirect = searchParams.get('redirect');
     const planId = searchParams.get('plan_id');
+    const redirectTo = searchParams.get('redirectTo');
     
-    // Build redirect URL
-    let redirectUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${process.env.NEXT_PUBLIC_DEFAULT_LOCALE}/auth/callback`;
+    // Build GitHub OAuth URL
+    const githubOAuthEndpoint = 'https://github.com/login/oauth/authorize';
+    
+    // 整合回调参数
+    const callbackParams = new URLSearchParams();
+    callbackParams.append('provider', 'github');
     
     // Add plan_id and redirect params if they exist
     if (redirect === 'payment' && planId) {
-      redirectUrl += `?redirect=payment&plan_id=${planId}`;
+      callbackParams.append('redirect', 'payment');
+      callbackParams.append('plan_id', planId);
     }
     
-    // Redirect to Supabase OAuth
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'github',
-      options: {
-        redirectTo: redirectUrl,
-        scopes: 'read:user user:email',
-      },
-    });
-    
-    if (error) {
-      console.error('GitHub OAuth error:', error);
-      return NextResponse.redirect(
-        new URL(`/${process.env.NEXT_PUBLIC_DEFAULT_LOCALE}/login?error=${encodeURIComponent(error.message)}`, 
-        request.url)
-      );
+    // If a custom redirect is provided, use that
+    if (redirectTo) {
+      callbackParams.append('final_redirect', redirectTo);
     }
     
-    // Redirect to the provided URL
-    return NextResponse.redirect(data.url);
+    // Construct GitHub OAuth URL
+    const oauthUrl = new URL(githubOAuthEndpoint);
+    oauthUrl.searchParams.append('client_id', process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID);
+    oauthUrl.searchParams.append('redirect_uri', `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`);
+    oauthUrl.searchParams.append('scope', 'read:user user:email');
+    
+    // 简化 state 参数，不再使用完整 URL，而是用一个简单的参数字符串
+    oauthUrl.searchParams.append('state', callbackParams.toString());
+    
+    // Redirect to GitHub OAuth URL
+    return NextResponse.redirect(oauthUrl.toString());
   } catch (error) {
     console.error('GitHub OAuth route error:', error);
     return NextResponse.redirect(
-      new URL(`/${process.env.NEXT_PUBLIC_DEFAULT_LOCALE}/login?error=${encodeURIComponent('Failed to authenticate with GitHub')}`, 
+      new URL(`/en/login?error=${encodeURIComponent('Failed to authenticate with GitHub')}`, 
       request.url)
     );
   }

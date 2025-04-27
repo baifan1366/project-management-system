@@ -5,7 +5,6 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FaGoogle, FaGithub, FaEye, FaEyeSlash, FaQuestionCircle } from 'react-icons/fa';
-import { supabase } from '@/lib/supabase';
 import LogoImage from '../../../public/logo.png';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -34,7 +33,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
-
+  const { user } = useGetUser();
   // Use our custom auth hook
   const { login, error: authError } = useAuth();
 
@@ -55,19 +54,6 @@ export default function LoginPage() {
     }
   };
 
-  // 检查用户是否已登录
-  useEffect(() => {
-    const checkUser = async () => {
-      const { user, error } = useGetUser();
-      
-      if (!error && user) {
-        console.log('用户已登录，处理重定向');
-        handleRedirect(user);
-      }
-    };
-    
-    checkUser();
-  }, []);
 
   // 构建重定向 URL，只包含计划ID
   const buildRedirectUrl = () => {
@@ -125,17 +111,16 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: buildRedirectUrl(),
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
-      if (error) throw error;
+      // Redirect to our custom Google OAuth endpoint
+      let url = `/api/auth/google`;
+      
+      // Add redirect and plan_id parameters if needed
+      if (redirect === 'payment' && planId) {
+        url += `?redirect=payment&plan_id=${planId}`;
+      }
+      
+      // Redirect to our custom OAuth endpoint
+      window.location.href = url;
     } catch (err) {
       console.error('Google sign in error:', err);
       setError(err.message || 'Failed to sign in with Google. Please try again.');
@@ -147,14 +132,16 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: buildRedirectUrl(),
-          scopes: 'read:user user:email',
-        },
-      });
-      if (error) throw error;
+      // Redirect to our custom GitHub OAuth endpoint
+      let url = `/api/auth/github`;
+      
+      // Add redirect and plan_id parameters if needed
+      if (redirect === 'payment' && planId) {
+        url += `?redirect=payment&plan_id=${planId}`;
+      }
+      
+      // Redirect to our custom OAuth endpoint
+      window.location.href = url;
     } catch (err) {
       console.error('GitHub sign in error:', err);
       setError(err.message || 'Failed to sign in with GitHub. Please try again.');

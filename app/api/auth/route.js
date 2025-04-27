@@ -130,20 +130,7 @@ async function handleLogin(data) {
       .limit(1);
 
     // Set cookie - Note: cookies() needs to be awaited
-    const cookieStore = cookies();
-    
-    // Log cookie information
-    console.log('Setting auth cookie:', {
-      token: `${token.substring(0, 10)}...`, // Only log a part of the token for security
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: '/',
-      sameSite: 'strict'
-    });
-    
-    // Set cookie
-    await cookieStore.set('auth_token', token, { 
+    await cookies().set('auth_token', token, { 
       httpOnly: false , 
       secure: process.env.NODE_ENV === 'production',
       maxAge: 7 * 24 * 60 * 60, // 7 days
@@ -151,9 +138,9 @@ async function handleLogin(data) {
       sameSite: 'strict'
     });
 
-
     // Log all cookies for debugging
-    console.log('All cookies:', Object.fromEntries([...cookieStore.getAll()].map(c => [c.name, c.value])));
+    const allCookies = await cookies().getAll();
+    console.log('All cookies:', Object.fromEntries(allCookies.map(c => [c.name, c.value])));
 
     // Remove sensitive data
     delete user.password_hash;
@@ -251,7 +238,6 @@ async function handleSignup(data) {
           id: userId,
           name,
           email: email.toLowerCase(),
-          provider: 'local',
           email_verified: false,
           password_hash: hashedPassword,
           verification_token: verificationToken,
@@ -332,17 +318,12 @@ async function handleSignup(data) {
 async function handleLogout() {
   try {
     // Clear the auth cookie
-    const cookieStore = cookies();
-    
-    // Log current cookies before clearing
-    console.log('Cookies before logout:', Object.fromEntries([...cookieStore.getAll()].map(c => [c.name, c.value])));
-    
-    // Delete the cookies
-    await cookieStore.delete('auth_token');
-    await cookieStore.delete('user_logged_in');
+    await cookies().delete('auth_token');
+    await cookies().delete('user_logged_in');
     
     // Log cookies after clearing
-    console.log('Cookies after logout:', Object.fromEntries([...cookieStore.getAll()].map(c => [c.name, c.value])));
+    const remainingCookies = await cookies().getAll();
+    console.log('Cookies after logout:', Object.fromEntries(remainingCookies.map(c => [c.name, c.value])));
 
     return NextResponse.json({
       success: true,

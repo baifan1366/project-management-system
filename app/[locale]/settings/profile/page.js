@@ -45,10 +45,20 @@ export default function ProfilePage() {
       email: session.email || ''
     });
     
-    const provider = session.provider || '';
+    let provider = 'local';
+    let providerId = '';
+    
+    if (session.google_provider_id) {
+      provider = 'google';
+      providerId = session.google_provider_id;
+    } else if (session.github_provider_id) {
+      provider = 'github';
+      providerId = session.github_provider_id;
+    }
+    
     setProviderData({
-      provider: provider || session.provider || 'local',
-      providerId: session.provider_id || session.provider_id || ''
+      provider: provider,
+      providerId: providerId
     });
   };
 

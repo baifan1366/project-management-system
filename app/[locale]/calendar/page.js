@@ -65,12 +65,20 @@ export default function CalendarPage() {
           return;
         }
         
-        if (currentUser?.provider === 'google') {
-          console.log('检测到Google提供商，正在检查令牌...');
-          // 需要在session中获取tokens
-          const { data: { session } } = await supabase.auth.getSession();
-          const accessToken = session?.provider_token;
-          const refreshToken = session?.provider_refresh_token;
+        // 使用google_provider_id检查是否连接了Google，而不是provider字段
+        if (currentUser?.google_provider_id) {
+          console.log('检测到Google提供商ID，正在检查令牌...');
+          // 从用户元数据中获取 tokens，而不是从 supabase session 中获取
+          const response = await fetch('/api/users/tokens?provider=google');
+          if (!response.ok) {
+            console.error('获取Google令牌失败');
+            setIsGoogleConnected(false);
+            return;
+          }
+          
+          const tokens = await response.json();
+          const accessToken = tokens.access_token;
+          const refreshToken = tokens.refresh_token;
           
           if (accessToken || refreshToken) {
             console.log('Google令牌可用，连接已建立');
@@ -203,10 +211,22 @@ export default function CalendarPage() {
         const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
         const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
         
-        // 获取当前会话信息
-        const { data: { session } } = await supabase.auth.getSession();
-        const accessToken = session?.provider_token;
-        const refreshToken = session?.provider_refresh_token;
+        // 使用我们的自定义API端点获取Google令牌
+        const tokensResponse = await fetch('/api/users/tokens?provider=google');
+        if (!tokensResponse.ok) {
+          console.error(t('noGoogleToken'));
+          toast.error(t('noGoogleToken'), {
+            action: {
+              label: t('goToSettings'),
+              onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
+            }
+          });
+          return;
+        }
+        
+        const tokens = await tokensResponse.json();
+        const accessToken = tokens.access_token;
+        const refreshToken = tokens.refresh_token;
         
         if (!accessToken && !refreshToken) {
           console.error(t('noGoogleToken'));
@@ -220,6 +240,7 @@ export default function CalendarPage() {
           return;
         }
         
+        console.log('正在获取Google日历事件...');
         const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}`);
         
         if (response.status === 401) {
@@ -315,29 +336,11 @@ export default function CalendarPage() {
   const handleConnectGoogle = async () => {
     try {
       // 总是请求日历权限
-      const scopes = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
-      
       // 显示正在连接的通知
       const toastId = toast.loading(t('connectingGoogle') || 'Connecting to Google...');
       
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/${window.location.pathname.split('/')[1]}/calendar`,
-          scopes: scopes,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-            include_granted_scopes: 'true'
-          },
-        },
-      });
-      
-      if (error) {
-        console.error(t('connectGoogleFailed'), error);
-        toast.dismiss(toastId);
-        throw error;
-      }
+      // 使用我们的自定义Google OAuth端点，而不是supabase
+      window.location.href = `/api/auth/google?redirectTo=${encodeURIComponent(window.location.pathname)}`;
       
       // OAuth流程会自动重定向，不需要处理成功情况
     } catch (err) {
@@ -412,10 +415,16 @@ export default function CalendarPage() {
         const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
         const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
         
-        // 获取当前会话信息
-        const { data: { session } } = await supabase.auth.getSession();
-        const accessToken = session?.provider_token;
-        const refreshToken = session?.provider_refresh_token;
+        // 使用我们的自定义API端点获取Google令牌，而不是Supabase session
+        const tokensResponse = await fetch('/api/users/tokens?provider=google');
+        if (!tokensResponse.ok) {
+          console.error(t('noGoogleToken'));
+          return;
+        }
+        
+        const tokens = await tokensResponse.json();
+        const accessToken = tokens.access_token;
+        const refreshToken = tokens.refresh_token;
         
         if (!accessToken && !refreshToken) {
           console.error(t('noGoogleToken'));

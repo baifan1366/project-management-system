@@ -9,8 +9,10 @@ CREATE TABLE "user" (
   "theme" VARCHAR(50) CHECK ("theme" IN ('light', 'dark', 'system')) DEFAULT 'system',
   "timezone" VARCHAR(50) DEFAULT 'UTC+0', -- User's timezone setting
   "hour_format" VARCHAR(10) CHECK ("hour_format" IN ('12h', '24h')) DEFAULT '24h', -- User's hour format preference
-  "provider" VARCHAR(50) CHECK ("provider" IN ('local', 'google', 'github')) DEFAULT 'local',
-  "provider_id" VARCHAR(255) UNIQUE, -- 绑定 OAuth 的唯一 ID（如 Google/GitHub UID）
+  "google_provider_id" VARCHAR(255),
+  "github_provider_id" VARCHAR(255),
+  "connected_providers" TEXT DEFAULT '[]',
+  "last_login_provider" VARCHAR(50),
   "mfa_secret" VARCHAR(255), -- TOTP 秘钥
   "is_mfa_enabled" BOOLEAN DEFAULT FALSE,
   "notifications_enabled" BOOLEAN DEFAULT TRUE,
@@ -23,8 +25,17 @@ CREATE TABLE "user" (
   "is_online" BOOLEAN DEFAULT FALSE,
   "reset_password_token" VARCHAR(255),
   "reset_password_expires" TIMESTAMP,
-  "password_hash" VARCHAR(255)
+  "password_hash" VARCHAR(255),
+  "google_access_token" VARCHAR(2048),
+  "google_refresh_token" VARCHAR(2048),
+  "google_token_expires_at" BIGINT,
+  "github_access_token" VARCHAR(2048),
+  "github_refresh_token" VARCHAR(2048),
 );
+
+-- 添加索引以提高查询性能
+CREATE INDEX IF NOT EXISTS idx_user_google_provider_id ON "user" (google_provider_id) WHERE google_provider_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_user_github_provider_id ON "user" (github_provider_id) WHERE github_provider_id IS NOT NULL;
 
 -- 默认字段表
 CREATE TABLE "default" (
