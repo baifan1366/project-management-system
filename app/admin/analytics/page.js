@@ -19,8 +19,8 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar, Pie } from 'react-chartjs-2';
-import { hasPermission } from '@/lib/permissions';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { checkAdminSession } from '@/lib/redux/features/adminSlice';
 
 // 注册Chart.js组件
 ChartJS.register(
@@ -37,49 +37,6 @@ ChartJS.register(
 );
 
 export default function AdminAnalytics() {
-
-  // 验证管理员会话并获取数据
-  useEffect(() => {
-    const checkAdminSession = async () => {
-      try {
-        setLoading(true);
-        
-        // 获取当前会话
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
-          throw new Error('No active session found');
-        }
-        
-        // 检查用户是否是管理员
-        const { data: admin, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', sessionData.session.user.email)
-          .eq('is_active', true)
-          .single();
-          
-        if (adminError || !admin) {
-          throw new Error('Unauthorized access');
-        }
-        
-        setAdminData(admin);
-        
-        // 获取分析数据
-        await fetchAnalyticsData(dateRange);
-        
-      } catch (error) {
-        console.error('Admin session check failed:', error);
-        // 重定向到管理员登录
-        router.replace(`/admin/adminLogin`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    checkAdminSession();
-  }, []);
-
   const router = useRouter();
   const params = useParams();
   
@@ -97,7 +54,31 @@ export default function AdminAnalytics() {
     conversionRate: 0,
     successRate: 0
   });
-  
+  const dispatch = useDispatch();
+  const permissions = useSelector((state) => state.admin.permissions);
+
+
+  // initialize the page
+  useEffect(() => {
+    const initAdminAnalytics = async () => {
+      try {
+        setLoading(true);
+        
+        // 获取分析数据
+        await fetchAnalyticsData(dateRange);
+        
+      } catch (error) {
+        console.error('Errror in fetching analytics data:', error);
+        // 重定向到管理员登录
+        router.replace(`/admin/adminLogin`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initAdminAnalytics();
+  }, [dispatch, router]);
+
   // 当日期范围变化时获取新数据
   useEffect(() => {
     if (adminData) {
@@ -486,6 +467,8 @@ export default function AdminAnalytics() {
   }
   
   return (
+    <div>
+    {permissions.includes('view_analytics') ? (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
@@ -662,5 +645,13 @@ export default function AdminAnalytics() {
         </main>
       </div>
     </div>
+    ) : (
+      <div className="flex-1 overflow-auto">
+        <div className="flex items-center justify-center h-full">
+          <p className="text-gray-500 dark:text-gray-400">You do not have permission to view this page</p>
+        </div>
+      </div>
+    )}
+  </div>
   );
 }

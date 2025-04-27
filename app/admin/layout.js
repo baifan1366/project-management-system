@@ -10,7 +10,7 @@ import { Provider } from 'react-redux';
 import { store } from '@/lib/redux/store';
 import { ThemeProvider } from 'next-themes';
 import { useDispatch } from 'react-redux';
-import { checkAdminSession, logoutAdmin } from '@/lib/redux/features/adminSlice';
+import { checkAdminSession, logoutAdmin, checkAdminPermissions } from '@/lib/redux/features/adminSlice';
 
 // Redux wrapper for accessing dispatch
 function AdminLayoutInner({ children }) {
@@ -42,7 +42,7 @@ function AdminLayoutInner({ children }) {
       return;
     }
     
-    const verifyAdminSession = async () => {
+    const verifySessionPermission = async () => {
       try {
         setLoading(true);
         
@@ -53,6 +53,24 @@ function AdminLayoutInner({ children }) {
         if (!adminData) {
           console.log('No admin data returned from checkAdminSession');
           throw new Error('No active session found or unauthorized access');
+        }
+
+        // 检查管理员权限 - 传递角色信息给 checkAdminPermissions
+        try {
+          const permissions = await dispatch(checkAdminPermissions(adminData.role)).unwrap();
+          if (!permissions) {
+            console.log('No permissions returned from checkAdminPermissions');
+            // 不要抛出错误，允许继续
+          }
+          
+          // Store permissions names in Redux state
+          if (Array.isArray(permissions) && permissions.length > 0) {
+            // This is handled in the Redux slice now
+            console.log(`Loaded ${permissions.length} permissions for role: ${adminData.role}`);
+          }
+        } catch (permError) {
+          console.error('Error checking permissions:', permError);
+          // 不要阻止登录，继续执行
         }
         
         console.log('Admin session verified successfully:', adminData.email);
@@ -71,7 +89,7 @@ function AdminLayoutInner({ children }) {
       }
     };
     
-    verifyAdminSession();
+    verifySessionPermission();
   }, [isLoginPage, router, pathname, dispatch]);
   
   // Handle logout

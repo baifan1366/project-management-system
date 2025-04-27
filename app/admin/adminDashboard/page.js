@@ -6,15 +6,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell } from 'react-icons/fa';
-import { useDispatch } from 'react-redux';
-import { checkAdminSession, logoutAdmin } from '@/lib/redux/features/adminSlice';
+import { useDispatch, useSelector } from 'react-redux';
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const params = useParams();
-  const locale = params.locale || 'en';
   const dispatch = useDispatch();
-  
   const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -24,22 +20,16 @@ export default function AdminDashboard() {
     revenueThisMonth: 0
   });
   const [recentActivity, setRecentActivity] = useState([]);
-  
-  // Verify admin session and fetch admin data
+
+  const permissions = useSelector((state) => state.admin.permissions);
+
+  // initialize the page
   useEffect(() => {
     const initDashboard = async () => {
       try {
         setLoading(true);
-        
-        // 使用 Redux 的 checkAdminSession
-        const adminData = await dispatch(checkAdminSession()).unwrap();
-        
-        if (!adminData) {
-          throw new Error('No active session found or unauthorized access');
-        }
-        
-        setAdminData(adminData);
-        
+
+        console.log('permissions', permissions || []);
         // Fetch dashboard statistics
         await fetchDashboardStats();
         
@@ -47,7 +37,7 @@ export default function AdminDashboard() {
         await fetchRecentActivity();
         
       } catch (error) {
-        console.error('Admin session check failed:', error);
+        console.error('Errror in fetching dashboard data:', error);
         // Redirect to admin login
         router.replace(`/admin/adminLogin`);
       } finally {
@@ -56,7 +46,7 @@ export default function AdminDashboard() {
     };
     
     initDashboard();
-  }, [dispatch, router]);
+  }, [dispatch, router, permissions]);
 
   // Fetch dashboard statistics
   const fetchDashboardStats = async () => {
@@ -128,36 +118,6 @@ export default function AdminDashboard() {
     }
   };
   
-  // Handle admin logout
-  const handleLogout = async () => {
-    try {
-      // Log the logout action
-      if (adminData) {
-        try {
-          await supabase.from('admin_activity_log').insert({
-            admin_id: adminData.id,
-            action: 'logout',
-            // 暂时省略 entity_id 字段，避免 UUID 错误
-            ip_address: '127.0.0.1',
-            user_agent: navigator.userAgent
-          });
-        } catch (logError) {
-          console.error('Error logging logout activity:', logError);
-          // 即使日志失败也继续登出流程
-        }
-      }
-      
-      // 使用 Redux 的 logoutAdmin
-      await dispatch(logoutAdmin()).unwrap();
-      
-      // Redirect to admin login
-      router.replace(`/admin/adminLogin`);
-      
-    } catch (error) {
-      console.error('Error during logout:', error);
-    }
-  };
-  
   // Format date for display
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -220,6 +180,7 @@ export default function AdminDashboard() {
         <main className="p-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {Array.isArray(permissions) && permissions.includes('view_users') && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -236,7 +197,9 @@ export default function AdminDashboard() {
                 </Link>
               </div>
             </div>
+            )}
             
+            {Array.isArray(permissions) && permissions.includes('view_subscriptions') && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -253,7 +216,9 @@ export default function AdminDashboard() {
                 </Link>
               </div>
             </div>
-            
+            )}
+
+            {Array.isArray(permissions) && permissions.includes('view_support_tickets') && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -270,7 +235,9 @@ export default function AdminDashboard() {
                 </Link>
               </div>
             </div>
-            
+            )}
+
+            {Array.isArray(permissions) && permissions.includes('view_analytics') && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -287,11 +254,36 @@ export default function AdminDashboard() {
                 </Link>
               </div>
             </div>
+            )}
+            
+            {!permissions.includes('view_users') && 
+             !permissions.includes('view_subscriptions') && 
+             !permissions.includes('view_support_tickets') && 
+             !permissions.includes('view_analytics') && (
+              <div className="col-span-full bg-yellow-50 dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 bg-yellow-100 dark:bg-yellow-900 rounded-full p-3 mr-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-600 dark:text-yellow-400">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-yellow-800 dark:text-yellow-300">Limited Dashboard Access</h3>
+                    <p className="mt-1 text-yellow-700 dark:text-yellow-400">
+                      Your admin role doesn't have permissions to view dashboard statistics. Please contact a super admin for assistance.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          
-          {/* Recent Activity */}
+
+          {/*Admins Recent Activity */}
+          {Array.isArray(permissions) && permissions.includes('view_admins') && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Recent Activity</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Admin Recent Activity</h3>
             
             {recentActivity.length > 0 ? (
               <div className="overflow-x-auto">
@@ -340,6 +332,7 @@ export default function AdminDashboard() {
               </Link>
             </div>
           </div>
+          )}
           
           {/* Quick Actions */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
@@ -347,21 +340,21 @@ export default function AdminDashboard() {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Link 
-                href={`/${locale}/admin/users/create`}
+                href={`/admin/adminManagement`}
                 className="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="text-gray-700 dark:text-gray-300">Create New User</span>
               </Link>
               
               <Link 
-                href={`/${locale}/admin/plans/create`}
+                href={`/admin/subscriptionManagement`}
                 className="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="text-gray-700 dark:text-gray-300">Add Subscription Plan</span>
               </Link>
               
               <Link 
-                href={`/${locale}/admin/promo-codes/create`}
+                href={`/admin/promoCodeManagement`}
                 className="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="text-gray-700 dark:text-gray-300">Create Promo Code</span>

@@ -5,8 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaPlus, FaEdit, FaTrash, FaCheck, FaToggleOn, FaToggleOff, FaTimes } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import { clsx } from 'clsx';
-import { hasPermission } from '@/lib/permissions';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { checkAdminSession } from '@/lib/redux/features/adminSlice';
 
 export default function AdminSubscriptions() {
   const router = useRouter();
@@ -53,36 +53,20 @@ export default function AdminSubscriptions() {
   const [totalPayments, setTotalPayments] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const dispatch = useDispatch();
+  const permissions = useSelector((state) => state.admin.permissions);
 
-  // Verify admin session
+  // initialize the page
   useEffect(() => {
-    const checkAdminSession = async () => {
+    const initAdminSubscriptions = async () => {
       try {
         setLoading(true);
-        
-        // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
-          throw new Error('No active session found');
-        }
-        
-        // Check if user is an admin
-        const { data: admin, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', sessionData.session.user.email)
-          .eq('is_active', true)
-          .single();
-          
-        if (adminError || !admin) {
-          throw new Error('Unauthorized access');
-        }
-        
-        setAdminData(admin);
-        
+
+        await fetchSubscriptionPlans();
+        await fetchPromoCodes();  
+
       } catch (error) {
-        console.error('Admin session check failed:', error);
+        console.error('Errror in fetching subscription plans:', error);
         // Redirect to admin login
         router.replace(`/admin/adminLogin`);
       } finally {
@@ -90,8 +74,8 @@ export default function AdminSubscriptions() {
       }
     };
     
-    checkAdminSession();
-  }, []);
+    initAdminSubscriptions();
+  }, [dispatch, router]);
 
   const fetchSubscriptionPlans = async () => {
     try {
@@ -152,12 +136,6 @@ export default function AdminSubscriptions() {
       return [];
     }
   };
-
-  // use useEffect to fetch subscription plans and promo codes
-  useEffect(() => {
-    fetchSubscriptionPlans();
-    fetchPromoCodes();  
-  }, []);
   
   // Open modal
   const openModal = ({type, plan = null, code = null}) => {
@@ -624,6 +602,7 @@ export default function AdminSubscriptions() {
           {/* Tabs */}
           <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
             <ul className="flex flex-wrap -mb-px">
+            {permissions.includes('view_subscription_plans') && (
               <li className="mr-2">
                 <button 
                   className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab === "subscriptionPlans" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
@@ -632,6 +611,8 @@ export default function AdminSubscriptions() {
                   Subscription Plans
                 </button>
               </li>
+            )}
+            {permissions.includes('view_promo_codes') && (
               <li className="mr-2">
                 <button 
                   className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab === "promoCodes" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
@@ -640,6 +621,8 @@ export default function AdminSubscriptions() {
                   Promo Codes
                 </button>
               </li>
+            )}
+            {permissions.includes('view_user_subscriptions') && (
               <li className="mr-2">
                 <button 
                   className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab === "userSubscriptions" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
@@ -648,6 +631,8 @@ export default function AdminSubscriptions() {
                   User Subscriptions
                 </button>
               </li>
+            )}
+            {permissions.includes('view_payment_history') && (
               <li className="mr-2">
                 <button 
                   className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab === "paymentHistory" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
@@ -656,24 +641,15 @@ export default function AdminSubscriptions() {
                   Payment History
                 </button>
               </li>
+            )}
             </ul>
           </div>
           
           {/* Subscription Plans Section */}
           {activeTab === "subscriptionPlans" && (
-            <>
+            <div>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Subscription Plans</h3>
-                
-                {/* <div className="flex space-x-2">
-                  <button 
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg flex items-center"
-                    onClick={() => openModal({type: 'add'})}
-                  >
-                    <FaPlus className="mr-2" />
-                    Add New Plan
-                  </button>
-                </div> */}
               </div>
               
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-8">
@@ -763,12 +739,15 @@ export default function AdminSubscriptions() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex justify-end space-x-3">
+                              {permissions.includes('edit_sub_plans') && (
                               <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300" 
                                 onClick={() => openModal({type: 'edit', plan})}
                               >
                                 <FaEdit />
                               </button>
+                              )}
                               {/* toggle active button */}
+                              {permissions.includes('toggle_sub_status') && (
                               <button
                                 onClick={() => toggleActive(plan.id, !plan.is_active, 'subscription_plan')}
                                 className={clsx(
@@ -780,6 +759,7 @@ export default function AdminSubscriptions() {
                               >
                                 {plan.is_active ? <FaToggleOn /> : <FaToggleOff />}
                               </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -788,7 +768,7 @@ export default function AdminSubscriptions() {
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* Promo Codes Section */}
@@ -798,6 +778,7 @@ export default function AdminSubscriptions() {
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Promo Codes</h3>
                 
                 <div className="flex space-x-2">
+                  {permissions.includes('add_promo_codes') && (
                   <button 
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg flex items-center"
                     onClick={() => openModal({type: 'add'})}
@@ -805,6 +786,7 @@ export default function AdminSubscriptions() {
                     <FaPlus className="mr-2" />
                     Add New Code
                   </button>
+                  )}
                 </div>
               </div>
               
@@ -869,12 +851,15 @@ export default function AdminSubscriptions() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex justify-end space-x-2">
+                              {permissions.includes('edit_promo_codes') && (
                               <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                                 onClick={() => openModal({type:'edit', code})}
                               >
                                 <FaEdit />
                               </button>
+                              )}
                               {/* toggle active button */}
+                              {permissions.includes('toggle_code_status') && (
                               <button
                                 onClick={() => toggleActive(code.id, !code.is_active, 'promo_code')}
                                 className={clsx(
@@ -886,13 +871,16 @@ export default function AdminSubscriptions() {
                               >
                                 {code.is_active ? <FaToggleOn /> : <FaToggleOff />}
                               </button>
+                              )}
                               {/* delete button */}
+                              {permissions.includes('delete_promo_codes') && (
                               <button
                                 onClick={() => deletePromoCode(code.id)}
                                 className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                               >
                                 <FaTrash />
                               </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -906,7 +894,7 @@ export default function AdminSubscriptions() {
 
           {/* User Subscriptions Section */}
           {activeTab === "userSubscriptions" && (
-            <>
+            <div>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">User Subscriptions</h3>
               </div>
@@ -914,12 +902,12 @@ export default function AdminSubscriptions() {
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 text-center">
                 <p className="text-gray-500 dark:text-gray-400">User subscription management coming soon.</p>
               </div>
-            </>
+            </div>
           )}
 
           {/* Payment History Section */}
           {activeTab === "paymentHistory" && (
-            <>
+            <div>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Payment History</h3>
                 <div className="flex space-x-2">
@@ -1136,374 +1124,12 @@ export default function AdminSubscriptions() {
                   </>
                 )}
               </div>
-            </>
+            </div>
           )}
         </main>
       </div>
 
       {/* SUBSCRIPTION MODALS */}
-      {/*subscription add modal*/}
-      {isModalOpen && modalType === 'add' && (
-        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
-          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>
-            <div className='flex justify-between items-center mb-4'>
-              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
-                {modalFor === "promoCode" ? "Add New Promo Code" : "Add New Subscription Plan"}
-              </h2>
-              <button
-                onClick={closeModal}
-                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              >
-                &times;
-              </button>
-            </div>
-            
-            {modalFor === "promoCode" ? (
-              // Promo code form
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                const codeData = {
-                  code: codeName,
-                  discount_type: codeType,
-                  discount_value: parseFloat(codeValue),
-                  description: codeDescription,
-                  is_active: codeIsActive === 'true',
-                  start_date: new Date(startDate).toISOString(),
-                  end_date: new Date(endDate).toISOString(),
-                  current_uses: 0,
-                  max_uses: parseInt(maxUses) || 0
-                };
-                
-                // Add promo code and only close if successful
-                const success = await addPromoCode(codeData);
-                if (success) {
-                  closeModal();
-                }
-              }}>
-                <div className='space-y-4'>
-                  <div>
-                    <label htmlFor='add-code-name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Promo Code
-                    </label>
-                    <input
-                      type='text'
-                      id='add-code-name'
-                      name='code'
-                      required
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter promo code'
-                      onChange={(e) => setCodeName(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-code-type' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Discount Type
-                    </label>
-                    <select
-                      id='add-code-type'
-                      name='discount_type'
-                      required
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setCodeType(e.target.value)}
-                    >
-                      <option value=''>Select discount type</option>
-                      <option value='PERCENTAGE'>Percentage</option>
-                      <option value='FIXED_AMOUNT'>Fixed Amount</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-code-value' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Discount Value
-                    </label>
-                    <input
-                      type='number'
-                      id='add-code-value'
-                      name='discount_value'
-                      required
-                      min='0'
-                      step='0.01'
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder={codeType === 'PERCENTAGE' ? 'Enter discount percentage' : 'Enter discount amount'}
-                      onChange={(e) => setCodeValue(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-code-description' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Description
-                    </label>
-                    <textarea
-                      id='add-code-description'
-                      name='description'
-                      rows='3'
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter promo code description'
-                      onChange={(e) => setCodeDescription(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-max-uses' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Max Usage Count
-                    </label>
-                    <input
-                      type='number'
-                      id='add-max-uses'
-                      name='max_uses'
-                      required
-                      min='0'
-                      value={maxUses}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter maximum number of uses'
-                      onChange={(e) => setMaxUses(e.target.value)}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Enter 0 for unlimited uses</p>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-start-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Start Date
-                    </label>
-                    <input
-                      type='date'
-                      id='add-start-date'
-                      name='start_date'
-                      required
-                      value={startDate}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-end-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      End Date
-                    </label>
-                    <input
-                      type='date'
-                      id='add-end-date'
-                      name='end_date'
-                      required
-                      value={endDate}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Status
-                    </label>
-                    <div className='flex items-center space-x-4'>
-                      <label className='inline-flex items-center'>
-                        <input
-                          type='radio'
-                          name='is_active'
-                          value='true'
-                          checked={codeIsActive === 'true'}
-                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                          onChange={() => setCodeIsActive('true')}
-                        />
-                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Active</span>
-                      </label>
-                      
-                      <label className='inline-flex items-center'>
-                        <input
-                          type='radio'
-                          name='is_active'
-                          value='false'
-                          checked={codeIsActive === 'false'}
-                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                          onChange={() => setCodeIsActive('false')}
-                        />
-                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Inactive</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className='mt-6 flex justify-end space-x-3'>
-                  <button
-                    type='button'
-                    onClick={closeModal}
-                    className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
-                      text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-                  >
-                    Cancel
-                  </button>
-                  
-                  <button
-                    type='submit'
-                    className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
-                      text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                      focus:ring-offset-2 focus:ring-indigo-500'
-                  >
-                    Add Code
-                  </button>
-                </div>
-              </form>
-            ) : (
-              // Subscription plan form
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const planData = {
-                  name: planName,
-                  type: planType,
-                  price: parseFloat(planPrice),
-                  billing_interval: planBilling,
-                  description: description,
-                  features: { features: features },
-                  max_members: parseInt(planMaxMembers),
-                  max_projects: parseInt(planMaxProjects),
-                  storage_limit: parseInt(planMaxStorage),
-                  is_active: planIsActive === 'true',
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                };
-                
-                // Add subscription plan logic here
-                // addSubscriptionPlan(planData);
-                closeModal();
-              }}>
-                <div className='space-y-4'>
-                  <div>
-                    <label htmlFor='add-name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Plan Name
-                    </label>
-                    <input
-                      type='text'
-                      id='add-name'
-                      name='name'
-                      required
-                      value={planName}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter plan name'
-                      onChange={(e) => setPlanName(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-type' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Plan Type
-                    </label>
-                    <select
-                      id='add-type'
-                      name='type'
-                      required
-                      value={planType}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setPlanType(e.target.value)}
-                    >
-                      <option value=''>Select plan type</option>
-                      <option value='FREE'>Free</option>
-                      <option value='PRO'>Pro</option>
-                      <option value='ENTERPRISE'>Enterprise</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-price' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Price
-                    </label>
-                    <input
-                      type='number'
-                      id='add-price'
-                      name='price'
-                      required
-                      min='0'
-                      step='0.01'
-                      value={planPrice}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter price'
-                      onChange={(e) => setPrice(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-billing' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Billing Interval
-                    </label>
-                    <select
-                      id='add-billing'
-                      name='billing_interval'
-                      required
-                      value={planBilling}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setPlanBilling(e.target.value)}
-                    >
-                      <option value=''>Select billing interval</option>
-                      <option value='MONTHLY'>Monthly</option>
-                      <option value='YEARLY'>Yearly</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-description' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Description
-                    </label>
-                    <textarea
-                      id='add-description'
-                      name='description'
-                      rows='3'
-                      value={description}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter plan description'
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
-                <div className='mt-6 flex justify-end space-x-3'>
-                  <button
-                    type='button'
-                    onClick={closeModal}
-                    className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
-                      text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-                  >
-                    Cancel
-                  </button>
-                  
-                  <button
-                    type='submit'
-                    className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
-                      text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                      focus:ring-offset-2 focus:ring-indigo-500'
-                  >
-                    Add Plan
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-
       {/*subscription edit modal*/}
       {isModalOpen && modalType === 'edit' && isPlanSelected && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
@@ -1845,7 +1471,7 @@ export default function AdminSubscriptions() {
         </div>
       )}
 
-      {/*edit*/}
+      {/* promo code edit modal*/}
       {isModalOpen && modalType === 'edit' && isCodeSelected && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
           <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>
