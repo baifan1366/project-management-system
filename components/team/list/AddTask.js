@@ -13,6 +13,8 @@ import { useEffect } from 'react';
 export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks, taskInputRef }) {
   const dispatch = useDispatch();
   const t = useTranslations('CreateTask');
+  const { user } = useGetUser();
+
   // 存储编辑中的任务状态
   const [editingTask, setEditingTask] = useState(null);
   // 存储编辑中的任务内容
@@ -70,7 +72,6 @@ export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks, 
     }
     
     try {
-      const { user } = useGetUser();
       const userId = user?.id;
       
       // 确保至少有一个值，如果第一个标签值是空的，设置默认值

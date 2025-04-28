@@ -33,7 +33,8 @@ export default function BodyContent({
   handleTaskValueChange,
   handleTaskEditComplete,
   handleKeyDown,
-  taskInputRef
+  taskInputRef,
+  setEditingTask
 }) {
   const t = useTranslations('CreateTask');
   const tConfirm = useTranslations('confirmation');
@@ -51,29 +52,77 @@ export default function BodyContent({
   const [hoveredTaskRow, setHoveredTaskRow] = useState(null);
   // 存储拖拽状态
   const [isDragging, setIsDragging] = useState(false);
+  // 新增：存储当前加载的团队ID
+  const currentTeamIdRef = useRef(null);
 
   // 从Redux中获取标签数据，用于获取真实的标签ID
   const { tags: tagsData } = useSelector((state) => state.teamCF);
+
+  // 增强当 teamId 变化时的清理和重置
+  useEffect(() => {
+    // 如果 teamId 变化或是第一次加载
+    if (currentTeamIdRef.current !== teamId) {
+      console.log(`Team ID changed from ${currentTeamIdRef.current} to ${teamId}`);
+      
+      // 清理本地状态
+      setCollapsedSections({});
+      setHoveredSectionHeader(null);
+      setHoveredTaskRow(null);
+      setIsDragging(false);
+      
+      // 重置请求状态
+      isSectionRequestInProgress.current = false;
+      isTaskRequestInProgress.current = false;
+      
+      // 更新当前团队ID
+      currentTeamIdRef.current = teamId;
+      
+      // 延迟加载部分，避免可能的竞态条件
+      if (teamId) {
+        setTimeout(() => {
+          // 仅当teamId有效时尝试加载
+          if (!isSectionRequestInProgress.current) {
+            loadSections();
+          }
+        }, 50);
+      }
+    }
+  }, [teamId]);
 
   // 处理部门数据
   const sectionInfo = useMemo(() => {
     if (!sections || !sections.length) return [];
     return sections.map(section => section);
-  }, [sections]);
+  }, [sections, teamId]);
 
   // 加载部门数据
   const loadSections = async () => {
-    if (!teamId || isSectionRequestInProgress.current) return;
+    // 检查是否有有效的teamId
+    if (!teamId) {
+      console.log('No teamId provided, cannot load sections');
+      return;
+    }
     
-    // 检查sections是否已经存在且有数据，如果有则不需要再次请求
-    if (sections && sections.length > 0) return;
+    // 避免请求冲突
+    if (isSectionRequestInProgress.current) {
+      console.log('Section request already in progress, skipping');
+      return;
+    }
+    
+    console.log(`Loading sections for team ${teamId}`);
     isSectionRequestInProgress.current = true;
+    
     try {
       setIsLoading(true);
       
-      await dispatch(getSectionByTeamId(teamId)).unwrap();
+      // 总是从API获取最新数据
+      const result = await dispatch(getSectionByTeamId(teamId)).unwrap();
+      console.log(`Loaded ${result?.length || 0} sections for team ${teamId}`);
+      
+      // 标记当前加载的团队ID
+      currentTeamIdRef.current = teamId;
     } catch (error) {
-      console.error('Error loading sections:', error);
+      console.error(`Error loading sections for team ${teamId}:`, error);
     } finally {
       setIsLoading(false);
       isSectionRequestInProgress.current = false;
@@ -82,26 +131,40 @@ export default function BodyContent({
 
   // 加载所有部门的任务
   const loadAllSectionTasks = async () => {
-    if (!teamId || isTaskRequestInProgress.current || !sections || !sections.length) return;
+    if (!teamId || isTaskRequestInProgress.current) return;
+    
+    // 确保有部门数据
+    if (!sections || sections.length === 0) return;
+    
     isTaskRequestInProgress.current = true;
     try {
       setIsLoading(true);
+      
+      // 创建新的任务数据对象，不依赖于之前的状态
+      const newTasksData = {};
       
       // 为每个部门加载任务
       for (let i = 0; i < sections.length; i++) {
         const section = sections[i];
         if (section && section.id) {
-          const taskData = await dispatch(fetchTasksBySectionId(section.id)).unwrap();
-          
-          // 将任务数据存储到本地状态中
-          setLocalTasks(prevTasks => ({
-            ...prevTasks,
-            [section.id]: taskData
-          }));
+          try {
+            const taskData = await dispatch(fetchTasksBySectionId(section.id)).unwrap();
+            // 将任务数据直接添加到新对象中
+            newTasksData[section.id] = taskData;
+          } catch (sectionError) {
+            console.error(`加载部门 ${section.id} 的任务失败:`, sectionError);
+            // 为失败的部门设置空数组
+            newTasksData[section.id] = [];
+          }
         }
       }
+      
+      // 一次性更新所有任务数据，替换旧数据
+      setLocalTasks(newTasksData);
     } catch (error) {
       console.error('加载所有任务失败:', error);
+      // 发生错误时重置任务数据
+      setLocalTasks({});
     } finally {
       setIsLoading(false);
       isTaskRequestInProgress.current = false;
@@ -379,6 +442,7 @@ export default function BodyContent({
                                 onClick={() => {
                                   // 允许用户点击任何任务开始编辑，不仅限于新任务
                                   if (!isEditing) {
+                                    // 使用从props传入的setEditingTask函数
                                     setEditingTask(task.id);
                                   }
                                 }}

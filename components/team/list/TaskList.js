@@ -18,7 +18,10 @@ import { Input } from '@/components/ui/input';
 import AddTask from './AddTask';
 import BodyContent from './BodyContent';
 import { useGetUser } from '@/lib/hooks/useGetUser';
-import { createSection } from '@/lib/redux/features/sectionSlice';
+import { createSection, resetSectionsState } from '@/lib/redux/features/sectionSlice';
+import {
+  resetTasksState
+} from '@/lib/redux/features/taskSlice';
 
 export default function TaskList({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
@@ -26,7 +29,12 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
   const [isPopoverOpen, setPopoverOpen] = useState(false);
   const isTagRequestInProgress = useRef(false);
   const hasLoadedTags = useRef(false);
-  
+  const { user } = useGetUser();
+
+  // 新增：部门和任务加载状态的引用
+  const isSectionRequestInProgress = useRef(false);
+  const isTaskRequestInProgress = useRef(false);
+
   // 存储标签顺序状态
   const [tagOrder, setTagOrder] = useState([]);
   // 存储标签拖拽状态
@@ -266,7 +274,8 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     handleTaskValueChange, 
     handleTaskEditComplete: originalHandleTaskEditComplete, 
     handleKeyDown,
-    checkTaskInputRef
+    checkTaskInputRef,
+    setEditingTask
   } = AddTask({ 
     sectionId: '', 
     teamId, 
@@ -326,22 +335,40 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
     handleTaskValueChange,
     handleTaskEditComplete,
     handleKeyDown,
-    taskInputRef
+    taskInputRef,
+    setEditingTask
   });
-
-  // 在部门数据加载后加载任务
-  useEffect(() => {
-    if (sections && sections.length > 0) {
-      loadAllSectionTasks();
-    }
-  }, [sections]);
 
   // 在组件初始化时加载部门
   useEffect(() => {
     if (teamId) {
-      loadSections();
+      // 首先重置加载标志
+      isSectionRequestInProgress.current = false;
+      isTagRequestInProgress.current = false;
+      
+      // 延迟一小段时间加载，确保Redux状态已被重置
+      const loadTimer = setTimeout(() => {
+        loadSections();
+      }, 100);
+      
+      return () => clearTimeout(loadTimer);
     }
   }, [teamId]);
+
+  // 在部门数据加载后加载任务
+  useEffect(() => {
+    if (teamId && sections && sections.length > 0) {
+      // 重置任务请求状态
+      isTaskRequestInProgress.current = false;
+      
+      // 延迟一小段时间加载，确保Redux部门状态已完全更新
+      const loadTasksTimer = setTimeout(() => {
+        loadAllSectionTasks();
+      }, 100);
+      
+      return () => clearTimeout(loadTasksTimer);
+    }
+  }, [sections, teamId]);
 
   // 新增：处理部门创建
   const handleAddSection = () => {
@@ -378,7 +405,6 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
       try {
         // 开始创建，显示加载状态
         setIsCreatingSection(true);
-        const { user } = useGetUser();
         const userId = user?.id
         // 准备创建部门的数据
         const sectionData = {
@@ -409,6 +435,31 @@ export default function TaskList({ projectId, teamId, teamCFId }) {
 
   // 计算总列数（标签列 + 操作列）
   const totalColumns = (Array.isArray(tagInfo) ? tagInfo.length : 0) + 1;
+
+  // 修改：当 teamId 变化时重置状态
+  useEffect(() => {
+    // 重置本地状态
+    setLocalTasks({});
+    setTagOrder([]);
+    setTagWidths({});
+    setIsCreatingTask(false);
+    setIsCreatingSection(false);
+    setNewSectionName('');
+
+    // 重置 Redux 状态
+    dispatch(resetTagsStatus());
+    dispatch(resetSectionsState());
+    dispatch(resetTasksState());
+    
+    // 重置请求标志
+    hasLoadedTags.current = false;
+    isTagRequestInProgress.current = false;
+    
+    // 当 teamId 为有效值时，初始化数据加载
+    if (teamId) {
+      loadTag();
+    }
+  }, [teamId, dispatch]);
 
   return (
     <div className="w-full h-full">

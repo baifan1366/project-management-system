@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,42 +22,73 @@ import { useGetUser } from '@/lib/hooks/useGetUser';
 import { Plus, Text, Calendar, User, Sigma, Fingerprint, SquareCheck, CircleCheck, Hash, ClipboardList, Clock3, Tag, Pen, Timer } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
+import { createTagValidationSchema, tagFormTransforms } from '@/components/validation/tagSchema'
 
 export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, teamCFId }) {
     const t = useTranslations('CreateTag')
+    const tValidation = useTranslations('validationRules')
     const [isLoading, setIsLoading] = useState(false)
     const dispatch = useDispatch()
     const [themeColor, setThemeColor] = useState('#64748b')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [showDescription, setShowDescription] = useState(false)
+    const { user } = useGetUser();
     const [tagTypes, setTagTypes] = useState(['TEXT', 'NUMBER', 'ID', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TAGS'])
 
-    const FormSchema = z.object({
-        name: z.string().trim().min(2, {
-            message: t('nameMin'),
-        }).max(50, {
-            message: t('nameMax'),
-        }),
-        type: z.string().min(1, {
-            message: t('typeRequired'),
-        }),
-        description: z.string().trim().optional()
-            .refine(val => !val || val.length >= 10, {
-                message: t('descriptionMin'),
-            })
-            .refine(val => !val || val.length <= 100, {
-                message: t('descriptionMax'),
-            })
-    })
+    const validationSchema = createTagValidationSchema(tValidation, { 
+        requireDescription: showDescription 
+    });
 
     const form = useForm({
-        resolver: zodResolver(FormSchema),
         defaultValues: {
           name: "",
           type: "TEXT",
           description: "",
         },
-      })
+    })
+
+    const validateForm = (data) => {
+        try {
+            const errors = {};
+            const transformedData = {
+                name: tagFormTransforms.name(data.name),
+                type: tagFormTransforms.type(data.type),
+                description: tagFormTransforms.description(data.description),
+            };
+
+            Object.keys(validationSchema.rules).forEach(field => {
+                if (field === 'description' && !showDescription) {
+                    return;
+                }
+                
+                const fieldRules = validationSchema.rules[field];
+                if (fieldRules && Array.isArray(fieldRules)) {
+                    for (const rule of fieldRules) {
+                        if (typeof rule.validate === 'function') {
+                            const result = rule.validate(transformedData[field]);
+                            if (!result.isValid) {
+                                errors[field] = result.message;
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+
+            return {
+                isValid: Object.keys(errors).length === 0,
+                errors,
+                transformedData
+            };
+        } catch (error) {
+            console.error('表单验证出错:', error);
+            return {
+                isValid: false,
+                errors: { form: '表单验证错误' },
+                transformedData: data
+            };
+        }
+    };
 
     useEffect(() => {
         const loadProjectData = async () => {
@@ -109,23 +138,35 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
 
     const onSubmit = async (data) => {
         if(isSubmitting) return;
-        setIsLoading(true);
-        setIsSubmitting(true)
-        try{
-            const { user } = useGetUser();
+        
+        try {
+            const validation = validateForm(data);
+            if (!validation.isValid) {
+                Object.keys(validation.errors).forEach(field => {
+                    form.setError(field, {
+                        type: 'manual',
+                        message: validation.errors[field]
+                    });
+                });
+                return;
+            }
+
+            setIsLoading(true);
+            setIsSubmitting(true);
+            
             const userId = user?.id
             const newTag = await dispatch(createTag({
-                name: data.name,
-                type: data.type,
-                description: data.description,
+                name: validation.transformedData.name,
+                type: validation.transformedData.type,
+                description: validation.transformedData.description,
                 created_by: userId
             })).unwrap()
             
-            // 先获取现有的标签IDs
-            const existingTagsResponse = await dispatch (getTags({teamId, teamCFId})).unwrap();
+            // Get existing tag IDs
+            const existingTagsResponse = await dispatch(getTags({teamId, teamCFId})).unwrap();
             const existingTagIds = existingTagsResponse.tag_ids || [];
             
-            // 将新标签添加到现有标签列表
+            // Add new tag to existing tag list
             const updatedTagIds = [...existingTagIds, newTag.id];
             
             await dispatch(updateTagIds({
@@ -139,9 +180,14 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
             setIsSubmitting(false)
             onClose()
         } catch(error) {
-            console.error(error)
+            console.error('创建标签出错:', error)
             setIsLoading(false)
             setIsSubmitting(false)
+            // 显示错误消息
+            form.setError('root', {
+                type: 'manual',
+                message: '保存标签时发生错误'
+            });
         }
     }
 
@@ -275,26 +321,25 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
                                 )}
                             />
                         )}
+                        <DialogFooter className="mt-8 flex justify-end gap-3">
+                            <Button
+                                type="button"
+                                onClick={onClose}
+                                disabled={isSubmitting}
+                                variant={themeColor}
+                            >
+                                {t('cancel')}
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                variant={themeColor}
+                            >
+                                {isSubmitting ? t('adding') : t('addTag')}
+                            </Button>
+                        </DialogFooter>
                     </form>
                 </Form>
-                <DialogFooter className="mt-8 flex justify-end gap-3">
-                    <Button
-                        type="button"
-                        onClick={onClose}
-                        disabled={isSubmitting}
-                        variant={themeColor}
-                    >
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={isSubmitting}
-                        variant={themeColor}
-                        onClick={form.handleSubmit(onSubmit)}
-                    >
-                        {isSubmitting ? t('adding') : t('addTag')}
-                    </Button>
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     )

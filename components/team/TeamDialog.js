@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,16 +22,24 @@ import { createTeamCustomField, getTags, updateTagIds } from '@/lib/redux/featur
 import { Lock, Eye, Pencil, Unlock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { createTeamValidationSchema, teamFormTransforms } from '@/components/validation/teamSchema'
 
 export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const t = useTranslations('CreateTeam')
+  const tValidation = useTranslations('validationRules')
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const dispatch = useDispatch()
   const { projects } = useSelector((state) => state.projects)
   const project = projects.find(p => String(p.id) === String(projectId))
   const [themeColor, setThemeColor] = useState('#64748b');
+  const [formErrors, setFormErrors] = useState({});
+  const [validationSchema, setValidationSchema] = useState(null);
+  const { user } = useGetUser();
 
+  useEffect(() => {
+    setValidationSchema(createTeamValidationSchema(tValidation));
+  }, [tValidation]);
 
   const buttonVariants = [
     { value: 'black', label: '黑色' },
@@ -45,24 +51,12 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
     { value: 'pink', label: '粉色' }
   ];
 
-  const FormSchema = z.object({
-    teamName: z.string().trim().min(2, {
-      message: t('teamNameMin'),
-    }).max(50, {
-      message: t('teamNameMax'),
-    }),
-    teamAccess: z.string().min(1, {
-      message: t('teamAccessRequired'),
-    }).transform((val) => val.toLowerCase()),
-  })
-
   const form = useForm({
-    resolver: zodResolver(FormSchema),
     defaultValues: {
       teamName: "",
       teamAccess: "",
     },
-  })
+  });
 
   useEffect(() => {
     if (project) {
@@ -77,24 +71,45 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
         teamName: "",
         teamAccess: "",
       });
-      form.clearErrors();
+      setFormErrors({});
     }
   }, [isOpen]);
 
+  const validateForm = (data) => {
+    if (!validationSchema) return { isValid: true, errors: {} };
+    
+    // 应用转换
+    const transformedData = {
+      teamName: teamFormTransforms.teamName(data.teamName),
+      teamAccess: teamFormTransforms.teamAccess(data.teamAccess),
+    };
+    
+    // 执行验证
+    return validationSchema.validate(transformedData);
+  };
+
   const onSubmit = async (data) => {
     if (isSubmitting) return;
+    
+    // 验证表单
+    const { isValid, errors } = validateForm(data);
+    
+    if (!isValid) {
+      setFormErrors(errors);
+      return;
+    }
+    
     setIsLoading(true);
     setIsSubmitting(true);
     
     try {
       // 获取当前用户信息
-      const { user } = useGetUser();
       const userId = user?.id;
       console.log('userId', userId)
       // 创建团队
       const team = await dispatch(createTeam({
-        name: data.teamName,
-        access: data.teamAccess,
+        name: teamFormTransforms.teamName(data.teamName),
+        access: teamFormTransforms.teamAccess(data.teamAccess),
         project_id: projectId,
         star: false,
         order_index: 0,
@@ -261,7 +276,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
             <FormField
               control={form.control}
               name="teamName"
-              render={({ field, fieldState }) => (
+              render={({ field }) => (
                 <FormItem>
                   <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
                     {t('teamName')}
@@ -270,15 +285,24 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                   <FormControl>
                     <Input 
                       className={`w-full px-3 py-2 border rounded-md ${
-                        fieldState.invalid ? 'border-red-500' : 'border-gray-300'
+                        formErrors.teamName ? 'border-red-500' : 'border-gray-300'
                       }`}
                       placeholder={t('teamNameRequired')} 
                       {...field} 
+                      onChange={(e) => {
+                        field.onChange(e);
+                        if (formErrors.teamName) {
+                          // 当用户开始输入时清除错误
+                          setFormErrors({...formErrors, teamName: undefined});
+                        }
+                      }}
                     />
                   </FormControl>
                   <div className="flex justify-end mt-1 min-h-[20px]">
                     <div className="flex-1">
-                      <FormMessage className="text-xs" />
+                      {formErrors.teamName && (
+                        <FormMessage className="text-xs">{formErrors.teamName}</FormMessage>
+                      )}
                     </div>
                     <span className="text-xs text-gray-500 ml-2">{field.value.trim().length}/50</span>
                   </div>
@@ -289,17 +313,25 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
             <FormField
               control={form.control}
               name="teamAccess"
-              render={({ field, fieldState }) => (
+              render={({ field }) => (
                 <FormItem>
                   <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
                     {t('teamAccess')}
                     <span className="text-red-500">*</span>
                   </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      if (formErrors.teamAccess) {
+                        setFormErrors({...formErrors, teamAccess: undefined});
+                      }
+                    }} 
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger 
                         className={`w-full px-3 py-2 border rounded-md ${
-                          fieldState.invalid ? 'border-red-500' : 'border-gray-300'
+                          formErrors.teamAccess ? 'border-red-500' : 'border-gray-300'
                         }`}
                       >
                         <SelectValue placeholder={t('teamAccessPlaceholder')}>
@@ -373,7 +405,9 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                   </Select>
                   <div className="flex justify-end mt-1 min-h-[20px]">
                     <div className="flex-1">
-                      <FormMessage className="text-xs text-red-500" />
+                      {formErrors.teamAccess && (
+                        <FormMessage className="text-xs text-red-500">{formErrors.teamAccess}</FormMessage>
+                      )}
                     </div>
                   </div>
                 </FormItem>
