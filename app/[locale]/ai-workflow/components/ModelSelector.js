@@ -10,29 +10,56 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
   
   // Fetch available models on component mount or when userId changes
   useEffect(() => {
-    if (userId) {
-      fetchModels();
-    }
+    // Log userId changes for debugging
+    console.log('ModelSelector: userId changed:', userId);
+    fetchModels();
   }, [userId]);
   
   // Fetch models from API
   const fetchModels = async () => {
-    if (!userId) return;
-    
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/ai/workflow-agent/models?userId=${userId}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch models');
+      if (userId) {
+        console.log('ModelSelector: Fetching models for userId:', userId);
+        const response = await fetch(`/api/ai/workflow-agent/models?userId=${userId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('ModelSelector: Models fetched successfully:', data);
+          setModels(data);
+          
+          // Set default model if not already set
+          if (!selectedModel && data.length > 0) {
+            onModelChange(data[0].id);
+          }
+          setIsLoading(false);
+          return;
+        } else {
+          console.error('ModelSelector: Failed to fetch models, status:', response.status);
+        }
+      } else {
+        console.log('ModelSelector: Using default models (no userId)');
       }
       
-      const data = await response.json();
-      setModels(data);
+      // Fallback to default models if API fails or userId is not available
+      const defaultModels = [
+        { 
+          id: "google/gemini-2.0-flash-exp:free", 
+          name: "Gemini Flash 2.0",
+          description: "Fast response time with excellent quality"
+        },
+        { 
+          id: "deepseek/deepseek-r1:free", 
+          name: "DeepSeek R1",
+          description: "671B parameters with open reasoning tokens" 
+        }
+      ];
       
-      // Set default model if not already set
-      if (!selectedModel && data.length > 0) {
-        onModelChange(data[0].id);
+      setModels(defaultModels);
+      
+      if (!selectedModel) {
+        onModelChange("google/gemini-2.0-flash-exp:free");
       }
     } catch (error) {
       console.error('Error fetching models:', error);
