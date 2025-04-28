@@ -198,8 +198,13 @@ export default function AIWorkflow() {
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
-        if (user) {
+        if (user && user.id) {
+          console.log('AIWorkflow: Setting userId from user:', user.id);
           setUserId(user.id);
+        } else if (user === null) {
+          console.log('AIWorkflow: User is null, not authenticated');
+        } else if (user) {
+          console.log('AIWorkflow: User exists but no ID:', user);
         }
       } catch (error) {
         console.error('Error getting user:', error);
@@ -208,7 +213,7 @@ export default function AIWorkflow() {
     };
     
     getCurrentUser();
-  }, []);
+  }, [user]); // Add user as a dependency so this effect runs when user changes
   
   // Load user workflows on component mount
   useEffect(() => {
@@ -291,6 +296,7 @@ export default function AIWorkflow() {
   // Update nodes with the handleInputChange function after userId is set
   useEffect(() => {
     if (userId) {
+      console.log('AIWorkflow: Updating nodes with userId:', userId);
       setNodes(prevNodes => 
         prevNodes.map(node => ({
           ...node,
