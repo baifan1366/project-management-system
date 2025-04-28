@@ -18,12 +18,12 @@ export default function ActivityLog() {
   const [error, setError] = useState(null);
   const locale = params.locale || 'en';
   const [userId, setUserId] = useState(null);
+  const { user } = useGetUser(); 
   
   // 获取当前用户ID
   useEffect(() => {
     async function getCurrentUser() {
       try {
-        const { user } = useGetUser();
         if (user) {
           setUserId(user.id);
         }
