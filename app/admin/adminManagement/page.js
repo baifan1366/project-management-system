@@ -1,60 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserShield, FaUserCog } from 'react-icons/fa';
-import useGetUser from '@/lib/hooks/useGetUser';
+import { useSelector, useDispatch } from 'react-redux';
+import { checkAdminSession } from '@/lib/redux/features/adminSlice';
+import Link from 'next/link';
 
 export default function AdminUserManagement() {
-  const { user: sessionData, error: sessionError } = useGetUser();
-  // Verify super admin session and fetch admin data
-  useEffect(() => {
-    const checkAdminSession = async () => {
-      try {
-        setLoading(true);
-
-        if (sessionError) {
-          throw new Error('No active session found');
-        }
-        
-        // Check if user is an admin with appropriate permissions
-        const { data: admin, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', sessionData.user.email)
-          .eq('is_active', true)
-          .single();
-          
-        if (adminError || !admin) {
-          throw new Error('Unauthorized access');
-        }
-        
-        // Check if admin has sufficient role to manage other admins (only SUPER_ADMIN can)
-        if (admin.role !== 'SUPER_ADMIN') {
-          throw new Error('Insufficient permissions');
-        }
-        
-        setAdminData(admin);
-        
-        // Fetch admin users
-        await fetchAdminUsers();
-
-      } catch (error) {
-        console.error('Admin session check failed:', error);
-        // Redirect to admin login
-        router.replace(`/${locale}/adminLogin`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    checkAdminSession();
-  }, []);
 
   const router = useRouter();
   const params = useParams();
-  const locale = params.locale || 'en';
+  const dispatch = useDispatch();
+  // Get the admin data from Redux state
+  const { admin: reduxAdminData, isAuthenticated } = useSelector(state => state.admin);
   
   const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -73,13 +33,48 @@ export default function AdminUserManagement() {
   const [selectedRole, setSelectedRole] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
   const [isPasswordValid, setIsPasswordValid] = useState(false)
   const [isPasswordMatch, setIsPasswordMatch] = useState(false)
   const [isEmailValid, setIsEmailValid] = useState(false)
+  const permissions = useSelector((state) => state.admin.permissions);
+
+  // initialize the page
+  useEffect(() => {
+    const initDashboard = async () => {
+      try {
+        setLoading(true);
+        
+        // Set adminData from Redux state if available
+        if (reduxAdminData) {
+          setAdminData(reduxAdminData);
+        } else {
+          // Try to fetch admin session if not already in Redux
+          const result = await dispatch(checkAdminSession()).unwrap();
+          if (result) {
+            setAdminData(result);
+          } else {
+            // If no admin data, redirect to login
+            throw new Error('No admin session found');
+          }
+        }
+        
+        // Fetch admin users
+        await fetchAdminUsers();  
+        
+      } catch (error) {
+        console.error('Error in fetching admins data:', error);
+        // Redirect to admin login
+        router.replace(`/admin/adminLogin`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initDashboard();
+  }, [dispatch, router, reduxAdminData]);
 
   // Fetch admin users from database
-  const fetchAdminUsers = async () => {
+  const fetchAdminUsers = useCallback(async () => {
     try {
       let query = supabase
         .from('admin_user')
@@ -95,8 +90,6 @@ export default function AdminUserManagement() {
         query = query.eq('role', 'SUPER_ADMIN');
       } else if (filter === 'admin') {
         query = query.eq('role', 'ADMIN');
-      } else if (filter === 'moderator') {
-        query = query.eq('role', 'MODERATOR');
       }
       
       const { data, error } = await query;
@@ -108,7 +101,7 @@ export default function AdminUserManagement() {
     } catch (error) {
       console.error('Error fetching admin users:', error);
     }
-  };
+  }, [filter]);
 
   // Fetch roles from database
   useEffect(()=>{
@@ -122,43 +115,18 @@ export default function AdminUserManagement() {
         
         // Extract unique roles from the result
         const roles = [...new Set(data.map(item => item.role))];
-        console.log(roles);
         setRoles(roles);
         
         // Return the array of roles
         return roles;
       } catch (error) {
         console.error('Error fetching roles:', error);
-        return ['SUPER_ADMIN', 'ADMIN', 'MODERATOR']; // Fallback to default roles
+        return ['SUPER_ADMIN', 'ADMIN']; // Fallback to default roles
       }
     }
     fetchRoles();
   },[]);
 
-  // Handle logout
-  const handleLogout = async () => {
-    try {
-      // Log the logout action
-      if (adminData) {
-        await supabase.from('admin_activity_log').insert({
-          admin_id: adminData.id,
-          action: 'logout',
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
-      }
-      
-      // Sign out
-      await supabase.auth.signOut();
-      
-      // Redirect to admin login
-      router.replace(`/${locale}/adminLogin`);
-      
-    } catch (error) {
-      console.error('Error during logout:', error);
-    }
-  };
-  
   // Handle filter change
   const handleFilterChange = (newFilter) => {
     setFilter(newFilter);
@@ -188,9 +156,9 @@ export default function AdminUserManagement() {
   const editAdmin = async (newAdminData) => {
     try {
       // Prevent non-super admins from elevating privileges
-      if (adminData.role !== 'SUPER_ADMIN') {
-        throw new Error('Only super admins can modify other admins');
-      }
+      // if (adminData.role !== 'SUPER_ADMIN') {
+      //   throw new Error('Only super admins can modify other admins');
+      // }
       
       // Create a filtered version of newAdminData that only includes non-empty values
       const filteredAdminData = {};
@@ -233,15 +201,15 @@ export default function AdminUserManagement() {
       
       // Log activity
       if (adminData) {
-        await supabase.from('admin_activity_log').insert({
+        await supabase.from('admin_activity_log').insert([{
           admin_id: adminData.id,
           action: 'update_admin_user',
           entity_type: 'admin_user',
-          entity_id: selectedAdmin.id,
+          entity_id: String(selectedAdmin.id),
           details: { updated_fields: Object.keys(filteredAdminData) },
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
-        });
+        }]);
       }
       
       closeModal();
@@ -255,9 +223,9 @@ export default function AdminUserManagement() {
   const createAdmin = async (adminUserData) => {
     try {
       // Prevent non-super admins from creating super admins
-      if (adminData.role !== 'SUPER_ADMIN' && adminUserData.role === 'SUPER_ADMIN') {
-        throw new Error('Only super admins can create other super admins');
-      }
+      // if (adminData.role !== 'SUPER_ADMIN' && adminUserData.role === 'SUPER_ADMIN') {
+      //   throw new Error('Only super admins can create other super admins');
+      // }  
       
       // For simplicity, in a real app you would hash the password properly
       // and handle authentication through your auth provider
@@ -279,14 +247,14 @@ export default function AdminUserManagement() {
       
       // Log activity
       if (adminData) {
-        await supabase.from('admin_activity_log').insert({
+        await supabase.from('admin_activity_log').insert([{
           admin_id: adminData.id,
           action: 'create_admin_user',
           entity_type: 'admin_user',
-          entity_id: data.id,
+          entity_id: String(data.id),
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
-        });
+        }]);
       }
       
       closeModal();
@@ -300,12 +268,12 @@ export default function AdminUserManagement() {
   const deleteAdmin = async () => {
     try {
       // Prevent deleting your own account
-      if (selectedAdmin.id === adminData.id) {
+      if (adminData && selectedAdmin.id === adminData.id) {
         throw new Error('You cannot delete your own account');
       }
       
       // Prevent non-super admins from deleting other super admins
-      if (adminData.role !== 'SUPER_ADMIN' && selectedAdmin.role === 'SUPER_ADMIN') {
+      if (adminData && adminData.role !== 'SUPER_ADMIN' && selectedAdmin.role === 'SUPER_ADMIN') {
         throw new Error('Only super admins can delete other super admins');
       }
       
@@ -321,14 +289,14 @@ export default function AdminUserManagement() {
       
       // Log activity
       if (adminData) {
-        await supabase.from('admin_activity_log').insert({
+        await supabase.from('admin_activity_log').insert([{
           admin_id: adminData.id,
           action: 'delete_admin_user',
           entity_type: 'admin_user',
-          entity_id: selectedAdmin.id,
+          entity_id: String(selectedAdmin.id),
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
-        });
+        }]);
       }
       
       closeModal();
@@ -374,8 +342,6 @@ export default function AdminUserManagement() {
         return 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100';
       case 'ADMIN':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100';
-      case 'MODERATOR':
-        return 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
     }
@@ -431,6 +397,7 @@ export default function AdminUserManagement() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       
       {/* Main Content */}
+      {permissions.includes('view_admins') ? (
       <div className="flex-1 overflow-auto">
         {/* Header */}
         <header className="bg-white dark:bg-gray-800 shadow-sm">
@@ -491,13 +458,15 @@ export default function AdminUserManagement() {
             </div>
             
             {/* Add Admin Button */}
+            {permissions.includes('add_admin') && (
             <button
               onClick={() => openModal('add')}
               className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
             >
-              <FaUserPlus className="mr-2" />
-              Add New Admin
-            </button>
+                <FaUserPlus className="mr-2" />
+                Add New Admin
+              </button>
+            )}
           </div>
           
           {/* Admins Table */}
@@ -552,8 +521,6 @@ export default function AdminUserManagement() {
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeStyle(admin.role)}`}>
                             {admin.role === 'SUPER_ADMIN' && <FaUserShield className="mr-1" />}
                             {admin.role === 'ADMIN' && <FaUserCog className="mr-1" />}
-                            {admin.role === 'MODERATOR' && <FaUsers className="mr-1" />}
-                            {admin.role}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
@@ -571,20 +538,24 @@ export default function AdminUserManagement() {
                           {admin.last_login ? formatDate(admin.last_login) : 'Never logged in'}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
+                          {permissions.includes("edit_admins") && (
                           <button
                             onClick={() => openModal('edit', admin)}
                             className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
-                            disabled={adminData.id === admin.id && adminData.role !== 'SUPER_ADMIN'}
+                            disabled={adminData && adminData.id === admin.id && adminData.role !== 'SUPER_ADMIN'}
                           >
                             <FaEdit />
                           </button>
+                          )}
+                          {permissions.includes("delete_admins") && (
                           <button
                             onClick={() => openModal('delete', admin)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                            disabled={adminData.id === admin.id}
+                            disabled={adminData && adminData.id === admin.id}
                           >
                             <FaTrash />
                           </button>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -593,7 +564,7 @@ export default function AdminUserManagement() {
                       <td colSpan="6" className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                         {searchQuery
                           ? 'No admin users match your search criteria'
-                          : 'No admin users found'}
+                          : 'No admin users found or you dont have permission to view this page'}
                       </td>
                     </tr>
                   )}
@@ -636,6 +607,26 @@ export default function AdminUserManagement() {
           </div>
         </div>
       </div>
+      ) : (
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-8 max-w-md text-center">
+          <div className="text-red-500 mb-4 text-5xl">
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">Access Restricted</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">You don't have permission to access the admin management. Please contact your administrator for assistance.</p>
+          <Link href="/admin/adminDashboard">
+            <button className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
+              Return to Dashboard
+            </button>
+          </Link>
+        </div>
+      </div>
+      )}
       
       {/* Modals would go here in a real implementation */}
       {/*add admin modal*/}
