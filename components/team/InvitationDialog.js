@@ -41,7 +41,8 @@ export default function InvitationDialog({ open, onClose }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const dispatch = useDispatch()
-  
+  const { user } = useGetUser()
+
   // 使用记忆化的选择器
   const team = useSelector(state => selectTeam(state, teamId));
   const teamUsers = useSelector(state => selectTeamUsers(state, teamId));
@@ -124,11 +125,9 @@ export default function InvitationDialog({ open, onClose }) {
       setIsLoading(true);
       setError(null);
 
-      // 1. 先获取当前用户信息
-      const { user , error} = useGetUser();
-      
+      // 1. 先获取当前用户信息      
       // 检查用户是否已登录
-      if (error || !user?.id) {
+      if (!user?.id) {
         throw new Error('未授权的操作，请先登录');
       }
 
