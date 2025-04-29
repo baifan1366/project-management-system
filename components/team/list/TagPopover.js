@@ -26,6 +26,13 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
         setPopoverOpen(false);
     };
     
+    // 检查projectId是否有值
+    useEffect(() => {
+        if (!projectId) {
+            console.error('TagPopover: ProjectId is missing', { projectId, teamId, teamCFId });
+        }
+    }, [projectId, teamId, teamCFId]);
+    
     // 加载标签数据
     const loadTag = async () => {
         if (!teamId || !teamCFId || isTagRequestInProgress.current) return;

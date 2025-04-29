@@ -1483,7 +1483,12 @@
     "confirmDeleteLink": "Confirm Delete Link",
     "link": "Link",
     "section": "Section",
-    "willBeDeleted": "will be deleted."
+    "willBeDeleted": "will be deleted.",
+    "addTask":"Add Task",
+    "editSection": "Edit Section",
+    "deleteSection":"Delete Section",
+    "sectionCollapsed": "Section Collapsed",
+    "input": "Input"
   },
   "validationRules": {
     "teamNameMin": "Team Name must be at least 2 characters.",

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { ChevronRight, ChevronDown, MoreHorizontal, Plus, Circle, Trash } from 'lucide-react';
@@ -17,83 +17,56 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useConfirm } from '@/hooks/use-confirm';
-import { deleteSection } from '@/lib/redux/features/sectionSlice';
+import { updateSection, deleteSection } from '@/lib/redux/features/sectionSlice';
+import { useTableContext } from './TableProvider';
+import { useResizeTools } from './ResizeTools';
 
-export default function BodyContent({ 
-  teamId, 
-  sections, 
-  localTasks, 
-  setLocalTasks,
-  tagWidths, 
-  tagOrder, 
-  sortedTagInfo,
-  editingTask,
-  editingTaskValues,
-  handleAddTask,
-  handleTaskValueChange,
-  handleTaskEditComplete,
-  handleKeyDown,
-  taskInputRef,
-  setEditingTask
-}) {
+export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues) {
   const t = useTranslations('CreateTask');
   const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
-  const [isLoading, setIsLoading] = useState(false);
-  const isSectionRequestInProgress = useRef(false);
-  const isTaskRequestInProgress = useRef(false);
   const { confirm } = useConfirm();
   
-  // 存储折叠状态的对象
-  const [collapsedSections, setCollapsedSections] = useState({});
-  // 存储悬停状态的对象
-  const [hoveredSectionHeader, setHoveredSectionHeader] = useState(null);
-  // 存储任务行悬停状态
-  const [hoveredTaskRow, setHoveredTaskRow] = useState(null);
-  // 存储拖拽状态
-  const [isDragging, setIsDragging] = useState(false);
-  // 新增：存储当前加载的团队ID
-  const currentTeamIdRef = useRef(null);
-
+  const {
+    teamId,
+    localTasks,
+    setLocalTasks,
+    sortedTagInfo,
+    tagOrder,
+    editingTask,
+    editingTaskValues,
+    taskInputRef,
+    setEditingTask,
+    collapsedSections,
+    setCollapsedSections,
+    hoveredSectionHeader,
+    setHoveredSectionHeader,
+    hoveredTaskRow,
+    setHoveredTaskRow,
+    editingSectionId,
+    setEditingSectionId,
+    editingSectionName,
+    setEditingSectionName,
+    sectionInputRef,
+    isSectionRequestInProgress,
+    isTaskRequestInProgress,
+    setIsLoading
+  } = useTableContext();
+  
   // 从Redux中获取标签数据，用于获取真实的标签ID
   const { tags: tagsData } = useSelector((state) => state.teamCF);
-
-  // 增强当 teamId 变化时的清理和重置
-  useEffect(() => {
-    // 如果 teamId 变化或是第一次加载
-    if (currentTeamIdRef.current !== teamId) {
-      console.log(`Team ID changed from ${currentTeamIdRef.current} to ${teamId}`);
-      
-      // 清理本地状态
-      setCollapsedSections({});
-      setHoveredSectionHeader(null);
-      setHoveredTaskRow(null);
-      setIsDragging(false);
-      
-      // 重置请求状态
-      isSectionRequestInProgress.current = false;
-      isTaskRequestInProgress.current = false;
-      
-      // 更新当前团队ID
-      currentTeamIdRef.current = teamId;
-      
-      // 延迟加载部分，避免可能的竞态条件
-      if (teamId) {
-        setTimeout(() => {
-          // 仅当teamId有效时尝试加载
-          if (!isSectionRequestInProgress.current) {
-            loadSections();
-          }
-        }, 50);
-      }
-    }
-  }, [teamId]);
+  
+  // 从Redux状态中获取部门数据
+  const { sections, status: sectionsStatus } = useSelector((state) => state.sections);
+  
+  // 获取标签宽度
+  const { getTagWidth } = useResizeTools();
 
   // 处理部门数据
   const sectionInfo = useMemo(() => {
     if (!sections || !sections.length) return [];
     return sections.map(section => section);
-  }, [sections, teamId]);
+  }, [sections]);
 
   // 加载部门数据
   const loadSections = async () => {
@@ -118,9 +91,6 @@ export default function BodyContent({
       // 总是从API获取最新数据
       const result = await dispatch(getSectionByTeamId(teamId)).unwrap();
       console.log(`Loaded ${result?.length || 0} sections for team ${teamId}`);
-      
-      // 标记当前加载的团队ID
-      currentTeamIdRef.current = teamId;
     } catch (error) {
       console.error(`Error loading sections for team ${teamId}:`, error);
     } finally {
@@ -179,44 +149,78 @@ export default function BodyContent({
     }));
   };
 
-  // 处理拖拽开始事件
-  const handleDragStart = (result) => {
-    setIsDragging(true);
+  // 实现编辑部门名称功能
+  const handleEditSection = (sectionId) => {
+    // 找到当前部门
+    const section = sectionInfo.find(s => s.id === sectionId);
+    if (!section) return;
+    
+    // 设置编辑状态
+    setEditingSectionId(sectionId);
+    setEditingSectionName(section.name);
+    
+    // 确保焦点在下一个渲染周期设置
+    setTimeout(() => {
+      if (sectionInputRef.current) {
+        sectionInputRef.current.focus();
+      }
+    }, 0);
+  }
+
+  // 完成部门名称编辑
+  const handleSectionEditComplete = async () => {
+    if (!editingSectionId) return;
+    
+    try {
+      // 这里应该添加更新部门名称的API调用
+      // 示例: 使用dispatch调用更新部门的action
+      await dispatch(updateSection({
+        teamId,
+        sectionId: editingSectionId,
+        sectionData: editingSectionName.trim()
+      })).unwrap();
+      
+      console.log('更新部门名称', {
+        sectionId: editingSectionId,
+        newName: editingSectionName.trim()
+      });
+      
+      // 重置编辑状态
+      setEditingSectionId(null);
+      setEditingSectionName('');
+    } catch (error) {
+      console.error('更新部门名称失败:', error);
+      // 可以在这里添加错误处理，例如显示通知
+    }
+  }
+
+  const handleDeleteSection = (sectionId) => {
+    confirm({
+      title: tConfirm('confirmDeleteSection'),
+      description: `${tConfirm('section')} "${sectionInfo.find(section => section.id === sectionId)?.name}" ${tConfirm('willBeDeleted')}`,
+      variant: 'error',
+      onConfirm: () => {
+        // 删除部门
+        console.log('删除部门', sectionId);
+        dispatch(deleteSection({teamId, sectionId}));
+      }
+    });
   };
 
-  // 处理拖放结束事件
-  const handleDragEnd = (result) => {
-    const { destination, source, type } = result;
-
-    // 无论操作是否成功，都要重置拖拽状态
-    setIsDragging(false);
-
-    // 如果没有目标位置或目标位置相同，则不执行任何操作
-    if (!destination || 
-        (destination.droppableId === source.droppableId && 
-         destination.index === source.index)) {
-      return;
+  // 任务操作函数（使用从外部传入的函数）
+  const handleAddTask = (sectionId) => {
+    if (addTaskFunc) {
+      addTaskFunc(sectionId);
+    } else {
+      // 如果没有传入函数，使用备用逻辑
+      console.log('添加任务到部门', sectionId);
     }
-
-    // 根据类型处理不同的拖放操作
-    if (type === 'TASK') {
-      // 处理任务拖放的逻辑
-      console.log('将任务从', source, '移动到', destination);
-      // 在这里添加更新任务位置的逻辑
-    } else if (type === 'SECTION') {
-      // 处理部门拖放的逻辑
-      console.log('将部门从', source.index, '移动到', destination.index);
-      // 在这里添加更新部门位置的逻辑
-    }
-  };
-
-  // 获取标签宽度
-  const getTagWidth = (index) => {
-    return tagWidths[index] || 200;
   };
 
   // 部门标题行
   const renderSectionHeader = (section, sectionProvided, snapshot) => {
+    const isEditingThisSection = editingSectionId === section.id;
+    
     return (
       <div
         ref={sectionProvided.innerRef}
@@ -255,15 +259,33 @@ export default function BodyContent({
           </Button>
           
           {/* 部门名称与按钮组放在同一个容器内，按钮组直接跟随名称 */}
-          <span 
-            {...sectionProvided.dragHandleProps}
-            className="cursor-grab left-0 font-medium"
-          >
-            {section.name}
-          </span>     
+          <div {...sectionProvided.dragHandleProps} className="cursor-grab left-0 font-medium">
+            {isEditingThisSection ? (
+              <input
+                type="text"
+                ref={sectionInputRef}
+                value={editingSectionName}
+                onChange={(e) => setEditingSectionName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSectionEditComplete();
+                  }
+                  e.stopPropagation(); // 防止键盘事件冒泡到拖拽处理
+                }}
+                autoFocus
+                className="bg-transparent border rounded px-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                onClick={(e) => e.stopPropagation()}
+                style={{ cursor: 'text' }} // 在输入框上显示文本光标而不是抓取光标
+              />
+            ) : (
+              <span>
+                {section.name}
+              </span>     
+            )}
+          </div>
 
           {/* 按钮组 - 当且仅当当前部门行被悬停时显示 */}
-          {hoveredSectionHeader === section.id && (
+          {hoveredSectionHeader === section.id && !isEditingThisSection && (
             <div className="flex items-center ml-2">
               {/* 添加任务按钮 */}
               <TooltipProvider>
@@ -300,8 +322,7 @@ export default function BodyContent({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>{t('editSection')}</DropdownMenuItem>
-                  <DropdownMenuItem>{t('renameSection')}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleEditSection(section.id)}>{t('editSection')}</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteSection(section.id)}>{t('deleteSection')}</DropdownMenuItem>
                 </DropdownMenuContent>
@@ -428,12 +449,12 @@ export default function BodyContent({
                             }
                             
                             // 检查是否是正在编辑的任务
-                            const isEditing = editingTask === task.id;
+                            const isEditing = externalEditingTask === task.id;
                             
                             return (
                               <div 
                                 key={`task-${task.id}-tag-${tagId}`} 
-                                className={`p-2 text-ellipsis whitespace-nowrap border-r h-10 flex items-center ${isEditing ? 'bg-accent/10' : ''}`}
+                                className={`p-2 overflow-hidden truncate border-r h-10 flex items-center ${isEditing ? 'bg-accent/10' : ''}`}
                                 style={{
                                   width: `${getTagWidth(tagIndex)}px`,
                                   minWidth: `${getTagWidth(tagIndex)}px`, 
@@ -451,15 +472,17 @@ export default function BodyContent({
                                   <input
                                     type="text"
                                     ref={tagIndex === 0 ? taskInputRef : null}
-                                    value={editingTaskValues[tagId] || editingTaskValues[String(tagId)] || ''}
+                                    value={externalEditingTaskValues[tagId] || externalEditingTaskValues[String(tagId)] || ''}
                                     onChange={(e) => handleTaskValueChange(task.id, tagId, e.target.value)}
-                                    onKeyDown={(e) => handleKeyDown(e, task.id, task.sectionId)}
+                                    onKeyDown={(e) => handleKeyDown(e, task.id, sectionId)}
                                     autoFocus={tagIndex === 0}
                                     className="w-full bg-transparent border-none focus:outline-none h-10"
                                     placeholder={`${t('input')} ${tag}`}
                                   />
                                 ) : (
-                                  tagValue
+                                  <div className="w-full overflow-hidden truncate">
+                                    {tagValue}
+                                  </div>
                                 )}
                               </div>
                             );
@@ -519,27 +542,10 @@ export default function BodyContent({
     );
   };
 
-  const handleDeleteSection = (sectionId) => {
-    confirm({
-      title: tConfirm('confirmDeleteSection'),
-      description: `${tConfirm('section')} "${sectionInfo.find(section => section.id === sectionId)?.name}" ${tConfirm('willBeDeleted')}`,
-      variant: 'error',
-      onConfirm: () => {
-        // 删除部门
-        console.log('删除部门', sectionId);
-        dispatch(deleteSection({teamId, sectionId}));
-      }
-    });
-  };
-
   return {
-    isLoading,
-    collapsedSections,
-    isDragging,
-    handleDragStart,
     loadSections,
     loadAllSectionTasks,
     renderBodyContent,
-    handleBodyDragEnd: handleDragEnd
+    handleAddTask
   };
 }

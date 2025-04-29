@@ -42,6 +42,13 @@ export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks, 
     // 设置为编辑状态
     setEditingTask(tempTaskId);
     setEditingTaskValues({});
+    
+    // 确保在下一个渲染周期后聚焦到输入框
+    setTimeout(() => {
+      if (taskInputRef && taskInputRef.current) {
+        taskInputRef.current.focus();
+      }
+    }, 0);
   };
 
   // 处理任务值更新
@@ -189,6 +196,6 @@ export default function AddTask({ sectionId, teamId, localTasks, setLocalTasks, 
     handleTaskEditComplete,
     handleKeyDown,
     renderAddTaskButton,
-    checkTaskInputRef
+    setEditingTask
   };
 }

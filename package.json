@@ -40,6 +40,7 @@
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.48.1",
+    "@tanstack/react-table": "^8.21.3",
     "@tiptap/extension-blockquote": "^2.11.7",
     "@tiptap/extension-bubble-menu": "^2.11.7",
     "@tiptap/extension-bullet-list": "^2.11.7",

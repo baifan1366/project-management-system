@@ -91,10 +91,24 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
     };
 
     useEffect(() => {
+        if (!projectId) {
+            console.error('ProjectId is missing', { projectId, teamId, teamCFId });
+        }
+    }, [projectId, teamId, teamCFId]);
+
+    useEffect(() => {
         const loadProjectData = async () => {
-            const projectData = await dispatch(fetchProjectById(projectId)).unwrap()
-            if (projectData.theme_color) {
-                setThemeColor(projectData.theme_color);
+            if (!projectId) {
+                console.error('ProjectId is required for loading project data');
+                return;
+            }
+            try {
+                const projectData = await dispatch(fetchProjectById(projectId)).unwrap()
+                setThemeColor(projectData?.theme_color ?? '#64748b');
+            } catch (error) {
+                console.error('获取项目数据失败:', error);
+                // 使用默认主题色
+                setThemeColor('#64748b');
             }
         }
         if(isOpen) {
