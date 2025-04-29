@@ -20,7 +20,7 @@ import TableProvider, { useTableContext } from './TableProvider';
 import { useLoadTag } from './LoadTag';
 import { useBodyContent } from './BodyContent';
 import { useDndTools } from './DndTools';
-import AddTask from './AddTask';
+import HandleTask from './HandleTask';
 
 function TaskListContent() {
   const t = useTranslations('CreateTask');
@@ -37,7 +37,9 @@ function TaskListContent() {
     sectionInputRef,
     localTasks,
     setLocalTasks,
-    taskInputRef
+    taskInputRef,
+    editingTaskValues,
+    setEditingTaskValues
   } = useTableContext();
   
   // 从Redux状态中获取部门数据
@@ -51,17 +53,18 @@ function TaskListContent() {
     loadTag
   } = useLoadTag();
   
-  // 获取添加任务相关功能
+  // 获取任务处理相关功能
   const {
     editingTask,
-    editingTaskValues,
-    handleAddTask: addTaskFunc,
+    isAddingTask,
+    isLoading: isTaskLoading,
+    handleAddTask,
     handleTaskValueChange,
     handleTaskEditComplete,
     handleKeyDown,
+    handleClickOutside,
     setEditingTask
-  } = AddTask({ 
-    sectionId: null, // 将在调用时传入具体的sectionId
+  } = HandleTask({ 
     teamId, 
     localTasks, 
     setLocalTasks, 
@@ -74,12 +77,13 @@ function TaskListContent() {
     loadAllSectionTasks,
     renderBodyContent
   } = useBodyContent(
-    addTaskFunc, 
-    handleTaskValueChange, 
-    handleTaskEditComplete, 
-    handleKeyDown, 
-    editingTask, 
-    editingTaskValues
+    handleAddTask,
+    handleTaskValueChange,
+    handleTaskEditComplete,
+    handleKeyDown,
+    editingTask,
+    editingTaskValues,
+    isTaskLoading
   );
   
   // 拖拽相关功能
@@ -99,10 +103,17 @@ function TaskListContent() {
   // 在部门数据加载后加载任务
   useEffect(() => {
     if (teamId && sections && sections.length > 0) {
-      // 部门加载完成后加载任务
       loadAllSectionTasks();
     }
   }, [teamId, sections]);
+
+  // 添加点击外部关闭编辑的事件监听
+  useEffect(() => {
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [handleClickOutside]);
 
   // 处理点击输入框外部关闭部门创建
   useEffect(() => {
@@ -148,10 +159,6 @@ function TaskListContent() {
         console.error('创建部门失败:', error);
         setIsCreatingSection(false);
       }
-    } else if (e.key === 'Escape') {
-      // 取消创建
-      setIsCreatingSection(false);
-      setNewSectionName('');
     }
   };
 
@@ -186,7 +193,7 @@ function TaskListContent() {
           <TableBody>
             <TableRow>
               <TableCell colSpan={totalColumns+1} className="p-0">
-                {renderBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, editingTask, editingTaskValues)}
+                {renderBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, editingTask, editingTaskValues)}
               </TableCell>
             </TableRow>
             <TableRow>

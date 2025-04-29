@@ -37,6 +37,7 @@ export default function TableProvider({ children, teamId, projectId, teamCFId })
   // 编辑状态
   const [editingTask, setEditingTask] = useState(null);
   const [editingTaskValues, setEditingTaskValues] = useState({});
+  const [isAddingTask, setIsAddingTask] = useState(false);
   
   // 拖拽状态
   const [isDragging, setIsDragging] = useState(false);
@@ -82,6 +83,7 @@ export default function TableProvider({ children, teamId, projectId, teamCFId })
     setEditingSectionName('');
     setEditingTask(null);
     setEditingTaskValues({});
+    setIsAddingTask(false);
 
     // 重置 Redux 状态
     dispatch(resetSectionsState());
@@ -92,6 +94,54 @@ export default function TableProvider({ children, teamId, projectId, teamCFId })
     isSectionRequestInProgress.current = false;
     isTaskRequestInProgress.current = false;
   }, [teamId, dispatch]);
+
+  // 跟踪最后一次点击的任务单元格
+  const [lastClickedCell, setLastClickedCell] = useState(null);
+  
+  // 在组件挂载时添加全局点击事件处理器，用于支持点击同行内不同单元格的编辑
+  useEffect(() => {
+    const handleGlobalClick = (e) => {
+      // 如果没有正在编辑的任务，不处理
+      if (!editingTask) return;
+      
+      // 检查是否点击了任务单元格（通常是包含input的div）
+      let taskCell = null;
+      let target = e.target;
+      
+      // 向上查找直到找到带有特定键名模式的元素，这通常是表格单元格
+      while (target && !taskCell) {
+        if (target.getAttribute && target.getAttribute('key') && 
+            target.getAttribute('key').startsWith(`task-`) && 
+            target.getAttribute('key').includes('-tag-')) {
+          taskCell = target;
+          break;
+        }
+        target = target.parentElement;
+      }
+      
+      // 如果找到了任务单元格
+      if (taskCell) {
+        // 从key属性中提取任务ID和标签ID
+        const key = taskCell.getAttribute('key');
+        const [taskPart, tagPart] = key.split('-tag-');
+        const clickedTaskId = taskPart.replace('task-', '');
+        
+        // 如果点击的是同一个任务的单元格，记录这个单元格以便后续处理
+        if (clickedTaskId === editingTask) {
+          setLastClickedCell(key);
+          // 不需要执行进一步操作，相关编辑框逻辑在单元格组件中处理
+        }
+      }
+    };
+    
+    // 添加点击事件监听器
+    document.addEventListener('click', handleGlobalClick);
+    
+    // 清理函数
+    return () => {
+      document.removeEventListener('click', handleGlobalClick);
+    };
+  }, [editingTask]);
 
   // 共享的上下文值
   const value = {
@@ -123,6 +173,10 @@ export default function TableProvider({ children, teamId, projectId, teamCFId })
     setEditingTask,
     editingTaskValues,
     setEditingTaskValues,
+    isAddingTask,
+    setIsAddingTask,
+    lastClickedCell,
+    setLastClickedCell,
     
     // 拖拽状态
     isDragging,

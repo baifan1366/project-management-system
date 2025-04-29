@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { ChevronRight, ChevronDown, MoreHorizontal, Plus, Circle, Trash } from 'lucide-react';
+import { ChevronRight, ChevronDown, MoreHorizontal, Plus, Circle, Trash, Loader2 } from 'lucide-react';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import { updateSection, deleteSection } from '@/lib/redux/features/sectionSlice'
 import { useTableContext } from './TableProvider';
 import { useResizeTools } from './ResizeTools';
 
-export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues) {
+export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading) {
   const t = useTranslations('CreateTask');
   const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
@@ -35,6 +35,7 @@ export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEdi
     tagOrder,
     editingTask,
     editingTaskValues,
+    setEditingTaskValues,
     taskInputRef,
     setEditingTask,
     collapsedSections,
@@ -50,7 +51,9 @@ export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEdi
     sectionInputRef,
     isSectionRequestInProgress,
     isTaskRequestInProgress,
-    setIsLoading
+    setIsLoading,
+    isAddingTask,
+    setIsAddingTask
   } = useTableContext();
   
   // 从Redux中获取标签数据，用于获取真实的标签ID
@@ -78,11 +81,9 @@ export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEdi
     
     // 避免请求冲突
     if (isSectionRequestInProgress.current) {
-      console.log('Section request already in progress, skipping');
       return;
     }
     
-    console.log(`Loading sections for team ${teamId}`);
     isSectionRequestInProgress.current = true;
     
     try {
@@ -90,7 +91,6 @@ export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEdi
       
       // 总是从API获取最新数据
       const result = await dispatch(getSectionByTeamId(teamId)).unwrap();
-      console.log(`Loaded ${result?.length || 0} sections for team ${teamId}`);
     } catch (error) {
       console.error(`Error loading sections for team ${teamId}:`, error);
     } finally {
@@ -205,16 +205,6 @@ export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEdi
         dispatch(deleteSection({teamId, sectionId}));
       }
     });
-  };
-
-  // 任务操作函数（使用从外部传入的函数）
-  const handleAddTask = (sectionId) => {
-    if (addTaskFunc) {
-      addTaskFunc(sectionId);
-    } else {
-      // 如果没有传入函数，使用备用逻辑
-      console.log('添加任务到部门', sectionId);
-    }
   };
 
   // 部门标题行
@@ -382,6 +372,10 @@ export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEdi
             className="task-container"
           >
             {localTasks[sectionId].map((task, taskIndex) => {
+              const isEditing = externalEditingTask === task.id;
+              const isTaskLoading = isEditing && externalIsLoading;
+              const isCurrentTaskBeingAdded = isAddingTask && task.id === externalEditingTask;
+              
               return (
                 <Draggable
                   key={`task-${task.id}`}
@@ -394,14 +388,21 @@ export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEdi
                       {...taskProvided.draggableProps}
                       className={`border-b border-border h-10 ${
                         snapshot.isDragging ? 'shadow-lg bg-accent/30' : ''
-                      } ${hoveredTaskRow === task.id ? 'bg-accent/20' : ''}`}
+                      } ${hoveredTaskRow === task.id ? 'bg-accent/20' : ''} ${
+                        isEditing || isCurrentTaskBeingAdded ? 'bg-accent/10' : ''
+                      }`}
                       onMouseEnter={() => setHoveredTaskRow(task.id)}
                       onMouseLeave={() => setHoveredTaskRow(null)}
+                      data-rfd-draggable-id={`task-${task.id}`}
                     >
                       <div className="flex items-center w-full h-full">
                         {/* 拖拽手柄 */}
                         <div {...taskProvided.dragHandleProps} className="flex justify-start items-center pl-4 pr-2 cursor-grab flex-shrink-0" >
-                          <Circle size={12} className="text-muted-foreground" />
+                          {isTaskLoading ? (
+                            <Loader2 size={12} className="animate-spin text-muted-foreground" />
+                          ) : (
+                            <Circle size={12} className="text-muted-foreground" />
+                          )}
                         </div>
                         
                         {/* 任务标签值容器 */}
@@ -411,77 +412,72 @@ export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEdi
                             const realIndex = tagOrder[tagIndex];
                             
                             // 从tagsData获取真实标签ID
-                            let tagId = String(realIndex + 1); // 默认的计算方式
+                            let tagId = String(realIndex + 1);
                             
-                            // 如果tagsData存在且包含tags数组，从中获取真实tagId
                             if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[realIndex]) {
                               tagId = String(tagsData.tags[realIndex].id);
                             }
                             
-                            // 查找task.tag_values中存在的tagId匹配的值
-                            let tagValue = '';
-                            if (task.tag_values) {
-                              // 尝试各种可能的格式匹配tagId
-                              const tagIdStr = String(tagId);
-                              // 直接使用字符串ID匹配
-                              if (tagIdStr in task.tag_values) {
-                                tagValue = task.tag_values[tagIdStr];
-                              } 
-                              // 尝试使用数字ID匹配（如果传入的是字符串形式）
-                              else if (tagId in task.tag_values) {
-                                tagValue = task.tag_values[tagId];
-                              }
-                              // 尝试使用纯数字ID匹配（去除前缀）
-                              else {
-                                const numericTagId = tagIdStr.replace(/^\D+/g, '');
-                                Object.keys(task.tag_values).forEach(key => {
-                                  if (key === numericTagId || String(key) === numericTagId) {
-                                    tagValue = task.tag_values[key];
-                                  } else {
-                                    // 移除键前缀再比较
-                                    const numericKey = String(key).replace(/^\D+/g, '');
-                                    if (numericKey === numericTagId) {
-                                      tagValue = task.tag_values[key];
-                                    }
-                                  }
-                                });
-                              }
-                            }
-                            
-                            // 检查是否是正在编辑的任务
-                            const isEditing = externalEditingTask === task.id;
+                            // 获取当前值
+                            const currentValue = (isEditing || isCurrentTaskBeingAdded) 
+                              ? (externalEditingTaskValues[tagId] || '')
+                              : (task.tag_values?.[tagId] || '');
                             
                             return (
                               <div 
                                 key={`task-${task.id}-tag-${tagId}`} 
-                                className={`p-2 overflow-hidden truncate border-r h-10 flex items-center ${isEditing ? 'bg-accent/10' : ''}`}
+                                className={`p-2 overflow-hidden truncate border-r h-10 flex items-center ${
+                                  isEditing || isCurrentTaskBeingAdded ? 'bg-accent/10' : ''
+                                }`}
                                 style={{
                                   width: `${getTagWidth(tagIndex)}px`,
                                   minWidth: `${getTagWidth(tagIndex)}px`, 
                                   maxWidth: `${getTagWidth(tagIndex)}px`,
                                 }}
                                 onClick={() => {
-                                  // 允许用户点击任何任务开始编辑，不仅限于新任务
-                                  if (!isEditing) {
-                                    // 使用从props传入的setEditingTask函数
+                                  if (!isEditing && !isTaskLoading && !isCurrentTaskBeingAdded) {
                                     setEditingTask(task.id);
+                                    
+                                    // 初始化整行的所有标签值
+                                    const allTagValues = {};
+                                    sortedTagInfo.forEach((tag, idx) => {
+                                      const rIndex = tagOrder[idx];
+                                      let tId = String(rIndex + 1);
+                                      
+                                      if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                        tId = String(tagsData.tags[rIndex].id);
+                                      }
+                                      
+                                      allTagValues[tId] = task.tag_values?.[tId] || '';
+                                    });
+                                    
+                                    setEditingTaskValues(allTagValues);
                                   }
                                 }}
                               >
-                                {isEditing ? (
+                                {(isEditing || isCurrentTaskBeingAdded) ? (
                                   <input
                                     type="text"
                                     ref={tagIndex === 0 ? taskInputRef : null}
-                                    value={externalEditingTaskValues[tagId] || externalEditingTaskValues[String(tagId)] || ''}
-                                    onChange={(e) => handleTaskValueChange(task.id, tagId, e.target.value)}
+                                    value={currentValue}
+                                    onChange={(e) => {
+                                      const newValue = e.target.value;
+                                      handleTaskValueChange(task.id, tagId, newValue);
+                                    }}
                                     onKeyDown={(e) => handleKeyDown(e, task.id, sectionId)}
                                     autoFocus={tagIndex === 0}
                                     className="w-full bg-transparent border-none focus:outline-none h-10"
                                     placeholder={`${t('input')} ${tag}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    disabled={isTaskLoading}
+                                    spellCheck="false"
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
                                   />
                                 ) : (
                                   <div className="w-full overflow-hidden truncate">
-                                    {tagValue}
+                                    {currentValue}
                                   </div>
                                 )}
                               </div>
@@ -499,8 +495,13 @@ export function useBodyContent(addTaskFunc, handleTaskValueChange, handleTaskEdi
                 variant="ghost" 
                 className="text-muted-foreground p-1 text-center"
                 onClick={() => handleAddTask(sectionId)}
+                disabled={externalIsLoading || isAddingTask}
               >
-                <Plus size={16} className="text-muted-foreground" />
+                {externalIsLoading ? (
+                  <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                ) : (
+                  <Plus size={16} className="text-muted-foreground" />
+                )}
               </Button>
             </div>
             {provided.placeholder}

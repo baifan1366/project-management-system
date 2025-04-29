@@ -28,8 +28,6 @@ export function MainNav() {
 
   useEffect(() => {
     const fetchProjects = async () => {
-      console.log('fetchProjectsInMainNav', user);
-
       try {
         if (user) {
           // 3. 获取用户的projects
