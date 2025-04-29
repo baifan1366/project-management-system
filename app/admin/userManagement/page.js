@@ -44,6 +44,11 @@ export default function UserManagement() {
     initializeUserManagement();
   }, [dispatch, router]);
   
+  // Add function to verify permission access
+  const hasPermission = (permissionName) => {
+    return permissions.includes(permissionName);
+  };
+
   // Fetch users from database
   const fetchUsers = async () => {
     try {
@@ -317,7 +322,7 @@ const addUser = async (userData) => {
   
   return (
     <div>
-      {permissions.includes('view_users') ? (
+      {hasPermission('view_users') ? (
       <div>
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm">
@@ -365,7 +370,7 @@ const addUser = async (userData) => {
           </div>
           
           {/* Add User Button */}
-          {permissions.includes('add_users') && (
+          {hasPermission('add_users') && (
           <button
             onClick={() => openModal('add')}
             className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
@@ -440,7 +445,7 @@ const addUser = async (userData) => {
                         {formatDate(user.created_at)}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
-                        {permissions.includes('edit_users') && (
+                        {hasPermission('edit_users') && (
                         <button
                           onClick={() => openModal('edit', user)}
                           className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
@@ -448,7 +453,7 @@ const addUser = async (userData) => {
                           <FaEdit />
                         </button>
                         )}
-                        {permissions.includes('delete_users') && (
+                        {hasPermission('delete_users') && (
                         <button
                           onClick={() => openModal('delete', user)}
                           className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"

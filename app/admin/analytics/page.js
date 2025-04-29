@@ -57,7 +57,6 @@ export default function AdminAnalytics() {
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
 
-
   // initialize the page
   useEffect(() => {
     const initAdminAnalytics = async () => {
@@ -86,6 +85,11 @@ export default function AdminAnalytics() {
     }
   }, [dateRange, adminData]);
   
+  // Add function to verify permission access TODO: 模块化这个代码
+  const hasPermission = (permissionName) => {
+    return permissions.includes(permissionName);
+  };
+
   // 获取分析数据
   const fetchAnalyticsData = async (days) => {
     try {
@@ -468,7 +472,7 @@ export default function AdminAnalytics() {
   
   return (
     <div>
-    {permissions.includes('view_analytics') ? (
+    {hasPermission('view_analytics') ? (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       {/* Main Content */}
       <div className="flex-1 overflow-auto">

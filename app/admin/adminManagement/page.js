@@ -103,12 +103,14 @@ export default function AdminUserManagement() {
     }
   }, [filter]);
 
-  // Fetch roles from database
+  // Fetch roles from database //TODO: change to validateIsSuperAdmin if can add admin
   useEffect(()=>{
     const fetchRoles = async () => {
       try {
+        // Instead of querying admin_role_permission for roles,
+        // get roles directly from admin_user table
         const { data, error } = await supabase
-          .from('admin_role_permission')
+          .from('admin_user')
           .select('role')
           
         if (error) throw error;
@@ -126,6 +128,11 @@ export default function AdminUserManagement() {
     }
     fetchRoles();
   },[]);
+
+  // Add function to verify permission access
+  const hasPermission = (permissionName) => {
+    return permissions.includes(permissionName);
+  };
 
   // Handle filter change
   const handleFilterChange = (newFilter) => {
@@ -155,10 +162,10 @@ export default function AdminUserManagement() {
   // Edit admin
   const editAdmin = async (newAdminData) => {
     try {
-      // Prevent non-super admins from elevating privileges
-      // if (adminData.role !== 'SUPER_ADMIN') {
-      //   throw new Error('Only super admins can modify other admins');
-      // }
+      // Verify permission
+      if (!hasPermission('edit_admins')) {
+        throw new Error('You do not have permission to edit admin users');
+      }
       
       // Create a filtered version of newAdminData that only includes non-empty values
       const filteredAdminData = {};
@@ -180,7 +187,7 @@ export default function AdminUserManagement() {
         filteredAdminData.password_hash = newAdminData.password_hash;
       }
       
-      if (newAdminData.role && ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(newAdminData.role)) {
+      if (newAdminData.role && ['SUPER_ADMIN', 'ADMIN'].includes(newAdminData.role)) {
         filteredAdminData.role = newAdminData.role;
       }
       
@@ -222,10 +229,10 @@ export default function AdminUserManagement() {
   // Create new admin
   const createAdmin = async (adminUserData) => {
     try {
-      // Prevent non-super admins from creating super admins
-      // if (adminData.role !== 'SUPER_ADMIN' && adminUserData.role === 'SUPER_ADMIN') {
-      //   throw new Error('Only super admins can create other super admins');
-      // }  
+      // Verify permission
+      if (!hasPermission('manage_admins')) {
+        throw new Error('You do not have permission to create admin users');
+      }
       
       // For simplicity, in a real app you would hash the password properly
       // and handle authentication through your auth provider
@@ -267,14 +274,14 @@ export default function AdminUserManagement() {
   // Delete admin
   const deleteAdmin = async () => {
     try {
+      // Verify permission
+      if (!hasPermission('manage_admins')) {
+        throw new Error('You do not have permission to delete admin users');
+      }
+      
       // Prevent deleting your own account
       if (adminData && selectedAdmin.id === adminData.id) {
         throw new Error('You cannot delete your own account');
-      }
-      
-      // Prevent non-super admins from deleting other super admins
-      if (adminData && adminData.role !== 'SUPER_ADMIN' && selectedAdmin.role === 'SUPER_ADMIN') {
-        throw new Error('Only super admins can delete other super admins');
       }
       
       const { error } = await supabase
@@ -335,7 +342,7 @@ export default function AdminUserManagement() {
   const currentAdmins = filteredAdmins.slice(indexOfFirstAdmin, indexOfLastAdmin);
   const totalPages = Math.ceil(filteredAdmins.length / adminsPerPage);
   
-  // Get role badge style
+  // Get role badge style TODO: change the validate logic
   const getRoleBadgeStyle = (role) => {
     switch (role) {
       case 'SUPER_ADMIN':
@@ -397,7 +404,7 @@ export default function AdminUserManagement() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       
       {/* Main Content */}
-      {permissions.includes('view_admins') ? (
+      {hasPermission('view_admins') ? (
       <div className="flex-1 overflow-auto">
         {/* Header */}
         <header className="bg-white dark:bg-gray-800 shadow-sm">
@@ -458,7 +465,7 @@ export default function AdminUserManagement() {
             </div>
             
             {/* Add Admin Button */}
-            {permissions.includes('add_admin') && (
+            {hasPermission('manage_admins') && (
             <button
               onClick={() => openModal('add')}
               className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
@@ -538,7 +545,7 @@ export default function AdminUserManagement() {
                           {admin.last_login ? formatDate(admin.last_login) : 'Never logged in'}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
-                          {permissions.includes("edit_admins") && (
+                          {hasPermission("edit_admins") && (
                           <button
                             onClick={() => openModal('edit', admin)}
                             className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
@@ -547,7 +554,7 @@ export default function AdminUserManagement() {
                             <FaEdit />
                           </button>
                           )}
-                          {permissions.includes("delete_admins") && (
+                          {hasPermission("delete_admins") && (
                           <button
                             onClick={() => openModal('delete', admin)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
@@ -1080,9 +1087,6 @@ export default function AdminUserManagement() {
         </div>
       </div>
     )}
-
-      {/* For brevity, I've omitted the actual modal implementation */}
-      {/* In a real app, you'd implement modals for adding, editing, and deleting admin users */}
     </div>
   );
 } 

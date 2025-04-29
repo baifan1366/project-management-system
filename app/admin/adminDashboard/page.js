@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell } from 'react-icons/fa';
 import { useDispatch, useSelector } from 'react-redux';
@@ -47,6 +46,11 @@ export default function AdminDashboard() {
     
     initDashboard();
   }, [dispatch, router, permissions]);
+
+  // Add function to verify permission access TODO: 模块化这个代码
+  const hasPermission = (permissionName) => {
+    return permissions.includes(permissionName);
+  };
 
   // Fetch dashboard statistics
   const fetchDashboardStats = async () => {
@@ -180,7 +184,7 @@ export default function AdminDashboard() {
         <main className="p-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {Array.isArray(permissions) && permissions.includes('view_users') && (
+            {hasPermission('view_users') && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -199,7 +203,7 @@ export default function AdminDashboard() {
             </div>
             )}
             
-            {Array.isArray(permissions) && permissions.includes('view_subscriptions') && (
+            {hasPermission('view_subscriptions') && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -218,7 +222,7 @@ export default function AdminDashboard() {
             </div>
             )}
 
-            {Array.isArray(permissions) && permissions.includes('view_support_tickets') && (
+            {hasPermission('view_support_tickets') && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -237,7 +241,7 @@ export default function AdminDashboard() {
             </div>
             )}
 
-            {Array.isArray(permissions) && permissions.includes('view_analytics') && (
+            {hasPermission('view_analytics') && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -256,10 +260,10 @@ export default function AdminDashboard() {
             </div>
             )}
             
-            {!permissions.includes('view_users') && 
-             !permissions.includes('view_subscriptions') && 
-             !permissions.includes('view_support_tickets') && 
-             !permissions.includes('view_analytics') && (
+            {!hasPermission('view_users') && 
+             !hasPermission('view_subscriptions') && 
+             !hasPermission('view_support_tickets') && 
+             !hasPermission('view_analytics') && (
               <div className="col-span-full bg-yellow-50 dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-yellow-200 dark:border-yellow-800">
                 <div className="flex items-center">
                   <div className="flex-shrink-0 bg-yellow-100 dark:bg-yellow-900 rounded-full p-3 mr-4">
@@ -281,7 +285,7 @@ export default function AdminDashboard() {
           </div>
 
           {/*Admins Recent Activity */}
-          {Array.isArray(permissions) && permissions.includes('view_admins') && (
+          {hasPermission('view_admins') && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Admin Recent Activity</h3>
             

@@ -468,17 +468,18 @@ CREATE TABLE "admin_permission" (
   "description" TEXT
 );
 
--- 管理员角色权限关联表 - 将角色与权限关联
+-- 管理员角色权限关联表 - 将每个管理员与权限关联
 CREATE TABLE "admin_role_permission" (
   "id" SERIAL PRIMARY KEY,
-  "role" VARCHAR(50) NOT NULL,
+  "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
   "permission_id" INT NOT NULL REFERENCES "admin_permission"("id") ON DELETE CASCADE,
-  UNIQUE ("role", "permission_id")
+  "is_active" BOOLEAN DEFAULT TRUE,
+  UNIQUE ("admin_id", "permission_id")
 );
 
 -- 创建索引提升查询性能
-CREATE INDEX idx_admin_role_permission_role ON "admin_role_permission"("role");
-CREATE INDEX idx_admin_role_permission_permission ON "admin_role_permission"("permission_id");
+CREATE INDEX idx_admin_role_permission_admin_id ON "admin_role_permission"("admin_id");
+CREATE INDEX idx_admin_role_permission_permission_id ON "admin_role_permission"("permission_id");
 
 
 -- 管理员会话表 - 跟踪管理员登录会话

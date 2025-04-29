@@ -49,6 +49,11 @@ export default function AdminSupport() {
       fetchSupportTickets();
     }
   }, [filter]);
+
+  // Add function to verify permission access TODO: 模块化这个代码
+  const hasPermission = (permissionName) => {
+    return permissions.includes(permissionName);
+  };
   
   // Fetch support tickets
   const fetchSupportTickets = async () => {
@@ -219,30 +224,6 @@ export default function AdminSupport() {
       console.error('Error sending reply:', error);
       alert(`Error sending reply: ${error.message}`);
       // toast.error('Error sending reply:', error);
-    }
-  };
-  
-  // Handle admin logout
-  const handleLogout = async () => {
-    try {
-      // Log the logout action
-      if (adminData) {
-        await supabase.from('admin_activity_log').insert({
-          admin_id: adminData.id,
-          action: 'logout',
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
-      }
-      
-      // Sign out
-      await supabase.auth.signOut();
-      
-      // Redirect to admin login
-      router.replace(`/${locale}/admin/login`);
-      
-    } catch (error) {
-      console.error('Error during logout:', error);
     }
   };
   
@@ -431,7 +412,7 @@ export default function AdminSupport() {
                       </p>
                     </div>
                     
-                    {permissions.includes('mark_support_tickets') && (
+                    {hasPermission('mark_support_tickets') && (
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleStatusChange('IN_PROGRESS')}
@@ -553,7 +534,7 @@ export default function AdminSupport() {
                     </div>
                   </div>
                   
-                  {permissions.includes('reply_to_tickets') && (
+                  {hasPermission('reply_to_tickets') && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Reply</h4>
                     <form onSubmit={handleReplySendEmail}>
