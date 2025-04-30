@@ -9,6 +9,79 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import { createTaskValidationSchema, taskFormTransforms } from '@/components/validation/taskSchema'
+import { updateTask, fetchTaskById } from '@/lib/redux/features/taskSlice';
+import { getTagByName } from '@/lib/redux/features/tagSlice';
+import { useDispatch } from "react-redux";
+
+/**
+ * 格式化日期为Gantt图所需的标准格式
+ * 
+ * @param {string|Date} date - 日期字符串或Date对象
+ * @returns {string} - 格式化后的日期字符串，格式为 "YYYY-MM-DD HH:MM"
+ */
+function formatGanttDate(date) {
+  try {
+    // 检查输入值是否为有效日期
+    if (!date) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day} 00:00`;
+    }
+    
+    // 处理Date对象
+    if (date instanceof Date) {
+      if (isNaN(date.getTime())) {
+        throw new Error("无效的日期对象");
+      }
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day} 00:00`;
+    }
+    
+    // 处理字符串
+    if (typeof date === 'string') {
+      // 已经是Gantt格式 (YYYY-MM-DD HH:MM)
+      if (date.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)) {
+        return date;
+      }
+      
+      // ISO日期格式 (YYYY-MM-DDThh:mm:ss.sssZ)
+      if (date.includes('T')) {
+        const datePart = date.split('T')[0];
+        return `${datePart} 00:00`;
+      }
+      
+      // 只有日期部分 (YYYY-MM-DD)
+      if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return `${date} 00:00`;
+      }
+      
+      // 尝试解析其他日期格式
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        throw new Error(`无法解析日期字符串: ${date}`);
+      }
+      
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day} 00:00`;
+    }
+    
+    throw new Error("无效的日期输入类型");
+  } catch (error) {
+    console.error("日期格式化错误:", error);
+    // 返回当前日期作为后备选项
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day} 00:00`;
+  }
+}
 
 export default function EditTaskDialog({ 
   taskColor,
@@ -25,7 +98,7 @@ export default function EditTaskDialog({
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
+  const dispatch = useDispatch();
   // 初始化表单
   const form = useForm({
     defaultValues: {
@@ -62,14 +135,38 @@ export default function EditTaskDialog({
     setIsSubmitting(true);
     
     try {
+      const formattedStartDate = formatGanttDate(data.startDate);
       const updatedTask = {
-        ...editTask,
-        text: data.taskName,
-        start_date: data.startDate,
-        duration: data.duration,
-        progress: data.progress
+        "Name": data.taskName,
+        "Start Date": formattedStartDate,
+        "Duration": data.duration,
+        "Progress": data.progress
       };
-      
+      const tagIdName = await dispatch(getTagByName("Name")).unwrap();
+      const tagIdStartDate = await dispatch(getTagByName("Start Date")).unwrap();
+      const tagIdDuration = await dispatch(getTagByName("Duration")).unwrap();
+      const tagIdProgress = await dispatch(getTagByName("Progress")).unwrap();
+
+      const updatedTaskData = {
+          // 使用tagId作为对象键映射相应的值
+          [tagIdName]: data.taskName,
+          [tagIdStartDate]: formattedStartDate,
+          [tagIdDuration]: parseInt(data.duration),
+          [tagIdProgress]: data.progress
+      }
+      const previousTaskData = await dispatch(fetchTaskById(editTask.id)).unwrap();
+
+      await dispatch(updateTask({ 
+        taskId: editTask.id,
+        taskData: {
+          tag_values: updatedTaskData
+        },
+        oldTask: {
+          //get previous task data
+          previousTaskData
+        }
+      })).unwrap();
+
       setEditTask(updatedTask);
       handleUpdateTask();
       setIsLoading(false);

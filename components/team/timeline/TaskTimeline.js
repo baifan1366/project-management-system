@@ -13,6 +13,78 @@ import { Plus } from 'lucide-react';
 import { initZoom, setZoom as applyZoom, handleZoomChange as changeZoom } from './TimelineTools';
 import { useConfirm } from '@/hooks/use-confirm';
 import { useTimelineData, formatDateForGantt } from './BodyContent';
+import { updateTask, fetchTaskById } from '@/lib/redux/features/taskSlice';
+import { getTagByName } from '@/lib/redux/features/tagSlice';
+
+/**
+ * 格式化日期为Gantt图所需的标准格式
+ * 
+ * @param {string|Date} date - 日期字符串或Date对象
+ * @returns {string} - 格式化后的日期字符串，格式为 "YYYY-MM-DD HH:MM"
+ */
+function formatGanttDate(date) {
+  try {
+    // 检查输入值是否为有效日期
+    if (!date) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day} 00:00`;
+    }
+    
+    // 处理Date对象
+    if (date instanceof Date) {
+      if (isNaN(date.getTime())) {
+        throw new Error("无效的日期对象");
+      }
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day} 00:00`;
+    }
+    
+    // 处理字符串
+    if (typeof date === 'string') {
+      // 已经是Gantt格式 (YYYY-MM-DD HH:MM)
+      if (date.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)) {
+        return date;
+      }
+      
+      // ISO日期格式 (YYYY-MM-DDThh:mm:ss.sssZ)
+      if (date.includes('T')) {
+        const datePart = date.split('T')[0];
+        return `${datePart} 00:00`;
+      }
+      
+      // 只有日期部分 (YYYY-MM-DD)
+      if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return `${date} 00:00`;
+      }
+      
+      // 尝试解析其他日期格式
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        throw new Error(`无法解析日期字符串: ${date}`);
+      }
+      
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day} 00:00`;
+    }
+    
+    throw new Error("无效的日期输入类型");
+  } catch (error) {
+    console.error("日期格式化错误:", error);
+    // 返回当前日期作为后备选项
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day} 00:00`;
+  }
+}
 
 export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   const ganttContainer = useRef(null);
@@ -41,6 +113,8 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   
   // 使用BodyContent中的自定义hook获取数据
   const { sections, allTasks, ganttTasks, links, tags } = useTimelineData(teamId, teamCFId, ganttObj, refreshFlag);
+
+  const dispatch = useDispatch();
 
   // Apply zoom level
   const setZoom = (value) => {
@@ -84,17 +158,12 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   }
 
   const handleUpdateTask = () => {
-    if (editTask.text.trim() === '') return;
-
-    try {
-      // 使用BodyContent中的格式化函数
-      const dateObj = formatDateForGantt(editTask.start_date);
-      
+    try {      
       const taskToUpdate = {
         id: editTask.id,
         text: editTask.text,
-        start_date: dateObj,
-        duration: parseInt(editTask.duration) || 1,
+        start_date: editTask.start_date,
+        duration: editTask.duration,
         progress: editTask.progress
       };
   
@@ -115,8 +184,8 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
 
   const handleDeleteTask = () => {
     confirm({
-      title: '确认删除',
-      description: `Task "${editTask.text}" will be deleted`,
+      title: t('confirmDeleteTask'),
+      description: `${t('task')} "${editTask.text}" ${t('willBeDeleted')}`,
       variant: 'error',
       onConfirm: () => {
         gantt.deleteTask(editTask.id);
@@ -300,6 +369,63 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
     initZoom();
     setZoom(currentZoom);
     
+    // 启用拖拽调整任务持续时间
+    gantt.config.drag_resize = true;
+
+    // 启用任务拖动（改变开始日期）
+    gantt.config.drag_move = true;
+
+    // 启用进度拖拽
+    gantt.config.drag_progress = true;
+    
+    // 任务更新前事件
+    gantt.attachEvent("onBeforeTaskUpdate", function(id, task){
+      // 验证任务数据，如有需要可以在此进行
+      return true; // 返回 false 会阻止更新
+    });
+
+    // 任务更新后事件
+    gantt.attachEvent("onAfterTaskUpdate", function(id, task){
+      // 此处可执行后续操作，例如数据同步或界面更新
+      setRefreshFlag(prev => prev + 1);
+    });
+
+    // 进度拖拽完成事件
+    gantt.attachEvent("onAfterTaskDrag", async function(id, mode, task) {
+      // 根据拖拽模式更新相应的任务数据
+      const updatedTask = gantt.getTask(id);
+      
+      if (mode == gantt.config.drag_mode.resize) {
+        // 调整了任务持续时间
+        console.log("任务持续时间已更新:", updatedTask.duration);
+      } 
+      else if (mode == gantt.config.drag_mode.move) {
+        // 移动了任务（更改了开始日期）
+        console.log("任务开始日期已更新:", updatedTask.start_date);
+      }
+      else if (mode == gantt.config.drag_mode.progress) {
+        // 调整了任务进度
+        console.log("任务进度已更新:", updatedTask.progress);
+      }
+      
+      // 创建与 EditTaskDialog 相同格式的任务数据
+      const taskToUpdate = {
+        id: updatedTask.id,
+        text: updatedTask.text,
+        start_date: updatedTask.start_date,
+        duration: updatedTask.duration,
+        progress: updatedTask.progress || 0
+      };
+
+      // 使用 calculateEndDate 自动计算结束日期
+      taskToUpdate.end_date = gantt.calculateEndDate(taskToUpdate);
+      
+      // 等待数据库更新完成
+      await updateTaskInDatabase(taskToUpdate);      
+      // 刷新数据
+      setRefreshFlag(prev => prev + 1);
+    });
+    
     return () => {
       // 在组件卸载时正确清理所有事件监听器
       if (gantt) {
@@ -328,6 +454,49 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
       setZoom(currentZoom);
     }
   }, [ganttObj, ganttTasks, currentZoom]);
+
+  // 添加一个新函数用于更新数据库
+  const updateTaskInDatabase = async (taskData) => {
+    try {
+      // 准备数据格式以匹配 EditTaskDialog 中的更新逻辑
+      const formattedStartDate = formatGanttDate(taskData.start_date);
+      
+      // 获取必要的标签ID
+      const tagIdName = await dispatch(getTagByName("Name")).unwrap();
+      const tagIdStartDate = await dispatch(getTagByName("Start Date")).unwrap();
+      const tagIdDuration = await dispatch(getTagByName("Duration")).unwrap();
+      const tagIdProgress = await dispatch(getTagByName("Progress")).unwrap();
+
+      const updatedTaskData = {
+        [tagIdName]: taskData.text,
+        [tagIdStartDate]: formattedStartDate,
+        [tagIdDuration]: parseInt(taskData.duration),
+        [tagIdProgress]: taskData.progress
+      };
+
+      const previousTaskData = await dispatch(fetchTaskById(taskData.id)).unwrap();
+
+      // 调用Redux action更新数据库
+      await dispatch(updateTask({ 
+        taskId: taskData.id,
+        taskData: {
+          tag_values: updatedTaskData
+        },
+        oldTask: {
+          previousTaskData
+        }
+      })).unwrap();
+
+      console.log("任务已成功更新到数据库");
+      
+      // 确保数据库更新后刷新甘特图
+      gantt.refreshData();
+      // 再次触发刷新标志，确保组件重新渲染
+      setRefreshFlag(prev => prev + 1);
+    } catch (error) {
+      console.error("更新任务到数据库时出错:", error);
+    }
+  };
 
   return (
     <div className={`w-full h-full overflow-hidden`}>

@@ -79,6 +79,7 @@ export async function GET(request) {
         .select('task_ids')
         .eq('id', sectionId)
         .single()
+        .order('id', { ascending: true });
         
       if (sectionError) throw sectionError
       
@@ -88,6 +89,7 @@ export async function GET(request) {
           .from('task')
           .select('*')
           .in('id', sectionData.task_ids)
+          .order('id', { ascending: true })
           
         if (tasksError) throw tasksError
         
@@ -101,6 +103,7 @@ export async function GET(request) {
         .from('section')
         .select('task_ids')
         .eq('team_id', teamId)
+        .order('id', { ascending: true })
         
       if (sectionsError) throw sectionsError
       

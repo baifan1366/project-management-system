@@ -143,18 +143,16 @@ export const mapTasksToGantt = (tasks, tags, gantt) => {
           case 'Name':
             taskName = String(value || '');
             break;
-          case 'Created At':
+          case 'Start Date':
             if (value) {
               startDate = value;
             }
             break;
           case 'Duration':
-          case 'duration':
             const duration = parseInt(value);
             taskDuration = !isNaN(duration) && duration > 0 ? duration : 1;
             break;
           case 'Progress':
-          case 'progress':
             const progress = parseFloat(value);
             if (!isNaN(progress)) {
               taskProgress = progress > 1 ? progress / 100 : progress;
