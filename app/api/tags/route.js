@@ -25,6 +25,7 @@ export async function GET(request) {
             .from('tag')
             .select('*')
             .order('id', { ascending: true })
+            .eq('default', true)
             
         if (error) {
             console.error(error)

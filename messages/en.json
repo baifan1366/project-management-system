@@ -1100,7 +1100,15 @@
     "typeRequired": "Field type is required.",
     "descriptionMax": "Description cannot exceed 100 characters.",
     "descriptionMin": "Description must be at least 10 characters.",
-    "addDescription": "Add description"
+    "addDescription": "Add description",
+    "newField": "New Field",
+    "loading": "Loading...",
+    "tagAlreadyExists": "Tag already exists",
+    "tagAlreadyExistsDescription": "Tag \"{tag}\" already exists",
+    "tagAdded": "Tag added",
+    "tagAddedDescription": "Successfully added tag \"{tag}\"",
+    "tagAddFailed": "Failed to add tag",
+    "tagAddFailedDescription": "Failed to add tag \"{tag}\""
   },
   "notificationCenter": {
     "title": "Notification Center",
