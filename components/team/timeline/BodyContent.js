@@ -14,7 +14,7 @@ const requestCache = {
   sections: {}
 };
 
-export const useTimelineData = (teamId, teamCFId, gantt) => {
+export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0) => {
   const dispatch = useDispatch();
   const allTags = useSelector(state => state.tags.tags);
   const teamCFTags = useSelector(state => state.teamCF.tags);
@@ -64,12 +64,18 @@ export const useTimelineData = (teamId, teamCFId, gantt) => {
     }
   }, [allTags, teamCFTags]);
 
-  // 获取部分和任务数据 - 每个teamId只请求一次
+  // 获取部分和任务数据 - 当添加新任务时重新加载
   useEffect(() => {
     let isMounted = true;
     
     async function fetchData() {
       try {
+        // 当收到刷新标志或初始加载时重置缓存状态
+        if (refreshFlag > 0) {
+          requestCache.sections[teamId] = false;
+          localRequestTracker.current.sectionsFetched = false;
+        }
+        
         if (!requestCache.sections[teamId] && !localRequestTracker.current.sectionsFetched) {
           // 获取部分数据
           const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
@@ -102,7 +108,7 @@ export const useTimelineData = (teamId, teamCFId, gantt) => {
     return () => {
       isMounted = false;
     };
-  }, [teamId, dispatch]);
+  }, [teamId, dispatch, refreshFlag]);
 
   // 当任务或标签数据更新时，重新映射并更新Gantt
   useEffect(() => {

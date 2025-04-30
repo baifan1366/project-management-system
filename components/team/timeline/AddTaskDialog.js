@@ -8,8 +8,83 @@ import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { createTaskValidationSchema, taskFormTransforms } from '@/components/validation/taskSchema'
+import { createTask } from '@/lib/redux/features/taskSlice';
+import { createSection, updateTaskIds, getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
+import useGetUser from "@/lib/hooks/useGetUser";
+import { useDispatch } from "react-redux";
+import { getTagByName } from '@/lib/redux/features/tagSlice';
 
-export default function AddTaskDialog({ taskColor, showTaskForm, setShowTaskForm, onTaskAdd }) {
+/**
+ * 格式化日期为Gantt图所需的标准格式
+ * 
+ * @param {string|Date} date - 日期字符串或Date对象
+ * @returns {string} - 格式化后的日期字符串，格式为 "YYYY-MM-DD HH:MM"
+ */
+function formatGanttDate(date) {
+  try {
+    // 检查输入值是否为有效日期
+    if (!date) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day} 00:00`;
+    }
+    
+    // 处理Date对象
+    if (date instanceof Date) {
+      if (isNaN(date.getTime())) {
+        throw new Error("无效的日期对象");
+      }
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day} 00:00`;
+    }
+    
+    // 处理字符串
+    if (typeof date === 'string') {
+      // 已经是Gantt格式 (YYYY-MM-DD HH:MM)
+      if (date.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)) {
+        return date;
+      }
+      
+      // ISO日期格式 (YYYY-MM-DDThh:mm:ss.sssZ)
+      if (date.includes('T')) {
+        const datePart = date.split('T')[0];
+        return `${datePart} 00:00`;
+      }
+      
+      // 只有日期部分 (YYYY-MM-DD)
+      if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return `${date} 00:00`;
+      }
+      
+      // 尝试解析其他日期格式
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        throw new Error(`无法解析日期字符串: ${date}`);
+      }
+      
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day} 00:00`;
+    }
+    
+    throw new Error("无效的日期输入类型");
+  } catch (error) {
+    console.error("日期格式化错误:", error);
+    // 返回当前日期作为后备选项
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day} 00:00`;
+  }
+}
+
+export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShowTaskForm, onTaskAdd }) {
   const t = useTranslations('CreateTask');
   const tValidation = useTranslations('validationRules');
   const [newTask, setNewTask] = useState({
@@ -21,7 +96,8 @@ export default function AddTaskDialog({ taskColor, showTaskForm, setShowTaskForm
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
+  const { user } = useGetUser();
+  const dispatch = useDispatch();
   const validateForm = (data) => {
     if (!validationSchema) return { isValid: true, errors: {} };
     const transformedData = {
@@ -54,16 +130,71 @@ export default function AddTaskDialog({ taskColor, showTaskForm, setShowTaskForm
     setIsSubmitting(true);
     
     try {
+      const userId = user?.id;
+      
+      // 确保日期格式正确
+      const formattedStartDate = formatGanttDate(data.startDate);
+      
       const updatedTask = {
-        text: data.taskName,
-        start_date: data.startDate,
-        duration: data.duration
+        "Name": data.taskName,
+        "Start Date": formattedStartDate,
+        "Duration": data.duration,
+        "Progress": 0
       };
-      
+      //compare the name, startDate and duration with the tag table's name
+      //by getting the tag.name, get the tag.id at the same time
+      const tagIdName = await dispatch(getTagByName("Name")).unwrap();
+      const tagIdStartDate = await dispatch(getTagByName("Start Date")).unwrap();
+      const tagIdDuration = await dispatch(getTagByName("Duration")).unwrap();
+      const tagIdProgress = await dispatch(getTagByName("Progress")).unwrap();
+
+      const taskData = {
+        tag_values: {
+          // 使用tagId作为对象键映射相应的值
+          [tagIdName]: data.taskName,
+          [tagIdStartDate]: formattedStartDate,
+          [tagIdDuration]: parseInt(data.duration),
+          [tagIdProgress]: 0
+        },
+        created_by: userId
+      }
+      const result = await dispatch(createTask(taskData)).unwrap();
+
+      //updateTaskIds
+      //check whether this team has section or not
+      //if has, update the task_ids at the first section.id table detected
+      //if not, create a new section and update the task_ids at the new section.id table
+      const sectionId = await dispatch(getSectionByTeamId(teamId)).unwrap();
+      if (sectionId != null && sectionId.length > 0) {
+        //select the first section.id
+        const firstSectionId = sectionId[0].id;
+        // 获取当前的task_ids列表，然后将新任务ID追加到现有列表中
+        const currentSection = sectionId[0];
+        const existingTaskIds = currentSection.task_ids || [];
+        const updatedTaskIds = [...existingTaskIds, result.id];
+        
+        await dispatch(updateTaskIds({
+          sectionId: firstSectionId,
+          teamId: teamId,
+          newTaskIds: updatedTaskIds // 使用包含所有任务ID的更新列表
+        })).unwrap();
+      } else {
+        //create a new section
+        const sectionData = {
+          teamId,
+          sectionName: "New Section",
+          createdBy: userId
+        };
+        const newSection = await dispatch(createSection({teamId, sectionData})).unwrap();
+        await dispatch(updateTaskIds({
+          sectionId: newSection.id,
+          teamId: teamId,
+          newTaskIds: [result.id]
+        })).unwrap();
+      }
+
       setNewTask(updatedTask);
-      
       handleAddTask(updatedTask);
-      console.log('addTask', updatedTask);
       form.reset();
       setIsLoading(false);
       setIsSubmitting(false);
@@ -77,14 +208,12 @@ export default function AddTaskDialog({ taskColor, showTaskForm, setShowTaskForm
   }  
 
   const handleAddTask = (task) => {
-    if (task.text.trim() === '') return;
-    
     try {
       onTaskAdd(task);
       
       setNewTask({
         text: '',
-        start_date: new Date().toISOString().split('T')[0] + ' 00:00',
+        start_date: formatGanttDate(new Date()),
         duration: 1
       });
     } catch (error) {

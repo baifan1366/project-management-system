@@ -26,6 +26,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [refreshFlag, setRefreshFlag] = useState(0);
   const [editTask, setEditTask] = useState({
     id: null,
     text: '',
@@ -39,7 +40,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   const [ganttObj, setGanttObj] = useState(null);
   
   // 使用BodyContent中的自定义hook获取数据
-  const { sections, allTasks, ganttTasks, links, tags } = useTimelineData(teamId, teamCFId, ganttObj);
+  const { sections, allTasks, ganttTasks, links, tags } = useTimelineData(teamId, teamCFId, ganttObj, refreshFlag);
 
   // Apply zoom level
   const setZoom = (value) => {
@@ -54,20 +55,28 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   // 新的回调函数，将在AddTaskDialog中被调用
   const handleTaskAdd = (taskData) => {
     try {
-      // 使用BodyContent中的格式化函数
-      const dateObj = formatDateForGantt(taskData.start_date);
-      
       const taskToAdd = {
-        text: taskData.text,
-        start_date: dateObj,
+        text: taskData.taskName,
+        start_date: taskData.startDate,
         duration: parseInt(taskData.duration) || 1,
         progress: 0
       };
       
       // 使用calculateEndDate自动计算结束日期
-      taskToAdd.end_date = gantt.calculateEndDate(taskToAdd);
-      
+      // taskToAdd.end_date = gantt.calculateEndDate(taskToAdd);
       const taskId = gantt.addTask(taskToAdd);
+      //make sure the task is added to the gantt
+      const task = gantt.getTask(taskId);
+      if (!task) {
+        throw new Error('Task not found');
+      }
+      //refresh the gantt
+      gantt.refreshData();
+      
+      // 触发数据刷新
+      setRefreshFlag(prev => prev + 1);
+      
+      console.log('task', task);
     } catch (error) {
       console.error("Error adding task:", error);
       alert("添加任务时出错，请检查日期格式");
@@ -93,6 +102,10 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
       taskToUpdate.end_date = gantt.calculateEndDate(taskToUpdate);
       
       gantt.updateTask(editTask.id, taskToUpdate);
+      
+      // 触发数据刷新
+      setRefreshFlag(prev => prev + 1);
+      
       setShowEditForm(false);
     } catch (error) {
       console.error("Error updating task:", error);
@@ -108,6 +121,10 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
       onConfirm: () => {
         gantt.deleteTask(editTask.id);
         gantt.refreshData();
+        
+        // 触发数据刷新
+        setRefreshFlag(prev => prev + 1);
+        
         setShowEditForm(false);
       }
     });
@@ -321,6 +338,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
       `}</style>
       <Toolbar />
       <AddTaskDialog
+        teamId={teamId}
         taskColor={taskColor}
         showTaskForm={showTaskForm}
         setShowTaskForm={setShowTaskForm}
