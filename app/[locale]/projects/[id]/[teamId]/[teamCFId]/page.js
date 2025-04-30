@@ -233,10 +233,6 @@ export default function TeamCustomFieldPage() {
                     {t('editTeamDetails')}
                   </DropdownMenuItem>
                   <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
-                    <Palette className="h-4 w-4 mr-2" />
-                    {t('setColorAndIcon')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
                     <Link className="h-4 w-4 mr-2" />
                     {t('copyTeamLink')}
                   </DropdownMenuItem>
@@ -248,10 +244,6 @@ export default function TeamCustomFieldPage() {
                   <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
                     <Settings2 className="h-4 w-4 mr-2" />
                     {t('manageTeamPermissions')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
-                    <Grid className="h-4 w-4 mr-2" />
-                    {t('manageDependencies')}
                   </DropdownMenuItem>
                   <hr className="my-1" />
                   <DropdownMenuItem className="text-red-500 flex items-center px-3 py-2 text-sm">
@@ -280,9 +272,6 @@ export default function TeamCustomFieldPage() {
                 open={open}
                 onClose={() => setOpen(false)}
               />
-              <Button variant="ghost" size="icon">
-                <Palette className="h-4 w-4" />
-              </Button>
             </div>
           </div>
           <div className="overflow-x-auto" style={{ 
@@ -344,16 +333,6 @@ export default function TeamCustomFieldPage() {
                 <Grid className="h-4 w-4 mr-1" />
                 {t('group')}
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem>{t('options')}</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </div>
         </div>

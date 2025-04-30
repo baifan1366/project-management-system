@@ -673,6 +673,7 @@
     "willBeDeleted": "will be deleted",
     "pleaseFillInTheFollowingInformationToCreateANewTask": "Please fill in the following information to create a new task",
     "add": "Add",
+    "adding": "Adding...",
     "startDate": "Start Date",
     "duration": "Duration",
     "endDate": "End Date",
@@ -721,7 +722,10 @@
     "pending": "Pending",
     "inProgress": "In Progress",
     "completed": "Completed",
-    "noAvailableTaskData": "No available task data"
+    "noAvailableTaskData": "No available task data",
+    "enterTaskName": "Enter task name",
+    "enterStartDate": "Enter start date",
+    "enterDuration": "Enter duration"
   },
   "ChatDialog": {
     "privateMessages": "Private Messages",
@@ -1331,7 +1335,9 @@
     "completionProgress": "Completion Progress",
     "delete": "Delete",
     "cancel": "Cancel",
-    "save": "Save"
+    "save": "Save",
+    "enterTaskName": "Enter task name",
+    "saving": "Saving..."
   },
   "AI_Workflow": {
     "title": "AI Workflow",
@@ -1506,16 +1512,21 @@
     "descriptionMax": "Description cannot exceed 100 characters.",
     "iconRequired": "Icon is required.",
     "iconMax": "Icon cannot exceed 50 characters.",
-    "fieldNameMin": "Field title must be at least 2 characters.",
-    "fieldNameMax": "Field title cannot exceed 50 characters.",
-    "fieldNameRequired": "Field title is required.",
-    "fieldTypeRequired": "Field type is required.",
-    "projectNameRequired": "Project name is required.",
-    "projectNameMin": "Project name must be at least 2 characters.",
-    "projectNameMax": "Project name cannot exceed 50 characters.",
+    "fieldNameMin": "Field Title must be at least 2 characters.",
+    "fieldNameMax": "Field Title cannot exceed 50 characters.",
+    "fieldNameRequired": "Field Title is required.",
+    "fieldTypeRequired": "Field Type is required.",
+    "projectNameRequired": "Project Name is required.",
+    "projectNameMin": "Project Name must be at least 2 characters.",
+    "projectNameMax": "Project Name cannot exceed 50 characters.",
     "visibilityRequired": "Visibility is required.",
     "visibilityInvalid": "Invalid visibility option.",
-    "themeColorRequired": "Theme color is required.",
-    "themeColorInvalid": "Invalid theme color option."
+    "themeColorRequired": "Theme Color is required.",
+    "themeColorInvalid": "Invalid theme color option.",
+    "taskNameRequired": "Task Name is required.",
+    "taskNameMin": "Task Name must be at least 2 characters.",
+    "taskNameMax": "Task Name cannot exceed 50 characters.",
+    "startDateRequired": "Start Date is required.",
+    "durationRequired": "Duration is required."
   }
 }

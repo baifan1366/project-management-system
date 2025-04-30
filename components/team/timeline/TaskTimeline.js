@@ -21,16 +21,11 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   const project = useSelector(state => 
     state.projects.projects.find(p => p.id.toString() === projectId.toString())
   );
-  
+  const currentDate = new Date().toISOString().split('T')[0];
   const zoom = 'Days';
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
-  const [newTask, setNewTask] = useState({
-    text: '',
-    start_date: new Date().toISOString().split('T')[0] + ' 00:00',
-    duration: 1
-  });
   const [editTask, setEditTask] = useState({
     id: null,
     text: '',
@@ -44,7 +39,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   const [ganttObj, setGanttObj] = useState(null);
   
   // 使用BodyContent中的自定义hook获取数据
-  const { sections, allTasks, ganttTasks, tags } = useTimelineData(teamId, teamCFId, ganttObj);
+  const { sections, allTasks, ganttTasks, links, tags } = useTimelineData(teamId, teamCFId, ganttObj);
 
   // Apply zoom level
   const setZoom = (value) => {
@@ -56,17 +51,16 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
     changeZoom(level, setZoom, setCurrentZoom);
   }
 
-  const handleAddTask = () => {
-    if (newTask.text.trim() === '') return;
-
+  // 新的回调函数，将在AddTaskDialog中被调用
+  const handleTaskAdd = (taskData) => {
     try {
       // 使用BodyContent中的格式化函数
-      const dateObj = formatDateForGantt(newTask.start_date);
+      const dateObj = formatDateForGantt(taskData.start_date);
       
       const taskToAdd = {
-        text: newTask.text,
+        text: taskData.text,
         start_date: dateObj,
-        duration: parseInt(newTask.duration) || 1,
+        duration: parseInt(taskData.duration) || 1,
         progress: 0
       };
       
@@ -74,12 +68,6 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
       taskToAdd.end_date = gantt.calculateEndDate(taskToAdd);
       
       const taskId = gantt.addTask(taskToAdd);
-      setShowTaskForm(false);
-      setNewTask({
-        text: '',
-        start_date: new Date().toISOString().split('T')[0] + ' 00:00',
-        duration: 1
-      });
     } catch (error) {
       console.error("Error adding task:", error);
       alert("添加任务时出错，请检查日期格式");
@@ -130,19 +118,13 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
     return (
       <div className="flex justify-between pl-1">
         <div className='flex justify-start items-center'>
-          <h2 className="font-bold">2025</h2>
+          <h2 className="font-medium">{currentDate}</h2>
           <Button 
             variant="outline"
             onClick={() => setShowTaskForm(true)}
-            className="border-none ml-1 p-0"
+            className="border-none ml-2 p-1"
           >
             <Plus size={16} />
-          </Button>
-          <Button 
-            variant="outline"
-            className="border-none p-0"
-          >
-            <ChevronDown className='h-4 w-4'/>
           </Button>
         </div>
         <div className="flex justify-end gap-1 items-end py-1 pr-1">
@@ -192,6 +174,35 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
     gantt.config.date_format = "%Y-%m-%d %H:%i";
     gantt.config.xml_date = "%Y-%m-%d %H:%i";
     gantt.config.show_grid = false;
+    
+    gantt.config.links = {
+      "finish_to_start": true,
+      "start_to_start": false,
+      "finish_to_finish": false,
+      "start_to_finish": false
+    };
+
+    // // 在 dhtmlx-gantt 库中，链接类型通常用数字表示：
+    // // 0: "finish_to_start" (结束到开始)
+    // // 1: "start_to_start" (开始到开始)
+    // // 2: "finish_to_finish" (结束到结束)
+    // // 3: "start_to_finish" (开始到结束)    
+    // gantt.config.default_link_type = 0; 
+    
+    // gantt.attachEvent("onLinkValidation", function(link) {
+    //   return link.type == 0; 
+    // });
+
+    // // 强制正确渲染链接箭头
+    // gantt.templates.link_class = function(link){
+    //   return "finish_to_start_link";
+    // };
+
+    // // 监听链接添加事件，确保类型正确
+    // gantt.attachEvent("onBeforeLinkAdd", function(id, link) {
+    //   link.type = 0; // 强制使用 finish_to_start
+    //   return true;
+    // });
     
     // Customize task color
     gantt.templates.task_class = () => `custom-task-color`;
@@ -292,7 +303,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
       ganttObj.clearAll();
       ganttObj.parse({
         data: ganttTasks,
-        links: []
+        links: links || []
       });
       setZoom(currentZoom);
     } else if (ganttObj && currentZoom) {
@@ -313,9 +324,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
         taskColor={taskColor}
         showTaskForm={showTaskForm}
         setShowTaskForm={setShowTaskForm}
-        newTask={newTask}
-        setNewTask={setNewTask}
-        handleAddTask={handleAddTask}
+        onTaskAdd={handleTaskAdd}
       />
       <EditTaskDialog
         taskColor={taskColor}

@@ -2,6 +2,19 @@ html, body, #root,#root div:only-child, .gantt-container {
     height: 92%;
   }
   
+  .gantt_task_area,
+  .gantt_task_rows,
+  .gantt_row,
+  .gantt_row.odd,
+  .gantt_task_bg,
+  .gantt_grid_data,
+  .gantt_container,
+  .gantt_grid_scale,
+  .gantt_task_row {
+    background-color: hsl(var(--background)) !important; /* or black */
+    border-color: hsl(var(--border) / 0.5);
+  }
+
   .gantt_scale_cell {
     border: none;
   }
@@ -27,32 +40,32 @@ html, body, #root,#root div:only-child, .gantt-container {
   }
   
   /* Grid and scales */
-  .gantt_grid_scale,
-  .gantt_task_scale {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+  /* .gantt_grid_scale,
+  .gantt_task_scale { */
+    /* background-color: hsl(var(--background)); */
+    /* color: hsl(var(--foreground)); */
     /* border-color: hsl(var(--border)); */
-  }
+  /* } */
   
-  .gantt_grid_data,
+  /* .gantt_grid_data,
   .gantt_task_bg {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-  }
+  } */
   
   /* Grid elements */
   /* .gantt_grid {
     border-color: hsl(var(--border));
   } */
   
-  .gantt_row {
+  /* .gantt_row { */
     /* border-color: hsl(var(--border)); */
-    background-color: transparent;
-  }
+    /* background-color: transparent;
+  } */
   
-  .gantt_row.odd {
+  /* .gantt_row.odd {
     background-color: transparent;
-  }
+  } */
   
   /* 修改行悬停效果 */
   .gantt_grid_data .gantt_row:hover {
