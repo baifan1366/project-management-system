@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaFilter, FaSearch, FaEnvelope, FaBuilding, FaUser, FaClock, FaCheck, FaTimes, FaSpinner, FaReply } from 'react-icons/fa';
-import { useSelector, useDispatch } from 'react-redux';
-import { checkAdminSession } from '@/lib/redux/features/adminSlice';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function AdminSupport() {
   const router = useRouter();
@@ -19,29 +18,47 @@ export default function AdminSupport() {
   const [replyText, setReplyText] = useState('');
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const dispatch = useDispatch();
-  const permissions = useSelector((state) => state.admin.permissions);
+  const { user: sessionData, error: sessionError } = useGetUser();
 
-  // initialize the page
+  // Verify admin session and fetch admin data
   useEffect(() => {
-    const initAdminSupport = async () => {
+    const checkAdminSession = async () => {
       try {
         setLoading(true);
+
+        
+        if (sessionError) {
+          throw new Error('No active session found');
+        }
+        
+        // Check if user is an admin
+        const { data: admin, error: adminError } = await supabase
+          .from('admin_user')
+          .select('*')
+          .eq('email', sessionData.user.email)
+          .eq('is_active', true)
+          .single();
+          
+        if (adminError || !admin) {
+          throw new Error('Unauthorized access');
+        }
+        
+        setAdminData(admin);
         
         // Fetch support tickets
         await fetchSupportTickets();
         
       } catch (error) {
-        console.error('Errror in fetching support tickets:', error);
+        console.error('Admin session check failed:', error);
         // Redirect to admin login
-        router.replace(`/admin/adminLogin`);
+        router.replace(`/${locale}/admin/login`);
       } finally {
         setLoading(false);
       }
     };
     
-    initAdminSupport();
-  }, [dispatch, router]);
+    checkAdminSession();
+  }, []);
   
   // Add useEffect to fetch tickets when filter changes
   useEffect(() => {
@@ -431,7 +448,6 @@ export default function AdminSupport() {
                       </p>
                     </div>
                     
-                    {permissions.includes('mark_support_tickets') && (
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleStatusChange('IN_PROGRESS')}
@@ -472,7 +488,6 @@ export default function AdminSupport() {
                         Mark as Spam
                       </button>
                     </div>
-                    )}
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -553,7 +568,6 @@ export default function AdminSupport() {
                     </div>
                   </div>
                   
-                  {permissions.includes('reply_to_tickets') && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Reply</h4>
                     <form onSubmit={handleReplySendEmail}>
@@ -575,8 +589,7 @@ export default function AdminSupport() {
                         </button>
                       </div>
                     </form>
-                  </div>  
-                  )}
+                  </div>
                 </div>
               ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 flex flex-col items-center justify-center h-[calc(100vh-180px)]">

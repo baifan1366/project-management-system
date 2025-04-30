@@ -145,7 +145,7 @@ CREATE TABLE "time_entry" (
 CREATE TABLE "custom_field" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'DASHBOARD', 'NOTE', 'GANTT', 'CALENDAR', 'WORKFLOW', 'KANBAN', 'AGILE', 'FILES')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'WORKFLOW', 'KANBAN', 'AGILE', 'FILES')),
   "description" TEXT,
   "icon" VARCHAR(255),
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -476,21 +476,21 @@ CREATE TABLE "admin_user" (
 CREATE TABLE "admin_permission" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) UNIQUE NOT NULL,
-  "description" TEXT
+  "description" TEXT,
+  "resource" VARCHAR(255) NOT NULL, -- 例如: 'users', 'projects', 'teams', 'subscriptions'
+  "action" VARCHAR(255) NOT NULL, -- 例如: 'create', 'read', 'update', 'delete', 'manage'
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 管理员角色权限关联表 - 将角色与权限关联
 CREATE TABLE "admin_role_permission" (
   "id" SERIAL PRIMARY KEY,
-  "role" VARCHAR(50) NOT NULL,
+  "role" VARCHAR(50) NOT NULL, -- 对应 admin_user 表中的 role
   "permission_id" INT NOT NULL REFERENCES "admin_permission"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE ("role", "permission_id")
 );
-
--- 创建索引提升查询性能
-CREATE INDEX idx_admin_role_permission_role ON "admin_role_permission"("role");
-CREATE INDEX idx_admin_role_permission_permission ON "admin_role_permission"("permission_id");
-
 
 -- 管理员会话表 - 跟踪管理员登录会话
 CREATE TABLE "admin_session" (

@@ -31,7 +31,8 @@ export default function Home({ params }) {
   });
   const [loading, setLoading] = useState(true);
   const [openAgentDialog, setOpenAgentDialog] = useState(false);
-  
+  const { user } = useGetUser();
+
   // 使用Redux获取任务数据
   const dispatch = useDispatch();
   const tasks = useSelector(state => state.tasks.tasks);
@@ -44,7 +45,6 @@ export default function Home({ params }) {
   useEffect(() => {
     async function getCurrentUser() {
       try {
-        const { user } = useGetUser();
         if (user) {
           setUserId(user.id);
         }
@@ -54,7 +54,7 @@ export default function Home({ params }) {
     }
     
     getCurrentUser();
-  }, []);
+  }, [user]);
 
   // 获取任务数据
   useEffect(() => {

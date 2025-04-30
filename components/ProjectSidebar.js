@@ -44,6 +44,7 @@ export default function ProjectSidebar({ projectId }) {
 
   const [projectName, setProjectName] = useState('');
   const [themeColor, setThemeColor] = useState('');
+  const { user } = useGetUser();
 
   // 项目名称下拉菜单
   useEffect(() => {
@@ -61,7 +62,6 @@ export default function ProjectSidebar({ projectId }) {
   // 获取用户加入的团队
   const fetchTeams = useCallback(async () => {
     try {
-      const { user } = useGetUser();
       if (!user) return;
 
       // 使用Redux action获取用户团队
@@ -80,7 +80,7 @@ export default function ProjectSidebar({ projectId }) {
     } catch (error) {
       console.error('获取用户团队失败:', error);
     }
-  }, []);
+  }, [user]);
 
   const getProjectData = useCallback(async () => {
     if (projectId) {

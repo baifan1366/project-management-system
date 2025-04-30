@@ -35,14 +35,18 @@ export async function GET(request) {
     }
     // 获取所有任务
     else if (fetchAll) {
+      console.log('Fetching all tasks');
       const { data: tasksData, error: tasksError } = await supabase
         .from('task')
-        .select('*')
-        .order('created_at', { ascending: false })
+        .select('*');
         
-      if (tasksError) throw tasksError
+      if (tasksError) {
+        console.error('Error fetching all tasks:', tasksError);
+        throw tasksError;
+      }
       
-      data = tasksData || []
+      data = tasksData || [];
+      console.log(`Fetched ${data.length} tasks`);
     }
     // 如果提供了特定任务ID，则只获取该任务
     else if (taskId) {
@@ -163,8 +167,8 @@ export async function POST(request) {
   }
 }
 
-// PUT /api/tasks - Update a task
-export async function PUT(request) {
+// PATCH /api/tasks - Update a task
+export async function PATCH(request) {
   try {
     const body = await request.json()
     console.log('Update data:', body)
@@ -176,15 +180,28 @@ export async function PUT(request) {
       )
     }
 
+    // 确保 updated_at 存在
+    const updateData = {
+      ...body,
+      updated_at: body.updated_at || new Date().toISOString()
+    }
+
     const { data, error } = await supabase
       .from('task')
-      .update(body)
+      .update(updateData)
       .eq('id', body.id)
       .select()
 
     if (error) {
       console.error('Database error:', error)
       throw error
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { error: 'Task not found or update failed' },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json(data[0])

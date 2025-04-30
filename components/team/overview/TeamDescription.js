@@ -8,7 +8,8 @@ import { useEffect, useState } from 'react';
 export default function TeamDescription({ teamId }) {
     const dispatch = useDispatch();
     const [teamOldValues, setTeamOldValues] = useState(null);
-    
+    const { user } = useGetUser();
+
     // 添加 useEffect 以确保加载团队数据
     useEffect(() => {
         const fetchTeam = async () => {
@@ -58,7 +59,6 @@ export default function TeamDescription({ teamId }) {
                 ...teamData,
                 description: sanitizeHtmlForStorage(teamData.description)
             };
-            const { user } = useGetUser();
             const userId = user?.id;
             // 更新团队描述到数据库
             dispatch(updateTeam({ 

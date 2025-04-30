@@ -29,7 +29,7 @@ export function MainNav() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        if (user?.id) {
+        if (user) {
           // 3. 获取用户的projects
           dispatch(fetchUserProjects(user.id));
         }
@@ -39,7 +39,7 @@ export function MainNav() {
     };
 
     fetchProjects();
-  }, [dispatch]);
+  }, [user]);
 
   const routes = [
     {

@@ -57,7 +57,7 @@ export async function POST(request) {
     }
 
     // 验证类型是否有效
-    const validTypes = ['LIST', 'OVERVIEW', 'TIMELINE', 'DASHBOARD', 'NOTE', 'GANTT', 'CALENDAR', 'BOARD', 'FILES'];
+    const validTypes = ['LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'AGILE', 'KANBAN', 'WORKFLOW', 'FILES'];
     if (!validTypes.includes(type)) {
       return NextResponse.json({ error: '无效的字段类型' }, { status: 400 });
     }

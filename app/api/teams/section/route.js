@@ -55,13 +55,13 @@ export async function POST(request) {
 //update section taskIds
 export async function PATCH(request) {
     const body = await request.json();
-    if(body.sectionName) {
-        const { sectionId, sectionName, updatedBy, teamId } = body;
+    if(body.sectionData) {
+        const { sectionId, sectionData, teamId } = body;
         const { data: section, error } = await supabase
             .from('section')
         .update({
-            name: sectionName,
-            updated_by: updatedBy
+            name: sectionData,
+            updated_at: new Date().toISOString()
         })
         .eq('id', sectionId)
         .eq('team_id', teamId)
@@ -70,6 +70,7 @@ export async function PATCH(request) {
         if (error) {
             return NextResponse.json({ error: error.message }, { status: 500 })
         }
+        return NextResponse.json(section)
     }
     if(body.newTaskIds) {
         const { sectionId, newTaskIds, teamId } = body;
@@ -82,7 +83,8 @@ export async function PATCH(request) {
         const { data: section, error: taskIdsError } = await supabase
             .from('section')
             .update({
-                task_ids: newTaskIds
+                task_ids: newTaskIds,
+                updated_at: new Date().toISOString()
             })
             .eq('team_id', teamId)
             .eq('id', sectionId)

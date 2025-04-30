@@ -16,7 +16,8 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const dataFetchedRef = useRef(false);
-  
+  const { user } = useGetUser();
+
   // 从 Redux store 获取自定义字段模板
   const availableFields = useSelector(state => state.customFields?.fields || []);
   const customFieldStatus = useSelector(state => state.customFields?.status || 'idle');
@@ -44,7 +45,6 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   // 处理字段点击事件
   const handleFieldClick = async (field) => {
     // 创建团队自定义字段
-    const { user } = useGetUser();
     const userId = user?.id;
     
     try {
