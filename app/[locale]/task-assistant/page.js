@@ -34,7 +34,7 @@ export default function TaskAssistantPage() {
     }
     
     getUserInfo();
-  }, []);
+  }, [data]);
   
   if (loading) {
     return (

@@ -53,6 +53,16 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
           id: "deepseek/deepseek-r1:free", 
           name: "DeepSeek R1",
           description: "671B parameters with open reasoning tokens" 
+        },
+        { 
+          id: "google/gemma-3-27b-it:free", 
+          name: "Gemma 3",
+          description: "Advanced reasoning and structured outputs" 
+        },
+        { 
+          id: "mistral/mistral-7b-instruct:free", 
+          name: "Mistral 7B",
+          description: "Efficient model for text generation" 
         }
       ];
       
@@ -90,23 +100,45 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
     onModelChange(modelId);
   };
   
+  // Get model icon based on model name
+  const getModelIcon = (modelName) => {
+    const lowerName = modelName.toLowerCase();
+    if (lowerName.includes('gemini') || lowerName.includes('gemma')) {
+      return "🌀"; // Google models
+    } else if (lowerName.includes('deepseek')) {
+      return "🔍"; // DeepSeek
+    } else if (lowerName.includes('mistral')) {
+      return "🌪️"; // Mistral
+    } else if (lowerName.includes('llama')) {
+      return "🦙"; // Llama models
+    }
+    return "🤖"; // Default AI icon
+  };
+  
   if (isLoading) {
-    return <Skeleton className="h-10 w-40 dark:bg-gray-700" />;
+    return <Skeleton className="h-10 w-40 dark:bg-[#383838]" />;
   }
   
   return (
     <Select value={selectedModel} onValueChange={handleModelChange}>
-      <SelectTrigger className="w-[220px] dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">
+      <SelectTrigger className="w-[220px] dark:bg-[#333333] dark:text-gray-200 dark:border-[#444444] focus:ring-offset-1 focus:ring-offset-[#444444] focus:ring-[#39ac91]">
         <SelectValue placeholder={t('selectModel')} />
       </SelectTrigger>
-      <SelectContent className="dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">
+      <SelectContent className="dark:bg-[#333333] dark:text-gray-200 dark:border-[#444444]">
         {models.map((model) => (
-          <SelectItem key={model.id} value={model.id} className="dark:hover:bg-gray-700">
-            <div className="flex flex-col">
-              <span className="text-s">{model.name}</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
-                {model.description}
-              </span>
+          <SelectItem 
+            key={model.id} 
+            value={model.id} 
+            className="dark:hover:bg-[#444444] dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]"
+          >
+            <div className="flex items-start">
+              <span className="mr-2 text-base">{getModelIcon(model.name)}</span>
+              <div className="flex flex-col">
+                <span className="text-s font-medium dark:text-gray-200">{model.name}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                  {model.description}
+                </span>
+              </div>
             </div>
           </SelectItem>
         ))}

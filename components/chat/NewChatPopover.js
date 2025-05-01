@@ -156,7 +156,7 @@ export default function NewChatPopover() {
         .from('chat_session')
         .insert([{
           type: selectedUsers.length === 1 ? 'PRIVATE' : 'GROUP',
-          name: selectedUsers.length === 1 ? null : `${selectedUsers.map(u => u.name).join(', ')}`,
+          name: selectedUsers.length === 1 ? selectedUsers[0].name : `${selectedUsers.map(u => u.name).join(', ')}`,
           created_by: currentUser.id
         }])
         .select()

@@ -18,7 +18,25 @@ export function ChatProvider({ children }) {
   // 当前AI对话ID
   const [aiConversationId, setAiConversationId] = useState(null);
   const [chatMode, setChatMode] = useState('normal');
-  const { user:authSession } = useGetUser();
+  const { user:authSession, isLoading: authLoading } = useGetUser();
+
+  // Add useEffect to handle the case where authentication is taking too long
+  useEffect(() => {
+    // If auth is still loading after 5 seconds, set chat loading to false
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.log('Authentication timeout - forcing chat context to load');
+        setLoading(false);
+      }
+    }, 5000);
+    
+    // If authSession is null and auth loading is complete, set loading to false
+    if (!authLoading && !authSession) {
+      setLoading(false);
+    }
+    
+    return () => clearTimeout(timeoutId);
+  }, [authSession, authLoading, loading]);
 
   // 处理头像URL，移除token
   const processAvatarUrl = (user) => {
@@ -519,7 +537,6 @@ export function ChatProvider({ children }) {
 
   // 获取会话消息
   const fetchMessages = async (sessionId) => {
-    const { user: authSession } = useGetUser();
     if (!authSession) return;
     
     // 先检查用户是否有权访问此会话
@@ -606,7 +623,6 @@ export function ChatProvider({ children }) {
 
   // 更新特定会话的未读消息计数
   const updateUnreadCount = async (sessionId) => {
-    const { user: authSession } = useGetUser();
     if (!authSession) return;
     
     // 获取所有会话的未读消息计数
@@ -678,8 +694,7 @@ export function ChatProvider({ children }) {
 
   // 发送消息
   const sendMessage = async (sessionId, content, replyToMessageId = null) => {
-    const { user: session } = useGetUser();
-    if (!session) {
+    if (!authSession) {
       throw new Error('User not logged in');
     }
 
@@ -688,7 +703,7 @@ export function ChatProvider({ children }) {
       .from('chat_message')
       .insert({
         session_id: sessionId,
-        user_id: session.id,
+        user_id: authSession.id,
         content,
         reply_to_message_id: replyToMessageId
       })
@@ -737,7 +752,7 @@ export function ChatProvider({ children }) {
 
     // 为每个参与者创建未读记录，除了发送者自己
     const readStatusRecords = participants
-      .filter(p => p.user_id !== session.id)
+      .filter(p => p.user_id !== authSession.id)
       .map(p => ({
         message_id: data.id,
         user_id: p.user_id,
@@ -828,9 +843,7 @@ export function ChatProvider({ children }) {
   // 删除消息的功能
   const deleteMessage = async (messageId) => {
     try {
-      // 获取当前用户会话信息
-      const { user: session } = useGetUser();
-      if (!session) {
+      if (!authSession) {
         console.error('用户未登录，无法删除消息');
         return { success: false, error: '未登录' };
       }
@@ -848,7 +861,7 @@ export function ChatProvider({ children }) {
       }
       
       // 确认消息属于当前用户
-      if (message.user_id !== session.id) {
+      if (message.user_id !== authSession.id) {
         console.error('无权删除他人消息');
         return { success: false, error: '无权操作' };
       }
@@ -894,7 +907,6 @@ export function ChatProvider({ children }) {
         filter: `session_id=eq.${currentSession.id}`
       }, async (payload) => {
         // 获取当前用户
-        const { user: authSession } = useGetUser();
         if (!authSession) return;
         
         // 如果消息ID已在sentMessageIds中，说明是自己发的消息，忽略实时更新
@@ -1040,7 +1052,6 @@ export function ChatProvider({ children }) {
         table: 'chat_message'
       }, async (payload) => {
         // 获取当前用户
-        const { user: authSession } = useGetUser();
         if (!authSession) return;
         
         // 如果消息ID已在sentMessageIds中，说明是自己发的消息，直接用现有数据更新
@@ -1180,7 +1191,6 @@ export function ChatProvider({ children }) {
         table: 'ai_chat_message'
       }, async (payload) => {
         // 获取当前用户
-        const { user: authSession } = useGetUser();
         if (!authSession) return;
         
         // 获取完整的AI消息信息
@@ -1239,7 +1249,6 @@ export function ChatProvider({ children }) {
       }, async (payload) => {
         // 当有消息标记为已读时，更新未读计数
         if (payload.new.read_at && !payload.old.read_at) {
-          const { user: authSession } = useGetUser();
           if (!authSession) return;
           
           // 如果是当前用户的消息读取状态
@@ -1289,7 +1298,6 @@ export function ChatProvider({ children }) {
       
       // 立即标记该会话所有消息为已读
       const setMessagesRead = async () => {
-        const { user: authSession } = useGetUser();
         if (authSession) {
           await markMessagesAsRead(session.id, authSession.id);
         }

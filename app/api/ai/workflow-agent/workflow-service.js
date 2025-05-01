@@ -176,6 +176,35 @@ Format your output as a JSON object with the following structure:
   ]
 }`,
 
+  task: `You are a task management assistant. Your task is to help the user create well-defined tasks based on their input.
+Please analyze the user's input and create structured task information.
+
+Format your output EXACTLY as a JSON object with the following structure:
+{
+  "tasks": [
+    {
+      "title": "Task Title",
+      "description": "Detailed description of what needs to be done",
+      "due_date": "YYYY-MM-DD", 
+      "priority": "HIGH|MEDIUM|LOW",
+      "assignees": ["username or email"],
+      "estimated_hours": 2,
+      "tags": ["tag1", "tag2"]
+    }
+  ]
+}
+
+Important details for creating good tasks:
+- Provide clear, specific task titles that describe what needs to be done
+- Include detailed descriptions with enough context for someone to understand the task
+- Set reasonable due dates based on the scope of work
+- Assign appropriate priority levels
+- Specify team members who should be assigned to the task if mentioned
+- Estimate time required if possible
+- Add relevant tags to categorize the task
+
+Make the tasks actionable, well-defined, and ready for implementation. Each task should be clear enough that a team member could start working on it without needing additional clarification.`,
+
   // 添加通用JSON格式
   json: `You are a JSON data generator. Your task is to create well-structured JSON data based on the user's input.
 Please analyze the user's input and generate a structured JSON response that best represents that information.
@@ -212,7 +241,28 @@ Example structure (adapt to your specific content):
   }
 }
 
-Make sure to generate high-quality, structured data that would be useful for further processing or display.`
+Make sure to generate high-quality, structured data that would be useful for further processing or display.`,
+
+  // Add the 'chat' format to the WORKFLOW_PROMPTS object
+  chat: `You are an intelligent assistant that helps users create chat messages.
+  Your task is to analyze the user's input and generate concise, well-formatted chat message content.
+  
+  Please format your response as a JSON object with the following structure:
+  {
+    "content": "The main message content that will be sent to chat participants",
+    "summary": "A brief summary of the message content (for reference only)",
+    "suggested_replies": ["Suggested reply 1", "Suggested reply 2", "Suggested reply 3"]
+  }
+  
+  Guidelines:
+  1. Create clear, concise content that communicates the key points from the user's input
+  2. The content should be conversational and appropriate for a chat message
+  3. Include all relevant information from the user's input
+  4. Format the content with appropriate line breaks for readability
+  5. Provide a brief summary of the message 
+  6. Include 2-3 suggested replies that recipients might use
+  
+  Respond ONLY with the JSON object, nothing else. Do not include explanations, markdown code blocks, or any other text.`
 };
 
 // Get workflow by ID
@@ -792,53 +842,160 @@ async function generateDOCX(content, userId) {
     const content_buffer = fs.readFileSync(templatePath, 'binary');
     const zip = new PizZip(content_buffer);
     
-    // Create a new instance of Docxtemplater
-    const doc = new Docxtemplater();
-    doc.loadZip(zip);
+    // Create a new instance of Docxtemplater using the updated API
+    const doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true
+    });
     
-    // Prepare document data
-    const title = content.title || "Document";
-    const documentSections = [];
+    // Helper function to recursively stringify objects
+    function stringifyObjectValues(obj) {
+      if (obj === null || obj === undefined) return "";
+      
+      // If it's already a string, return it
+      if (typeof obj === 'string') return obj;
+      
+      // If it's a primitive, convert to string
+      if (typeof obj !== 'object') return String(obj);
+      
+      // If it's an array, stringify each item
+      if (Array.isArray(obj)) {
+        return obj.map(item => {
+          if (typeof item === 'object' && item !== null) {
+            return JSON.stringify(item, null, 2);
+          }
+          return String(item);
+        });
+      }
+      
+      // It's an object, process each property
+      const result = {};
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          const value = obj[key];
+          
+          if (Array.isArray(value)) {
+            // Handle arrays
+            result[key] = stringifyObjectValues(value);
+          } else if (typeof value === 'object' && value !== null) {
+            // For nested objects, stringify them
+            if (key === 'subsections') {
+              // Special handling for subsections - keep structure but stringify content
+              result[key] = value.map(subsection => {
+                const processed = {...subsection};
+                if (typeof processed.content === 'object') {
+                  processed.content = JSON.stringify(processed.content, null, 2);
+                }
+                if (Array.isArray(processed.bullets)) {
+                  processed.bullets = processed.bullets.map(bullet => 
+                    typeof bullet === 'object' ? JSON.stringify(bullet, null, 2) : String(bullet)
+                  );
+                }
+                return processed;
+              });
+            } else {
+              // For other objects, convert to JSON string
+              result[key] = JSON.stringify(value, null, 2);
+            }
+          } else {
+            // For primitives, convert to string
+            result[key] = String(value);
+          }
+        }
+      }
+      return result;
+    }
     
-    // Process sections if available
-    if (content.sections && Array.isArray(content.sections)) {
-      content.sections.forEach(section => {
-        let sectionContent = {
+    // Process title
+    const title = typeof content.title === 'string' ? content.title : 
+                  (typeof content.title === 'object' ? JSON.stringify(content.title, null, 2) : "Document");
+    
+    // Create a document structure if we have raw data
+    let documentSections = [];
+    
+    // Check if content is not already in the expected format
+    if (!content.sections && typeof content === 'object') {
+      console.log("Content is not in expected format, creating a structured document from raw data");
+      
+      // Convert raw data to a document format
+      documentSections = [{
+        heading: "Generated Content",
+        content: JSON.stringify(content, null, 2),
+        bullets: [],
+        subsections: []
+      }];
+      
+      // Try to create a more structured document by extracting keys from content
+      if (Object.keys(content).length > 0) {
+        documentSections = Object.keys(content).map(key => {
+          const value = content[key];
+          let sectionContent = "";
+          let sectionBullets = [];
+          
+          if (typeof value === 'string') {
+            sectionContent = value;
+          } else if (Array.isArray(value)) {
+            sectionBullets = value.map(item => typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item));
+          } else if (typeof value === 'object' && value !== null) {
+            sectionContent = JSON.stringify(value, null, 2);
+          } else {
+            sectionContent = String(value);
+          }
+          
+          return {
+            heading: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+            content: sectionContent,
+            bullets: sectionBullets,
+            subsections: []
+          };
+        });
+      }
+    }
+    // Process sections if available in the expected format
+    else if (content.sections && Array.isArray(content.sections)) {
+      // Use the existing sections but process them to handle objects
+      documentSections = content.sections.map(section => {
+        return {
           heading: section.heading || "",
-          content: section.content || "",
-          subsections: []
+          content: typeof section.content === 'object' ? JSON.stringify(section.content, null, 2) : (section.content || ""),
+          bullets: Array.isArray(section.bullets) ? section.bullets.map(bullet => 
+            typeof bullet === 'object' ? JSON.stringify(bullet, null, 2) : String(bullet)
+          ) : [],
+          subsections: Array.isArray(section.subsections) ? section.subsections.map(subsection => ({
+            heading: subsection.heading || "",
+            content: typeof subsection.content === 'object' ? JSON.stringify(subsection.content, null, 2) : (subsection.content || ""),
+            bullets: Array.isArray(subsection.bullets) ? subsection.bullets.map(bullet => 
+              typeof bullet === 'object' ? JSON.stringify(bullet, null, 2) : String(bullet)
+            ) : []
+          })) : []
         };
-        
-        // Process subsections if available
-        if (section.subsections && Array.isArray(section.subsections)) {
-          section.subsections.forEach(subsection => {
-            let subsectionContent = {
-              heading: subsection.heading || "",
-              content: subsection.content || "",
-              bullets: subsection.bullets || []
-            };
-            sectionContent.subsections.push(subsectionContent);
-          });
-        }
-        
-        // Process bullets if available at section level
-        if (section.bullets && Array.isArray(section.bullets)) {
-          sectionContent.bullets = section.bullets;
-        } else {
-          sectionContent.bullets = [];
-        }
-        
-        documentSections.push(sectionContent);
       });
     }
+    
+    // Apply our recursive stringify to ensure everything is properly formatted
+    const processedSections = stringifyObjectValues({sections: documentSections}).sections;
     
     // Prepare the template data
     const templateData = {
       title: title,
-      sections: documentSections,
+      sections: processedSections,
       current_date: new Date().toLocaleDateString(),
-      has_sections: documentSections.length > 0
+      has_sections: processedSections.length > 0
     };
+    
+    // Log the template data for debugging
+    console.log("Template data structure:", JSON.stringify({
+      titleType: typeof title,
+      sectionsCount: processedSections.length,
+      sampleSection: processedSections.length > 0 ? {
+        heading: processedSections[0].heading,
+        contentType: typeof processedSections[0].content,
+        contentPreview: typeof processedSections[0].content === 'string' ? 
+                         processedSections[0].content.substring(0, 50) : 'Not a string',
+        bulletsCount: processedSections[0].bullets ? processedSections[0].bullets.length : 0,
+        subsectionsCount: processedSections[0].subsections ? processedSections[0].subsections.length : 0
+      } : 'No sections'
+    }, null, 2));
     
     // Set the template variables
     doc.setData(templateData);
@@ -882,10 +1039,110 @@ function normalizeFormatName(format) {
     'ppt_generation': 'ppt',
     'document_generation': 'document',
     'api_request': 'api_request',
-    'data_analysis': 'data_analysis'
+    'data_analysis': 'data_analysis',
+    'task_management': 'task'
   };
   
   return formatMap[format] || format;
+}
+
+// Create tasks from the AI response
+async function createTasksFromResult(taskResult, userId, teamId, projectId) {
+  try {
+    console.log(`Creating tasks from result for user ${userId}, project ${projectId}, team ${teamId}`);
+    
+    // Import the createTask function from db-service.js
+    const { createTask, addTaskToSection, createSection } = require('../task-manager-agent/db-service');
+    
+    // Ensure we have a valid task result
+    if (!taskResult || !taskResult.tasks || !Array.isArray(taskResult.tasks)) {
+      console.error("Invalid task result format:", taskResult);
+      return { 
+        success: false, 
+        error: "Invalid task result format. Expected 'tasks' array.",
+        tasksCreated: 0
+      };
+    }
+
+    // Create a default section for the tasks if no teamId is provided
+    // or if team exists but no section exists for it yet
+    let sectionId = null;
+    if (teamId) {
+      try {
+        // First check if the team already has a section
+        const { supabase } = require('@/lib/supabase');
+        const { data: existingSections, error: fetchError } = await supabase
+          .from('section')
+          .select('id')
+          .eq('team_id', teamId)
+          .limit(1);
+        
+        if (fetchError) {
+          console.error("Error fetching sections:", fetchError);
+        }
+        
+        if (existingSections && existingSections.length > 0) {
+          // Use the existing section
+          sectionId = existingSections[0].id;
+          console.log(`Using existing section with ID: ${sectionId}`);
+        } else {
+          // Create a new section for the team
+          const section = await createSection(teamId, userId);
+          sectionId = section.id;
+          console.log(`Created new section with ID: ${sectionId}`);
+        }
+      } catch (error) {
+        console.error("Error working with sections:", error);
+      }
+    }
+    
+    // Process each task
+    const createdTasks = [];
+    const failedTasks = [];
+    
+    for (const taskInfo of taskResult.tasks) {
+      try {
+        // Create the task
+        const task = await createTask(taskInfo, userId);
+        console.log(`Created task with ID: ${task.id}`);
+        
+        // Add task to section if section exists
+        if (sectionId) {
+          await addTaskToSection(sectionId, task.id);
+          console.log(`Added task ${task.id} to section ${sectionId}`);
+        }
+        
+        createdTasks.push({
+          id: task.id,
+          title: taskInfo.title
+        });
+      } catch (error) {
+        console.error(`Failed to create task "${taskInfo.title}":`, error);
+        failedTasks.push({
+          title: taskInfo.title,
+          error: error.message
+        });
+      }
+    }
+    
+    return {
+      success: createdTasks.length > 0,
+      tasksCreated: createdTasks.length,
+      tasksFailed: failedTasks.length,
+      tasks: createdTasks,
+      failedTasks: failedTasks,
+      sectionId: sectionId,
+      teamId: teamId,
+      projectId: projectId
+    };
+  } catch (error) {
+    console.error("Error creating tasks:", error);
+    return {
+      success: false,
+      error: error.message,
+      tasksCreated: 0
+    };
+  }
 }
 
 // Execute a workflow
@@ -896,7 +1153,9 @@ export async function executeWorkflow(workflowId, inputs, modelId, userId, optio
     outputSettings = {},
     nodeConnections = {},
     connectionMap = {},
-    aiModels = []
+    aiModels = [],
+    teamId = null,
+    projectId = null
   } = options;
   
   // 获取工作流
@@ -1009,13 +1268,157 @@ export async function executeWorkflow(workflowId, inputs, modelId, userId, optio
     if (outputFormats.includes('document')) {
       console.log('生成Word文档...');
       try {
-        const docContent = results['document'] || { error: "No valid document content generated" };
+        // Check if there's API response data that should be used for document generation
+        let docContent = results['document'] || { error: "No valid document content generated" };
+        
+        // Check for API response data from connected API nodes
+        if (Object.keys(connectionMap).length > 0) {
+          for (const nodeId in nodeConnections) {
+            const nodeSettings = outputSettings[nodeId];
+            // If this is a document node with API input source
+            if (nodeSettings && nodeSettings.type === 'document') {
+              // Find API nodes that connect to this document node
+              const sourceNodes = Object.keys(connectionMap).filter(id => 
+                connectionMap[id].includes(nodeId) && outputSettings[id]?.type === 'api'
+              );
+              
+              if (sourceNodes.length > 0) {
+                console.log(`Found API source nodes for document ${nodeId}: ${sourceNodes.join(', ')}`);
+                // Use the first API response as document content
+                const apiSourceId = sourceNodes[0];
+                if (apiResponses[apiSourceId] && apiResponses[apiSourceId].data) {
+                  console.log(`Using API response from ${apiSourceId} for document generation`);
+                  docContent = apiResponses[apiSourceId].data;
+                }
+              }
+            }
+          }
+        }
+        
         const docUrl = await generateDOCX(docContent, userId);
         documentUrls['document'] = docUrl;
         console.log('文档生成成功:', docUrl);
       } catch (error) {
         console.error('生成文档时出错:', error);
         documentUrls['document_error'] = error.message;
+      }
+    }
+    
+    // 处理任务创建
+    if (outputFormats.includes('task')) {
+      console.log('处理任务创建...');
+      try {
+        // Check if there's task data in the results
+        const taskContent = results['task'];
+        if (taskContent) {
+          // Get team and project IDs from output settings if available
+          let taskTeamId = teamId;
+          let taskProjectId = projectId;
+          
+          // Find any task nodes in the output settings
+          const taskNodes = Object.entries(outputSettings).filter(([_, settings]) => 
+            settings.type === 'task'
+          );
+          
+          if (taskNodes.length > 0) {
+            const [nodeId, nodeSettings] = taskNodes[0];
+            console.log(`Using task settings from node ${nodeId}`);
+            
+            // Override with node-specific team and project if available
+            if (nodeSettings.teamId) {
+              taskTeamId = nodeSettings.teamId;
+            }
+            
+            if (nodeSettings.projectId) {
+              taskProjectId = nodeSettings.projectId;
+            }
+          }
+          
+          // Create tasks using the task data with project and team
+          const taskResult = await createTasksFromResult(taskContent, userId, taskTeamId, taskProjectId);
+          
+          // Store the task creation result
+          results['task_result'] = taskResult;
+          
+          if (taskResult.success) {
+            console.log(`Successfully created ${taskResult.tasksCreated} tasks`);
+          } else {
+            console.error(`Failed to create tasks: ${taskResult.error}`);
+          }
+        } else {
+          console.error('No task content available in AI response');
+          results['task_result'] = { 
+            success: false, 
+            error: 'No task content generated by AI' 
+          };
+        }
+      } catch (error) {
+        console.error('处理任务创建时出错:', error);
+        results['task_error'] = error.message;
+      }
+    }
+    
+    // 处理聊天消息发送
+    if (outputFormats.includes('chat')) {
+      console.log('处理聊天消息发送...');
+      try {
+        // Find chat nodes in the output settings
+        const chatNodes = Object.entries(outputSettings).filter(([_, settings]) => 
+          settings.type === 'chat'
+        );
+        
+        if (chatNodes.length > 0) {
+          // Process each chat node
+          for (const [nodeId, nodeSettings] of chatNodes) {
+            console.log(`Processing chat node ${nodeId}`);
+            
+            // Get chat session IDs, message template and format
+            const chatSessionIds = nodeSettings.chatSessionIds || [];
+            const messageTemplate = nodeSettings.messageTemplate || 'Hello, this is an automated message from the workflow system:\n\n{{content}}';
+            const messageFormat = nodeSettings.messageFormat || 'text';
+            
+            if (chatSessionIds.length > 0) {
+              // Determine the content to use
+              // First, check if there's dedicated chat content in the results
+              let contentToSend = results['chat'] || results['json'] || results['text'] || { content: 'No content was generated.' };
+              
+              // If the content is an object, convert it to string
+              let contentStr = '';
+              if (typeof contentToSend === 'object') {
+                // Try to use a 'content' field if it exists
+                if (contentToSend.content) {
+                  contentStr = contentToSend.content;
+                } else {
+                  // Otherwise stringify the whole object
+                  contentStr = JSON.stringify(contentToSend, null, 2);
+                }
+              } else {
+                contentStr = String(contentToSend);
+              }
+              
+              // Replace {{content}} in the message template with the actual content
+              const finalMessage = messageTemplate.replace('{{content}}', contentStr);
+              
+              // Send messages to the selected chat sessions
+              console.log(`Sending messages to ${chatSessionIds.length} chat sessions with format ${messageFormat}`);
+              const chatResult = await sendChatSessionMessages(chatSessionIds, finalMessage, messageFormat, userId);
+              
+              // Store the chat message sending result
+              results[`chat_result_${nodeId}`] = chatResult;
+            } else {
+              console.warn(`No chat sessions selected for node ${nodeId}`);
+              results[`chat_result_${nodeId}`] = { 
+                success: false, 
+                error: 'No chat sessions selected' 
+              };
+            }
+          }
+        } else {
+          console.warn('Chat output format specified but no chat nodes found in settings');
+        }
+      } catch (error) {
+        console.error('发送聊天消息时出错:', error);
+        results['chat_error'] = error.message;
       }
     }
     
@@ -1086,7 +1489,7 @@ export async function executeWorkflow(workflowId, inputs, modelId, userId, optio
                 } catch (apiError) {
                   console.error(`执行API请求时出错:`, apiError);
                   apiResponses[nodeId] = {
-                    success: false,
+                    success: false, 
                     error: apiError.message || 'API请求失败'
                   };
                 }
@@ -1235,7 +1638,7 @@ async function processAIRequest(model, formatPrompt, userPrompt, format, results
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.3,
-      max_tokens: 2500
+      max_tokens: 5000
     };
     
     // 根据模型提供者添加适当的response_format设置
@@ -1254,8 +1657,25 @@ async function processAIRequest(model, formatPrompt, userPrompt, format, results
     // 使用特定格式的提示执行AI请求
     const completion = await openai.chat.completions.create(requestConfig);
     
+    // Add diagnostic logging
+    console.log(`从模型 ${model} 收到响应:`, JSON.stringify(completion).substring(0, 300) + '...');
+    
+    // Check if completion has the expected structure
+    if (!completion || !completion.choices || !Array.isArray(completion.choices) || completion.choices.length === 0) {
+      console.error(`从模型 ${model} 接收到无效响应:`, completion);
+      results[format] = { error: `无效的模型响应结构` };
+      return { error: `无效的模型响应结构` };
+    }
+    
     // 提取并解析AI响应
     const aiContent = completion.choices[0]?.message?.content || "";
+    
+    // Check if content is empty or null
+    if (!aiContent) {
+      console.error(`从模型 ${model} 接收到空内容`);
+      results[format] = { error: `模型返回了空内容` };
+      return { error: `模型返回了空内容` };
+    }
     
     // 尝试清理非JSON内容
     let cleanedContent = aiContent;
@@ -1298,3 +1718,126 @@ async function processAIRequest(model, formatPrompt, userPrompt, format, results
     return { error: `处理AI请求时出错: ${error.message}` };
   }
 }
+
+/**
+ * Sends a message to multiple chat sessions
+ * @param {string[]} sessionIds - Array of chat session IDs to send messages to
+ * @param {string} content - Message content
+ * @param {string} format - Message format (text, markdown, html)
+ * @param {string} userId - User ID of the sender
+ * @returns {Promise<object>} - Result object with success status and message IDs
+ */
+async function sendChatSessionMessages(sessionIds, content, format = 'text', userId) {
+  try {
+    if (!sessionIds || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+      throw new Error('No chat sessions provided');
+    }
+
+    if (!content || content.trim() === '') {
+      throw new Error('Message content cannot be empty');
+    }
+
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    // Format the message according to the specified format
+    let formattedContent = content;
+    
+    // Add format-specific markers if needed
+    if (format === 'markdown') {
+      // If it's markdown, we don't need to do anything special
+      formattedContent = content;
+    } else if (format === 'html') {
+      // If it's HTML, wrap it in a special marker for the frontend to render correctly
+      formattedContent = `<html-content>${content}</html-content>`;
+    }
+
+    // Create an array of message objects to insert
+    const messagesToInsert = sessionIds.map(sessionId => ({
+      session_id: sessionId,
+      user_id: userId,
+      content: formattedContent,
+    }));
+
+    // Insert all messages in a batch
+    const { data, error } = await supabase
+      .from('chat_message')
+      .insert(messagesToInsert)
+      .select('id, session_id');
+
+    if (error) {
+      console.error('Error sending chat messages:', error);
+      throw error;
+    }
+
+    // For each session, we need to create read status records for all participants except the sender
+    const messageIds = data.map(message => message.id);
+    const sessionIdsWithMsgs = data.map(message => message.session_id);
+    
+    // Get all participants for the sessions
+    const { data: participants, error: participantsError } = await supabase
+      .from('chat_participant')
+      .select('user_id, session_id')
+      .in('session_id', sessionIdsWithMsgs);
+    
+    if (participantsError) {
+      console.error('Error fetching participants:', participantsError);
+      // We don't throw here because messages were already sent
+    }
+    
+    if (participants && participants.length > 0) {
+      // Create read status records for each message and each participant (except sender)
+      const readStatusRecords = [];
+      
+      data.forEach(message => {
+        const sessionParticipants = participants.filter(p => p.session_id === message.session_id);
+        
+        sessionParticipants.forEach(participant => {
+          if (participant.user_id !== userId) {
+            readStatusRecords.push({
+              message_id: message.id,
+              user_id: participant.user_id,
+              read_at: null
+            });
+          }
+        });
+      });
+      
+      if (readStatusRecords.length > 0) {
+        const { error: readStatusError } = await supabase
+          .from('chat_message_read_status')
+          .insert(readStatusRecords);
+        
+        if (readStatusError) {
+          console.error('Error creating read status records:', readStatusError);
+          // We don't throw here because messages were already sent
+        }
+      }
+    }
+
+    return {
+      success: true,
+      messageIds,
+      sessionIds: sessionIdsWithMsgs
+    };
+  } catch (error) {
+    console.error('Error in sendChatSessionMessages:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// Add the new function to the exports
+export { 
+  getAvailableModels, 
+  getWorkflow, 
+  executeWorkflow, 
+  saveWorkflowExecution, 
+  createWorkflow, 
+  updateWorkflow, 
+  getUserWorkflows,
+  sendChatSessionMessages 
+};

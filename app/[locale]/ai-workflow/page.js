@@ -32,7 +32,9 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
-  Menu
+  Menu,
+  CheckCircle,
+  MessageSquare
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -124,6 +126,20 @@ const initialNodes = [
       apiMethod: 'POST',
       inputs: {}
     }
+  },
+  {
+    id: 'task_output',
+    type: 'workflowNode',
+    position: { x: 350, y: 350 },
+    data: { 
+      label: 'Task Creation',
+      icon: <CheckCircle size={20} />,
+      nodeType: 'output',
+      outputType: 'task',
+      description: 'Create project tasks automatically',
+      handleInputChange: () => {},
+      inputs: {}
+    }
   }
 ];
 
@@ -145,6 +161,12 @@ const initialEdges = [
     id: 'json_output-api_output', 
     source: 'json_output', 
     target: 'api_output', 
+    animated: true 
+  },
+  { 
+    id: 'process-task_output', 
+    source: 'process', 
+    target: 'task_output', 
     animated: true 
   }
 ];
@@ -508,6 +530,9 @@ export default function AIWorkflow() {
                   case 'api':
                     nodeData.icon = <Code size={20} />;
                     break;
+                  case 'task':
+                    nodeData.icon = <CheckCircle size={20} />;
+                    break;
                 }
               }
             }
@@ -704,6 +729,13 @@ export default function AIWorkflow() {
               };
             }
           }
+        } else if (outputType === 'task') {
+          // 为 task 节点收集项目和团队设置
+          outputSettings[node.id] = {
+            type: 'task',
+            projectId: node.data.projectId || null,
+            teamId: node.data.teamId || null
+          };
         }
       });
       
@@ -842,6 +874,43 @@ export default function AIWorkflow() {
           }
         };
         break;
+      case 'task':
+        node = {
+          id,
+          type: 'workflowNode',
+          position: { x: 400, y: 500 },
+          data: { 
+            label: 'Task Creation',
+            icon: <CheckCircle size={20} />,
+            nodeType: 'output',
+            outputType: 'task',
+            description: 'Create project tasks automatically',
+            handleInputChange: handleNodeInputChange,
+            userId: userId,
+            inputs: {}
+          }
+        };
+        break;
+      case 'chat':
+        node = {
+          id,
+          type: 'workflowNode',
+          position: { x: 450, y: 500 },
+          data: { 
+            label: 'Chat Message',
+            icon: <MessageSquare size={20} />,
+            nodeType: 'output',
+            outputType: 'chat',
+            description: 'Sends messages to selected chat sessions',
+            handleInputChange: handleNodeInputChange,
+            userId: userId,
+            chatSessionIds: [],
+            messageTemplate: 'Hello, this is an automated message from the workflow system:\n\n{{content}}',
+            messageFormat: 'text',
+            inputs: {}
+          }
+        };
+        break;
       case 'ai_model':
         node = {
           id,
@@ -875,19 +944,19 @@ export default function AIWorkflow() {
   };
   
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen bg-[#f5f5f5] dark:bg-[#1f1f1f]">
       <div className="grid grid-cols-12 gap-4 p-4 h-full">
         {/* Left panel - Workflow List */}
-        <div className={`${isPanelCollapsed ? 'col-span-1' : 'col-span-3'} bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden transition-all duration-300`}>
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+        <div className={`${isPanelCollapsed ? 'col-span-1' : 'col-span-3'} bg-white dark:bg-[#282828] rounded-lg shadow-sm border border-gray-100 dark:border-[#333333] overflow-hidden transition-all duration-300`}>
+          <div className="p-4 border-b border-gray-100 dark:border-[#383838] flex justify-between items-center">
             <h2 className={`text-md font-semibold ${isPanelCollapsed ? 'hidden' : 'block'}`}>{t('myWorkflows')}</h2>
             <div className="flex items-center">
-
               <Button 
                 onClick={createNewWorkflow} 
                 size="icon" 
                 variant="ghost"
                 title={t('newWorkflow')}
+                className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333333]"
               >
                 <PlusCircle className="h-5 w-5" />
               </Button>
@@ -895,7 +964,7 @@ export default function AIWorkflow() {
                 onClick={togglePanel} 
                 size="icon" 
                 variant="ghost" 
-                className="mr-1"
+                className="mr-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333333]"
               >
                 {isPanelCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
               </Button>
@@ -905,9 +974,9 @@ export default function AIWorkflow() {
           <div className="p-2">
             {isLoading ? (
               <div className="space-y-2">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full dark:bg-[#383838]" />
+                <Skeleton className="h-12 w-full dark:bg-[#383838]" />
+                <Skeleton className="h-12 w-full dark:bg-[#383838]" />
               </div>
             ) : userWorkflows.length > 0 ? (
               <div className="space-y-2">
@@ -915,16 +984,16 @@ export default function AIWorkflow() {
                   <div 
                     key={workflow.id} 
                     className={cn(
-                      "flex justify-between items-center p-3 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800",
-                      currentWorkflow && currentWorkflow.id === workflow.id ? "bg-blue-50 border border-blue-200 dark:hover:bg-gray-700" : ""
+                      "flex justify-between items-center p-3 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-[#333333]",
+                      currentWorkflow && currentWorkflow.id === workflow.id ? "bg-[#eef6ff] border border-[#d9e8fc] dark:bg-[#303742] dark:border-[#3a4553]" : ""
                     )}
                     onClick={() => loadWorkflow(workflow.id)}
                   >
                     <div className="flex items-center">
                       <div className="mr-3 text-xl">{workflow.icon || '📄'}</div>
                       <div className={isPanelCollapsed ? 'hidden' : 'block'}>
-                        <div className="font-medium">{workflow.name}</div>
-                        <div className="text-xs text-gray-500">
+                        <div className="font-medium dark:text-gray-200">{workflow.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
                           {t(`workflowTypes.${workflow.type}`) || workflow.type}
                         </div>
                       </div>
@@ -936,15 +1005,15 @@ export default function AIWorkflow() {
                         e.stopPropagation();
                         deleteWorkflow(workflow.id);
                       }}
-                      className={isPanelCollapsed ? 'hidden' : 'block'}
+                      className={`${isPanelCollapsed ? 'hidden' : 'block'} text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-[#333333] dark:hover:text-red-400`}
                     >
-                      <Trash2 className="h-4 w-4 text-gray-500" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className={`${isPanelCollapsed ? 'py-2' : 'py-8'} text-center text-gray-500`}>
+              <div className={`${isPanelCollapsed ? 'py-2' : 'py-8'} text-center text-gray-500 dark:text-gray-400`}>
                 <Database className="h-10 w-10 mx-auto mb-2 opacity-50" />
                 <p className={isPanelCollapsed ? 'hidden' : 'block'}>{t('noWorkflows')}</p>
                 <p className={`text-sm ${isPanelCollapsed ? 'hidden' : 'block'}`}>{t('createFirstWorkflow')}</p>
@@ -954,24 +1023,24 @@ export default function AIWorkflow() {
         </div>
         
         {/* Middle panel - Workflow Editor */}
-        <div className={`${isPanelCollapsed ? 'col-span-11' : 'col-span-9'} bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden transition-all duration-300`}>
-          <div className="border-b border-gray-200 p-4 flex justify-between items-center">
+        <div className={`${isPanelCollapsed ? 'col-span-11' : 'col-span-9'} bg-white dark:bg-[#282828] rounded-lg shadow-sm border border-gray-100 dark:border-[#333333] overflow-hidden transition-all duration-300`}>
+          <div className="border-b border-gray-100 dark:border-[#383838] p-4 flex justify-between items-center">
             <div>
               <input
                 type="text"
                 value={workflowName}
                 onChange={(e) => setWorkflowName(e.target.value)}
-                className="text-lg font-semibold bg-transparent border-none focus:outline-none focus:ring-0 w-full"
+                className="text-lg font-semibold bg-transparent border-none focus:outline-none focus:ring-0 w-full dark:text-gray-200 dark:placeholder-gray-500"
                 placeholder="Workflow Name"
               />
-              <div className="flex items-center text-sm text-gray-500">
+              <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                 <Select value={workflowType} onValueChange={setWorkflowType}>
-                  <SelectTrigger className="h-7 w-auto border-none focus:ring-0">
+                  <SelectTrigger className="h-7 w-auto border-none focus:ring-0 dark:bg-transparent dark:text-gray-300">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="dark:bg-[#333333] dark:border-[#444444]">
                     {workflowTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
+                      <SelectItem key={type.id} value={type.id} className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">
                         <div className="flex items-center">
                           {type.icon}
                           <span className="ml-2">{type.name}</span>
@@ -983,7 +1052,11 @@ export default function AIWorkflow() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <Button onClick={saveWorkflow} disabled={isSaving}>
+              <Button 
+                onClick={saveWorkflow} 
+                disabled={isSaving}
+                className="bg-[#ff6d5a] hover:bg-[#ff5c46] text-white dark:bg-[#ff6d5a] dark:hover:bg-[#ff5c46] dark:text-white"
+              >
                 <Save className="h-4 w-4 mr-2" />
                 {t('save')}
               </Button>
@@ -991,6 +1064,7 @@ export default function AIWorkflow() {
                 onClick={handleShowExecutionForm} 
                 disabled={isExecuting || !currentWorkflow}
                 variant="default"
+                className="bg-[#39ac91] hover:bg-[#33a085] text-white dark:bg-[#39ac91] dark:hover:bg-[#33a085] dark:text-white"
               >
                 <PlayCircle className="h-4 w-4 mr-2" />
                 {t('run')}
@@ -1002,32 +1076,37 @@ export default function AIWorkflow() {
             {/* Workflow Configuration */}
             <div className="space-y-4 col-span-1">
               <div>
-                <Label>{t('workflowDescription')}</Label>
+                <Label className="dark:text-gray-300">{t('workflowDescription')}</Label>
                 <Textarea
                   value={workflowDescription}
                   onChange={(e) => setWorkflowDescription(e.target.value)}
                   placeholder="Describe what this workflow does"
-                  className="resize-none h-20"
+                  className="resize-none h-20 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
                 />
               </div>
               
               <div>
-                <Label>{t('promptTemplate')}</Label>
+                <Label className="dark:text-gray-300">{t('promptTemplate')}</Label>
                 <Textarea
                   value={workflowPrompt}
                   onChange={(e) => setWorkflowPrompt(e.target.value)}
                   placeholder="Enter your prompt template with {{variable}} placeholders"
-                  className="h-40 font-mono text-sm"
+                  className="h-40 font-mono text-sm dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {t('variablePlaceholder', { variableSyntax: '{{variable_name}}' })}
                 </p>
               </div>
               
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <Label>{t('inputVariables')}</Label>
-                  <Button onClick={addInputField} size="sm" variant="outline">
+                  <Label className="dark:text-gray-300">{t('inputVariables')}</Label>
+                  <Button 
+                    onClick={addInputField} 
+                    size="sm" 
+                    variant="outline"
+                    className="dark:bg-[#333333] dark:text-gray-300 dark:border-[#444444] dark:hover:bg-[#444444]"
+                  >
                     <PlusCircle className="h-3 w-3 mr-1" />
                     {t('addInput')}
                   </Button>
@@ -1040,34 +1119,34 @@ export default function AIWorkflow() {
                         value={field.name}
                         onChange={(e) => updateInputField(index, 'name', e.target.value)}
                         placeholder="Variable name"
-                        className="w-1/3"
+                        className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
                       />
                       <Input
                         value={field.label}
                         onChange={(e) => updateInputField(index, 'label', e.target.value)}
                         placeholder="Display label"
-                        className="w-1/3"
+                        className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
                       />
                       <Select
                         value={field.type}
                         onValueChange={(value) => updateInputField(index, 'type', value)}
                       >
-                        <SelectTrigger className="w-1/4">
+                        <SelectTrigger className="w-1/4 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
                           <SelectValue placeholder="Type" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="text">Text</SelectItem>
-                          <SelectItem value="textarea">Text Area</SelectItem>
-                          <SelectItem value="number">Number</SelectItem>
+                        <SelectContent className="dark:bg-[#333333] dark:border-[#444444]">
+                          <SelectItem value="text" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text</SelectItem>
+                          <SelectItem value="textarea" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text Area</SelectItem>
+                          <SelectItem value="number" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Number</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button
                         onClick={() => removeInputField(index)}
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8"
+                        className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-[#333333] dark:hover:text-red-400"
                       >
-                        <Trash2 className="h-4 w-4 text-gray-500" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
@@ -1076,7 +1155,7 @@ export default function AIWorkflow() {
             </div>
             
             {/* Workflow Flow Editor */}
-            <div className="border rounded-md overflow-hidden h-[500px] col-span-2 dark:bg-gray-500">
+            <div className="border rounded-md overflow-hidden h-[500px] col-span-2 dark:border-[#444444]">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -1086,48 +1165,74 @@ export default function AIWorkflow() {
                 nodeTypes={nodeTypes}
                 fitView
                 proOptions={proOptions}
+                className="dark:bg-[#202020]"
               >
-                <Background variant="dots" gap={12} size={1} />
-                <Controls className=" dark:text-black" />
-                {/* <MiniMap /> */}
-                {/* <Panel position="top-left" className="bg-white p-2 rounded shadow-md">
-                  <div className="text-xs space-y-1">
-                    <p className="font-semibold">连接节点指南:</p>
-                    <ul className="list-disc pl-4 text-gray-600">
-                      <li>通过拖动节点底部连接点到目标节点顶部连接点来创建连接</li>
-                      <li>将 JSON 输出节点连接到 API 节点，实现请求数据传递</li>
-                      <li>API 节点会使用连接的 JSON 节点输出作为请求体</li>
-                    </ul>
-                  </div>
-                </Panel> */}
+                <Background variant="dots" gap={12} size={1} color="#444444" />
+                <Controls className="bg-white dark:bg-[#333333] dark:border-[#444444] dark:text-gray-300" />
                 <Panel position="top-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="bg-white dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#444444]"
+                      >
                         <PlusCircle className="h-3 w-3 mr-1" />
                         {t('addNode')}
                         <ChevronDown className="h-3 w-3 ml-1" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">
-                      <DropdownMenuItem onClick={() => addNode('document')} className="dark:hover:bg-gray-700">
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200"
+                    >
+                      <DropdownMenuItem 
+                        onClick={() => addNode('document')} 
+                        className="dark:hover:bg-[#444444] dark:focus:bg-[#444444]"
+                      >
                         <FileText className="h-4 w-4 mr-2" />
                         <span>{t('document')}</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => addNode('ppt')} className="dark:hover:bg-gray-700">
+                      <DropdownMenuItem 
+                        onClick={() => addNode('ppt')} 
+                        className="dark:hover:bg-[#444444] dark:focus:bg-[#444444]"
+                      >
                         <PresentationIcon className="h-4 w-4 mr-2" />
                         <span>{t('presentation')}</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => addNode('json')} className="dark:hover:bg-gray-700">
+                      <DropdownMenuItem 
+                        onClick={() => addNode('json')} 
+                        className="dark:hover:bg-[#444444] dark:focus:bg-[#444444]"
+                      >
                         <Code className="h-4 w-4 mr-2" />
                         <span>JSON</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => addNode('api')} className="dark:hover:bg-gray-700">
+                      <DropdownMenuItem 
+                        onClick={() => addNode('api')} 
+                        className="dark:hover:bg-[#444444] dark:focus:bg-[#444444]"
+                      >
                         <Code className="h-4 w-4 mr-2" />
                         <span>{t('apiRequest')}</span>
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator className="dark:bg-gray-700" />
-                      <DropdownMenuItem onClick={() => addNode('ai_model')} className="dark:hover:bg-gray-700">
+                      <DropdownMenuItem 
+                        onClick={() => addNode('task')} 
+                        className="dark:hover:bg-[#444444] dark:focus:bg-[#444444]"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2 text-amber-500" />
+                        <span>{t('taskCreation') || 'Task Creation'}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => addNode('chat')} 
+                        className="dark:hover:bg-[#444444] dark:focus:bg-[#444444]"
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2 text-indigo-500" />
+                        <span>{t('chatMessage') || 'Chat Message'}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="dark:bg-[#444444]" />
+                      <DropdownMenuItem 
+                        onClick={() => addNode('ai_model')} 
+                        className="dark:hover:bg-[#444444] dark:focus:bg-[#444444]"
+                      >
                         <Settings className="h-4 w-4 mr-2" />
                         <span>{t('aiModel')}</span>
                       </DropdownMenuItem>
@@ -1143,10 +1248,10 @@ export default function AIWorkflow() {
       {/* Input Form Overlay */}
       {showExecutionForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-1/3">
+          <Card className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
             <CardHeader>
-              <CardTitle>{t('executeWorkflow')}</CardTitle>
-              <CardDescription>
+              <CardTitle className="dark:text-gray-100">{t('executeWorkflow')}</CardTitle>
+              <CardDescription className="dark:text-gray-400">
                 {t('workflowInputs')} {workflowName}
               </CardDescription>
             </CardHeader>
@@ -1162,6 +1267,7 @@ export default function AIWorkflow() {
                 variant="outline"
                 onClick={() => setShowExecutionForm(false)}
                 disabled={isExecuting}
+                className="dark:bg-[#333333] dark:text-gray-300 dark:border-[#444444] dark:hover:bg-[#444444]"
               >
                 {t('cancel')}
               </Button>
@@ -1173,9 +1279,9 @@ export default function AIWorkflow() {
       {/* Execution Result Overlay */}
       {executionResult && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-3/4 max-h-[80vh] overflow-auto dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
+          <Card className="w-3/4 max-h-[80vh] overflow-auto dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
             <CardHeader>
-              <CardTitle>{t('workflowResult')}</CardTitle>
+              <CardTitle className="dark:text-gray-100">{t('workflowResult')}</CardTitle>
               <CardDescription className="dark:text-gray-400">
                 {t('executedWith')} {t(`workflowTypes.${workflowType}`)}
               </CardDescription>
@@ -1184,23 +1290,23 @@ export default function AIWorkflow() {
               <div className="space-y-4">
                 {/* API Response Results */}
                 {executionResult.apiResponses && Object.keys(executionResult.apiResponses).length > 0 && (
-                  <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md">
-                    <h3 className="text-sm font-medium mb-2">{t('apiResponseResults')}</h3>
+                  <div className="bg-blue-50 dark:bg-[#2a3246] p-4 rounded-md border border-blue-100 dark:border-[#3a4255]">
+                    <h3 className="text-sm font-medium mb-2 dark:text-blue-300">{t('apiResponseResults')}</h3>
                     <div className="space-y-3">
                       {Object.entries(executionResult.apiResponses).map(([nodeId, response]) => (
-                        <div key={nodeId} className="p-3 border rounded bg-white dark:bg-gray-800 dark:border-gray-700">
+                        <div key={nodeId} className="p-3 border rounded bg-white dark:bg-[#282828] dark:border-[#383838]">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-medium">{t('node')}: {nodeId}</h4>
+                            <h4 className="font-medium dark:text-gray-200">{t('node')}: {nodeId}</h4>
                             <span className={`px-2 py-1 rounded text-xs ${response.success ? 
-                              'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 
-                              'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'}`}>
+                              'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 dark:border dark:border-green-800' : 
+                              'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 dark:border dark:border-red-800'}`}>
                               {response.success ? t('success') : t('failure')} {response.status && `(${response.status})`}
                             </span>
                           </div>
                           {response.data && (
                             <div className="mt-2">
                               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('responseData')}:</p>
-                              <pre className="bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs overflow-auto max-h-40 dark:text-gray-300">
+                              <pre className="bg-gray-50 dark:bg-[#222222] p-2 rounded text-xs overflow-auto max-h-40 dark:text-gray-300 border dark:border-[#383838]">
                                 {JSON.stringify(response.data, null, 2)}
                               </pre>
                             </div>
@@ -1218,20 +1324,20 @@ export default function AIWorkflow() {
 
                 {/* Generated Files */}
                 {(executionResult.document || executionResult.ppt || executionResult.docxUrl || executionResult.pptxUrl) && (
-                  <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md">
-                    <h3 className="text-sm font-medium mb-2">{t('generatedFiles')}</h3>
+                  <div className="bg-blue-50 dark:bg-[#2a3246] p-4 rounded-md border border-blue-100 dark:border-[#3a4255]">
+                    <h3 className="text-sm font-medium mb-2 dark:text-blue-300">{t('generatedFiles')}</h3>
                     <div className="space-y-2">
                       {/* Word Document */}
                       {(executionResult.document || executionResult.docxUrl) && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400 mr-2" />
-                            <span>{t('wordDocument')}</span>
+                            <span className="dark:text-gray-200">{t('wordDocument')}</span>
                           </div>
                           <a 
                             href={executionResult.document || executionResult.docxUrl} 
                             download 
-                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 flex items-center"
+                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 flex items-center"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
@@ -1243,7 +1349,7 @@ export default function AIWorkflow() {
                       
                       {/* Document Information */}
                       {executionResult.documentInfo && (
-                        <div className="mt-2 bg-green-50 dark:bg-green-900/10 p-3 rounded-md text-xs">
+                        <div className="mt-2 bg-green-50 dark:bg-[#223a30] p-3 rounded-md text-xs border border-green-100 dark:border-[#2a4a3d]">
                           <div className="font-medium text-green-600 dark:text-green-400 mb-1">
                             {executionResult.documentInfo.type}
                           </div>
@@ -1260,12 +1366,12 @@ export default function AIWorkflow() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <PresentationIcon className="h-5 w-5 text-blue-500 dark:text-blue-400 mr-2" />
-                            <span>{t('powerPointPresentation')}</span>
+                            <span className="dark:text-gray-200">{t('powerPointPresentation')}</span>
                           </div>
                           <a 
                             href={executionResult.ppt || executionResult.pptxUrl} 
                             download 
-                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 flex items-center"
+                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 flex items-center"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
@@ -1280,7 +1386,7 @@ export default function AIWorkflow() {
                 
                 {/* SlideGo-inspired Design Information */}
                 {executionResult.designInfo && (
-                  <div className="mt-2 bg-blue-50 dark:bg-blue-900/10 p-3 rounded-md text-xs">
+                  <div className="mt-2 bg-blue-50 dark:bg-[#2a3246] p-3 rounded-md text-xs border border-blue-100 dark:border-[#3a4255]">
                     <div className="font-medium text-blue-600 dark:text-blue-400 mb-1">
                       {executionResult.designInfo.type} Presentation Design
                     </div>
@@ -1292,13 +1398,72 @@ export default function AIWorkflow() {
                   </div>
                 )}
                 
+                {/* Task Creation Results */}
+                {executionResult.task_result && executionResult.task_result.success && (
+                  <div className="bg-amber-50 dark:bg-[#3a3020] p-4 rounded-md border border-amber-100 dark:border-[#4a4030]">
+                    <h3 className="text-sm font-medium mb-2 dark:text-amber-300">{t('taskCreationResults') || 'Task Creation Results'}</h3>
+                    <div className="flex items-center mb-2">
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        width="16" 
+                        height="16" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        className="text-amber-500 dark:text-amber-400 mr-2"
+                      >
+                        <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z" />
+                        <path d="m9 12 2 2 4-4" />
+                      </svg>
+                      <span className="font-medium dark:text-amber-300">
+                        {t('tasksCreated', { count: executionResult.task_result.tasksCreated }) || 
+                         `Created ${executionResult.task_result.tasksCreated} tasks successfully`}
+                      </span>
+                    </div>
+                    
+                    {executionResult.taskInfo && (
+                      <div className="mt-2 bg-amber-100/50 dark:bg-[#463828] p-3 rounded-md text-xs border border-amber-200 dark:border-[#564838]">
+                        <div className="font-medium text-amber-800 dark:text-amber-400 mb-1">
+                          {executionResult.taskInfo.type}
+                        </div>
+                        <ul className="list-disc pl-4 text-gray-600 dark:text-gray-400">
+                          {executionResult.taskInfo.features.map((feature, index) => (
+                            <li key={index}>{feature}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {executionResult.task_result.tasks && executionResult.task_result.tasks.length > 0 && (
+                      <div className="mt-3">
+                        <p className="font-medium dark:text-amber-300 mb-1">{t('createdTasks') || 'Created Tasks:'}</p>
+                        <ul className="bg-white dark:bg-[#282420] p-2 rounded border border-amber-100 dark:border-[#383430] text-xs space-y-1">
+                          {executionResult.task_result.tasks.map((task, index) => (
+                            <li key={index} className="flex items-center">
+                              <span className="text-amber-500 dark:text-amber-400 mr-1">•</span>
+                              <span className="dark:text-gray-300">{task.title}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 {/* Generated Content Results */}
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
-                  <h3 className="text-sm font-medium mb-2">{t('generatedContent')}</h3>
-                  <Tabs defaultValue="json">
-                    <TabsList className="mb-2 dark:bg-gray-700">
+                <div className="bg-gray-50 dark:bg-[#282828] p-4 rounded-md border border-gray-100 dark:border-[#383838]">
+                  <h3 className="text-sm font-medium mb-2 dark:text-gray-200">{t('generatedContent')}</h3>
+                  <Tabs defaultValue="json" className="w-full">
+                    <TabsList className="mb-2 bg-white dark:bg-[#333333] border border-gray-100 dark:border-[#444444]">
                       {Object.keys(executionResult.results || {}).map((format) => (
-                        <TabsTrigger key={format} value={format} className="dark:data-[state=active]:bg-gray-800 dark:data-[state=active]:text-gray-100">
+                        <TabsTrigger 
+                          key={format} 
+                          value={format} 
+                          className="dark:text-gray-400 dark:data-[state=active]:bg-[#444444] dark:data-[state=active]:text-gray-100 dark:data-[state=active]:border-b-2 dark:data-[state=active]:border-[#39ac91]"
+                        >
                           {format === 'ppt' ? t('presentation') : 
                             format === 'document' ? t('document') : 
                               format.charAt(0).toUpperCase() + format.slice(1)}
@@ -1308,7 +1473,7 @@ export default function AIWorkflow() {
                     
                     {Object.entries(executionResult.results || {}).map(([format, content]) => (
                       <TabsContent key={format} value={format}>
-                        <div className="bg-white dark:bg-gray-900 p-3 rounded border dark:border-gray-700 max-h-[500px] overflow-auto">
+                        <div className="bg-white dark:bg-[#222222] p-3 rounded border border-gray-100 dark:border-[#383838] max-h-[500px] overflow-auto">
                           <pre className="text-xs dark:text-gray-300">{JSON.stringify(content, null, 2)}</pre>
                         </div>
                       </TabsContent>
@@ -1321,7 +1486,7 @@ export default function AIWorkflow() {
               <Button 
                 variant="outline"
                 onClick={() => setExecutionResult(null)}
-                className="dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                className="dark:bg-[#333333] dark:text-gray-300 dark:border-[#444444] dark:hover:bg-[#444444]"
               >
                 {t('close')}
               </Button>

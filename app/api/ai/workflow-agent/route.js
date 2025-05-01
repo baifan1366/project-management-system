@@ -10,6 +10,8 @@ export async function POST(request) {
       modelId, 
       aiModels = [],
       userId, 
+      teamId = null,
+      projectId = null,
       outputFormats = [], 
       outputSettings = {},
       nodeConnections = {},
@@ -34,7 +36,9 @@ export async function POST(request) {
         outputSettings,
         nodeConnections,
         connectionMap,
-        aiModels
+        aiModels,
+        teamId,
+        projectId
       }
     );
     
@@ -62,6 +66,21 @@ export async function POST(request) {
           "Professional typography with blue headings and proper spacing",
           "Properly formatted bullet points for better readability",
           "Custom sections and subsections with structured content"
+        ]
+      };
+    }
+    
+    // Add information about task creation if tasks were created
+    if (result.task_result && result.task_result.success) {
+      result.taskInfo = {
+        type: "Project Tasks",
+        taskCount: result.task_result.tasksCreated,
+        features: [
+          "Automatically generated actionable tasks",
+          "Tasks integrated with the project management system",
+          "Proper task prioritization and categorization",
+          "Assignees set based on mentioned team members",
+          "Tasks organized in appropriate sections"
         ]
       };
     }

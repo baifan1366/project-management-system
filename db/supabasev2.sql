@@ -243,6 +243,7 @@ CREATE TABLE "notification" (
   "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('TASK_ASSIGNED', 'COMMENT_ADDED', 'MENTION', 'DUE_DATE', 'TEAM_INVITATION', 'SYSTEM')),
   "related_entity_type" VARCHAR(50), -- 例如：'task', 'project', 'team', 'comment'
   "related_entity_id" VARCHAR(255), -- 相关实体的ID
+  "data" JSONB,
   "is_read" BOOLEAN DEFAULT FALSE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -344,7 +345,7 @@ CREATE TABLE IF NOT EXISTS workflows (
     is_public BOOLEAN NOT NULL DEFAULT FALSE,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     icon VARCHAR(10),
-    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES "user"("id") ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
@@ -359,14 +360,15 @@ CREATE INDEX IF NOT EXISTS idx_workflows_is_deleted ON workflows (is_deleted);
 CREATE TABLE IF NOT EXISTS workflow_executions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     workflow_id UUID REFERENCES workflows(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES "user"("id") ON DELETE SET NULL,
     model_id VARCHAR(255),
     inputs JSONB,
     result JSONB,
     status VARCHAR(50) NOT NULL,
     output_formats TEXT[] DEFAULT '{}'::text[],
     document_urls JSONB DEFAULT '{}'::jsonb,
-    executed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+    executed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    api_responses JSONB DEFAULT '{}'::jsonb
 );
 
 -- Create index for faster queries
