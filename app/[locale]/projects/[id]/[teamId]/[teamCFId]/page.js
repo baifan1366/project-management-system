@@ -1,12 +1,12 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users, Check, TextQuote, CircleCheck, FileUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useEffect, useState, useMemo } from 'react';
-import { fetchTeamById, fetchProjectTeams, updateTeamStar, updateTeam } from '@/lib/redux/features/teamSlice';
+import { fetchTeamById, fetchProjectTeams, updateTeamStar, updateTeam, fetchUserTeams } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
 import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
@@ -41,6 +41,7 @@ export default function TeamCustomFieldPage() {
   const dispatch = useDispatch();
   const params = useParams();
   const tConfirm = useTranslations('confirmation');
+  const router = useRouter();
   // 从URL参数中获取projectId、teamId和teamCFId
   const projectId = params?.id;
   const teamId = params?.teamId;
@@ -136,6 +137,17 @@ export default function TeamCustomFieldPage() {
     };
   }, [dispatch, projectId, teamId, teamCFId]);
 
+  useEffect(() => {
+    // 如果团队已归档，立即跳转到项目主页
+    if (selectedTeam?.archive) {
+      // NOTE: This navigation is triggered because the team has been archived.
+      router.replace(`/projects/${projectId}`);
+      return;
+    }
+    // 只要团队数据变化就刷新页面（可选，通常只需依赖 selectedTeam.archive）
+    // router.replace(router.asPath); // 如果你想强制刷新页面，可以取消注释
+  }, [selectedTeam, projectId, router]);
+
   // 使用 useMemo 缓存自定义字段内容渲染结果
   const customFieldContent = useMemo(() => {
     if (cfStatus === 'loading') {
@@ -218,26 +230,28 @@ export default function TeamCustomFieldPage() {
     }
   };
 
-  const handleArchiveTeam = () => {
+  const handleArchiveTeam = async () => {
     confirm({
-        title: tConfirm('confirmArchiveTeam'),
-        description: `${tConfirm('team')} "${selectedTeam.name}" ${tConfirm('willBeArchived')}`,
-        variant: 'error',
-        onConfirm: () => {
-          const userId = user?.id;
-          // 更新团队描述到数据库
-          dispatch(updateTeam({ 
-              teamId, 
-              data: {
-                archive: true
-              },
-              user_id: userId,
-              old_values: selectedTeam,
-              updated_at: new Date().toISOString()
-          }));
-          console.log("confirm archive");
-          setOnClose(true);
-        }
+      title: tConfirm('confirmArchiveTeam'),
+      description: `${tConfirm('team')} "${selectedTeam.name}" ${tConfirm('willBeArchived')}`,
+      variant: 'error',
+      onConfirm: async () => {
+        const userId = user?.id;
+        // Await the updateTeam dispatch to ensure the archive operation completes before fetching user teams
+        await dispatch(updateTeam({ 
+          teamId, 
+          data: {
+            archive: true
+          },
+          user_id: userId,
+          old_values: selectedTeam,
+          updated_at: new Date().toISOString()
+        }));
+        console.log("confirm archive");
+        // Await fetching the updated user teams list
+        await dispatch(fetchUserTeams({ userId, projectId }));
+        setOnClose(true);
+      }
     });
   };
 

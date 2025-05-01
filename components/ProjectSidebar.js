@@ -100,15 +100,16 @@ export default function ProjectSidebar({ projectId }) {
   const menuItems = useMemo(() => {
     if (!customFields || customFields.length === 0) return [];
     
-    return userTeams.map((team, index) => {
-      // 获取该团队的第一个自定义字段ID，如果没有则使用默认的第一个自定义字段
+    // 只显示未归档的团队
+    const activeTeams = userTeams.filter(team => team.archive === false);
+
+    return activeTeams.map((team, index) => {
       const teamCFId = teamFirstCFIds[team.id] || customFields[0]?.id || '';
-      
       return {
         ...team,
         id: team.id,
         label: team.name,
-        href: `/projects/${projectId}/${team.id}/${teamCFId}`, 
+        href: `/projects/${projectId}/${team.id}/${teamCFId}`,
         access: team.access,
         order_index: team.order_index || index
       };
