@@ -41,7 +41,6 @@ export default function ProjectSidebar({ projectId }) {
   const customFields = useSelector(selectTeamCustomFields);
   const teamFirstCFIds = useSelector(selectTeamFirstCFIds);
   const userTeams = useSelector(state => state.teams.userTeams); 
-
   const [projectName, setProjectName] = useState('');
   const [themeColor, setThemeColor] = useState('');
   const { user } = useGetUser();
@@ -66,7 +65,6 @@ export default function ProjectSidebar({ projectId }) {
 
       // 使用Redux action获取用户团队
       const teams = await dispatch(fetchUserTeams({ userId: user.id, projectId })).unwrap();
-      
       // 对每个团队都获取自定义字段
       if (teams && teams.length > 0) {
         // 并行等待所有自定义字段获取完成
@@ -250,10 +248,10 @@ export default function ProjectSidebar({ projectId }) {
                   <div
                     {...provided.droppableProps}
                     ref={provided.innerRef}
-                    className="space-y-0.5"
                   >
                     {menuItems.map((item, index) => {
-                      const isActive = pathname === item.href;
+                      // 修改检查逻辑：检查路径名是否包含团队ID部分
+                      const isActive = pathname.includes(`/projects/${projectId}/${item.id}/`);
                       return (
                         <Draggable key={item.id} draggableId={String(item.id)} index={index}>
                           {(provided) => (
@@ -322,7 +320,7 @@ export default function ProjectSidebar({ projectId }) {
             onClick={() => {
               setDialogOpen(true);
             }} 
-            className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors mt-2"
+            className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors"
           >
             <Plus size={16} className="text-muted-foreground" />
             <span className="ml-2 text-sm">{t('new_team')}</span>

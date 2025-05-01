@@ -6,12 +6,16 @@ import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useEffect, useState, useMemo } from 'react';
-import { fetchTeamById, fetchProjectTeams, updateTeamStar } from '@/lib/redux/features/teamSlice';
+import { fetchTeamById, fetchProjectTeams, updateTeamStar, updateTeam } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
+import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
+import { store } from '@/lib/redux/store';
+import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useConfirm } from '@/hooks/use-confirm';
 import TaskTab from "@/components/team/TaskTab"
 import InvitationDialog from '@/components/team/InvitationDialog';
-import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
+import EditTeamDialog from '@/components/team/EditTeamDialog';
 import TaskList from '@/components/team/list/TaskList';
 import TaskGantt from '@/components/team/gantt/TaskGantt';
 import TaskKanban from '@/components/team/kanban/TaskKanban';
@@ -19,7 +23,6 @@ import TaskFile from '@/components/team/file/TaskFile';
 import TaskWorkflow from '@/components/team/workflow/TaskWorkflow';
 import TaskOverview from '@/components/team/overview/TaskOverview';
 import TaskTimeline from '@/components/team/timeline/TaskTimeline';
-import { store } from '@/lib/redux/store';
 
 // 创建记忆化的选择器
 const selectTeams = state => state.teams.teams;
@@ -37,22 +40,26 @@ export default function TeamCustomFieldPage() {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const params = useParams();
-  
+  const tConfirm = useTranslations('confirmation');
   // 从URL参数中获取projectId、teamId和teamCFId
   const projectId = params?.id;
   const teamId = params?.teamId;
   const teamCFId = params?.teamCFId;
-  
   // 使用记忆化的选择器
   const teamsError = useSelector(selectTeamError);
   const selectedTeam = useSelector(state => selectTeamById(state, teamId));
-  
+  const { user } = useGetUser();
+  const { confirm } = useConfirm();
   const { currentItem, status: cfStatus, error: cfError } = useSelector((state) => state.teamCF);
-  
   const [isLoading, setIsLoading] = useState(false);
   const [currentView, setCurrentView] = useState('list');
   const [open, setOpen] = useState(false);
-  const [addButtonText, setAddButtonText] = useState('addTask');
+  const [editTeamOpen, setEditTeamOpen] = useState(false);
+  const [editTeamActiveTab, setEditTeamActiveTab] = useState("details");
+  const [addButtonText, setAddButtonText] = useState('addTask');  
+  const [onClose, setOnClose] = useState(true);
+  // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
+  const isStarred = selectedTeam?.star || false;  
 
   useEffect(() => {
     let unsubscribe = null;
@@ -128,9 +135,6 @@ export default function TeamCustomFieldPage() {
       }
     };
   }, [dispatch, projectId, teamId, teamCFId]);
-
-  // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
-  const isStarred = selectedTeam?.star || false;
 
   // 使用 useMemo 缓存自定义字段内容渲染结果
   const customFieldContent = useMemo(() => {
@@ -214,6 +218,29 @@ export default function TeamCustomFieldPage() {
     }
   };
 
+  const handleArchiveTeam = () => {
+    confirm({
+        title: tConfirm('confirmArchiveTeam'),
+        description: `${tConfirm('team')} "${selectedTeam.name}" ${tConfirm('willBeArchived')}`,
+        variant: 'error',
+        onConfirm: () => {
+          const userId = user?.id;
+          // 更新团队描述到数据库
+          dispatch(updateTeam({ 
+              teamId, 
+              data: {
+                archive: true
+              },
+              user_id: userId,
+              old_values: selectedTeam,
+              updated_at: new Date().toISOString()
+          }));
+          console.log("confirm archive");
+          setOnClose(true);
+        }
+    });
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
       <div className="max-w-none border-0 bg-background text-foreground flex flex-col flex-grow">
@@ -228,31 +255,44 @@ export default function TeamCustomFieldPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64 p-1">
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
+                  <DropdownMenuItem 
+                    className="flex items-center px-3 py-2 text-sm"
+                    onClick={() => {
+                      setEditTeamActiveTab("details");
+                      setEditTeamOpen(true);
+                    }}
+                  >
                     <Pen className="h-4 w-4 mr-2" />
                     {t('editTeamDetails')}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
-                    <Link className="h-4 w-4 mr-2" />
-                    {t('copyTeamLink')}
-                  </DropdownMenuItem>
-                  <hr className="my-1" />
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
+                  <DropdownMenuItem 
+                    className="flex items-center px-3 py-2 text-sm"
+                    onClick={() => {
+                      setEditTeamActiveTab("members");
+                      setEditTeamOpen(true);
+                    }}
+                  >
                     <Users className="h-4 w-4 mr-2" />
                     {t('manageMembers')}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
+                  <DropdownMenuItem 
+                    className="flex items-center px-3 py-2 text-sm"
+                    onClick={() => {
+                      setEditTeamActiveTab("permissions");
+                      setEditTeamOpen(true);
+                    }}
+                  >
                     <Settings2 className="h-4 w-4 mr-2" />
                     {t('manageTeamPermissions')}
                   </DropdownMenuItem>
                   <hr className="my-1" />
-                  <DropdownMenuItem className="text-red-500 flex items-center px-3 py-2 text-sm">
+                  <DropdownMenuItem 
+                    className="text-red-500 flex items-center px-3 py-2 text-sm"
+                    onClick={handleArchiveTeam}
+                    onClose={() => onClose(false)}
+                  >
                     <Archive className="h-4 w-4 mr-2" />
                     {t('archiveTeam')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-red-500 flex items-center px-3 py-2 text-sm">
-                    <Trash className="h-4 w-4 mr-2" />
-                    {t('deleteTeam')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -340,6 +380,12 @@ export default function TeamCustomFieldPage() {
           {customFieldContent}
         </div>
       </div>
+      <EditTeamDialog 
+        open={editTeamOpen} 
+        onClose={() => setEditTeamOpen(false)} 
+        team={selectedTeam}
+        activeTab={editTeamActiveTab}
+      />
     </div>
   );
 }

@@ -23,6 +23,7 @@ export async function GET(request) {
         `)
         .eq('project_id', projectId)
         .eq('user_team.user_id', userId)
+        .eq('archive', false)
         .order('order_index', { ascending: true });
 
       if (error) {

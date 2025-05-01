@@ -1502,7 +1502,14 @@
     "editSection": "Edit Section",
     "deleteSection":"Delete Section",
     "sectionCollapsed": "Section Collapsed",
-    "input": "Input"
+    "input": "Input",
+    "confirmArchiveTeam": "Confirm Archive Team",
+    "team": "Team",
+    "willBeArchived": "will be archived.",
+    "deleteTeamConfirmation": "Confirm Delete Team",
+    "deleteTeamWarning": "Warning",
+    "typeTeamNameToConfirm": "Type Team Name to Confirm",
+    "permanentlyDelete": "Delete"
   },
   "validationRules": {
     "teamNameMin": "Team Name must be at least 2 characters.",
@@ -1536,5 +1543,24 @@
     "taskNameMax": "Task Name cannot exceed 50 characters.",
     "startDateRequired": "Start Date is required.",
     "durationRequired": "Duration is required."
+  },
+  "Team": {
+    "details": "Details",
+    "members": "Members",
+    "permissions": "Permissions",
+    "teamName": "Team Name",
+    "teamDescription":"Team Description",
+    "deleteTeam":"Delete team",
+    "cancel": "Cancel",
+    "saveChanges":"Save Changes",
+    "teamMembers":"Team Members",
+    "membersManagementDescription": "",
+    "membersListPlaceholder": "Enter member name",
+    "teamPermissions": "Team Permissions",
+    "permissionsManagementDescription": "",
+    "permissionsSettingsPlaceholder": "",
+    "editTeam": "Edit Team",
+    "enterTeamName": "Enter team name",
+    "enterTeamDescription": "Enter team description"
   }
 }

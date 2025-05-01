@@ -135,12 +135,11 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json()
-    
     // 处理单个团队更新
     if (body.id) {
       const updateData = { ...body };
       // 确保只更新允许的字段
-      const allowedFields = ['name', 'description', 'access', 'star'];
+      const allowedFields = ['name', 'description', 'access', 'star', 'archive'];
       Object.keys(updateData).forEach(key => {
         if (!allowedFields.includes(key)) {
           delete updateData[key];

@@ -70,7 +70,8 @@ CREATE TABLE "team" (
   "order_index" INT DEFAULT 0,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "star" BOOL DEFAULT FALSE
+  "star" BOOL DEFAULT FALSE,
+  "archive" BOOL DEFAULT FALSE
 );
 
 -- 用户与团队的关系表（多对多）
