@@ -59,8 +59,16 @@ export default function TeamCustomFieldPage() {
   const [editTeamActiveTab, setEditTeamActiveTab] = useState("details");
   const [addButtonText, setAddButtonText] = useState('addTask');  
   const [onClose, setOnClose] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
   const isStarred = selectedTeam?.star || false;  
+
+  const handleEditSuccess = () => {
+    setRefreshKey(prev => {
+      const newValue = prev + 1;
+      return newValue;
+    }); // 每次编辑后递增
+  };
 
   useEffect(() => {
     let unsubscribe = null;
@@ -178,7 +186,7 @@ export default function TeamCustomFieldPage() {
       return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
     }
     if (fieldType === 'OVERVIEW') {
-      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} />
     }
     if (fieldType === 'TIMELINE') {
       return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
@@ -187,7 +195,7 @@ export default function TeamCustomFieldPage() {
       return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
     }
     return <div>暂不支持的字段类型: {fieldType}</div>;
-  }, [currentItem]);
+  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey]);
 
   // 处理加载状态
   if (isLoading) {
@@ -399,6 +407,7 @@ export default function TeamCustomFieldPage() {
         onClose={() => setEditTeamOpen(false)} 
         team={selectedTeam}
         activeTab={editTeamActiveTab}
+        onSuccess={handleEditSuccess}
       />
     </div>
   );

@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { fetchTeamById } from '@/lib/redux/features/teamSlice';
 import { useDispatch } from 'react-redux';
 
-export default function TaskOverview({ projectId, teamId, teamCFId }) {
+export default function TaskOverview({ projectId, teamId, teamCFId, refreshKey }) {
     const t = useTranslations('TeamOverview');
     const [description, setDescription] = useState('');
     const [expandedSections, setExpandedSections] = useState({
@@ -78,18 +78,22 @@ export default function TaskOverview({ projectId, teamId, teamCFId }) {
 
     useEffect(() => {
         const fetchTeam = async () => {
-            const team = await dispatch(fetchTeamById(teamId)).unwrap();
-            // 确保描述内容适合富文本编辑器格式
-            // 如果描述为空或不是HTML格式，进行适当处理
-            const description = team[0].description || '';
-            
-            // 设置描述到状态
-            setDescription(description);
-            setPendingDescription(description);
-            console.log(team[0].description);
+            try {
+                const team = await dispatch(fetchTeamById(teamId)).unwrap();
+                // 确保描述内容适合富文本编辑器格式
+                // 如果描述为空或不是HTML格式，进行适当处理
+                const description = team[0].description || '';
+                
+                // 设置描述到状态
+                setDescription(description);
+                setPendingDescription(description);
+            } catch (error) {
+                console.error('获取团队数据失败:', error);
+            }
         };
+        
         fetchTeam();
-    }, [teamId, dispatch]);
+    }, [teamId, dispatch, refreshKey]);
 
     return (
         <div className="flex flex-col gap-1 p-0">

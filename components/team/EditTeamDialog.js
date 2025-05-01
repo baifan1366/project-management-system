@@ -12,21 +12,22 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Pen, Users, Settings2, Trash2, Plus } from "lucide-react";
 import { useDispatch } from 'react-redux';
-// 假设您已经有团队相关的Redux操作
-// import { updateTeam, deleteTeam } from '@/lib/redux/features/teamSlice';
+import { updateTeam, deleteTeam } from '@/lib/redux/features/teamSlice';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
-const EditTeamDialog = ({ open, onClose, team, activeTab }) => {
+const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess }) => {
   const t = useTranslations('Team');
   const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
-  
+  const { user } = useGetUser();
+
   // 状态管理
   const [currentTab, setCurrentTab] = useState(activeTab);
   const [teamName, setTeamName] = useState('');
   const [teamDescription, setTeamDescription] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  
+  const [saving, setIsSaving] = useState(false);
   // 加载团队数据
   useEffect(() => {
     if (team) {
@@ -37,17 +38,28 @@ const EditTeamDialog = ({ open, onClose, team, activeTab }) => {
   }, [team, activeTab]);
   
   // 更新团队详情
-  const handleUpdateTeam = () => {
+  const handleUpdateTeam = async () => {
+    setIsSaving(true);
     if (!teamName.trim()) return;
     
-    // 这里调用更新团队的API
-    // dispatch(updateTeam({
-    //   id: team.id,
-    //   name: teamName,
-    //   description: teamDescription
-    // }));
-    
-    onClose();
+    try {
+      const userId = user?.id;
+      const name = teamName;
+      const description = teamDescription;
+      const update = await dispatch(updateTeam({ 
+        teamId: team.id, 
+        data: {name, description},
+        user_id: userId,
+        old_values: team,
+        updated_at: new Date().toISOString()
+      })).unwrap();
+      onSuccess(); // 确保在成功时调用onSuccess
+    } catch (error) {
+      console.error('更新团队时出错:', error);
+    } finally {
+      setIsSaving(false);
+      onClose();
+    }
   };
   
   // 删除团队
@@ -158,11 +170,21 @@ const EditTeamDialog = ({ open, onClose, team, activeTab }) => {
             )}
             
             <div className="flex-1 flex justify-end gap-2">
-              <Button variant="outline" onClick={onClose}>
+              {/* The cancel button is disabled while saving to prevent duplicate actions */}
+              <Button 
+                variant="outline" 
+                onClick={onClose} 
+                disabled={saving}
+              >
                 {t('cancel')}
               </Button>
-              <Button variant="green" onClick={handleUpdateTeam}>
-                {t('saveChanges')}
+              {/* The save button is disabled and shows "Saving..." while saving to provide user feedback and prevent duplicate submissions */}
+              <Button 
+                variant="green" 
+                onClick={handleUpdateTeam} 
+                disabled={saving}
+              >
+                {saving ? t('saving') : t('saveChanges')}
               </Button>
             </div>
           </DialogFooter>

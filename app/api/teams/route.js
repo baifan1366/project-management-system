@@ -135,6 +135,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json()
+    console.log(body)
     // 处理单个团队更新
     if (body.id) {
       const updateData = { ...body };

@@ -1553,6 +1553,7 @@
     "deleteTeam":"Delete team",
     "cancel": "Cancel",
     "saveChanges":"Save Changes",
+    "saving": "Saving...",
     "teamMembers":"Team Members",
     "membersManagementDescription": "",
     "membersListPlaceholder": "Enter member name",
