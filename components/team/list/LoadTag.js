@@ -204,6 +204,7 @@ export function useLoadTag() {
       teamId={teamId}
       teamCFId={teamCFId}
       projectId={projectId}
+      existingTags={tagInfo}
     />
   );
 

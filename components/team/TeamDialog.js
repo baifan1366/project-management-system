@@ -113,7 +113,8 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
         project_id: projectId,
         star: false,
         order_index: 0,
-        created_by: userId
+        created_by: userId,
+        archive: false
       })).unwrap();
 
       // 创建团队用户关系

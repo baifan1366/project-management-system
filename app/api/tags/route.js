@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    
+    const tagName = searchParams.get('name')
     if (id) {
         // 获取单个标签
         const { data, error } = await supabase
@@ -19,12 +19,25 @@ export async function GET(request) {
         }
         
         return NextResponse.json(data)
+    } else if (tagName) {
+        const { data, error } = await supabase
+            .from('tag')
+            .select('*')
+            .eq('name', tagName)
+            .single()
+
+        if (error) {
+            console.error(error)
+            return NextResponse.json({ error: '获取标签失败' }, { status: 500 })
+        }
+        return NextResponse.json(data)
     } else {
         // 获取所有标签
         const { data, error } = await supabase
             .from('tag')
             .select('*')
             .order('id', { ascending: true })
+            .eq('default', true)
             
         if (error) {
             console.error(error)

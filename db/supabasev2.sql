@@ -70,7 +70,8 @@ CREATE TABLE "team" (
   "order_index" INT DEFAULT 0,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "star" BOOL DEFAULT FALSE
+  "star" BOOL DEFAULT FALSE,
+  "archive" BOOL DEFAULT FALSE
 );
 
 -- 用户与团队的关系表（多对多）
@@ -123,6 +124,7 @@ CREATE TABLE "tag" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "description" TEXT,
+  "default" BOOLEAN DEFAULT FALSE,
   "type" TEXT NOT NULL CHECK ("type" IN ('SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'ID', 'TAGS')), 
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -19,6 +19,7 @@ export async function GET(request) {
       .eq('id', teamCFId)
       .eq('team_id', teamId)
       .single()
+      .order('id', { ascending: true })
     
     if (fieldError) {
       console.error('获取字段标签ID失败:', fieldError)
@@ -33,6 +34,7 @@ export async function GET(request) {
         .from('tag')
         .select('*')
         .in('id', tagIds)
+        .order('id', { ascending: true })
         
       if (tagError) {
         console.error('获取标签详情失败:', tagError)

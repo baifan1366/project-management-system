@@ -41,7 +41,7 @@ export default function ProjectSidebar({ projectId }) {
   const customFields = useSelector(selectTeamCustomFields);
   const teamFirstCFIds = useSelector(selectTeamFirstCFIds);
   const userTeams = useSelector(state => state.teams.userTeams); 
-
+  const teamDeletedStatus = useSelector(state => state.teams.teamDeletedStatus);
   const [projectName, setProjectName] = useState('');
   const [themeColor, setThemeColor] = useState('');
   const { user } = useGetUser();
@@ -66,7 +66,6 @@ export default function ProjectSidebar({ projectId }) {
 
       // 使用Redux action获取用户团队
       const teams = await dispatch(fetchUserTeams({ userId: user.id, projectId })).unwrap();
-      
       // 对每个团队都获取自定义字段
       if (teams && teams.length > 0) {
         // 并行等待所有自定义字段获取完成
@@ -98,24 +97,32 @@ export default function ProjectSidebar({ projectId }) {
     } 
   }, [dispatch, projectId, fetchTeams, getProjectData]);
 
+  // 监听团队删除状态，当团队被删除时刷新团队列表
+  useEffect(() => {
+    if (teamDeletedStatus === 'succeeded') {
+      fetchTeams();
+    }
+  }, [teamDeletedStatus, fetchTeams]);
+
   // 确保有自定义字段数据后再生成菜单项
   const menuItems = useMemo(() => {
     if (!customFields || customFields.length === 0) return [];
     
-    return userTeams.map((team, index) => {
-      // 获取该团队的第一个自定义字段ID，如果没有则使用默认的第一个自定义字段
+    // 只显示未归档的团队
+    const activeTeams = userTeams.filter(team => team.archive === false);
+
+    return activeTeams.map((team, index) => {
       const teamCFId = teamFirstCFIds[team.id] || customFields[0]?.id || '';
-      
       return {
         ...team,
         id: team.id,
         label: team.name,
-        href: `/projects/${projectId}/${team.id}/${teamCFId}`, 
+        href: `/projects/${projectId}/${team.id}/${teamCFId}`,
         access: team.access,
         order_index: team.order_index || index
       };
     }).sort((a, b) => a.order_index - b.order_index);
-  }, [userTeams, customFields, teamFirstCFIds]);
+  }, [userTeams, customFields, teamFirstCFIds, userTeams.length]);
 
   // 处理拖拽结束
   const handleDragEnd = useCallback(async (result) => {
@@ -250,10 +257,10 @@ export default function ProjectSidebar({ projectId }) {
                   <div
                     {...provided.droppableProps}
                     ref={provided.innerRef}
-                    className="space-y-0.5"
                   >
                     {menuItems.map((item, index) => {
-                      const isActive = pathname === item.href;
+                      // 修改检查逻辑：检查路径名是否包含团队ID部分
+                      const isActive = pathname.includes(`/projects/${projectId}/${item.id}/`);
                       return (
                         <Draggable key={item.id} draggableId={String(item.id)} index={index}>
                           {(provided) => (
@@ -322,7 +329,7 @@ export default function ProjectSidebar({ projectId }) {
             onClick={() => {
               setDialogOpen(true);
             }} 
-            className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors mt-2"
+            className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors"
           >
             <Plus size={16} className="text-muted-foreground" />
             <span className="ml-2 text-sm">{t('new_team')}</span>
