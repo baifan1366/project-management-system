@@ -13,13 +13,17 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
 import { Pen, Users, Settings2, Trash2, Plus } from "lucide-react";
 import { useDispatch } from 'react-redux';
 import { updateTeam, deleteTeam } from '@/lib/redux/features/teamSlice';
+import { deleteTeamUserByTeamId } from '@/lib/redux/features/teamUserSlice';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useRouter } from 'next/navigation';
 
-const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess }) => {
+const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }) => {
   const t = useTranslations('Team');
   const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
   const { user } = useGetUser();
+  const router = useRouter();
+  const userId = user?.id;
 
   // 状态管理
   const [currentTab, setCurrentTab] = useState(activeTab);
@@ -28,6 +32,11 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [saving, setIsSaving] = useState(false);
+
+  const formReset = () => {
+    setDeleteConfirmText('');
+  }
+
   // 加载团队数据
   useEffect(() => {
     if (team) {
@@ -43,7 +52,6 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess }) => {
     if (!teamName.trim()) return;
     
     try {
-      const userId = user?.id;
       const name = teamName;
       const description = teamDescription;
       const update = await dispatch(updateTeam({ 
@@ -63,12 +71,26 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess }) => {
   };
   
   // 删除团队
-  const handleDeleteTeam = () => {
+  const handleDeleteTeam = async () => {
     if (deleteConfirmText !== team?.name) return;
-    // 这里调用删除团队的API
-    // dispatch(deleteTeam(team.id));
-    setConfirmDelete(false);
-    onClose();
+    try {
+      // 这里调用删除团队的API并等待操作完成
+      const teamId = team?.id;
+      // console.log(team);
+      
+      // Delete all team members first to avoid orphaned records
+      // This ensures proper cleanup of user associations before removing the team
+      await dispatch(deleteTeamUserByTeamId({userId, teamId})).unwrap();
+      
+      // Then delete the team itself
+      await dispatch(deleteTeam({userId, teamId})).unwrap();
+      
+      setConfirmDelete(false);
+      onClose();
+      router.replace(`/projects/${projectId}`);
+    } catch (error) {
+      console.error('删除团队失败:', error);
+    }
   };
   
   return (
@@ -197,26 +219,28 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess }) => {
           <AlertDialogHeader>
             <AlertDialogTitle>{tConfirm('deleteTeamConfirmation')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tConfirm('deleteTeamWarning')}
-              <div className="mt-4">
                 <Label htmlFor="confirmDelete" className="text-sm font-medium">
-                  {tConfirm('typeTeamNameToConfirm', { teamName: team?.name })}
+                  {tConfirm('type{teamName}ToConfirm', { teamName: team?.name })}
+                
+                  <Input 
+                    id="confirmDelete"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    className="mt-2"
+                    placeholder={team?.name}
+                  />
                 </Label>
-                <Input 
-                  id="confirmDelete"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="mt-2"
-                  placeholder={team?.name}
-                />
-              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{tConfirm('cancel')}</AlertDialogCancel>
+            <AlertDialogCancel
+              onClick={formReset}
+            >
+              {tConfirm('cancel')}
+            </AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteTeam} 
-              className="bg-red-500 hover:bg-red-600"
+              className="bg-red-700 hover:bg-red-800 text-white"
               disabled={deleteConfirmText !== team?.name}
             >
               {tConfirm('permanentlyDelete')}

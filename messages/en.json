@@ -1508,7 +1508,7 @@
     "willBeArchived": "will be archived.",
     "deleteTeamConfirmation": "Confirm Delete Team",
     "deleteTeamWarning": "Warning",
-    "typeTeamNameToConfirm": "Type Team Name to Confirm",
+    "type{teamName}ToConfirm": "Type {teamName} to Confirm",
     "permanentlyDelete": "Delete"
   },
   "validationRules": {

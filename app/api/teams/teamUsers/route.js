@@ -211,3 +211,31 @@ export async function POST(request) {
     );
   }
 }
+
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const teamId = searchParams.get('teamId')
+
+    const { error } = await supabase
+      .from('user_team')
+      .delete()
+      .eq('team_id', teamId)
+
+    if (error) {
+      console.error('Database error:', error)
+      throw error
+    }
+
+    return NextResponse.json(
+      { message: 'Team user deleted successfully' },
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error('Error deleting team user:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete team user' },
+      { status: 500 }
+    )
+  }
+}

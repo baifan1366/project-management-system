@@ -41,6 +41,7 @@ export default function ProjectSidebar({ projectId }) {
   const customFields = useSelector(selectTeamCustomFields);
   const teamFirstCFIds = useSelector(selectTeamFirstCFIds);
   const userTeams = useSelector(state => state.teams.userTeams); 
+  const teamDeletedStatus = useSelector(state => state.teams.teamDeletedStatus);
   const [projectName, setProjectName] = useState('');
   const [themeColor, setThemeColor] = useState('');
   const { user } = useGetUser();
@@ -96,6 +97,13 @@ export default function ProjectSidebar({ projectId }) {
     } 
   }, [dispatch, projectId, fetchTeams, getProjectData]);
 
+  // 监听团队删除状态，当团队被删除时刷新团队列表
+  useEffect(() => {
+    if (teamDeletedStatus === 'succeeded') {
+      fetchTeams();
+    }
+  }, [teamDeletedStatus, fetchTeams]);
+
   // 确保有自定义字段数据后再生成菜单项
   const menuItems = useMemo(() => {
     if (!customFields || customFields.length === 0) return [];
@@ -114,7 +122,7 @@ export default function ProjectSidebar({ projectId }) {
         order_index: team.order_index || index
       };
     }).sort((a, b) => a.order_index - b.order_index);
-  }, [userTeams, customFields, teamFirstCFIds]);
+  }, [userTeams, customFields, teamFirstCFIds, userTeams.length]);
 
   // 处理拖拽结束
   const handleDragEnd = useCallback(async (result) => {

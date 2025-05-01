@@ -408,6 +408,7 @@ export default function TeamCustomFieldPage() {
         team={selectedTeam}
         activeTab={editTeamActiveTab}
         onSuccess={handleEditSuccess}
+        projectId={projectId}
       />
     </div>
   );
