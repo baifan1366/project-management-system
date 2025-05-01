@@ -276,7 +276,7 @@ export default function TeamCustomFieldPage() {
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 p-1">
+                <DropdownMenuContent className="w-60 p-1">
                   <DropdownMenuItem 
                     className="flex items-center px-3 py-2 text-sm"
                     onClick={() => {
@@ -300,12 +300,12 @@ export default function TeamCustomFieldPage() {
                   <DropdownMenuItem 
                     className="flex items-center px-3 py-2 text-sm"
                     onClick={() => {
-                      setEditTeamActiveTab("permissions");
+                      setEditTeamActiveTab("access");
                       setEditTeamOpen(true);
                     }}
                   >
                     <Settings2 className="h-4 w-4 mr-2" />
-                    {t('manageTeamPermissions')}
+                    {t('editTeamAccess')}
                   </DropdownMenuItem>
                   <hr className="my-1" />
                   <DropdownMenuItem 

@@ -8,27 +8,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, 
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
-import { Pen, Users, Settings2, Trash2, Plus } from "lucide-react";
-import { useDispatch } from 'react-redux';
-import { updateTeam, deleteTeam } from '@/lib/redux/features/teamSlice';
+import { Pen, Users, Settings2, Trash2, Plus, Lock, Eye, Pencil, Unlock } from "lucide-react";
+import { useDispatch, useSelector } from 'react-redux';
+import { updateTeam, deleteTeam, fetchUserTeams } from '@/lib/redux/features/teamSlice';
 import { deleteTeamUserByTeamId } from '@/lib/redux/features/teamUserSlice';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useRouter } from 'next/navigation';
 
 const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }) => {
+  const { user } = useGetUser();    
+  const { projects } = useSelector((state) => state.projects)
   const t = useTranslations('Team');
   const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
-  const { user } = useGetUser();
   const router = useRouter();
   const userId = user?.id;
+  const project = projects.find(p => String(p.id) === String(projectId))
 
   // 状态管理
   const [currentTab, setCurrentTab] = useState(activeTab);
   const [teamName, setTeamName] = useState('');
   const [teamDescription, setTeamDescription] = useState('');
+  const [teamAccess, setTeamAccess] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [saving, setIsSaving] = useState(false);
@@ -42,6 +46,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
     if (team) {
       setTeamName(team.name || '');
       setTeamDescription(team.description || '');
+      setTeamAccess(team.access || '');
       setCurrentTab(activeTab);
     }
   }, [team, activeTab]);
@@ -54,13 +59,18 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
     try {
       const name = teamName;
       const description = teamDescription;
+      const access = teamAccess;
       const update = await dispatch(updateTeam({ 
         teamId: team.id, 
-        data: {name, description},
+        data: {name, description, access},
         user_id: userId,
         old_values: team,
         updated_at: new Date().toISOString()
       })).unwrap();
+      
+      // 更新成功后，刷新用户团队列表
+      await dispatch(fetchUserTeams({ userId, projectId })).unwrap();
+      
       onSuccess(); // 确保在成功时调用onSuccess
     } catch (error) {
       console.error('更新团队时出错:', error);
@@ -84,6 +94,9 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
       
       // Then delete the team itself
       await dispatch(deleteTeam({userId, teamId})).unwrap();
+      
+      // 删除成功后，刷新用户团队列表
+      await dispatch(fetchUserTeams({ userId, projectId })).unwrap();
       
       setConfirmDelete(false);
       onClose();
@@ -116,9 +129,9 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                 <Users className="h-4 w-4 mr-1" />
                 {t('members')}
               </TabsTrigger>
-              <TabsTrigger value="permissions" className="flex items-center">
+              <TabsTrigger value="access" className="flex items-center">
                 <Settings2 className="h-4 w-4 mr-1" />
-                {t('permissions')}
+                {t('access')}
               </TabsTrigger>
             </TabsList>
             
@@ -167,17 +180,87 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
             </TabsContent>
             
             {/* 权限管理标签内容 */}
-            <TabsContent value="permissions" className="space-y-4">
+            <TabsContent value="access" className="space-y-4">
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">{t('teamPermissions')}</h3>
-                {/* 这里添加权限设置界面 */}
-                <div className="text-sm text-muted-foreground">
-                  {t('permissionsManagementDescription')}
+                {/* 权限设置 */}
+                <div className="space-y-2">
+                  <Label htmlFor="teamAccess">{t('teamAccess')}</Label>
+                  <Select
+                    value={teamAccess}
+                    onValueChange={(value) => setTeamAccess(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={t('teamAccessPlaceholder')}>
+                        {teamAccess ? (
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center">
+                              {teamAccess === 'invite_only' && <Lock className="w-4 h-4 mr-2 text-gray-500" />}
+                              {teamAccess === 'can_edit' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
+                              {teamAccess === 'can_check' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
+                              {teamAccess === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500" />}
+                              <span>
+                                {teamAccess === 'invite_only' && t('inviteOnly')}
+                                {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}
+                                {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}
+                                {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project.project_name })}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          ''
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="invite_only" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                        <div className="flex items-center w-full">
+                          <Lock className="w-5 h-5 mr-3 text-gray-500" />
+                          <div className="flex-1">
+                            <div className="font-medium">{t('inviteOnly')}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {t('inviteOnlyDescription')}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="can_edit" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                        <div className="flex items-center w-full">
+                          <Pencil className="w-5 h-5 mr-3 text-gray-500" />
+                          <div className="flex-1">
+                            <div className="font-medium">{t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {t('everyoneCanEditDescription')}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="can_check" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                        <div className="flex items-center w-full">
+                          <Eye className="w-5 h-5 mr-3 text-gray-500" />
+                          <div className="flex-1">
+                            <div className="font-medium">{t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {t('everyoneCanCheckDescription')}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="can_view" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                        <div className="flex items-center w-full">
+                          <Unlock className="w-5 h-5 mr-3 text-gray-500" />
+                          <div className="flex-1">
+                            <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName: project.project_name })}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {t('everyoneCanViewDescription')}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                
-                {/* 权限设置示例 */}
-                <div className="border rounded-md p-4">
-                  <p>{t('permissionsSettingsPlaceholder')}</p>
+                <div className="text-sm text-muted-foreground">
+                  {t('accessManagementDescription')}
                 </div>
               </div>
             </TabsContent>

@@ -42,6 +42,7 @@ export default function ProjectSidebar({ projectId }) {
   const teamFirstCFIds = useSelector(selectTeamFirstCFIds);
   const userTeams = useSelector(state => state.teams.userTeams); 
   const teamDeletedStatus = useSelector(state => state.teams.teamDeletedStatus);
+  const teamUpdatedStatus = useSelector(state => state.teams.teamUpdatedStatus);
   const [projectName, setProjectName] = useState('');
   const [themeColor, setThemeColor] = useState('');
   const { user } = useGetUser();
@@ -103,6 +104,13 @@ export default function ProjectSidebar({ projectId }) {
       fetchTeams();
     }
   }, [teamDeletedStatus, fetchTeams]);
+
+  // 监听团队更新状态，当团队被更新时刷新团队列表
+  useEffect(() => {
+    if (teamUpdatedStatus === 'succeeded') {
+      fetchTeams();
+    }
+  }, [teamUpdatedStatus, fetchTeams]);
 
   // 确保有自定义字段数据后再生成菜单项
   const menuItems = useMemo(() => {
