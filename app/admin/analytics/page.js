@@ -20,7 +20,7 @@ import {
 } from 'chart.js';
 import { Line, Bar, Pie } from 'react-chartjs-2';
 import { useSelector, useDispatch } from 'react-redux';
-import { checkAdminSession } from '@/lib/redux/features/adminSlice';
+import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 
 // 注册Chart.js组件
 ChartJS.register(
@@ -650,10 +650,8 @@ export default function AdminAnalytics() {
       </div>
     </div>
     ) : (
-      <div className="flex-1 overflow-auto">
-        <div className="flex items-center justify-center h-full">
-          <p className="text-gray-500 dark:text-gray-400">You do not have permission to view this page</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center w-full">
+        <AccessRestrictedModal />
       </div>
     )}
   </div>

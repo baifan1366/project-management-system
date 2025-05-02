@@ -453,8 +453,6 @@ CREATE TABLE "admin_user" (
   "password_hash" VARCHAR(255) NOT NULL,
   "full_name" VARCHAR(255),
   "avatar_url" VARCHAR(255),
-  "role" VARCHAR(50) CHECK ("role" IN ('SUPER_ADMIN', 'ADMIN')) DEFAULT 'ADMIN',
-  "supabase_user_id" UUID UNIQUE,
   "is_active" BOOLEAN DEFAULT TRUE,
   "last_login" TIMESTAMP,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -6,6 +6,7 @@ import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine
 import { supabase } from '@/lib/supabase';
 import { clsx } from 'clsx';
 import { useSelector, useDispatch } from 'react-redux';
+import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 
 export default function AdminSubscriptions() {
   const router = useRouter();
@@ -570,6 +571,7 @@ export default function AdminSubscriptions() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       
+      //todo： 组件化header
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         {/* Header */}
@@ -595,7 +597,11 @@ export default function AdminSubscriptions() {
           </div>
         </header>
         
-        {/* Subscription Management Content */}
+        {/* Subscription Managment Content */}
+        {(hasPermission('view_subscription_plans') || 
+          hasPermission('view_promo_codes') || 
+          hasPermission('view_user_subscriptions') || 
+          hasPermission('view_payment_history')) ? (
         <main className="p-6">
           {/* Tabs */}
           <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
@@ -644,7 +650,7 @@ export default function AdminSubscriptions() {
           </div>
           
           {/* Subscription Plans Section */}
-          {activeTab === "subscriptionPlans" && (
+          { hasPermission('view_subscription_plans') && activeTab === "subscriptionPlans" && (
             <div>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Subscription Plans</h3>
@@ -1468,6 +1474,11 @@ export default function AdminSubscriptions() {
             </div>
           )}
         </main>
+        ) : (
+        <div className="min-h-screen flex items-center justify-center w-full">
+          <AccessRestrictedModal />
+        </div>
+        )}
       </div>
 
       {/* SUBSCRIPTION MODALS */}

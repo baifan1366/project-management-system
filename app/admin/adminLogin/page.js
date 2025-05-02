@@ -64,8 +64,6 @@ export default function AdminLoginPage() {
       
       if (adminData) {
         console.log('Login successful, redirecting to dashboard');
-        // 存储已经在 loginAdmin action 中完成，这里不需要重复
-        // localStorage.setItem('adminData', JSON.stringify(adminData));
         
         // Redirect to admin dashboard
         router.replace(`/admin/adminDashboard`);

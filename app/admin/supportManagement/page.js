@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaFilter, FaSearch, FaEnvelope, FaBuilding, FaUser, FaClock, FaCheck, FaTimes, FaSpinner, FaReply } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
-import { checkAdminSession } from '@/lib/redux/features/adminSlice';
-
+import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 export default function AdminSupport() {
   const router = useRouter();
   const params = useParams();
@@ -309,7 +309,9 @@ export default function AdminSupport() {
         </header>
         
         {/* Support Tickets Content */}
-        <main className="p-6">
+        {(hasPermission('view_support_tickets') || 
+          hasPermission('reply_to_tickets') || 
+          hasPermission('mark_support_tickets')) ? (
           <div className="flex flex-col md:flex-row gap-6">
             {/* Tickets List */}
             <div className="w-full md:w-1/3 lg:w-1/4">
@@ -570,7 +572,11 @@ export default function AdminSupport() {
               )}
             </div>
           </div>
-        </main>
+        ) : (
+        <div className="min-h-screen flex items-center justify-center w-full">
+          <AccessRestrictedModal />
+        </div>
+        )}
       </div>
     </div>
   );

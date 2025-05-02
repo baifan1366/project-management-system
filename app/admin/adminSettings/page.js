@@ -12,6 +12,7 @@ import LandingPageSettings from '@/components/admin/settings/LandingPageSettings
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 
 export default function AdminSettings() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function AdminSettings() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {hasPermission('manage_system_settings') && (
+      {hasPermission('manage_system_settings') ? (
         <div>
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm">
@@ -151,6 +152,10 @@ export default function AdminSettings() {
           </CardContent>
         </Card>
       </main>
+      </div>
+    ) : (
+      <div className="min-h-screen flex items-center justify-center">
+        <AccessRestrictedModal />
       </div>
     )}
     </div>
