@@ -100,21 +100,6 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
     onModelChange(modelId);
   };
   
-  // Get model icon based on model name
-  const getModelIcon = (modelName) => {
-    const lowerName = modelName.toLowerCase();
-    if (lowerName.includes('gemini') || lowerName.includes('gemma')) {
-      return "🌀"; // Google models
-    } else if (lowerName.includes('deepseek')) {
-      return "🔍"; // DeepSeek
-    } else if (lowerName.includes('mistral')) {
-      return "🌪️"; // Mistral
-    } else if (lowerName.includes('llama')) {
-      return "🦙"; // Llama models
-    }
-    return "🤖"; // Default AI icon
-  };
-  
   if (isLoading) {
     return <Skeleton className="h-10 w-40 dark:bg-[#383838]" />;
   }
@@ -132,7 +117,6 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
             className="dark:hover:bg-[#444444] dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]"
           >
             <div className="flex items-start">
-              <span className="mr-2 text-base">{getModelIcon(model.name)}</span>
               <div className="flex flex-col">
                 <span className="text-s font-medium dark:text-gray-200">{model.name}</span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">

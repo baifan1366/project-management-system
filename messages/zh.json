@@ -287,9 +287,12 @@
       "mention": "提及了您",
       "assignment": "分配给您",
       "update": "项目更新",
-      "deadline": "截止日期临近"
+      "deadline": "截止日期临近",
+      "MENTION": "提及了您"
     },
-    "actionFailed": "操作失败，请重试"
+    "actionFailed": "操作失败，请重试",
+    "mentionNotification": "您在聊天消息中被提及",
+    "clickToViewMention": "点击查看消息"
   },
   "errors": {
     "general": "出错了",
@@ -637,7 +640,18 @@
     "messageWithdrawn": "此消息已被撤回",
     "copy": "复制",
     "copiedToClipboard": "已复制到剪贴板",
-    "translationFailed": "翻译失败"
+    "translationFailed": "翻译失败",
+    "users": "用户",
+    "projects": "项目",
+    "tasks": "任务",
+    "loading": "加载中...",
+    "noResults": "未找到结果",
+    "mentionSomebody": "提及某人...",
+    "mentionPrompt": "输入@可提及用户、项目或任务",
+    "mentionedYou": "提及了您",
+    "mentionInChat": "在聊天消息中提及了您",
+    "clickToViewMention": "点击查看消息",
+    "errorFetchingMentions": "获取提及建议时出错"
   },
   "TeamInvitation": {
     "teamInvitation": "团队邀请",

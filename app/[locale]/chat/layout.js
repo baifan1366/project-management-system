@@ -22,13 +22,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { useSelector } from 'react-redux';
 
 function ChatLayout({ children }) {
   const t = useTranslations('Chat');
   const { formatLastSeen } = useLastSeen(); // 使用上次在线时间钩子
   const { formatChatTime } = useChatTime(); // 使用聊天时间钩子
-  const { usersStatus } = useUserStatus(); // 使用增强的用户状态上下文
+  const { 
+    currentUser, 
+    usersStatus 
+  } = useUserStatus();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -76,9 +78,7 @@ function ChatLayout({ children }) {
 
     setIsSearching(true);
     try {
-      // 获取当前用户会话信息
-      const session = useSelector((state) => state.users.currentUser);
-      if (!session) {
+      if (!currentUser) {
         setIsSearching(false);
         return;
       }
@@ -87,7 +87,7 @@ function ChatLayout({ children }) {
       const { data: userSessions, error: sessionError } = await supabase
         .from('chat_participant')
         .select('session_id')
-        .eq('user_id', session.id);
+        .eq('user_id', currentUser.id);
         
       if (sessionError) {
         console.error('搜索聊天错误:', sessionError);

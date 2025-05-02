@@ -1,5 +1,3 @@
-import { supabase } from '@/lib/supabase';
-
 // Safe JSON parsing function
 export function safeParseJSON(jsonString) {
   try {

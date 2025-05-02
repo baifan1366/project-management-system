@@ -21,14 +21,42 @@ export async function GET(request) {
       if (userError) throw userError
       
       if (user) {
-        const { data: tasksData, error: tasksError } = await supabase
+        // 获取用户创建的任务
+        const { data: createdTasks, error: createdError } = await supabase
           .from('task')
           .select('*')
-          .eq('assignee_id', user.id)
+          .eq('created_by', user.id);
           
-        if (tasksError) throw tasksError
+        if (createdError) {
+          console.error('Error fetching tasks created by current user:', createdError);
+          throw createdError;
+        }
         
-        data = tasksData || []
+        // 获取所有任务，然后在代码中过滤
+        const { data: allTasks, error: allTasksError } = await supabase
+          .from('task')
+          .select('*');
+          
+        if (allTasksError) {
+          console.error('Error fetching all tasks:', allTasksError);
+          throw allTasksError;
+        }
+        
+        // 过滤出分配给当前用户的任务
+        const assignedTasks = allTasks.filter(task => 
+          task.tag_values && task.tag_values.assignee_id === user.id
+        );
+        
+        // 合并两个数组并去重
+        const allUserTasks = [...createdTasks];
+        
+        assignedTasks.forEach(task => {
+          if (!allUserTasks.some(t => t.id === task.id)) {
+            allUserTasks.push(task);
+          }
+        });
+        
+        data = allUserTasks;
       } else {
         throw new Error('User not authenticated')
       }
@@ -62,14 +90,47 @@ export async function GET(request) {
     } 
     // 如果提供了用户ID，则获取分配给该用户的所有任务
     else if (userId) {
-      const { data: tasksData, error: tasksError } = await supabase
+      console.log(`Fetching tasks for user: ${userId}`);
+      
+      // 获取用户创建的任务
+      const { data: createdTasks, error: createdError } = await supabase
         .from('task')
         .select('*')
-        .eq('assignee_id', userId)
+        .eq('created_by', userId);
         
-      if (tasksError) throw tasksError
+      if (createdError) {
+        console.error('Error fetching tasks created by user:', createdError);
+        throw createdError;
+      }
       
-      data = tasksData || []
+      // For tasks where the user is assigned, we need to use containment query on tag_values JSONB
+      // Unfortunately, direct equality on nested JSONB is complex in Postgres
+      // For now, we'll fetch all tasks and filter on the server side
+      const { data: allTasks, error: allTasksError } = await supabase
+        .from('task')
+        .select('*');
+        
+      if (allTasksError) {
+        console.error('Error fetching all tasks:', allTasksError);
+        throw allTasksError;
+      }
+      
+      // Filter tasks where the user is assigned in tag_values.assignee_id
+      const assignedTasks = allTasks.filter(task => 
+        task.tag_values && task.tag_values.assignee_id === userId
+      );
+      
+      // Combine created and assigned tasks, removing duplicates
+      const allUserTasks = [...createdTasks];
+      
+      assignedTasks.forEach(task => {
+        if (!allUserTasks.some(t => t.id === task.id)) {
+          allUserTasks.push(task);
+        }
+      });
+      
+      console.log(`Found ${allUserTasks.length} tasks for user`);
+      data = allUserTasks;
     }
     // 如果提供了章节ID，则获取该章节下的所有任务
     else if (sectionId) {

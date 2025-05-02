@@ -1,0 +1,44 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Translation Resources Rule
+
+## Overview
+All user-facing text in the application, including error messages and toast notifications, must be stored in translation files rather than hardcoded in the codebase.
+
+## Translation Files
+The project uses the following translation files:
+- [messages/en.json](mdc:messages/en.json) - English translations
+- [messages/zh.json](mdc:messages/zh.json) - Chinese translations
+
+## Guidelines
+
+1. **No Hardcoded Strings**: Never hardcode user-facing text directly in components or utilities.
+
+2. **Message Organization**: Organize messages by feature or module to maintain a clean structure.
+
+3. **Complete Coverage**: Every string in English must have a corresponding entry in Chinese.
+
+4. **Usage Example**:
+   ```jsx
+   // Incorrect ❌
+   <div>Error: Failed to save data</div>
+   
+   // Correct ✅
+   <div>{t('errors.failedToSave')}</div>
+   ```
+
+5. **Error Messages**: All error messages from API calls or validation must use translation keys.
+
+6. **Toast Notifications**: All toast/notification messages must use translation keys.
+
+7. **Dynamic Content**: For messages with variables, use appropriate interpolation syntax:
+   ```jsx
+   // Example
+   t('notifications.itemsAdded', { count: 5 })
+   ```
+
+This ensures the application is fully internationalized and can easily support multiple languages.
+

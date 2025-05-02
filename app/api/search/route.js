@@ -50,7 +50,7 @@ async function recordSearchHistory(searchTerm, userId = null) {
 }
 
 // 搜索项目
-async function searchProjects(query) {
+async function searchProjects(query, limit = 10) {
   // 首先尝试使用全文搜索
   const { data: tsData, error: tsError } = await supabase
     .from('project')
@@ -60,7 +60,7 @@ async function searchProjects(query) {
       config: 'english'
     })
     .order('updated_at', { ascending: false })
-    .limit(10);
+    .limit(limit);
   
   if (tsError) {
     console.error('项目全文搜索失败:', tsError);
@@ -71,7 +71,7 @@ async function searchProjects(query) {
       .select('*')
       .or(`project_name.ilike.%${query}%,description.ilike.%${query}%`)
       .order('updated_at', { ascending: false })
-      .limit(10);
+      .limit(limit);
     
     if (error) {
       console.error('项目模糊搜索失败:', error);
@@ -91,56 +91,93 @@ async function searchProjects(query) {
 }
 
 // 搜索任务
-async function searchTasks(query) {
-  // 首先尝试使用全文搜索
-  const { data: tsData, error: tsError } = await supabase
-    .from('task')
-    .select(`
-      *,
-      project:project_id (project_name)
-    `)
-    .textSearch('tsv_searchable', query, {
-      type: 'plain',
-      config: 'english'
-    })
-    .order('updated_at', { ascending: false })
-    .limit(10);
-  
-  if (tsError) {
-    console.error('任务全文搜索失败:', tsError);
-    
-    // 失败后回退到模糊搜索
-    const { data, error } = await supabase
+async function searchTasks(query, limit = 10) {
+  try {
+    // 首先尝试使用全文搜索
+    const { data: tsData, error: tsError } = await supabase
       .from('task')
-      .select(`
-        *,
-        project:project_id (project_name)
-      `)
-      .or(`tag_values::text.ilike.%${query}%`)
+      .select('*')
+      .textSearch('tsv_searchable', query, {
+        type: 'plain',
+        config: 'english'
+      })
       .order('updated_at', { ascending: false })
-      .limit(10);
+      .limit(limit);
     
-    if (error) {
-      console.error('任务模糊搜索失败:', error);
-      return [];
+    if (tsError) {
+      console.error('任务全文搜索失败:', { message: tsError.message, details: tsError.details, hint: tsError.hint, code: tsError.code });
+      
+      // 失败后回退到模糊搜索
+      const { data, error } = await supabase
+        .from('task')
+        .select('*')
+        .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+        .order('updated_at', { ascending: false })
+        .limit(limit);
+      
+      if (error) {
+        console.error('任务模糊搜索失败:', { message: error.message, details: error.details, hint: error.hint, code: error.code });
+        return [];
+      }
+      
+      return data.map(task => ({
+        ...task,
+        type: 'task'
+      }));
     }
     
-    return data.map(task => ({
+    return (tsData || []).map(task => ({
       ...task,
-      project_name: task.project?.project_name,
       type: 'task'
     }));
+  } catch (error) {
+    console.error('搜索任务时发生异常:', error);
+    return [];
   }
-  
-  return (tsData || []).map(task => ({
-    ...task,
-    project_name: task.project?.project_name,
-    type: 'task'
-  }));
 }
 
 // 搜索用户
-async function searchUsers(query) {
+async function searchUsers(query, limit = 10, sessionId = null) {
+  // If sessionId is provided, only return users who are participants in that chat session
+  if (sessionId) {
+    const { data: participants, error: participantsError } = await supabase
+      .from('chat_participant')
+      .select('user_id')
+      .eq('session_id', sessionId);
+    
+    if (participantsError) {
+      console.error('获取聊天参与者失败:', participantsError);
+      return [];
+    }
+    
+    // Get the user IDs of the participants
+    const participantUserIds = participants.map(p => p.user_id);
+    
+    if (participantUserIds.length === 0) {
+      return [];
+    }
+    
+    // Get users that match the query and are participants in the chat session
+    const { data, error } = await supabase
+      .from('user')
+      .select('*')
+      .in('id', participantUserIds)
+      .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error('搜索聊天参与者失败:', error);
+      return [];
+    }
+    
+    return (data || []).map(user => ({
+      ...user,
+      type: 'user'
+    }));
+  }
+  
+  // Regular user search when no sessionId is provided (existing code)
   // 首先尝试使用全文搜索
   const { data: tsData, error: tsError } = await supabase
     .from('user')
@@ -150,7 +187,7 @@ async function searchUsers(query) {
       config: 'english'
     })
     .order('updated_at', { ascending: false })
-    .limit(10);
+    .limit(limit);
   
   if (tsError) {
     console.error('用户全文搜索失败:', tsError);
@@ -161,7 +198,7 @@ async function searchUsers(query) {
       .select('*')
       .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
       .order('updated_at', { ascending: false })
-      .limit(10);
+      .limit(limit);
     
     if (error) {
       console.error('搜索用户失败:', error);
@@ -182,55 +219,60 @@ async function searchUsers(query) {
 
 // 搜索团队
 async function searchTeams(query) {
-  // 首先尝试使用全文搜索
-  const { data: tsData, error: tsError } = await supabase
-    .from('team')
-    .select(`
-      *,
-      project:project_id (project_name),
-      created_by_user:created_by (name)
-    `)
-    .textSearch('tsv_searchable', query, {
-      type: 'plain',
-      config: 'english'
-    })
-    .order('updated_at', { ascending: false })
-    .limit(10);
-  
-  if (tsError) {
-    console.error('团队全文搜索失败:', tsError);
-    
-    // 失败后回退到模糊搜索
-    const { data, error } = await supabase
+  try {
+    // 首先尝试使用全文搜索
+    const { data: tsData, error: tsError } = await supabase
       .from('team')
       .select(`
         *,
-        project:project_id (project_name),
+        project(project_name),
         created_by_user:created_by (name)
       `)
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+      .textSearch('tsv_searchable', query, {
+        type: 'plain',
+        config: 'english'
+      })
       .order('updated_at', { ascending: false })
       .limit(10);
     
-    if (error) {
-      console.error('团队模糊搜索失败:', error);
-      return [];
+    if (tsError) {
+      console.error('团队全文搜索失败:', { message: tsError.message, details: tsError.details, hint: tsError.hint, code: tsError.code });
+      
+      // 失败后回退到模糊搜索
+      const { data, error } = await supabase
+        .from('team')
+        .select(`
+          *,
+          project(project_name),
+          created_by_user:created_by (name)
+        `)
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+        .order('updated_at', { ascending: false })
+        .limit(10);
+      
+      if (error) {
+        console.error('团队模糊搜索失败:', { message: error.message, details: error.details, hint: error.hint, code: error.code });
+        return [];
+      }
+      
+      return (data || []).map(team => ({
+        ...team,
+        project_name: team.project?.project_name,
+        creator_name: team.created_by_user?.name,
+        type: 'team'
+      }));
     }
     
-    return (data || []).map(team => ({
+    return (tsData || []).map(team => ({
       ...team,
       project_name: team.project?.project_name,
       creator_name: team.created_by_user?.name,
       type: 'team'
     }));
+  } catch (error) {
+    console.error('搜索团队时发生异常:', error);
+    return [];
   }
-  
-  return (tsData || []).map(team => ({
-    ...team,
-    project_name: team.project?.project_name,
-    creator_name: team.created_by_user?.name,
-    type: 'team'
-  }));
 }
 
 // 搜索消息
@@ -263,51 +305,79 @@ async function searchMessages(query) {
 
 // GET方法处理搜索请求
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q');
-  
-  if (!query || !query.trim()) {
-    return NextResponse.json({ results: [] });
-  }
-  
-  const searchTerm = query.trim();
-  let allResults = [];
-  
   try {
-    // 获取当前用户ID（如果已登录）
-    const { user } = useGetUser();
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get('query') || '';
+    const userId = searchParams.get('userId');
+    const type = searchParams.get('type'); // Get the search type (mention, etc.)
+    const sessionId = searchParams.get('sessionId'); // Get the chat session ID
+    
+    // 如果查询过短，返回空结果
+    if (query.length < 2) {
+      return NextResponse.json({
+        results: [],
+        message: '查询词太短'
+      });
+    }
+    
+    // For mentions, we need to limit results and prioritize recent items
+    if (type === 'mention') {
+      const results = [];
+      
+      // Users (limit to 5 for mentions)
+      const users = await searchUsers(query, 5, sessionId);
+      results.push(...users);
+      
+      // Projects (limit to 3 for mentions)
+      const projects = await searchProjects(query, 3);
+      results.push(...projects);
+      
+      // Tasks (limit to 3 for mentions)
+      const tasks = await searchTasks(query, 3);
+      results.push(...tasks);
+      
+      return NextResponse.json({
+        results,
+      });
+    }
     
     // 记录搜索历史
-    await recordSearchHistory(searchTerm, user?.id);
+    if (query) {
+      await recordSearchHistory(query, userId);
+    }
     
-    // 并行执行所有搜索
-    const [projectResults, taskResults, userResults, teamResults, messageResults] = await Promise.all([
-      searchProjects(searchTerm),
-      searchTasks(searchTerm),
-      searchUsers(searchTerm),
-      searchTeams(searchTerm),
-      searchMessages(searchTerm)
+    // 并行执行多个搜索
+    const [
+      projects,
+      tasks,
+      users,
+      teams,
+      messages
+    ] = await Promise.all([
+      searchProjects(query),
+      searchTasks(query),
+      searchUsers(query, 10, sessionId),
+      searchTeams(query),
+      searchMessages(query)
     ]);
     
-    // 合并所有结果
-    allResults = [
-      ...projectResults,
-      ...taskResults,
-      ...userResults,
-      ...teamResults,
-      ...messageResults
+    // 合并结果
+    const results = [
+      ...projects,
+      ...tasks,
+      ...users,
+      ...teams,
+      ...messages
     ];
     
-    // 按相关性排序（简单实现：最新的排在前面）
-    allResults.sort((a, b) => {
-      const dateA = new Date(a.updated_at || a.created_at);
-      const dateB = new Date(b.updated_at || b.created_at);
-      return dateB - dateA;
+    return NextResponse.json({
+      results
     });
-    
-    return NextResponse.json({ results: allResults });
   } catch (error) {
-    console.error('搜索失败:', error);
-    return NextResponse.json({ results: [], error: 'Search failed' }, { status: 500 });
+    console.error('Search API error:', error);
+    return NextResponse.json({
+      error: '搜索失败',
+      details: error.message
+    }, { status: 500 });
   }
 } 

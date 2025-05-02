@@ -1,4 +1,4 @@
-import { openai } from '../task-manager-agent/config';
+import { openai } from '../../api/ai/task-manager-agent/config';
 import { safeParseJSON, executeApiRequest, createDocxTemplate } from './utils';
 import { supabase } from '@/lib/supabase';
 import PizZip from 'pizzip';
@@ -1052,7 +1052,7 @@ async function createTasksFromResult(taskResult, userId, teamId, projectId) {
     console.log(`Creating tasks from result for user ${userId}, project ${projectId}, team ${teamId}`);
     
     // Import the createTask function from db-service.js
-    const { createTask, addTaskToSection, createSection } = require('../task-manager-agent/db-service');
+    const { createTask, addTaskToSection, createSection } = require('../../api/ai/task-manager-agent/db-service');
     
     // Ensure we have a valid task result
     if (!taskResult || !taskResult.tasks || !Array.isArray(taskResult.tasks)) {

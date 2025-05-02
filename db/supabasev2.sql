@@ -246,6 +246,7 @@ CREATE TABLE "notification" (
   "related_entity_type" VARCHAR(50), -- 例如：'task', 'project', 'team', 'comment'
   "related_entity_id" VARCHAR(255), -- 相关实体的ID
   "data" JSONB,
+  "link" VARCHAR(255),
   "is_read" BOOLEAN DEFAULT FALSE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -278,10 +279,13 @@ CREATE TABLE "chat_message" (
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "content" TEXT NOT NULL,
   "reply_to_message_id" INT REFERENCES "chat_message"("id") ON DELETE SET NULL,
+  "mentions" JSONB,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "is_deleted" BOOLEAN DEFAULT FALSE
 );
+
+CREATE INDEX IF NOT EXISTS chat_message_mentions_idx ON chat_message USING GIN (mentions);
 
 -- 聊天消息已读状态表
 CREATE TABLE "chat_message_read_status" (

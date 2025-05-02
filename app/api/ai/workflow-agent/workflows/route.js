@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createWorkflow, updateWorkflow, getUserWorkflows, getWorkflow } from '../workflow-service';
+import { createWorkflow, updateWorkflow, getUserWorkflows, getWorkflow } from '../../../../[locale]/ai-workflow/workflow-service';
 
 // GET endpoint to fetch all workflows for a user
 export async function GET(request) {

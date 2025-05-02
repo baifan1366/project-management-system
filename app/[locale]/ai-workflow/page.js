@@ -95,51 +95,6 @@ const initialNodes = [
       selectedModel: 'google/gemini-2.0-flash-exp:free',
       inputs: {}
     }
-  },
-  {
-    id: 'json_output',
-    type: 'workflowNode',
-    position: { x: 150, y: 350 },
-    data: { 
-      label: 'JSON Output',
-      icon: <Code size={20} />,
-      nodeType: 'output',
-      outputType: 'json',
-      description: 'Generate JSON result',
-      handleInputChange: () => {},
-      jsonFormat: '{\n  "title": "Result",\n  "content": "Generated content",\n  "items": []\n}',
-      inputs: {}
-    }
-  },
-  {
-    id: 'api_output',
-    type: 'workflowNode',
-    position: { x: 350, y: 500 },
-    data: { 
-      label: 'API Request',
-      icon: <Code size={20} />,
-      nodeType: 'output',
-      outputType: 'api',
-      description: 'Send data to external API',
-      handleInputChange: () => {},
-      apiUrl: 'https://httpbin.org/post',
-      apiMethod: 'POST',
-      inputs: {}
-    }
-  },
-  {
-    id: 'task_output',
-    type: 'workflowNode',
-    position: { x: 350, y: 350 },
-    data: { 
-      label: 'Task Creation',
-      icon: <CheckCircle size={20} />,
-      nodeType: 'output',
-      outputType: 'task',
-      description: 'Create project tasks automatically',
-      handleInputChange: () => {},
-      inputs: {}
-    }
   }
 ];
 
@@ -149,24 +104,6 @@ const initialEdges = [
     id: 'input-process', 
     source: 'input', 
     target: 'process', 
-    animated: true 
-  },
-  { 
-    id: 'process-json_output', 
-    source: 'process', 
-    target: 'json_output', 
-    animated: true 
-  },
-  { 
-    id: 'json_output-api_output', 
-    source: 'json_output', 
-    target: 'api_output', 
-    animated: true 
-  },
-  { 
-    id: 'process-task_output', 
-    source: 'process', 
-    target: 'task_output', 
     animated: true 
   }
 ];
@@ -188,6 +125,7 @@ export default function AIWorkflow() {
   
   // State for panel collapse
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
+  const [isConfigCollapsed, setIsConfigCollapsed] = useState(false);
   
   // State for workflow
   const [nodes, setNodes] = useState(initialNodes);
@@ -697,6 +635,13 @@ export default function AIWorkflow() {
         const outputType = node.data.outputType || 'default';
         outputFormats.push(outputType);
         
+        // For debugging
+        console.log(`[Debug] Processing output node:`, {
+          id: node.id,
+          type: outputType,
+          data: node.data
+        });
+        
         // 为每种输出类型收集设置
         if (outputType === 'json' && node.data.jsonFormat) {
           outputSettings[node.id] = {
@@ -736,26 +681,53 @@ export default function AIWorkflow() {
             projectId: node.data.projectId || null,
             teamId: node.data.teamId || null
           };
+        } else if (outputType === 'chat') {
+          // 为 chat 节点收集聊天会话ID和消息模板
+          console.log(`[Debug] Chat node found:`, {
+            id: node.id,
+            chatSessionIds: node.data.chatSessionIds,
+            messageTemplate: node.data.messageTemplate,
+            messageFormat: node.data.messageFormat
+          });
+          
+          // Check if chatSessionIds is defined and not empty
+          if (node.data.chatSessionIds && node.data.chatSessionIds.length > 0) {
+            outputSettings[node.id] = {
+              type: 'chat',
+              chatSessionIds: node.data.chatSessionIds,
+              messageTemplate: node.data.messageTemplate || 'Hello, this is an automated message from the workflow system:\n\n{{content}}',
+              messageFormat: node.data.messageFormat || 'text'
+            };
+            console.log(`[Debug] Added chat settings for node ${node.id}:`, outputSettings[node.id]);
+          } else {
+            console.warn(`[Debug] No chat sessions selected for chat node ${node.id}`);
+          }
         }
       });
       
-      // 发送请求，包含连接信息和多模型配置
+      // Create the request payload
+      const payload = {
+        workflowId: currentWorkflow.id,
+        inputs,
+        modelId: selectedModel,
+        aiModels: aiModels, // 发送所有选择的AI模型
+        userId,
+        outputFormats,
+        outputSettings,
+        nodeConnections,
+        connectionMap
+      };
+      
+      // Debug log the entire payload
+      console.log(`[Debug] Full workflow execution payload:`, JSON.stringify(payload, null, 2));
+      
+      // 发送请求
       const response = await fetch('/api/ai/workflow-agent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          workflowId: currentWorkflow.id,
-          inputs,
-          modelId: selectedModel,
-          aiModels: aiModels, // 发送所有选择的AI模型
-          userId,
-          outputFormats,
-          outputSettings,
-          nodeConnections,
-          connectionMap
-        }),
+        body: JSON.stringify(payload),
       });
       
       if (!response.ok) {
@@ -942,6 +914,11 @@ export default function AIWorkflow() {
   const togglePanel = () => {
     setIsPanelCollapsed(!isPanelCollapsed);
   };
+
+  // Toggle config collapse
+  const toggleConfig = () => {
+    setIsConfigCollapsed(!isConfigCollapsed);
+  };
   
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f5] dark:bg-[#1f1f1f]">
@@ -1023,7 +1000,7 @@ export default function AIWorkflow() {
         </div>
         
         {/* Middle panel - Workflow Editor */}
-        <div className={`${isPanelCollapsed ? 'col-span-11' : 'col-span-9'} bg-white dark:bg-[#282828] rounded-lg shadow-sm border border-gray-100 dark:border-[#333333] overflow-hidden transition-all duration-300`}>
+        <div className={`${isPanelCollapsed ? 'col-span-11' : 'col-span-9'} h-auto bg-white dark:bg-[#282828] rounded-lg shadow-sm border border-gray-100 dark:border-[#333333] overflow-hidden transition-all duration-300`}>
           <div className="border-b border-gray-100 dark:border-[#383838] p-4 flex justify-between items-center">
             <div>
               <input
@@ -1072,9 +1049,20 @@ export default function AIWorkflow() {
             </div>
           </div>
           
-          <div className="p-4 grid grid-cols-3 gap-4">
+          <div className="p-4 grid grid-cols-3 gap-4 h-5/6">
             {/* Workflow Configuration */}
-            <div className="space-y-4 col-span-1">
+            <div className={`space-y-4 transition-all duration-300 ${isConfigCollapsed ? 'col-span-0 hidden' : 'col-span-1'}`}>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-sm font-medium dark:text-gray-300">{t('workflowConfiguration') || 'Workflow Configuration'}</h3>
+                <Button 
+                  onClick={toggleConfig} 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-6 w-6 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333333]"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </div>
               <div>
                 <Label className="dark:text-gray-300">{t('workflowDescription')}</Label>
                 <Textarea
@@ -1155,7 +1143,19 @@ export default function AIWorkflow() {
             </div>
             
             {/* Workflow Flow Editor */}
-            <div className="border rounded-md overflow-hidden h-[500px] col-span-2 dark:border-[#444444]">
+            <div className={`border rounded-md overflow-hidden ${isConfigCollapsed ? 'col-span-3' : 'col-span-2'} h-full dark:border-[#444444] transition-all duration-300`}>
+              {isConfigCollapsed && (
+                <div className="absolute left-4 top-4 z-10">
+                  <Button 
+                    onClick={toggleConfig} 
+                    size="icon" 
+                    variant="outline" 
+                    className="h-8 w-8 bg-white/90 dark:bg-[#333333]/90 dark:border-[#444444] dark:text-gray-300"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
