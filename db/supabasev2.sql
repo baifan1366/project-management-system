@@ -661,3 +661,14 @@ CREATE TABLE "payment" (
 
 -- For better performance when querying payment by user
 CREATE INDEX idx_payment_user_id ON "payment"("user_id");
+
+CREATE TABLE task_links (
+    id SERIAL PRIMARY KEY,  -- 自增主键
+    source_task_id INT NOT NULL,
+    target_task_id INT NOT NULL,
+    link_type INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (source_task_id) REFERENCES task(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_task_id) REFERENCES task(id) ON DELETE CASCADE
+);
