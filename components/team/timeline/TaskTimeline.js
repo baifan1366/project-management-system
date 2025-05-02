@@ -88,7 +88,7 @@ function formatGanttDate(date) {
   }
 }
 
-export default function TaskTimeline({ projectId, teamId, teamCFId }) {
+export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }) {
   const ganttContainer = useRef(null);
   const t = useTranslations('CreateTask');
   const { confirm } = useConfirm();
@@ -115,7 +115,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   const [ganttObj, setGanttObj] = useState(null);
   
   // 使用BodyContent中的自定义hook获取数据
-  const { sections, allTasks, ganttTasks, links, tags } = useTimelineData(teamId, teamCFId, ganttObj, refreshFlag);
+  const { sections, allTasks, ganttTasks, links, tags } = useTimelineData(teamId, teamCFId, ganttObj, refreshFlag, refreshKey);
 
   const dispatch = useDispatch();
 
@@ -544,7 +544,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
       // 如果没有任务数据但有缩放级别更新，只更新缩放
       setZoom(currentZoom);
     }
-  }, [ganttObj, ganttTasks, links, currentZoom]); // 添加links依赖项
+  }, [ganttObj, ganttTasks, links, currentZoom, refreshKey]); // 添加links依赖项
 
   // 添加一个新函数用于更新数据库
   const updateTaskInDatabase = async (taskData) => {

@@ -16,7 +16,7 @@ const requestCache = {
   taskLinks: false // 添加任务链接的缓存标志
 };
 
-export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0) => {
+export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0, refreshKey) => {
   const dispatch = useDispatch();
   const allTags = useSelector(state => state.tags.tags);
   const teamCFTags = useSelector(state => state.teamCF.tags);
@@ -186,7 +186,7 @@ export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0) => {
     }
   }, [allTasks, tags, gantt]);
 
-  return { sections, allTasks, ganttTasks, links, tags };
+  return { sections, allTasks, ganttTasks, links, tags, refreshKey };
 };
 
 // 将任务映射到Gantt格式
