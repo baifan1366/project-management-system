@@ -140,7 +140,7 @@ export async function PUT(request) {
     if (body.id) {
       const updateData = { ...body };
       // 确保只更新允许的字段
-      const allowedFields = ['name', 'description', 'access', 'star', 'archive'];
+      const allowedFields = ['name', 'description', 'access', 'star', 'archive', 'status'];
       Object.keys(updateData).forEach(key => {
         if (!allowedFields.includes(key)) {
           delete updateData[key];

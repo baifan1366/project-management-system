@@ -62,6 +62,47 @@ export default function TeamCustomFieldPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
   const isStarred = selectedTeam?.star || false;  
+  
+  // 定义团队状态及对应颜色
+  const statusColors = {
+    PENDING: "text-yellow-500",
+    IN_PROGRESS: "text-blue-500",
+    COMPLETED: "text-green-500",
+    CANCELLED: "text-red-500",
+    ON_HOLD: "text-gray-500"
+  };
+  
+  const statusBgColors = {
+    PENDING: "bg-transparent",
+    IN_PROGRESS: "bg-transparent",
+    COMPLETED: "bg-transparent",
+    CANCELLED: "bg-transparent",
+    ON_HOLD: "bg-transparent"
+  };
+
+  const statusFocusColors = {
+    PENDING: "focus:bg-yellow-100 focus:text-yellow-700",
+    IN_PROGRESS: "focus:bg-blue-100 focus:text-blue-700",
+    COMPLETED: "focus:bg-green-100 focus:text-green-700",
+    CANCELLED: "focus:bg-red-100 focus:text-red-700",
+    ON_HOLD: "focus:bg-gray-100 focus:text-gray-700"
+  }
+
+  const statusTopHoverColors = {
+    PENDING: "hover:bg-accent",
+    IN_PROGRESS: "hover:bg-accent",
+    COMPLETED: "hover:bg-accent",
+    CANCELLED: "hover:bg-accent",
+    ON_HOLD: "hover:bg-accent"
+  };
+
+  const statusHoverColors = {
+    PENDING: "hover:bg-yellow-100",
+    IN_PROGRESS: "hover:bg-blue-100",
+    COMPLETED: "hover:bg-green-100",
+    CANCELLED: "hover:bg-red-100",
+    ON_HOLD: "hover:bg-gray-100"
+  };
 
   const handleEditSuccess = () => {
     setRefreshKey(prev => {
@@ -104,6 +145,9 @@ export default function TeamCustomFieldPage() {
               teamId,
               teamCFId
             })).unwrap();
+            
+            // 数据加载完成后，更新刷新键以触发customFieldContent重新渲染
+            setRefreshKey(prev => prev + 1);
           }
         } else {
           // 如果未加载完成，则监听状态变化
@@ -113,7 +157,10 @@ export default function TeamCustomFieldPage() {
               dispatch(fetchTeamCustomFieldById({
                 teamId,
                 teamCFId
-              }));
+              })).then(() => {
+                // 数据加载完成后，更新刷新键以触发重新渲染
+                setRefreshKey(prev => prev + 1);
+              });
               
               if (unsubscribe) {
                 unsubscribe();
@@ -171,28 +218,28 @@ export default function TeamCustomFieldPage() {
     }
     const fieldType = currentItem.custom_field?.type;
     if (fieldType === 'LIST') {
-      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} />;
+      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'GANTT') {
-      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     if (fieldType === 'KANBAN') {
-      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     if (fieldType === 'FILES') {
-      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     if (fieldType === 'WORKFLOW') {
-      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     if (fieldType === 'OVERVIEW') {
       return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} />
     }
     if (fieldType === 'TIMELINE') {
-      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     if (fieldType === 'CALENDAR') {
-      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     return <div>暂不支持的字段类型: {fieldType}</div>;
   }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey]);
@@ -233,6 +280,7 @@ export default function TeamCustomFieldPage() {
         teamId: selectedTeam.id, 
         star: newStarStatus 
       })).unwrap();
+      setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error updating star status:', error);
     }
@@ -256,11 +304,30 @@ export default function TeamCustomFieldPage() {
           updated_at: new Date().toISOString()
         }));
         console.log("confirm archive");
+        setRefreshKey(prev => prev + 1);
         // Await fetching the updated user teams list
         await dispatch(fetchUserTeams({ userId, projectId }));
         setOnClose(true);
       }
     });
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    try {
+      const userId = user?.id;
+      await dispatch(updateTeam({ 
+        teamId, 
+        data: {
+          status: newStatus
+        },
+        user_id: userId,
+        old_values: selectedTeam,
+        updated_at: new Date().toISOString()
+      })).unwrap();
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error updating team status:', error);
+    }
   };
 
   return (
@@ -276,7 +343,7 @@ export default function TeamCustomFieldPage() {
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 p-1">
+                <DropdownMenuContent className="w-60 p-1">
                   <DropdownMenuItem 
                     className="flex items-center px-3 py-2 text-sm"
                     onClick={() => {
@@ -300,12 +367,12 @@ export default function TeamCustomFieldPage() {
                   <DropdownMenuItem 
                     className="flex items-center px-3 py-2 text-sm"
                     onClick={() => {
-                      setEditTeamActiveTab("permissions");
+                      setEditTeamActiveTab("access");
                       setEditTeamOpen(true);
                     }}
                   >
                     <Settings2 className="h-4 w-4 mr-2" />
-                    {t('manageTeamPermissions')}
+                    {t('editTeamAccess')}
                   </DropdownMenuItem>
                   <hr className="my-1" />
                   <DropdownMenuItem 
@@ -321,10 +388,63 @@ export default function TeamCustomFieldPage() {
               <Button variant="ghost" size="icon" onClick={handleStarClick}>
                 {isStarred ? <Star className="h-4 w-4" /> : <StarOff className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="sm">
-                <Circle className="h-4 w-4 mr-2" />
-                {t('setStatus')}
-              </Button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    size="sm"
+                    className={selectedTeam?.status ? `flex items-center px-3 py-2 text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200` : ""}
+                  >
+                    <Circle 
+                      className="h-4 w-4" 
+                      style={selectedTeam?.status ? {fill: 'currentColor'} : {}} 
+                    />
+                    {selectedTeam?.status ? t(selectedTeam.status) : t('setStatus')}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-55 p-1">
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.PENDING} ${statusHoverColors.PENDING} transition-colors duration-200 ${statusFocusColors.PENDING}`}
+                    onClick={() => handleStatusChange('PENDING')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('PENDING')}
+                    {selectedTeam?.status === 'PENDING' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.IN_PROGRESS} ${statusHoverColors.IN_PROGRESS} transition-colors duration-200 ${statusFocusColors.IN_PROGRESS}`}
+                    onClick={() => handleStatusChange('IN_PROGRESS')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('IN_PROGRESS')}
+                    {selectedTeam?.status === 'IN_PROGRESS' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.COMPLETED} ${statusHoverColors.COMPLETED} transition-colors duration-200 ${statusFocusColors.COMPLETED}`}
+                    onClick={() => handleStatusChange('COMPLETED')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('COMPLETED')}
+                    {selectedTeam?.status === 'COMPLETED' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.CANCELLED} ${statusHoverColors.CANCELLED} transition-colors duration-200 ${statusFocusColors.CANCELLED}`}
+                    onClick={() => handleStatusChange('CANCELLED')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('CANCELLED')}
+                    {selectedTeam?.status === 'CANCELLED' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.ON_HOLD} ${statusHoverColors.ON_HOLD} transition-colors duration-200 ${statusFocusColors.ON_HOLD}`}
+                    onClick={() => handleStatusChange('ON_HOLD')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('ON_HOLD')}
+                    {selectedTeam?.status === 'ON_HOLD' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>

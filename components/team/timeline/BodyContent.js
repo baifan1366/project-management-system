@@ -6,30 +6,35 @@ import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchAllTags } from '@/lib/redux/features/tagSlice';
 import { getTags } from '@/lib/redux/features/teamCFSlice';
+import { fetchTaskLink } from '@/lib/redux/features/taskLinksSlice';
 
 // 使用唯一键记录全局请求状态，避免重复请求
 const requestCache = {
   allTags: false,
   teamTags: {},
-  sections: {}
+  sections: {},
+  taskLinks: false // 添加任务链接的缓存标志
 };
 
-export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0) => {
+export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0, refreshKey) => {
   const dispatch = useDispatch();
   const allTags = useSelector(state => state.tags.tags);
   const teamCFTags = useSelector(state => state.teamCF.tags);
   const tagsStatus = useSelector(state => state.teamCF.tagsStatus);
+  const taskLinks = useSelector(state => state.taskLinks.links); // 从Redux获取任务链接
   
   const [sections, setSections] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
   const [ganttTasks, setGanttTasks] = useState([]);
   const [tags, setTags] = useState([]);
+  const [links, setLinks] = useState([]); // 添加links状态存储任务链接
   
   // 本地跟踪当前组件实例的已请求状态
   const localRequestTracker = useRef({
     allTagsFetched: false,
     teamTagsFetched: false,
-    sectionsFetched: false
+    sectionsFetched: false,
+    taskLinksFetched: false // 添加任务链接的本地跟踪标志
   });
 
   // 获取所有通用标签 - 全局只请求一次
@@ -63,6 +68,68 @@ export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0) => {
       setTags(allTags);
     }
   }, [allTags, teamCFTags]);
+
+  // 获取任务链接数据
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function fetchLinks() {
+      try {
+        // 当收到刷新标志时重置缓存状态
+        if (refreshFlag > 0) {
+          requestCache.taskLinks = false;
+          localRequestTracker.current.taskLinksFetched = false;
+        }
+        
+        if (!requestCache.taskLinks && !localRequestTracker.current.taskLinksFetched) {
+          await dispatch(fetchTaskLink());
+          
+          if (!isMounted) return;
+          
+          requestCache.taskLinks = true;
+          localRequestTracker.current.taskLinksFetched = true;
+        }
+      } catch (error) {
+        console.error("获取任务链接失败:", error);
+      }
+    }
+    
+    fetchLinks();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch, refreshFlag]);
+
+  // 当Redux中的taskLinks更新时，更新本地links状态
+  useEffect(() => {
+    if (taskLinks && taskLinks.length > 0) {
+      // 处理链接数据，转换为gantt需要的格式
+      const formattedLinks = taskLinks.map(link => {
+        // 确保链接类型是有效的值（0-3）并转换为字符串
+        let linkType = link.link_type;
+        if (linkType === null || linkType === undefined) {
+          linkType = 0; // 默认使用 finish_to_start
+        }
+        
+        // 确保链接类型在有效范围内
+        if (linkType < 0 || linkType > 3) {
+          linkType = 0;
+        }
+        
+        return {
+          id: link.id,
+          source: link.source_task_id,
+          target: link.target_task_id,
+          type: linkType.toString() // gantt需要字符串类型
+        };
+      });
+      
+      setLinks(formattedLinks);
+    } else {
+      setLinks([]);
+    }
+  }, [taskLinks]);
 
   // 获取部分和任务数据 - 当添加新任务时重新加载
   useEffect(() => {
@@ -119,7 +186,7 @@ export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0) => {
     }
   }, [allTasks, tags, gantt]);
 
-  return { sections, allTasks, ganttTasks, tags };
+  return { sections, allTasks, ganttTasks, links, tags, refreshKey };
 };
 
 // 将任务映射到Gantt格式

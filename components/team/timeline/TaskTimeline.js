@@ -15,6 +15,8 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { useTimelineData, formatDateForGantt } from './BodyContent';
 import { updateTask, fetchTaskById } from '@/lib/redux/features/taskSlice';
 import { getTagByName } from '@/lib/redux/features/tagSlice';
+import { createTaskLink, deleteTaskLink } from '@/lib/redux/features/taskLinksSlice';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 /**
  * 格式化日期为Gantt图所需的标准格式
@@ -86,13 +88,14 @@ function formatGanttDate(date) {
   }
 }
 
-export default function TaskTimeline({ projectId, teamId, teamCFId }) {
+export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }) {
   const ganttContainer = useRef(null);
   const t = useTranslations('CreateTask');
   const { confirm } = useConfirm();
   const project = useSelector(state => 
     state.projects.projects.find(p => p.id.toString() === projectId.toString())
   );
+  const { user } = useGetUser();
   const currentDate = new Date().toISOString().split('T')[0];
   const zoom = 'Days';
   const [currentZoom, setCurrentZoom] = useState(zoom);
@@ -112,7 +115,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   const [ganttObj, setGanttObj] = useState(null);
   
   // 使用BodyContent中的自定义hook获取数据
-  const { sections, allTasks, ganttTasks, links, tags } = useTimelineData(teamId, teamCFId, ganttObj, refreshFlag);
+  const { sections, allTasks, ganttTasks, links, tags } = useTimelineData(teamId, teamCFId, ganttObj, refreshFlag, refreshKey);
 
   const dispatch = useDispatch();
 
@@ -125,6 +128,77 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
   const handleZoomChange = (level) => {
     changeZoom(level, setZoom, setCurrentZoom);
   }
+
+  // 任务链接相关函数 - 创建任务链接
+  const handleCreateTaskLink = async (link) => {
+    try {
+      if (!link || !link.source || !link.target) {
+        console.error("创建链接时缺少必要参数");
+        return false;
+      }
+      
+      // 验证链接类型，确保是有效值
+      let linkType = parseInt(link.type);
+      if (isNaN(linkType) || linkType < 0 || linkType > 3) {
+        console.error("链接类型无效:", link.type);
+        linkType = 0; // 默认使用 finish_to_start (0)
+      }
+
+      // 使用Redux dispatch创建链接
+      const resultAction = await dispatch(createTaskLink({
+        source_task_id: link.source,
+        target_task_id: link.target,
+        link_type: linkType, // 使用数字类型存储
+        user_id: user?.id
+      }));
+
+      // 检查action状态
+      if (createTaskLink.fulfilled.match(resultAction)) {
+        console.log("任务链接创建成功", resultAction.payload);
+        
+        // 刷新甘特图数据
+        setRefreshFlag(prev => prev + 1);
+        
+        return true;
+      } else {
+        console.error("创建任务链接失败:", resultAction.error);
+        return false;
+      }
+    } catch (error) {
+      console.error("创建任务链接失败:", error);
+      return false;
+    }
+  };
+
+  // 删除任务链接
+  const handleDeleteTaskLink = async (linkId) => {
+    try {
+      if (!linkId) {
+        console.error("删除链接时缺少必要参数");
+        return false;
+      }
+      
+      // 使用Redux dispatch删除链接
+      const user_id = user?.id;
+      const resultAction = await dispatch(deleteTaskLink({ user_id, linkId }));
+      
+      // 检查action状态
+      if (deleteTaskLink.fulfilled.match(resultAction)) {
+        console.log("任务链接删除成功", resultAction.payload);
+        
+        // 刷新甘特图数据
+        setRefreshFlag(prev => prev + 1);
+        
+        return true;
+      } else {
+        console.error("删除任务链接失败:", resultAction.error);
+        return false;
+      }
+    } catch (error) {
+      console.error("删除任务链接失败:", error);
+      return false;
+    }
+  };
 
   // 新的回调函数，将在AddTaskDialog中被调用
   const handleTaskAdd = (taskData) => {
@@ -261,34 +335,27 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
     gantt.config.xml_date = "%Y-%m-%d %H:%i";
     gantt.config.show_grid = false;
     
+    // 配置链接类型 - 链接类型配置
     gantt.config.links = {
-      "finish_to_start": true,
-      "start_to_start": false,
-      "finish_to_finish": false,
-      "start_to_finish": false
+      "finish_to_start": "0", // 类型 0
+      "start_to_start": "1",   // 类型 1
+      "finish_to_finish": "2", // 类型 2
+      "start_to_finish": "3"   // 类型 3
     };
 
-    // // 在 dhtmlx-gantt 库中，链接类型通常用数字表示：
-    // // 0: "finish_to_start" (结束到开始)
-    // // 1: "start_to_start" (开始到开始)
-    // // 2: "finish_to_finish" (结束到结束)
-    // // 3: "start_to_finish" (开始到结束)    
-    // gantt.config.default_link_type = 0; 
+    // 设置默认链接类型为 "finish_to_start"(结束到开始) 
+    gantt.config.default_link_type = "0";
     
-    // gantt.attachEvent("onLinkValidation", function(link) {
-    //   return link.type == 0; 
-    // });
-
-    // // 强制正确渲染链接箭头
-    // gantt.templates.link_class = function(link){
-    //   return "finish_to_start_link";
-    // };
-
-    // // 监听链接添加事件，确保类型正确
-    // gantt.attachEvent("onBeforeLinkAdd", function(id, link) {
-    //   link.type = 0; // 强制使用 finish_to_start
-    //   return true;
-    // });
+    // 配置链接验证
+    gantt.attachEvent("onLinkValidation", function(link) {
+      // 确保链接类型是有效的字符串("0"到"3")
+      const validTypes = ["0", "1", "2", "3"];
+      if (!validTypes.includes(link.type)) {
+        console.warn("链接类型无效，修正为默认类型:", link.type);
+        link.type = "0"; // 设为默认类型
+      }
+      return true;
+    });
     
     // Customize task color
     gantt.templates.task_class = () => `custom-task-color`;
@@ -326,6 +393,25 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
       return false; // Prevent default behavior
     });
 
+    // 为链接添加创建事件处理函数
+    gantt.attachEvent("onAfterLinkAdd", async function(id, link) {
+      // 确保链接类型是有效的数字（0-3）
+      const validLinkType = parseInt(link.type);
+      if (isNaN(validLinkType) || validLinkType < 0 || validLinkType > 3) {
+        console.error("无效的链接类型:", link.type);
+        gantt.deleteLink(id);
+        return false;
+      }
+      
+      // 创建链接到后端数据库
+      const result = await handleCreateTaskLink({...link, type: validLinkType.toString()});
+      if (!result) {
+        // 如果创建失败，则从前端移除链接
+        gantt.deleteLink(id);
+      }
+      return true;
+    });
+
     // Add link deletion confirmation
     const linkClickHandler = (id) => {
       const link = gantt.getLink(id);
@@ -336,9 +422,14 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
         title: t('confirmDeleteLink'),
         description: `${t('link')} ${sourceTask.text} – ${targetTask.text} ${t('willBeDeleted')}`,
         variant: 'error',
-        onConfirm: () => {
-          gantt.deleteLink(id);
-          gantt.refreshData();
+        onConfirm: async () => {
+          // 删除数据库中的链接
+          const success = await handleDeleteTaskLink(id);
+          if (success) {
+            // 删除甘特图中的链接
+            gantt.deleteLink(id);
+            gantt.refreshData();
+          }
         }
       });
       return false;
@@ -453,7 +544,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId }) {
       // 如果没有任务数据但有缩放级别更新，只更新缩放
       setZoom(currentZoom);
     }
-  }, [ganttObj, ganttTasks, currentZoom]);
+  }, [ganttObj, ganttTasks, links, currentZoom, refreshKey]); // 添加links依赖项
 
   // 添加一个新函数用于更新数据库
   const updateTaskInDatabase = async (taskData) => {

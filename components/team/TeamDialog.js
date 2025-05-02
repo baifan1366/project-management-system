@@ -105,7 +105,6 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
     try {
       // 获取当前用户信息
       const userId = user?.id;
-      console.log('userId', userId)
       // 创建团队
       const team = await dispatch(createTeam({
         name: teamFormTransforms.teamName(data.teamName),
@@ -345,9 +344,9 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                                 {field.value === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500" />}
                                 <span>
                                   {field.value === 'invite_only' && t('inviteOnly')}
-                                  {field.value === 'can_edit' && t('everyoneCanEdit')}
-                                  {field.value === 'can_check' && t('everyoneCanCheck')}
-                                  {field.value === 'can_view' && t('everyoneCanView')}
+                                  {field.value === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}
+                                  {field.value === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}
+                                  {field.value === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project.project_name })}
                                 </span>
                               </div>
                             </div>
@@ -373,7 +372,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                         <div className="flex items-center w-full">
                           <Pencil className="w-5 h-5 mr-3 text-gray-500" />
                           <div className="flex-1">
-                            <div className="font-medium">{t('everyoneCanEdit')}</div>
+                            <div className="font-medium">{t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}</div>
                             <div className="text-xs text-gray-500 mt-0.5">
                               {t('everyoneCanEditDescription')}
                             </div>
@@ -384,7 +383,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                         <div className="flex items-center w-full">
                           <Eye className="w-5 h-5 mr-3 text-gray-500" />
                           <div className="flex-1">
-                            <div className="font-medium">{t('everyoneCanCheck')}</div>
+                            <div className="font-medium">{t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}</div>
                             <div className="text-xs text-gray-500 mt-0.5">
                               {t('everyoneCanCheckDescription')}
                             </div>
@@ -395,7 +394,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                         <div className="flex items-center w-full">
                           <Unlock className="w-5 h-5 mr-3 text-gray-500" />
                           <div className="flex-1">
-                            <div className="font-medium">{t('everyoneCanView')}</div>
+                            <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName: project.project_name })}</div>
                             <div className="text-xs text-gray-500 mt-0.5">
                               {t('everyoneCanViewDescription')}
                             </div>
