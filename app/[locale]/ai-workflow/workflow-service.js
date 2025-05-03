@@ -1832,7 +1832,6 @@ async function sendChatSessionMessages(sessionIds, content, format = 'text', use
 
 // Add the new function to the exports
 export { 
-  getAvailableModels, 
   getWorkflow, 
   executeWorkflow, 
   saveWorkflowExecution, 
