@@ -189,7 +189,7 @@ export default function ProjectSidebar({ projectId }) {
           <div className="relative" ref={dropdownRef}>
             <button 
               onClick={() => setDropdownOpen(!isDropdownOpen)} 
-              className="flex items-center w-full px-4 py-2.5 text-foreground hover:bg-accent/50 transition-colors"
+              className="flex items-center justify-between w-full px-4 py-2.5 text-foreground hover:bg-accent/50 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <div 
@@ -200,7 +200,7 @@ export default function ProjectSidebar({ projectId }) {
                 </div>
                 <span className="text-sm font-medium">{projectName}</span>
               </div>
-              <ChevronDown className="ml-auto text-muted-foreground"/>
+              <ChevronDown className="h-4 w-4"/>           
             </button>
             <div className={cn(
               "absolute left-0 right-0 mt-1 py-1 bg-popover border border-border rounded-md shadow-lg z-10",
@@ -227,8 +227,8 @@ export default function ProjectSidebar({ projectId }) {
                 <span>{t('settings')}</span>
               </Link>
               <div className="my-1 border-t border-border"></div>
-              <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-destructive transition-colors">
-                <Archive size={16} className="text-destructive" />
+              <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-red-500 hover:text-red-600 transition-colors">
+                <Archive size={16} className="text-red-500 hover:text-red-600" />
                 <span>{t('archiveProject')}</span>
               </Link>
             </div>

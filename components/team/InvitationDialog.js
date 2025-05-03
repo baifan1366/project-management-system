@@ -332,7 +332,7 @@ export default function InvitationDialog({ open, onClose }) {
               type="submit" 
               className="w-full"
               variant={themeColor}
-              disabled={!email}
+              disabled={!email || isLoading}
             >
               {t('sendInvite')}
             </Button>

@@ -730,7 +730,10 @@
     "noAvailableTaskData": "No available task data",
     "enterTaskName": "Enter task name",
     "enterStartDate": "Enter start date",
-    "enterDuration": "Enter duration"
+    "enterDuration": "Enter duration",
+    "totalLikes": "Total likes",
+    "likedThisTask": "liked this task",
+    "loadingUsers": "Loading users..."
   },
   "ChatDialog": {
     "privateMessages": "Private Messages",

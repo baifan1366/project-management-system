@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { PlusIcon, MoreHorizontal , ThumbsUp, Pen, Trash2, Check, User} from 'lucide-react';
+import { PlusIcon, MoreHorizontal , Pen, Trash2, Check, User} from 'lucide-react';
 import { Button } from '../../ui/button';
 import { useTranslations } from 'next-intl';
 import BodyContent from './BodyContent';
 import HandleSection from './HandleSection';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu';
+import LikeTask from './LikeTask';
 
 export default function TaskKanban({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
@@ -276,7 +277,9 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                 <span className="text-black dark:text-white ml-1">{column?.taskIds?.length || 0}</span>
                               </div>
                             ) : (
-                              <h2 className="font-semibold text-black dark:text-white">{column?.title} <span className="text-black dark:text-white ml-1">{column?.taskIds?.length || 0}</span></h2>
+                              <div className="flex items-center">
+                                <h2 className="font-semibold text-black dark:text-white">{column?.title} </h2> <span className="text-gray-800 dark:text-gray-400 ml-1">{column?.taskIds?.length || 0}</span>
+                              </div>
                             )}
                             <div className="flex">
                               <Button 
@@ -336,9 +339,9 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                           {/* 顶部栏 */}
                                           <div className="flex justify-between items-center">
                                             <div className="flex items-center">
-                                              <button className="mr-2 h-5 w-5 rounded-full flex items-center justify-center border border-gray-300 hover:bg-gray-200">
+                                              {/* <button className="mr-2 h-4 w-4 rounded-full flex items-center justify-center border border-gray-300 hover:bg-gray-200">
                                                 <Check size={12} className="text-gray-500" />
-                                              </button>
+                                              </button> */}
                                               <span className="text-sm text-black dark:text-white">{task.content}</span>
                                             </div>
                                             <button className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black">
@@ -351,9 +354,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                             <div>
                                               <User size={14} className="text-gray-500" />
                                             </div>
-                                            <button className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black">
-                                              <ThumbsUp size={14} className="text-gray-500" />
-                                            </button>
+                                            <LikeTask task={task} onLikeUpdate={() => {}} />
                                           </div>
                                         </div>
                                       )}

@@ -90,7 +90,7 @@ VALUES
 -- Insert default data
 INSERT INTO "default" (id, name, qty, updated_at, edited_by)
 VALUES
-  (1, 'custom_field', 7, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  (1, 'custom_field', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
   (2, 'tag', 4, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
   
 -- Insert section data
