@@ -571,31 +571,8 @@ export default function AdminSubscriptions() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       
-      //todo： 组件化header
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Subscription Management</h2>
-            
-            <div className="flex items-center">
-              <button className="p-2 mr-4 text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400">
-                <FaBell />
-              </button>
-              
-              <div className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-2">
-                  {adminData?.username?.charAt(0).toUpperCase() || 'A'}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{adminData?.full_name || adminData?.username}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{adminData?.role}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
         
         {/* Subscription Managment Content */}
         {(hasPermission('view_subscription_plans') || 

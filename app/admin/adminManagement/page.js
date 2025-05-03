@@ -622,223 +622,201 @@ export default function AdminUserManagement() {
   
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      
+
       {/* Main Content */}
-      {hasPermission('view_admins') ? (
       <div className="flex-1 overflow-auto">
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Admin User Management</h2>
-            
-            <div className="flex items-center">
-              <button className="p-2 mr-4 text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400">
-                <FaBell />
-              </button>
-              
-              <div className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-2">
-                  {adminData?.username?.charAt(0).toUpperCase() || 'A'}
+
+        {/* Content Area */}
+        {hasPermission('view_admins') ? (
+          <div className="p-6">
+            {/* Top Controls */}
+            <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Filter */}
+                <div className="flex items-center space-x-2">
+                  <FaFilter className="text-gray-400" />
+                  <select 
+                    className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md py-1.5 px-3 text-sm"
+                    value={filter}
+                    onChange={(e) => handleFilterChange(e.target.value)}
+                  >
+                    <option value="all">All Admins</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="superadmin">Super Admins</option>
+                    <option value="admin">Admins</option>
+                  </select>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{adminData?.full_name || adminData?.username}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{adminData?.role}</p>
+                
+                {/* Search */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search admins..."
+                    className="pl-9 pr-4 py-1.5 w-full md:w-64 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-sm"
+                    value={searchQuery}
+                    onChange={handleSearch}
+                  />
+                  <FaSearch className="absolute left-3 top-2 text-gray-400" />
                 </div>
-              </div>
-            </div>
-          </div>
-        </header>
-        
-        {/* Admin Management Content */}
-        <div className="p-6">
-          {/* Top Controls */}
-          <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Filter */}
-              <div className="flex items-center space-x-2">
-                <FaFilter className="text-gray-400" />
-                <select 
-                  className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md py-1.5 px-3 text-sm"
-                  value={filter}
-                  onChange={(e) => handleFilterChange(e.target.value)}
-                >
-                  <option value="all">All Admins</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="superadmin">Super Admins</option>
-                  <option value="admin">Admins</option>
-                </select>
               </div>
               
-              {/* Search */}
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search admins..."
-                  className="pl-9 pr-4 py-1.5 w-full md:w-64 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-sm"
-                  value={searchQuery}
-                  onChange={handleSearch}
-                />
-                <FaSearch className="absolute left-3 top-2 text-gray-400" />
-              </div>
+              {/* Add Admin Button */}
+              {hasPermission('manage_admins') && (
+              <button
+                onClick={() => openModal('add')}
+                className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
+              >
+                  <FaUserPlus className="mr-2" />
+                  Add New Admin
+                </button>
+              )}
             </div>
             
-            {/* Add Admin Button */}
-            {hasPermission('manage_admins') && (
-            <button
-              onClick={() => openModal('add')}
-              className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
-            >
-                <FaUserPlus className="mr-2" />
-                Add New Admin
-              </button>
-            )}
-          </div>
-          
-          {/* Admins Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Admin
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Role
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Last Login
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {currentAdmins.length > 0 ? (
-                    currentAdmins.map((admin) => (
-                      <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
-                              {admin.full_name?.charAt(0).toUpperCase() || admin.username?.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {admin.full_name || admin.username}
+            {/* Admins Table */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Admin
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Role
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Last Login
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {currentAdmins.length > 0 ? (
+                      currentAdmins.map((admin) => (
+                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
+                                {admin.full_name?.charAt(0).toUpperCase() || admin.username?.charAt(0).toUpperCase()}
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                @{admin.username}
+                              <div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {admin.full_name || admin.username}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  @{admin.username}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {admin.email}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeStyle(getEffectiveRole(admin))}`}>
-                            {getEffectiveRole(admin) === 'SUPER_ADMIN' && <FaUserShield className="mr-1" />}
-                            {getEffectiveRole(admin) === 'ADMIN' && <FaUserCog className="mr-1" />}
-                            {getEffectiveRole(admin)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          {admin.is_active ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                              Active
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {admin.email}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeStyle(getEffectiveRole(admin))}`}>
+                              {getEffectiveRole(admin) === 'SUPER_ADMIN' && <FaUserShield className="mr-1" />}
+                              {getEffectiveRole(admin) === 'ADMIN' && <FaUserCog className="mr-1" />}
+                              {getEffectiveRole(admin)}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
-                              Inactive
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {admin.last_login ? formatDate(admin.last_login) : 'Never logged in'}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
-                          {hasPermission("edit_admins") && (
-                          <button
-                            onClick={() => openModal('edit', admin)}
-                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
-                            disabled={adminData && adminData.id === admin.id && adminData.role !== 'SUPER_ADMIN'}
-                          >
-                            <FaEdit />
-                          </button>
-                          )}
-                          {hasPermission("delete_admins") && (
-                          <button
-                            onClick={() => openModal('delete', admin)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                            disabled={adminData && adminData.id === admin.id}
-                          >
-                            <FaTrash />
-                          </button>
-                          )}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            {admin.is_active ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
+                                Inactive
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {admin.last_login ? formatDate(admin.last_login) : 'Never logged in'}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
+                            {hasPermission("edit_admins") && (
+                            <button
+                              onClick={() => openModal('edit', admin)}
+                              className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
+                              disabled={adminData && adminData.id === admin.id && adminData.role !== 'SUPER_ADMIN'}
+                            >
+                              <FaEdit />
+                            </button>
+                            )}
+                            {hasPermission("delete_admins") && (
+                            <button
+                              onClick={() => openModal('delete', admin)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                              disabled={adminData && adminData.id === admin.id}
+                            >
+                              <FaTrash />
+                            </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                          {searchQuery
+                            ? 'No admin users match your search criteria'
+                            : 'No admin users found or you dont have permission to view this page'}
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="6" className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        {searchQuery
-                          ? 'No admin users match your search criteria'
-                          : 'No admin users found or you dont have permission to view this page'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            
-            {/* Pagination */}
-            {filteredAdmins.length > adminsPerPage && (
-              <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
-                <div className="flex-1 flex justify-between items-center">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                      currentPage === 1
-                        ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
-                        : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                      currentPage === totalPages
-                        ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
-                        : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Next
-                  </button>
-                </div>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
+              
+              {/* Pagination */}
+              {filteredAdmins.length > adminsPerPage && (
+                <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex-1 flex justify-between items-center">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+                        currentPage === 1
+                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                          : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+                        currentPage === totalPages
+                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                          : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="min-h-screen flex items-center justify-center w-full">
+            <AccessRestrictedModal />
+          </div>
+        )}
       </div>
-      ) : (
-      <div className="min-h-screen flex items-center justify-center w-full">
-        <AccessRestrictedModal />
-      </div>
-      )}
       
       {/* Modals would go here in a real implementation */}
       {/*add admin modal*/}

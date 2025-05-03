@@ -325,19 +325,6 @@ const addUser = async (userData) => {
     <div>
       {hasPermission('view_users') ? (
       <div>
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">User Management</h2>
-          
-          <div className="flex items-center">
-            <button className="p-2 mr-4 text-gray-500 dark:text-gray-400 hover:text-slate-500 dark:hover:text-slate-400">
-              <FaBell />
-            </button>
-          </div>
-        </div>
-      </header>
-      
       {/* User Management Content */}
       <div className="p-6">
         {/* Top Controls */}

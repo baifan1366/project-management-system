@@ -471,189 +471,160 @@ export default function AdminAnalytics() {
   }
   
   return (
-    <div>
-    {hasPermission('view_analytics') ? (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Analytics Dashboard</h2>
-            
-            <div className="flex items-center space-x-4">
-              <div>
-                <select
-                  value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="7">Last 7 days</option>
-                  <option value="30">Last 30 days</option>
-                  <option value="90">Last 90 days</option>
-                  <option value="365">Last 12 months</option>
-                </select>
-              </div>
-              
-              <div className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-2">
-                  {adminData?.username?.charAt(0).toUpperCase() || 'A'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
         
         {/* Analytics Content */}
-        <main className="p-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.totalRevenue)}</p>
+        {hasPermission('view_analytics') ? (
+          <div className="p-6">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.totalRevenue)}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-500 dark:text-green-300">
+                    <FaMoneyBillWave />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-500 dark:text-green-300">
-                  <FaMoneyBillWave />
+                <div className="mt-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    For the selected period
+                  </p>
                 </div>
               </div>
-              <div className="mt-4">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  For the selected period
-                </p>
+              
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Order Value</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.averageOrderValue)}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-500 dark:text-blue-300">
+                    <FaChartLine />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Per successful transaction
+                  </p>
+                </div>
+              </div>
+              
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Conversion Rate</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.conversionRate.toFixed(2)}%</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
+                    <FaUsers />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Users to paid subscribers
+                  </p>
+                </div>
+              </div>
+              
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Success Rate</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.successRate.toFixed(2)}%</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center text-yellow-500 dark:text-yellow-300">
+                    <FaChartBar />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Completed transactions
+                  </p>
+                </div>
               </div>
             </div>
             
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Order Value</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.averageOrderValue)}</p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-500 dark:text-blue-300">
-                  <FaChartLine />
-                </div>
+            {/* Charts - Revenue and User Growth */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Revenue Trend</h3>
+                {revenueData.labels.length > 0 ? (
+                  <div className="h-80">
+                    <Line data={revenueData} options={lineOptions} />
+                  </div>
+                ) : (
+                  <div className="h-80 flex items-center justify-center">
+                    <p className="text-gray-500 dark:text-gray-400">No revenue data available for the selected period</p>
+                  </div>
+                )}
               </div>
-              <div className="mt-4">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Per successful transaction
-                </p>
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Conversion Rate</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.conversionRate.toFixed(2)}%</p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
-                  <FaUsers />
-                </div>
-              </div>
-              <div className="mt-4">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Users to paid subscribers
-                </p>
+              
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">User Growth</h3>
+                {userGrowthData.labels.length > 0 ? (
+                  <div className="h-80">
+                    <Bar data={userGrowthData} options={barOptions} />
+                  </div>
+                ) : (
+                  <div className="h-80 flex items-center justify-center">
+                    <p className="text-gray-500 dark:text-gray-400">No user growth data available for the selected period</p>
+                  </div>
+                )}
               </div>
             </div>
             
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Success Rate</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.successRate.toFixed(2)}%</p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center text-yellow-500 dark:text-yellow-300">
-                  <FaChartBar />
-                </div>
+            {/* Charts - Payment Methods and Plan Distribution */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Payment Methods</h3>
+                {paymentMethodData.labels.length > 0 ? (
+                  <div className="h-80">
+                    <Pie data={paymentMethodData} options={pieOptions} />
+                  </div>
+                ) : (
+                  <div className="h-80 flex items-center justify-center">
+                    <p className="text-gray-500 dark:text-gray-400">No payment method data available</p>
+                  </div>
+                )}
               </div>
-              <div className="mt-4">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Completed transactions
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Charts - Revenue and User Growth */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Revenue Trend</h3>
-              {revenueData.labels.length > 0 ? (
-                <div className="h-80">
-                  <Line data={revenueData} options={lineOptions} />
-                </div>
-              ) : (
-                <div className="h-80 flex items-center justify-center">
-                  <p className="text-gray-500 dark:text-gray-400">No revenue data available for the selected period</p>
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">User Growth</h3>
-              {userGrowthData.labels.length > 0 ? (
-                <div className="h-80">
-                  <Bar data={userGrowthData} options={barOptions} />
-                </div>
-              ) : (
-                <div className="h-80 flex items-center justify-center">
-                  <p className="text-gray-500 dark:text-gray-400">No user growth data available for the selected period</p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Charts - Payment Methods and Plan Distribution */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Payment Methods</h3>
-              {paymentMethodData.labels.length > 0 ? (
-                <div className="h-80">
-                  <Pie data={paymentMethodData} options={pieOptions} />
-                </div>
-              ) : (
-                <div className="h-80 flex items-center justify-center">
-                  <p className="text-gray-500 dark:text-gray-400">No payment method data available</p>
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Subscription Plan Distribution</h3>
-              {planDistributionData.labels.length > 0 ? (
-                <div className="h-80">
-                  <Pie 
-                    data={planDistributionData} 
-                    options={{
-                      ...pieOptions,
-                      plugins: {
-                        ...pieOptions.plugins,
-                        title: {
-                          ...pieOptions.plugins.title,
-                          text: 'Subscription Plans'
+              
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Subscription Plan Distribution</h3>
+                {planDistributionData.labels.length > 0 ? (
+                  <div className="h-80">
+                    <Pie 
+                      data={planDistributionData} 
+                      options={{
+                        ...pieOptions,
+                        plugins: {
+                          ...pieOptions.plugins,
+                          title: {
+                            ...pieOptions.plugins.title,
+                            text: 'Subscription Plans'
+                          }
                         }
-                      }
-                    }} 
-                  />
-                </div>
-              ) : (
-                <div className="h-80 flex items-center justify-center">
-                  <p className="text-gray-500 dark:text-gray-400">No subscription plan data available</p>
-                </div>
-              )}
+                      }} 
+                    />
+                  </div>
+                ) : (
+                  <div className="h-80 flex items-center justify-center">
+                    <p className="text-gray-500 dark:text-gray-400">No subscription plan data available</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </main>
+        ) : (
+          <div className="min-h-screen flex items-center justify-center w-full">
+            <AccessRestrictedModal />
+          </div>
+        )}
       </div>
     </div>
-    ) : (
-      <div className="min-h-screen flex items-center justify-center w-full">
-        <AccessRestrictedModal />
-      </div>
-    )}
-  </div>
   );
 }

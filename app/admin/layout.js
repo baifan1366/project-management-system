@@ -6,6 +6,7 @@ import { geistSans, geistMono } from "@/lib/fonts";
 import "@/app/globals.css";
 import { supabase } from '@/lib/supabase';
 import AdminSidebar from '@/components/admin/AdminSidebar';
+import AdminHeader from '@/components/admin/AdminHeader';
 import { Provider } from 'react-redux';
 import { store } from '@/lib/redux/store';
 import { ThemeProvider } from 'next-themes';
@@ -30,6 +31,19 @@ function AdminLayoutInner({ children }) {
     if (path.includes('supportManagement')) return 'support';
     if (path.includes('adminSettings')) return 'settings';
     return '';
+  };
+  
+  // Get current page title
+  const getPageTitle = () => {
+    const path = pathname.split('/').pop();
+    if (path.includes('dashboard')) return 'Dashboard Overview';
+    if (path.includes('userManagement')) return 'User Management';
+    if (path.includes('adminManagement')) return 'Admin Management';
+    if (path.includes('subscriptionManagement')) return 'Subscription Management';
+    if (path.includes('supportManagement')) return 'Support Tickets';
+    if (path.includes('adminSettings')) return 'System Settings';
+    if (path.includes('analytics')) return 'Analytics Dashboard';
+    return 'Admin Panel';
   };
   
   // Skip auth check for login page
@@ -121,18 +135,6 @@ function AdminLayoutInner({ children }) {
     }
   };
   
-  // Show loading state
-  if (loading && !isLoginPage) {
-    return (
-      <div className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center`}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading admin panel...</p>
-        </div>
-      </div>
-    );
-  }
-  
   // Don't show sidebar on login page
   if (isLoginPage) {
     return (
@@ -150,6 +152,10 @@ function AdminLayoutInner({ children }) {
         onLogout={handleLogout} 
       />
       <div className="flex-1 overflow-auto">
+        <AdminHeader 
+          title={getPageTitle()}
+          adminData={adminData}
+        />
         {children}
       </div>
     </div>
