@@ -566,9 +566,11 @@ CREATE INDEX idx_team_invitation_email ON "user_team_invitation"("user_email");
 CREATE INDEX idx_team_invitation_team ON "user_team_invitation"("team_id");
 CREATE INDEX idx_team_invitation_status ON "user_team_invitation"("status");
 
--- 索引
+-- 为订阅相关表创建索引
+CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
 CREATE INDEX idx_user_subscription_user ON "user_subscription_plan"("user_id");
 CREATE INDEX idx_user_subscription_status ON "user_subscription_plan"("status");
+
 CREATE INDEX idx_promo_code_code ON "promo_code"("code");
 CREATE INDEX idx_promo_code_active ON "promo_code"("is_active");
 
