@@ -13,10 +13,11 @@ import { Plus } from 'lucide-react';
 import { initZoom, setZoom as applyZoom, handleZoomChange as changeZoom } from './TimelineTools';
 import { useConfirm } from '@/hooks/use-confirm';
 import { useTimelineData, formatDateForGantt } from './BodyContent';
-import { updateTask, fetchTaskById } from '@/lib/redux/features/taskSlice';
+import { updateTask, fetchTaskById, deleteTask } from '@/lib/redux/features/taskSlice';
 import { getTagByName } from '@/lib/redux/features/tagSlice';
 import { createTaskLink, deleteTaskLink } from '@/lib/redux/features/taskLinksSlice';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { getSectionByTeamId, getSectionById, updateTaskIds } from '@/lib/redux/features/sectionSlice';
 
 /**
  * 格式化日期为Gantt图所需的标准格式
@@ -256,22 +257,49 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
     }
   }
 
-  const handleDeleteTask = () => {
+  const handleDeleteTask = async () => {
     confirm({
       title: t('confirmDeleteTask'),
       description: `${t('task')} "${editTask.text}" ${t('willBeDeleted')}`,
       variant: 'error',
-      onConfirm: () => {
-        gantt.deleteTask(editTask.id);
-        gantt.refreshData();
-        
-        // 触发数据刷新
-        setRefreshFlag(prev => prev + 1);
-        
-        setShowEditForm(false);
+      onConfirm: async () => {
+        try {
+          // 获取所有部分
+          const sectionsResult = await dispatch(getSectionByTeamId(teamId)).unwrap();
+          
+          // 检查每个部分是否包含要删除的任务ID
+          for (const section of sectionsResult) {
+            if (section.task_ids && section.task_ids.includes(parseInt(editTask.id))) {
+              // 从task_ids数组中移除该任务ID
+              const updatedTaskIds = section.task_ids.filter(id => id !== parseInt(editTask.id));
+              
+              // 更新部分的task_ids
+              await dispatch(updateTaskIds({
+                sectionId: section.id,
+                teamId: teamId,
+                newTaskIds: updatedTaskIds
+              }));
+            }
+          }
+          
+          // 删除任务
+          gantt.deleteTask(editTask.id);
+          const deleteResult = await dispatch(deleteTask({
+            sectionId: null, // API会处理从部分中删除任务ID
+            userId: user?.id,
+            oldValues: editTask,
+            taskId: editTask.id
+          })).unwrap();
+          
+          gantt.refreshData();
+          setRefreshFlag(prev => prev + 1);
+          setShowEditForm(false);
+        } catch (error) {
+          console.error("删除任务时出错:", error);
+        }
       }
     });
-  }
+  };
 
   // Toolbar component
   const Toolbar = () => {
@@ -540,11 +568,16 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
         links: links || []
       });
       setZoom(currentZoom);
-    } else if (ganttObj && currentZoom) {
-      // 如果没有任务数据但有缩放级别更新，只更新缩放
+    } else {
+      // 当没有任务数据时，清空甘特图并更新缩放
+      ganttObj.clearAll();
+      ganttObj.parse({
+        data: [],
+        links: []
+      });
       setZoom(currentZoom);
     }
-  }, [ganttObj, ganttTasks, links, currentZoom, refreshKey]); // 添加links依赖项
+  }, [ganttObj, ganttTasks, links, currentZoom, refreshKey]); 
 
   // 添加一个新函数用于更新数据库
   const updateTaskInDatabase = async (taskData) => {

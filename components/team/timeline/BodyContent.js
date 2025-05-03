@@ -179,10 +179,16 @@ export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0, refres
 
   // 当任务或标签数据更新时，重新映射并更新Gantt
   useEffect(() => {
-    // 只有当gantt已初始化且有任务和标签数据时
-    if (gantt && allTasks.length > 0 && tags.length > 0) {
-      const updatedGanttTasks = mapTasksToGantt(allTasks, tags, gantt);
-      setGanttTasks(updatedGanttTasks);
+    // 当gantt已初始化且有标签数据时进行处理(不管是否有任务)
+    if (gantt && tags.length > 0) {
+      if (allTasks.length > 0) {
+        // 有任务时，正常映射任务
+        const updatedGanttTasks = mapTasksToGantt(allTasks, tags, gantt);
+        setGanttTasks(updatedGanttTasks);
+      } else {
+        // 当没有任务时，设置空数组以清空甘特图
+        setGanttTasks([]);
+      }
     }
   }, [allTasks, tags, gantt]);
 

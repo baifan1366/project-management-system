@@ -354,7 +354,7 @@ export default function EditTaskDialog({
               <div className="flex-1 flex justify-end gap-2">
                 <Button 
                   type="button"
-                  variant={taskColor}
+                  variant="outline"
                   onClick={handleCancel}
                   disabled={isLoading}
                 >
