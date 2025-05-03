@@ -7,7 +7,7 @@ import pptxgenjs from 'pptxgenjs';
 import { v4 as uuidv4 } from 'uuid';
 
 // Get available AI models
-export const getAvailableModels = () => {
+const getAvailableModels = () => {
   return [
     { id: "google/gemini-2.0-flash-exp:free", name: "Gemini Flash 2.0", description: "Fast response time with quality on par with larger models. Enhanced multimodal understanding and function calling." },
     { id: "qwen/qwen2.5-vl-32b-instruct:free", name: "Qwen 2.5 VL", description: "Proficient in recognizing common objects and analyzing texts, charts, and layouts within images." },
@@ -266,7 +266,7 @@ Make sure to generate high-quality, structured data that would be useful for fur
 };
 
 // Get workflow by ID
-export async function getWorkflow(workflowId) {
+async function getWorkflow(workflowId) {
   const { data, error } = await supabase
     .from('workflows')
     .select('*')
@@ -1146,7 +1146,7 @@ async function createTasksFromResult(taskResult, userId, teamId, projectId) {
 }
 
 // Execute a workflow
-export async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}) {
+async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}) {
   // 获取传入的选项
   const { 
     outputFormats = [], 
@@ -1556,7 +1556,7 @@ async function saveWorkflowExecution(workflowId, userId, model, inputs, results,
 }
 
 // Create a new workflow
-export async function createWorkflow(workflow, userId) {
+async function createWorkflow(workflow, userId) {
   const { data, error } = await supabase
     .from('workflows')
     .insert({
@@ -1574,7 +1574,7 @@ export async function createWorkflow(workflow, userId) {
 }
 
 // Update an existing workflow
-export async function updateWorkflow(workflowId, updates, userId) {
+async function updateWorkflow(workflowId, updates, userId) {
   // First check if the user has permission to update this workflow
   const { data: existing, error: fetchError } = await supabase
     .from('workflows')
@@ -1609,7 +1609,7 @@ export async function updateWorkflow(workflowId, updates, userId) {
 }
 
 // Get workflows for a user (created by them or shared with them)
-export async function getUserWorkflows(userId) {
+async function getUserWorkflows(userId) {
   const { data, error } = await supabase
     .from('workflows')
     .select('*')
@@ -1831,7 +1831,8 @@ async function sendChatSessionMessages(sessionIds, content, format = 'text', use
 }
 
 // Add the new function to the exports
-export { 
+export {
+  getAvailableModels,
   getWorkflow, 
   executeWorkflow, 
   saveWorkflowExecution, 
