@@ -376,7 +376,7 @@ export default function TeamCustomFieldPage() {
                   </DropdownMenuItem>
                   <hr className="my-1" />
                   <DropdownMenuItem 
-                    className="text-red-500 flex items-center px-3 py-2 text-sm"
+                    className="text-red-500 flex items-center px-3 py-2 text-sm focus:text-red-500"
                     onClick={handleArchiveTeam}
                     onClose={() => onClose(false)}
                   >

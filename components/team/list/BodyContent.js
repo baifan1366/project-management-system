@@ -314,7 +314,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => handleEditSection(section.id)}>{t('editSection')}</DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteSection(section.id)}>{t('deleteSection')}</DropdownMenuItem>
+                  <DropdownMenuItem className="text-red-500 focus:text-red-600" onClick={() => handleDeleteSection(section.id)}>{t('deleteSection')}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
