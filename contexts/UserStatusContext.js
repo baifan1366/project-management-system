@@ -21,7 +21,7 @@ export function UserStatusProvider({ children }) {
       setIsOnline(user.is_online || false);
       setLastSeen(user.last_seen_at);
     }
-  }, []);
+  }, [user]);
 
   // 更新当前用户的在线状态
   const updateUserOnlineStatus = async () => {

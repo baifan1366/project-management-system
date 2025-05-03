@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import ChatSearch from '@/components/chat/ChatSearch';
 import useGetUser from '@/lib/hooks/useGetUser';
+import MentionSelector from '@/components/chat/MentionSelector';
+import MentionItem from '@/components/chat/MentionItem';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -70,7 +72,6 @@ export default function ChatPage() {
   const t = useTranslations('Chat');
   const { formatLastSeen } = useLastSeen();
   const { userTimezone, hourFormat, adjustTimeByOffset } = useUserTimezone();
-  const { user: authUser, isLoading: isAuthLoading } = useGetUser();
   const [message, setMessage] = useState('');
   const { confirm } = useConfirm();
   const { 
@@ -86,12 +87,11 @@ export default function ChatPage() {
   
   // 使用增强的UserStatusContext
   const { 
-    currentUser: statusCurrentUser, 
+    currentUser, 
     getUserStatus, 
     usersStatus 
   } = useUserStatus();
-  
-  const [currentUser, setCurrentUser] = useState(null);
+ 
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const [isPending, setIsPending] = useState(false);
@@ -150,20 +150,24 @@ export default function ChatPage() {
     }
   }, [messages]);
 
-  // Update currentUser when authUser changes
-  useEffect(() => {
-    if (authUser) {
-      setCurrentUser(authUser);
-    }
-  }, [authUser]);
-
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (message.trim() && currentSession) {
       try {
-        await sendMessage(currentSession.id, message, replyToMessage?.id);
+        // Extract mentions from the message
+        const extractedMentions = mentions.length > 0 ? mentions : extractMentionsFromMessage(message);
+        
+        // Send message with mentions
+        await sendMessage(
+          currentSession.id, 
+          message, 
+          replyToMessage?.id, 
+          extractedMentions
+        );
+        
         setMessage('');
         setReplyToMessage(null); // 发送后清除回复状态
+        setMentions([]); // Clear mentions after sending
         
         // 发送消息后立即刷新对方状态
         if (otherParticipantId) {
@@ -173,6 +177,37 @@ export default function ChatPage() {
         console.error(t('errors.sendMessageFailed'), error);
       }
     }
+  };
+  
+  // Extract mentions from message text using regex patterns
+  const extractMentionsFromMessage = (text) => {
+    const mentions = [];
+    const userPattern = /@([a-zA-Z0-9_.-]+)/g;
+    const projectPattern = /#([a-zA-Z0-9_.-]+)/g;
+    const taskPattern = /(.+) \((.+)\)/g;
+    
+    // Extract user mentions
+    let match;
+    while ((match = userPattern.exec(text)) !== null) {
+      mentions.push({
+        type: 'user',
+        name: match[1],
+        startIndex: match.index,
+        endIndex: match.index + match[0].length
+      });
+    }
+    
+    // Extract project mentions
+    while ((match = projectPattern.exec(text)) !== null) {
+      mentions.push({
+        type: 'project',
+        name: match[1],
+        startIndex: match.index,
+        endIndex: match.index + match[0].length
+      });
+    }
+    
+    return mentions;
   };
 
   // 回复消息处理函数
@@ -353,6 +388,268 @@ export default function ChatPage() {
         return newState;
       });
     }
+  };
+
+  // @mention state
+  const [isMentionOpen, setIsMentionOpen] = useState(false);
+  const [mentionSearchText, setMentionSearchText] = useState('');
+  const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
+  const textareaRef = useRef(null);
+  const [mentions, setMentions] = useState([]);
+
+  // Process the input to check for @ mentions
+  const handleInputChange = (e) => {
+    const curValue = e.target.value;
+    const cursorPosition = e.target.selectionStart;
+    
+    // Find if we're currently in a mention context (after an @ symbol)
+    const textBeforeCursor = curValue.substring(0, cursorPosition);
+    const mentionMatch = textBeforeCursor.match(/@(\S*)$/);
+    
+    if (mentionMatch) {
+      // We found an @ symbol followed by some text
+      const mentionText = mentionMatch[1];
+      
+      // Calculate position for the mention selector
+      const textareaElement = textareaRef.current;
+      if (textareaElement) {
+        // Create a hidden div to calculate text position
+        const hiddenDiv = document.createElement('div');
+        hiddenDiv.style.position = 'absolute';
+        hiddenDiv.style.top = '0';
+        hiddenDiv.style.left = '0';
+        hiddenDiv.style.visibility = 'hidden';
+        hiddenDiv.style.whiteSpace = 'pre-wrap';
+        hiddenDiv.style.width = `${textareaElement.clientWidth}px`;
+        hiddenDiv.style.font = window.getComputedStyle(textareaElement).font;
+        hiddenDiv.style.padding = window.getComputedStyle(textareaElement).padding;
+        
+        // Calculate the position of the @ symbol
+        const atSymbolIndex = textBeforeCursor.lastIndexOf('@');
+        const textBeforeAt = textBeforeCursor.substring(0, atSymbolIndex);
+        
+        hiddenDiv.textContent = textBeforeAt;
+        document.body.appendChild(hiddenDiv);
+        
+        // Get position of cursor
+        const rect = textareaElement.getBoundingClientRect();
+        const textareaScrollTop = textareaElement.scrollTop;
+        
+        // Calculate line height
+        const lineHeight = parseInt(window.getComputedStyle(textareaElement).lineHeight) || 18;
+        
+        // Count newlines before the @ symbol
+        const newlines = (textBeforeAt.match(/\n/g) || []).length;
+        
+        // Calculate the position
+        const left = rect.left + (hiddenDiv.clientWidth % textareaElement.clientWidth);
+        
+        // Get the cursor position relative to the viewport
+        const cursorTop = rect.top + Math.floor(hiddenDiv.clientWidth / textareaElement.clientWidth) * lineHeight - textareaScrollTop;
+        
+        // Clean up
+        document.body.removeChild(hiddenDiv);
+        
+        // Set position and open mention selector
+        setMentionPosition({ 
+          top: cursorTop, 
+          left: left 
+        });
+        setMentionSearchText(mentionText);
+        setIsMentionOpen(true);
+      }
+    } else {
+      // Close the mention selector if no @ symbol is found
+      setIsMentionOpen(false);
+    }
+  };
+
+  // Handle selecting a mention from the dropdown
+  const handleMentionSelect = (mention) => {
+    // Get the current text and cursor position
+    const curValue = message;
+    const cursorPosition = textareaRef.current ? textareaRef.current.selectionStart : 0;
+    
+    // Find the position of the @ symbol before the cursor
+    const textBeforeCursor = curValue.substring(0, cursorPosition);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1) {
+      // Replace the @text with the selected mention's displayText
+      const newText = 
+        curValue.substring(0, atIndex) + 
+        mention.displayText + 
+        ' ' + 
+        curValue.substring(cursorPosition);
+      
+      setMessage(newText);
+      
+      // Add to mentions array for later processing
+      setMentions(prev => [...prev, {
+        ...mention,
+        startIndex: atIndex,
+        endIndex: atIndex + mention.displayText.length
+      }]);
+      
+      // Close the mention selector
+      setIsMentionOpen(false);
+      
+      // Focus back on textarea and position cursor after the inserted mention
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const newPosition = atIndex + mention.displayText.length + 1; // +1 for the space
+          textareaRef.current.setSelectionRange(newPosition, newPosition);
+        }
+      }, 0);
+    }
+  };
+  
+  // Process message content to render mentions properly
+  const formatMessageContent = (content) => {
+    // Simple regex pattern to detect mentions for display
+    const userPattern = /@([a-zA-Z0-9_.-]+)/g;
+    const projectPattern = /#([a-zA-Z0-9_.-]+)/g;
+    const taskPattern = /\[([^\]]+)\]/g;
+    
+    let formattedContent = content;
+    
+    // Replace user mentions
+    formattedContent = formattedContent.replace(userPattern, (match, username) => {
+      return `<span class="mention-user">@${username}</span>`;
+    });
+    
+    // Replace project mentions
+    formattedContent = formattedContent.replace(projectPattern, (match, projectName) => {
+      return `<span class="mention-project">#${projectName}</span>`;
+    });
+    
+    // Replace task mentions
+    formattedContent = formattedContent.replace(taskPattern, (match, taskName) => {
+      return `<span class="mention-task">${taskName}</span>`;
+    });
+    
+    return formattedContent;
+  };
+
+  // Process message to display mentions with proper components
+  const processMessageWithMentions = (content, msgMentions = null) => {
+    if (!content) return '';
+    
+    // If we have stored mentions data, use it for better display
+    if (msgMentions && Array.isArray(msgMentions) && msgMentions.length > 0) {
+      // Sort mentions by startIndex in reverse order to replace from end to start
+      // This ensures indices remain valid during replacement
+      const sortedMentions = [...msgMentions].sort((a, b) => b.startIndex - a.startIndex);
+      
+      // Create an array of content pieces
+      let contentPieces = [content];
+      
+      // Process each mention
+      sortedMentions.forEach(mention => {
+        const lastPiece = contentPieces.pop();
+        
+        // Split the content at the mention position
+        const before = lastPiece.substring(0, mention.startIndex);
+        const after = lastPiece.substring(mention.endIndex);
+        
+        // Create the appropriate mention component
+        const mentionComponent = (
+          <MentionItem 
+            key={`${mention.type}-${mention.id || mention.name}`}
+            type={mention.type}
+            id={mention.id || mention.name}
+            name={mention.name}
+            projectName={mention.projectName}
+          />
+        );
+        
+        // Push the parts back into the content array
+        contentPieces.push(before, mentionComponent, after);
+      });
+      
+      return contentPieces;
+    }
+    
+    // Fallback to regex-based parsing if no stored mentions data
+    // Parse the message content to identify mentions
+    // Format: @username for users, #project-name for projects, task title (project) for tasks
+    
+    // Pattern for user mentions: @username
+    const userPattern = /@([a-zA-Z0-9_.-]+)/g;
+    
+    // Pattern for project mentions: #project-name
+    const projectPattern = /#([a-zA-Z0-9_.-]+)/g;
+    
+    // Pattern for task mentions with the project in parentheses: TaskTitle (ProjectName)
+    const taskPattern = /(.+) \((.+)\)/g;
+    
+    // Create a temporary div to hold the message with mention components
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    // Process the message text
+    const processedContent = tempDiv.textContent;
+    
+    // We'll use React's createElement to build our component structure
+    const elements = [];
+    let lastIndex = 0;
+    
+    // Helper function to add text segments
+    const addTextSegment = (text, index) => {
+      if (text) {
+        elements.push(text);
+      }
+      lastIndex = index;
+    };
+    
+    // Find user mentions
+    processedContent.replace(userPattern, (match, username, index) => {
+      // Add text before the mention
+      addTextSegment(processedContent.substring(lastIndex, index), index);
+      
+      // Add the mention component
+      elements.push(
+        <MentionItem 
+          key={`user-${index}`}
+          type="user"
+          id={username} // This is just a placeholder, we don't have the actual user ID
+          name={username}
+        />
+      );
+      
+      lastIndex = index + match.length;
+      return match; // This doesn't affect the output, just satisfies the replace function
+    });
+    
+    // Find project mentions
+    processedContent.replace(projectPattern, (match, projectName, index) => {
+      // Check if this index is already processed (part of a user mention)
+      if (index < lastIndex) return match;
+      
+      // Add text before the mention
+      addTextSegment(processedContent.substring(lastIndex, index), index);
+      
+      // Add the mention component
+      elements.push(
+        <MentionItem 
+          key={`project-${index}`}
+          type="project"
+          id={projectName} // This is just a placeholder
+          name={projectName}
+        />
+      );
+      
+      lastIndex = index + match.length;
+      return match;
+    });
+    
+    // Add any remaining text
+    if (lastIndex < processedContent.length) {
+      elements.push(processedContent.substring(lastIndex));
+    }
+    
+    return elements.length > 0 ? elements : processedContent;
   };
 
   if (!currentSession && chatMode === 'normal') {
@@ -578,7 +875,7 @@ export default function ChatPage() {
                                   if (ref) translatorRefs.current[`translator-${msg.id}`] = ref;
                                 }}
                               >
-                                {msg.content}
+                                {processMessageWithMentions(msg.content, msg.mentions)}
                               </GoogleTranslator>
                             </div>
                           )}
@@ -700,19 +997,45 @@ export default function ChatPage() {
                     </button>
                   </div>
                 )}
-                <div className="px-3 p-1">
+                <div className="px-3 p-1 relative">
                   <textarea
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      handleInputChange(e);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         handleSendMessage(e);
                       }
+                      // 处理提及建议导航
+                      if (isMentionOpen) {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          // 处理向下箭头键（让MentionSelector内部处理）
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          // 处理向上箭头键（让MentionSelector内部处理）
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          setIsMentionOpen(false);
+                        }
+                      }
                     }}
                     placeholder={t('inputPlaceholder')}
                     className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm p-2 max-h-60"
                     rows={1}
+                    ref={textareaRef}
+                  />
+                  
+                  {/* @提及选择器 */}
+                  <MentionSelector
+                    isOpen={isMentionOpen}
+                    searchText={mentionSearchText}
+                    onSelect={handleMentionSelect}
+                    onClose={() => setIsMentionOpen(false)}
+                    position={mentionPosition}
                   />
                 </div>
               </div>

@@ -60,6 +60,7 @@ function WorkflowNode({ data, selected, id }) {
     
     try {
       setIsLoadingChatSessions(true);
+      console.log(`[Debug] Fetching chat sessions for user ID: ${data.userId}`);
       const response = await fetch(`/api/chat/sessions?userId=${data.userId}`);
       
       if (!response.ok) {
@@ -67,7 +68,11 @@ function WorkflowNode({ data, selected, id }) {
       }
       
       const chatSessionData = await response.json();
-      setChatSessions(chatSessionData);
+      console.log(`[Debug] All chat sessions:`, chatSessionData);
+      // Filter out AI type chat sessions
+      const filteredSessions = chatSessionData.filter(session => session.type !== 'AI');
+      console.log(`[Debug] Filtered sessions (non-AI):`, filteredSessions);
+      setChatSessions(filteredSessions);
     } catch (error) {
       console.error('Error fetching chat sessions:', error);
     } finally {
@@ -173,12 +178,14 @@ function WorkflowNode({ data, selected, id }) {
 
   // Toggle chat session selection
   const toggleChatSession = (sessionId) => {
+    console.log(`[Debug] Toggling chat session: ${sessionId}`);
     setSelectedChatSessions(prev => {
       const isSelected = prev.includes(sessionId);
       
       // If already selected, remove it
       if (isSelected) {
         const updated = prev.filter(id => id !== sessionId);
+        console.log(`[Debug] Removed session ${sessionId}. Updated selection:`, updated);
         // Save the updated selection
         if (data.handleInputChange) {
           data.handleInputChange(id, 'chatSessionIds', updated);
@@ -188,6 +195,7 @@ function WorkflowNode({ data, selected, id }) {
       // If not selected, add it
       else {
         const updated = [...prev, sessionId];
+        console.log(`[Debug] Added session ${sessionId}. Updated selection:`, updated);
         // Save the updated selection
         if (data.handleInputChange) {
           data.handleInputChange(id, 'chatSessionIds', updated);
@@ -537,7 +545,7 @@ function WorkflowNode({ data, selected, id }) {
                           htmlFor={`chat-session-${session.id}`}
                           className="text-xs cursor-pointer dark:text-gray-300"
                         >
-                          {session.name || `Chat #${session.id.substring(0, 6)}`}
+                          {session.name || `Chat #${typeof session.id === 'string' ? session.id.substring(0, 6) : session.id}`}
                         </label>
                       </div>
                     ))}
@@ -621,7 +629,7 @@ function WorkflowNode({ data, selected, id }) {
                 />
               )}
               <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                {t('templateHint') || 'Use {{content}} to insert workflow output'}
+                {t('templateHint')}
               </p>
             </div>
           </div>

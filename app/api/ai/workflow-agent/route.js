@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { executeWorkflow } from './workflow-service';
+import { executeWorkflow } from '../../../[locale]/ai-workflow/workflow-service';
 
 export async function POST(request) {
   try {

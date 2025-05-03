@@ -60,7 +60,8 @@ export default function SearchPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+      const userIdParam = currentUser?.id ? `&userId=${currentUser.id}` : '';
+      const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}${userIdParam}`);
       const data = await response.json();
       
       if (response.ok) {

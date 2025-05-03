@@ -581,6 +581,7 @@ export function ChatProvider({ children }) {
         replied_message:reply_to_message_id (
           id,
           content,
+          mentions,
           user:user_id (
             id,
             name,
@@ -693,7 +694,7 @@ export function ChatProvider({ children }) {
   };
 
   // 发送消息
-  const sendMessage = async (sessionId, content, replyToMessageId = null) => {
+  const sendMessage = async (sessionId, content, replyToMessageId = null, mentions = []) => {
     if (!authSession) {
       throw new Error('User not logged in');
     }
@@ -705,7 +706,8 @@ export function ChatProvider({ children }) {
         session_id: sessionId,
         user_id: authSession.id,
         content,
-        reply_to_message_id: replyToMessageId
+        reply_to_message_id: replyToMessageId,
+        mentions: mentions.length > 0 ? mentions : null // Add mentions to the message
       })
       .select(`
         *,
@@ -724,6 +726,7 @@ export function ChatProvider({ children }) {
         replied_message:reply_to_message_id (
           id,
           content,
+          mentions,
           user:user_id (
             id,
             name,
@@ -770,6 +773,53 @@ export function ChatProvider({ children }) {
       }
     }
 
+    // Create notifications for mentioned users
+    if (mentions && mentions.length > 0) {
+      try {
+        // Filter out user mentions
+        const userMentions = mentions.filter(mention => mention.type === 'user');
+        
+        if (userMentions.length > 0) {
+          // Get user IDs for the mentions where we have the name
+          const userNames = userMentions.map(mention => mention.name);
+          
+          if (userNames.length > 0) {
+            // Get actual user IDs from names
+            const { data: mentionedUsers, error: mentionedUsersError } = await supabase
+              .from('user')
+              .select('id, name')
+              .in('name', userNames);
+            
+            if (!mentionedUsersError && mentionedUsers && mentionedUsers.length > 0) {
+              // Prepare notifications for mentioned users
+              const notifications = mentionedUsers.map(user => ({
+                user_id: user.id,
+                type: 'MENTION',
+                title: `You were mentioned in a chat`,
+                content: `${authSession.name} mentioned you in a message`,
+                link: `/chat?session=${sessionId}`,
+                data: {
+                  session_id: sessionId,
+                  message_id: data.id,
+                  mentioned_by: authSession.id
+                }
+              }));
+              
+              // Insert notifications
+              if (notifications.length > 0) {
+                await supabase
+                  .from('notification')
+                  .insert(notifications);
+              }
+            }
+          }
+        }
+      } catch (notifyError) {
+        console.error('Error creating mention notifications:', notifyError);
+        // Don't throw error, just log it
+      }
+    }
+
     // 记录已发送的消息ID，用于防止重复添加
     sentMessageIds.add(data.id);
     
@@ -806,6 +856,7 @@ export function ChatProvider({ children }) {
           replied_message:reply_to_message_id (
             id,
             content,
+            mentions,
             user:user_id (
               id,
               name,
@@ -934,6 +985,7 @@ export function ChatProvider({ children }) {
             replied_message:reply_to_message_id (
               id,
               content,
+              mentions,
               user:user_id (
                 id,
                 name,
@@ -1079,6 +1131,7 @@ export function ChatProvider({ children }) {
             replied_message:reply_to_message_id (
               id,
               content,
+              mentions,
               user:user_id (
                 id,
                 name,
@@ -1275,7 +1328,7 @@ export function ChatProvider({ children }) {
       supabase.removeChannel(aiMessagesChannel);
       supabase.removeChannel(readStatusChannel);
     };
-  }, []);
+  }, [authSession]);
 
   // 包装setCurrentSession，添加权限检查
   const setCurrentSessionWithCheck = (session) => {
