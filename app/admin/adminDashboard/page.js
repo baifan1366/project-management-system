@@ -180,7 +180,7 @@ export default function AdminDashboard() {
             </div>
             )}
             
-            {hasPermission('view_subscriptions') && (
+            {hasPermission('view_subscription_plans') && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>

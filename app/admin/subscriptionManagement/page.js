@@ -55,7 +55,11 @@ export default function AdminSubscriptions() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
-
+  const [userSubscriptions, setUserSubscriptions] = useState([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('all');
+  const [planTypeFilter, setPlanTypeFilter] = useState('all');
+  
   // initialize the page
   useEffect(() => {
     const initAdminSubscriptions = async () => {
@@ -121,16 +125,38 @@ export default function AdminSubscriptions() {
 
   const fetchUserSubscriptions = async () => {
     try {
-      const { data, error } = await supabase
+      // Build the query with joins to get both user and plan details
+      let query = supabase
         .from('user_subscription_plan')
-        .select('*')
+        .select(`
+          *,
+          user:user_id (id, email, name),
+          plan:plan_id (id, name, type, max_members, max_projects, max_teams, max_ai_chat, max_ai_task, max_ai_workflow)
+        `)
         .order('created_at', { ascending: false });
-      if(error){
-        console.error('Error fetching user subscriptions:', error);
-      } else {
-        console.log('User subscriptions fetched successfully:', data);
-        setUserSubscriptions(data);
+      
+      // Apply filters if they are set
+      if (subscriptionStatusFilter !== 'all') {
+        query = query.eq('status', subscriptionStatusFilter);
       }
+      
+      if (userSearchQuery) {
+        query = query.or(`user.email.ilike.%${userSearchQuery}%,user.name.ilike.%${userSearchQuery}%`);
+      }
+      
+      if (planTypeFilter !== 'all') {
+        query = query.eq('plan.type', planTypeFilter);
+      }
+        
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching user subscriptions:', error);
+        return;
+      }
+      
+      console.log('User subscriptions fetched successfully:', data);
+      setUserSubscriptions(data || []);
     } catch (error) {
       console.error('Error in fetchUserSubscriptions:', error);
     }
@@ -557,6 +583,20 @@ export default function AdminSubscriptions() {
     }
   };
 
+  // Calculate remaining usage based on plan limits and current usage
+  const calculateRemainingUsage = (current, max) => {
+    // If max is -1, it means unlimited
+    if (max === -1) return "∞";
+    return max - current;
+  };
+
+  // Apply filters when they change
+  useEffect(() => {
+    if (activeTab === 'userSubscriptions') {
+      fetchUserSubscriptions();
+    }
+  }, [activeTab, userSearchQuery, subscriptionStatusFilter, planTypeFilter]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -701,7 +741,9 @@ export default function AdminSubscriptions() {
                             <div className="text-xs text-gray-500 dark:text-gray-400">
                               <div>Projects: {plan.max_projects === -1 ? 'Unlimited' : plan.max_projects}</div>
                               <div>Members: {plan.max_members === -1 ? 'Unlimited' : plan.max_members}</div>
-                              <div>Storage: {formatStorage(plan.storage_limit)}</div>
+                              <div>AI Chat: {plan.max_ai_chat === -1 ? 'Unlimited' : plan.max_ai_chat}</div>
+                              <div>AI Task: {plan.max_ai_task === -1 ? 'Unlimited' : plan.max_ai_task}</div>
+                              <div>AI Workflow: {plan.max_ai_workflow === -1 ? 'Unlimited' : plan.max_ai_workflow}</div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -882,10 +924,14 @@ export default function AdminSubscriptions() {
                   <input
                     type="text"
                     placeholder="Search by user email or name"
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
                   />
                   <select 
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                    value={planTypeFilter}
+                    onChange={(e) => setPlanTypeFilter(e.target.value)}
                   >
                     <option value="all">All Plans</option>
                     <option value="FREE">Free</option>
@@ -893,7 +939,9 @@ export default function AdminSubscriptions() {
                     <option value="ENTERPRISE">Enterprise</option>
                   </select>
                   <select 
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                    value={subscriptionStatusFilter}
+                    onChange={(e) => setSubscriptionStatusFilter(e.target.value)}
                   >
                     <option value="all">All Status</option>
                     <option value="ACTIVE">Active</option>
@@ -904,221 +952,249 @@ export default function AdminSubscriptions() {
               </div>
               
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          User
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Plan
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Start Date
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          End Date
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Amount
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Auto Renew
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {/* Sample data rows - would be replaced with actual data */}
-                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold mr-3">
-                              JD
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">John Doe</div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">john.doe@example.com</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                            PRO
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          Jan 15, 2023
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          Jan 15, 2024
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          $120.00 USD
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                            Active
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          <span className="text-green-600 dark:text-green-400">
-                            <FaCheck className="inline mr-1" /> Enabled
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-3">
-                            <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                              <FaEdit />
-                            </button>
-                            <button className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
-                              <FaTimes />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-semibold mr-3">
-                              AS
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">Alice Smith</div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">alice.smith@example.com</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                            ENTERPRISE
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          Mar 5, 2023
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          Mar 5, 2024
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          $480.00 USD
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                            Active
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          <span className="text-green-600 dark:text-green-400">
-                            <FaCheck className="inline mr-1" /> Enabled
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-3">
-                            <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                              <FaEdit />
-                            </button>
-                            <button className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
-                              <FaTimes />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr className="bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white font-semibold mr-3">
-                              BJ
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">Bob Johnson</div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">bob.johnson@example.com</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                            PRO
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          Feb 12, 2023
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          Feb 12, 2024
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          $120.00 USD
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
-                            Canceled
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          <span className="text-red-600 dark:text-red-400">
-                            <FaTimes className="inline mr-1" /> Disabled
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-3">
-                            <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                              <FaEdit />
-                            </button>
-                            <button className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300">
-                              <FaCheck />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                {userSubscriptions.length === 0 ? (
+                  <div className="p-6 text-center">
+                    <p className="text-gray-500 dark:text-gray-400">
+                      {userSearchQuery || subscriptionStatusFilter !== 'all' || planTypeFilter !== 'all' 
+                        ? 'No subscriptions found matching your filters.'
+                        : 'No subscriptions found in the system.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            User
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Plan
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Date Range
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Projects Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Members Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            AI Chat Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            AI Task Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            AI Workflow Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {userSubscriptions.map((subscription) => {
+                          return (
+                            <tr key={subscription.id} className={subscription.status !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-3">
+                                    {subscription.user?.name?.charAt(0).toUpperCase() || subscription.user?.email?.charAt(0).toUpperCase() || 'U'}
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {subscription.user?.name || 'Unknown'}
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                      {subscription.user?.email || 'No email'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                  ${subscription.plan?.type === 'FREE' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : 
+                                    subscription.plan?.type === 'PRO' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
+                                    'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}
+                                >
+                                  {subscription.plan?.name || subscription.plan?.type || 'Unknown'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {formatDate(subscription.start_date)} - {formatDate(subscription.end_date)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_projects} / {subscription.plan?.max_projects === -1 ? '∞' : subscription.plan?.max_projects}
+                                  </span>
+                                  {subscription.plan?.max_projects !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          subscription.current_projects / subscription.plan?.max_projects > 0.8 
+                                            ? 'bg-red-500' 
+                                            : subscription.current_projects / subscription.plan?.max_projects > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, (subscription.current_projects / subscription.plan?.max_projects * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_members} / {subscription.plan?.max_members === -1 ? '∞' : subscription.plan?.max_members}
+                                  </span>
+                                  {subscription.plan?.max_members !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          subscription.current_members / subscription.plan?.max_members > 0.8 
+                                            ? 'bg-red-500' 
+                                            : subscription.current_members / subscription.plan?.max_members > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, (subscription.current_members / subscription.plan?.max_members * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              {/* AI Chat Usage */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_ai_chat || 0} / {subscription.plan?.max_ai_chat === -1 ? '∞' : subscription.plan?.max_ai_chat}
+                                  </span>
+                                  {subscription.plan?.max_ai_chat !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          (subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat > 0.8 
+                                            ? 'bg-red-500' 
+                                            : (subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, ((subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              {/* AI Task Usage */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_ai_task || 0} / {subscription.plan?.max_ai_task === -1 ? '∞' : subscription.plan?.max_ai_task}
+                                  </span>
+                                  {subscription.plan?.max_ai_task !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          (subscription.current_ai_task || 0) / subscription.plan?.max_ai_task > 0.8 
+                                            ? 'bg-red-500' 
+                                            : (subscription.current_ai_task || 0) / subscription.plan?.max_ai_task > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, ((subscription.current_ai_task || 0) / subscription.plan?.max_ai_task * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              {/* AI Workflow Usage */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_ai_workflow || 0} / {subscription.plan?.max_ai_workflow === -1 ? '∞' : subscription.plan?.max_ai_workflow}
+                                  </span>
+                                  {subscription.plan?.max_ai_workflow !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          (subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow > 0.8 
+                                            ? 'bg-red-500' 
+                                            : (subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, ((subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div>
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    ${subscription.status === 'ACTIVE' 
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
+                                      : subscription.status === 'CANCELED'
+                                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                                    }`}
+                                  >
+                                    {subscription.status}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  {subscription.auto_renew ? (
+                                    <span className="text-green-600 dark:text-green-400">
+                                      <FaCheck className="inline mr-1" /> Auto-renew
+                                    </span>
+                                  ) : (
+                                    <span className="text-red-600 dark:text-red-400">
+                                      <FaTimes className="inline mr-1" /> No renewal
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div className="flex justify-end space-x-3">
+                                  <button 
+                                    className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                    title="Edit subscription"
+                                  >
+                                    <FaEdit />
+                                  </button>
+                                  {subscription.status === 'ACTIVE' ? (
+                                    <button 
+                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                      title="Cancel subscription"
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+                                      title="Reactivate subscription"
+                                    >
+                                      <FaCheck />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 
-                {/* Pagination */}
-                <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex-1 flex justify-between sm:hidden">
-                    <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                      Previous
-                    </button>
-                    <button className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                      Next
-                    </button>
-                  </div>
-                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm text-gray-700 dark:text-gray-400">
-                        Showing <span className="font-medium">1</span> to <span className="font-medium">3</span> of{" "}
-                        <span className="font-medium">3</span> results
-                      </p>
-                    </div>
-                    <div>
-                      <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                        <button className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <span className="sr-only">Previous</span>
-                          <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                        <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-                          1
-                        </button>
-                        <button className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <span className="sr-only">Next</span>
-                          <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </nav>
-                    </div>
-                  </div>
-                </div>
+                {/* Pagination will be added when needed */}
               </div>
               
               {/* Subscription Analytics */}
