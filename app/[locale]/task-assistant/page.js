@@ -47,8 +47,8 @@ export default function TaskAssistantPage() {
   if (!userId) {
     return (
       <div className="container w-full py-12 px-4 md:px-6 h-[calc(100vh-64px)] overflow-auto">
-        <div className="text-center space-y-3">
-          <div className="flex justify-center mb-4">
+        <div className="text-center space-y-3 w-full">
+          <div className="flex justify-center mb-4  w-full">
             <Image 
               src="/pengy assistant.png" 
               alt="Pengy Assistant" 

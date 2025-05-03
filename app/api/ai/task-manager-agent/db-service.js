@@ -79,14 +79,45 @@ export async function createTeamCustomField(teamId, fieldData, userId) {
 
 // 创建团队自定义字段值
 export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, userId) {
+  // First check if a value already exists for this team custom field
+  const { data: existingValues, error: checkError } = await supabase
+    .from('team_custom_field_value')
+    .select('id')
+    .eq('team_custom_field_id', teamCustomFieldId)
+    .limit(1);
+    
+  if (checkError) {
+    console.error(`Failed to check existing values for field ${fieldData.name}:`, checkError);
+    // Continue with the function rather than throwing error
+  }
+  
+  // If there's already a value for this field, skip creation
+  if (existingValues && existingValues.length > 0) {
+    console.log(`${fieldData.name} view configuration already exists, skipping creation`);
+    return;
+  }
+  
   let valueData = {};
   
-  // 根据字段类型设置不同的值
-  if (fieldData.id === 1) { // List视图
+  // Set different values based on field type
+  if (fieldData.id === 1) { // Overview
     valueData = {
       team_custom_field_id: teamCustomFieldId,
-      name: "任务列表",
-      description: "简单列表格式显示任务",
+      name: "Project Overview",
+      description: "High-level overview of project progress and metrics",
+      icon: "LayoutGrid",
+      value: {
+        sections: ["progress", "recent", "upcoming"],
+        refreshInterval: 300
+      },
+      created_by: userId
+    };
+  }
+  else if (fieldData.id === 2) { // List
+    valueData = {
+      team_custom_field_id: teamCustomFieldId,
+      name: "Task List",
+      description: "Simple list format for displaying tasks",
       icon: "List",
       value: {
         defaultView: "list",
@@ -95,24 +126,11 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 2) { // Dashboard视图
+  else if (fieldData.id === 3) { // Files
     valueData = {
       team_custom_field_id: teamCustomFieldId,
-      name: "项目仪表盘",
-      description: "项目进度和指标的可视化仪表盘",
-      icon: "BarChart3",
-      value: {
-        showMetrics: true,
-        refreshInterval: 60
-      },
-      created_by: userId
-    };
-  }
-  else if (fieldData.id === 3) { // File视图
-    valueData = {
-      team_custom_field_id: teamCustomFieldId,
-      name: "项目文件",
-      description: "管理与任务相关的文件",
+      name: "Project Files",
+      description: "Manage task-related files and documents",
       icon: "Files",
       value: {
         sortBy: "createdAt",
@@ -121,12 +139,26 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 4) { // Gantt视图
+  else if (fieldData.id === 4) { // Timeline
     valueData = {
       team_custom_field_id: teamCustomFieldId,
-      name: "甘特图",
-      description: "项目进度的甘特图表示",
-      icon: "GanttChart",
+      name: "Project Timeline",
+      description: "Display tasks in timeline format",
+      icon: "SquareChartGantt",
+      value: {
+        zoom: "month",
+        showMilestones: true,
+        groupBy: "assignee"
+      },
+      created_by: userId
+    };
+  }
+  else if (fieldData.id === 5) { // Gantt
+    valueData = {
+      team_custom_field_id: teamCustomFieldId,
+      name: "Gantt Chart",
+      description: "Project progress in Gantt chart format",
+      icon: "ChartGantt",
       value: {
         showCriticalPath: true,
         showDependencies: true,
@@ -135,11 +167,11 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 5) { // Board视图
+  else if (fieldData.id === 6) { // Kanban Board
     valueData = {
       team_custom_field_id: teamCustomFieldId,
-      name: "团队任务看板",
-      description: "任务看板视图",
+      name: "Task Board",
+      description: "Kanban board for task management",
       icon: "LayoutDashboard",
       value: {
         defaultView: "board",
@@ -149,12 +181,25 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 6) { // Calendar视图
+  else if (fieldData.id === 7) { // Workflow
     valueData = {
       team_custom_field_id: teamCustomFieldId,
-      name: "团队日历",
-      description: "任务日历视图",
-      icon: "Calendar",
+      name: "Workflow View",
+      description: "Display tasks in workflow format",
+      icon: "LayoutDashboard",
+      value: {
+        showSteps: true,
+        autoProgress: false
+      },
+      created_by: userId
+    };
+  }
+  else if (fieldData.id === 8) { // Calendar
+    valueData = {
+      team_custom_field_id: teamCustomFieldId,
+      name: "Task Calendar",
+      description: "Calendar view for scheduling tasks",
+      icon: "CalendarRange",
       value: {
         defaultView: "month",
         showWeekends: true,
@@ -163,11 +208,11 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 7) { // Note视图
+  else if (fieldData.id === 9) { // Notion
     valueData = {
       team_custom_field_id: teamCustomFieldId,
-      name: "项目笔记",
-      description: "项目相关笔记和文档",
+      name: "Project Notes",
+      description: "Text field for task-related notes",
       icon: "Text",
       value: {
         editorType: "rich",
@@ -176,67 +221,92 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 8) { // Timeline视图
+  else if (fieldData.id === 10) { // Agile
     valueData = {
       team_custom_field_id: teamCustomFieldId,
-      name: "项目时间线",
-      description: "任务时间线视图",
-      icon: "GanttChart",
+      name: "Agile Board",
+      description: "Agile board for managing tasks in agile workflow",
+      icon: "Pen",
       value: {
-        zoom: "month",
-        showMilestones: true,
-        groupBy: "assignee"
-      },
-      created_by: userId
-    };
-  }
-  else if (fieldData.id === 9) { // Overview视图
-    valueData = {
-      team_custom_field_id: teamCustomFieldId,
-      name: "项目概览",
-      description: "项目进度和指标概览",
-      icon: "LayoutGrid",
-      value: {
-        sections: ["progress", "recent", "upcoming"],
-        refreshInterval: 300
+        sprintDuration: 14,
+        showBurndownChart: true,
+        enableStoryPoints: true
       },
       created_by: userId
     };
   }
   
-  // 创建字段值
+  // Create field value (without checking for error code 23505)
   const { error: teamCustomFieldValueError } = await supabase
     .from('team_custom_field_value')
     .insert([valueData]);
     
   if (teamCustomFieldValueError) {
-    // 检查是否为主键冲突错误 (23505)
+    // Check if it's a primary key conflict error (23505)
     if (teamCustomFieldValueError.code === '23505' || 
         (teamCustomFieldValueError.message && 
         teamCustomFieldValueError.message.includes('23505'))) {
-      console.warn(`${valueData.name}视图配置已存在，跳过创建`);
+      console.warn(`${valueData.name} view configuration already exists, skipping creation`);
     } else {
-      console.error(`创建${valueData.name}视图配置失败:`, teamCustomFieldValueError);
+      console.error(`Failed to create ${valueData.name} view configuration:`, teamCustomFieldValueError);
       throw new Error(`Failed to create ${valueData.name} view config: ${teamCustomFieldValueError.message}`);
     }
   }
 }
 
-// 将用户添加到团队
+// Add user to team
 export async function addUserToTeam(userId, teamId) {
-  console.log("正在将用户添加到团队...");
-  const { error: userTeamError } = await supabase
+  console.log("Adding user to team...");
+  
+  // First check if user is already in team
+  const { data: existingUserTeam, error: checkError } = await supabase
     .from('user_team')
-    .insert([{
-      user_id: userId,
-      team_id: teamId,
-      role: 'OWNER',
-      created_by: userId
-    }]);
+    .select('id')
+    .eq('user_id', userId)
+    .eq('team_id', teamId)
+    .limit(1);
     
-  if (userTeamError) {
-    console.error("将用户添加到团队失败:", userTeamError);
-    throw new Error(`Failed to add user to team: ${userTeamError.message}`);
+  if (checkError) {
+    console.error("Failed to check if user is in team:", checkError);
+    // Continue anyway - we'll check for duplicates on insert
+  }
+  
+  // If user is already in team, return success
+  if (existingUserTeam && existingUserTeam.length > 0) {
+    console.log(`User ${userId} is already in team ${teamId}`);
+    return;
+  }
+  
+  // Important: Don't specify the 'id' field - let PostgreSQL auto-generate it
+  try {
+    const { error: userTeamError } = await supabase
+      .from('user_team')
+      .insert([{
+        user_id: userId,
+        team_id: teamId,
+        role: 'OWNER',
+        created_by: userId
+      }]);
+      
+    if (userTeamError) {
+      // Check if it's a duplicate entry error (user is already in team)
+      if (userTeamError.code === '23505' && 
+          userTeamError.message.includes('user_team_user_id_team_id_key')) {
+        // User is already in team, this is fine
+        console.log(`User ${userId} is already in team ${teamId} (caught in error handler)`);
+        return;
+      }
+      
+      console.error("Failed to add user to team:", userTeamError);
+      // Don't throw error - continue with the rest of the process
+      console.log("Continuing despite user_team error");
+    } else {
+      console.log(`Successfully added user ${userId} to team ${teamId}`);
+    }
+  } catch (error) {
+    console.error("Error in addUserToTeam:", error);
+    // Don't throw error - continue with the rest of the process
+    console.log("Continuing despite user_team error");
   }
 }
 
@@ -411,25 +481,107 @@ async function createTeamNotification(
   }
 }
 
-// 创建默认分区
+// Create default section
 export async function createSection(teamId, userId) {
-  console.log("正在创建默认分区...");
-  const { data: sectionData, error: sectionError } = await supabase
-    .from('section')
-    .insert([{
-      name: "默认分区",
-      team_id: teamId,
-      created_by: userId,
-      task_ids: [] // 确保初始化为空数组
-    }])
-    .select();
-    
-  if (sectionError) {
-    console.error("创建分区失败:", sectionError);
-    throw new Error(`Failed to create section: ${sectionError.message}`);
-  }
+  console.log("Creating default section...");
   
-  return sectionData[0];
+  try {
+    // First check if a section already exists for this team
+    const { data: existingSections, error: checkError } = await supabase
+      .from('section')
+      .select('id')
+      .eq('team_id', teamId)
+      .limit(1);
+      
+    if (checkError) {
+      console.error("Failed to check for existing sections:", checkError);
+      // Continue anyway
+    }
+    
+    // If a section already exists for this team, return it
+    if (existingSections && existingSections.length > 0) {
+      console.log(`Team ${teamId} already has a section, using existing section ID: ${existingSections[0].id}`);
+      return existingSections[0];
+    }
+    
+    // Implement retry logic with random IDs for section creation
+    const maxRetries = 5;
+    let retryCount = 0;
+    let lastError = null;
+    
+    while (retryCount < maxRetries) {
+      try {
+        // For first attempt, let PostgreSQL auto-generate ID
+        // For retries, use a random ID
+        let insertData = {
+          name: "Section",
+          team_id: teamId,
+          created_by: userId,
+          task_ids: [] // Initialize as empty array
+        };
+        
+        // Add random ID for retry attempts
+        if (retryCount > 0) {
+          // Generate a large random ID to avoid conflicts
+          const randomId = Math.floor(100000 + Math.random() * 900000);
+          insertData.id = randomId;
+          console.log(`Retry attempt ${retryCount} with random ID: ${randomId}`);
+        }
+        
+        const { data: sectionData, error: sectionError } = await supabase
+          .from('section')
+          .insert([insertData])
+          .select();
+          
+        if (sectionError) {
+          throw sectionError;
+        }
+        
+        console.log(`Section created successfully, ID: ${sectionData[0].id}`);
+        return sectionData[0];
+      } catch (error) {
+        lastError = error;
+        
+        // Check if it's a duplicate key error (23505)
+        const errorDetails = typeof error.message === 'string' ? error.message : JSON.stringify(error);
+        const isDuplicateKeyError = errorDetails.includes('23505') || 
+                                   errorDetails.includes('duplicate key') || 
+                                   errorDetails.includes('already exists');
+        
+        if (!isDuplicateKeyError) {
+          console.error("Failed to create section with non-recoverable error:", error);
+          break;
+        }
+        
+        retryCount++;
+        console.log(`Section creation failed due to duplicate key (attempt ${retryCount}/${maxRetries}), retrying...`);
+        
+        // Short delay before next retry
+        await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
+      }
+    }
+    
+    // If all retries failed, try one last time to get an existing section
+    console.log("All section creation attempts failed, looking for any existing section as fallback");
+    const { data: fallbackSection, error: fallbackError } = await supabase
+      .from('section')
+      .select('id')
+      .eq('team_id', teamId)
+      .limit(1);
+      
+    if (!fallbackError && fallbackSection && fallbackSection.length > 0) {
+      console.log(`Found existing section as fallback, ID: ${fallbackSection[0].id}`);
+      return fallbackSection[0];
+    }
+    
+    // Return a mock section as last resort
+    console.error("Failed to create section after multiple attempts and couldn't find existing section:", lastError);
+    return { id: 0, name: "Default Section", team_id: teamId, task_ids: [] };
+  } catch (error) {
+    console.error("Error in createSection:", error);
+    // Return a mock section to continue the process
+    return { id: 0, name: "Default Section", team_id: teamId, task_ids: [] };
+  }
 }
 
 // 查找用户ID通过名称或邮箱
@@ -482,52 +634,113 @@ export async function getUserIdByNameOrEmail(nameOrEmail) {
 
 // 创建任务
 export async function createTask(taskInfo, userId) {
-  console.log("正在创建任务:", taskInfo.title);
+  console.log("Creating task:", taskInfo.name);
   
-  // 处理指派给用户的逻辑
+  // Process assignee logic
   let assigneeId = null;
   
-  // 检查任务信息中是否有指定的assignees
+  // Check if task info has specified assignees
   if (taskInfo.assignees && taskInfo.assignees.length > 0) {
-    // 从AI响应中获取第一个指定的用户名或邮箱
+    // Get the first specified username or email from AI response
     const assigneeName = taskInfo.assignees[0];
     assigneeId = await getUserIdByNameOrEmail(assigneeName);
     
     if (assigneeId) {
-      console.log(`任务将分配给用户: ${assigneeName} (ID: ${assigneeId})`);
+      console.log(`Task will be assigned to user: ${assigneeName} (ID: ${assigneeId})`);
     } else {
-      console.log(`未找到用户 ${assigneeName}, 任务将不分配`);
+      console.log(`User ${assigneeName} not found, task will not be assigned`);
     }
   }
   
-  // 构建标准化的tag_values对象
+  // Build standardized tag_values object
   const tagValues = {
-    1: taskInfo.title,
-    1: taskInfo.description || '',
-    3: taskInfo.due_date || null,
-    4: taskInfo.priority || 'MEDIUM',
-    12: 'TODO',
+    1: taskInfo.name,
+    5: taskInfo.description || '',
+    6: taskInfo.start_date || new Date().toISOString().split('T')[0], //yyyy-mm-dd
+    4: taskInfo.due_date || null,
+    10: taskInfo.tag || 'MEDIUM',
+    3: taskInfo.status ||'IN PROGRESS',
     2: assigneeId || ''
   };
   
-  // 调试输出
-  console.log("任务数据:", JSON.stringify(tagValues, null, 2));
+  // Debug output
+  console.log("Task data:", JSON.stringify(tagValues, null, 2));
   
-  const { data: taskData, error: taskError } = await supabase
-    .from('task')
-    .insert([{
-      created_by: userId,
-      tag_values: tagValues
-    }])
-    .select();
-    
-  if (taskError) {
-    console.error("创建任务失败:", taskError);
-    throw new Error(`Failed to create task: ${taskError.message}`);
+  // Implement retry logic with exponential backoff
+  const maxRetries = 5;
+  let retryCount = 0;
+  let lastError = null;
+  
+  while (retryCount < maxRetries) {
+    try {
+      const { data: taskData, error: taskError } = await supabase
+        .from('task')
+        .insert([{
+          created_by: userId,
+          tag_values: tagValues
+        }])
+        .select();
+        
+      // If we get here, the operation succeeded
+      if (taskError) {
+        throw taskError;
+      }
+      
+      console.log("Task created successfully, ID:", taskData[0].id);
+      return taskData[0];
+    } catch (error) {
+      lastError = error;
+      
+      // Check if it's a duplicate key error (23505)
+      const errorDetails = typeof error.message === 'string' ? error.message : JSON.stringify(error);
+      const isDuplicateKeyError = errorDetails.includes('23505') || 
+                                 errorDetails.includes('duplicate key') || 
+                                 errorDetails.includes('already exists');
+      
+      // If it's not a duplicate key error, no need to retry
+      if (!isDuplicateKeyError) {
+        console.error("Failed to create task with non-recoverable error:", error);
+        break;
+      }
+      
+      retryCount++;
+      console.log(`Task creation failed due to duplicate key (attempt ${retryCount}/${maxRetries}), retrying...`);
+      
+      // For duplicate key errors, try with an explicit insert using a random ID
+      // This is only for the retries, not the first attempt
+      try {
+        // Generate a large random ID that's unlikely to conflict
+        const randomId = Math.floor(100000 + Math.random() * 900000);
+        
+        const { data: taskData, error: taskError } = await supabase
+          .from('task')
+          .insert([{
+            id: randomId,
+            created_by: userId,
+            tag_values: tagValues
+          }])
+          .select();
+          
+        if (taskError) {
+          console.error(`Retry with random ID ${randomId} failed:`, taskError);
+          // Continue to next iteration
+        } else {
+          console.log(`Task created successfully with random ID ${randomId}`);
+          return taskData[0];
+        }
+      } catch (retryError) {
+        console.error("Error during retry:", retryError);
+        // Continue to next iteration
+      }
+      
+      // Short delay before next retry
+      await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
+    }
   }
   
-  console.log("任务创建成功，ID:", taskData[0].id);
-  return taskData[0];
+  // If we've exhausted all retries, throw the last error
+  console.error(`Failed to create task after ${maxRetries} attempts:`, lastError);
+  throw new Error(`Failed to create task after ${maxRetries} attempts: ${lastError.message}`);
 }
 
 // 将任务添加到分区

@@ -1,94 +1,166 @@
-// 安全地解析JSON字符串
+// Safely parse JSON string with enhanced error handling
 export function safeParseJSON(jsonString) {
+  if (!jsonString || typeof jsonString !== 'string') {
+    return { data: null, error: "Invalid input: Not a string" };
+  }
+
   try {
-    // 尝试直接解析
+    // Try direct parsing first
     return { data: JSON.parse(jsonString), error: null };
   } catch (error) {
-    console.error("JSON解析错误，原始字符串:", jsonString);
+    console.error("JSON parsing error, attempting to fix...");
     
     try {
-      // 如果常规解析失败，尝试清理字符串然后解析
-      // 1. 查找第一个 '{' 和最后一个 '}'
-      const startIdx = jsonString.indexOf('{');
-      const endIdx = jsonString.lastIndexOf('}');
+      // Sanitize the JSON string
+      let sanitizedContent = jsonString;
+      
+      // Extract JSON object if embedded in other text
+      const startIdx = sanitizedContent.indexOf('{');
+      const endIdx = sanitizedContent.lastIndexOf('}');
       
       if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-        const jsonSubstring = jsonString.substring(startIdx, endIdx + 1);
-        
-        // 尝试解析清理后的JSON
-        try {
-          return { data: JSON.parse(jsonSubstring), error: null };
-        } catch (subError) {
-          // 如果还是失败，检查是否存在多余的右大括号问题
-          // 计算左右大括号数量
-          const leftBraces = (jsonSubstring.match(/\{/g) || []).length;
-          const rightBraces = (jsonSubstring.match(/\}/g) || []).length;
-          
-          if (rightBraces > leftBraces) {
-            // 如果右大括号更多，找到匹配的最后一个右大括号
-            let depth = 0;
-            let matchedEndIdx = -1;
-            
-            for (let i = 0; i < jsonSubstring.length; i++) {
-              if (jsonSubstring[i] === '{') depth++;
-              else if (jsonSubstring[i] === '}') {
-                depth--;
-                if (depth === 0) matchedEndIdx = i;
-              }
-            }
-            
-            if (matchedEndIdx !== -1) {
-              const balancedJson = jsonSubstring.substring(0, matchedEndIdx + 1);
-              return { data: JSON.parse(balancedJson), error: null };
-            }
-          }
-        }
+        sanitizedContent = sanitizedContent.substring(startIdx, endIdx + 1);
       }
       
-      return { data: null, error: "无法提取有效的JSON内容" };
+      // Replace problematic characters in property values
+      sanitizedContent = sanitizedContent
+        // Remove control characters which are invalid in JSON strings
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+        // Handle trailing commas in property values with no following property
+        .replace(/,\s*}/g, '}')
+        .replace(/,\s*]/g, ']')
+        // Fix invalid commas in objects (e.g. { "id": 6,, "name": ... })
+        .replace(/,\s*,/g, ',');
+      
+      // Handle potential issues with property names and values
+      // This regex finds property patterns and fixes misplaced commas in values
+      sanitizedContent = sanitizedContent.replace(/"([^"]+)"\s*:\s*"([^"]*)(?:,)(?!")([^"]*)"(?=\s*[,}])/g, 
+        (match, propName, value1, value2) => {
+          // Fix a comma inside a string value by removing it
+          return `"${propName}": "${value1}${value2}"`;
+        }
+      );
+      
+      // Fix quotes in property names
+      sanitizedContent = sanitizedContent.replace(/([{,]\s*)([^"'\s][^:]*?)(\s*:)/g, 
+        (match, prefix, propName, suffix) => {
+          // Add quotes around unquoted property names
+          return `${prefix}"${propName}"${suffix}`;
+        }
+      );
+      
+      // Fix missing quotes at the end of string values
+      sanitizedContent = sanitizedContent.replace(/"([^"]+)"\s*:\s*"([^"]*)(?!")(?=\s*[,}])/g, 
+        (match, propName, value) => {
+          return `"${propName}": "${value}"`;
+        }
+      );
+      
+      // Check and fix unbalanced JSON structure
+      let openBraces = (sanitizedContent.match(/\{/g) || []).length;
+      let closeBraces = (sanitizedContent.match(/\}/g) || []).length;
+      let openBrackets = (sanitizedContent.match(/\[/g) || []).length;
+      let closeBrackets = (sanitizedContent.match(/\]/g) || []).length;
+      
+      // Add missing closing braces
+      while (closeBraces < openBraces) {
+        sanitizedContent += '}';
+        closeBraces++;
+      }
+      
+      // Add missing closing brackets
+      while (closeBrackets < openBrackets) {
+        sanitizedContent += ']';
+        closeBrackets++;
+      }
+      
+      // Fix missing colons in property assignments
+      sanitizedContent = sanitizedContent.replace(/"([^"]+)"\s+(?!")/g, '"$1": ');
+      
+      // Fix quoted property followed by non-colon
+      sanitizedContent = sanitizedContent.replace(/"([^"]+)"(?!\s*:)(?=\s*[,}])/g, '"$1": ""');
+      
+      // Fix truncated object with properties that lack values
+      sanitizedContent = sanitizedContent.replace(/"([^"]+)"\s*:(?!\s*["{\[0-9tfn])/g, '"$1": null');
+      
+      console.log("Sanitized JSON:", sanitizedContent.substring(0, 100) + "...");
+      
+      // Try parsing the sanitized JSON
+      try {
+        const result = JSON.parse(sanitizedContent);
+        return { data: result, error: null };
+      } catch (innerError) {
+        // Last resort: try JSON5 parsing approach (more lenient)
+        try {
+          // Implement a more forgiving JSON parser
+          // First, convert all single quotes to double quotes
+          let lenientJson = sanitizedContent.replace(/'/g, '"');
+          
+          // Allow trailing commas in objects and arrays
+          lenientJson = lenientJson
+            .replace(/,\s*}/g, '}')
+            .replace(/,\s*]/g, ']');
+          
+          // Try parsing with eval (only as last resort, in controlled context)
+          // Note: This is not ideal for security, but we're already in a server context
+          // with sanitized input that came from our own AI
+          const jsonFn = new Function('return ' + lenientJson);
+          const evalResult = jsonFn();
+          
+          if (evalResult && typeof evalResult === 'object') {
+            return { data: evalResult, error: null };
+          } else {
+            throw new Error("Failed to parse JSON with lenient method");
+          }
+        } catch (lenientError) {
+          return { data: null, error: `Failed to parse sanitized JSON: ${innerError.message}` };
+        }
+      }
     } catch (cleanError) {
-      return { data: null, error: error.message };
+      return { data: null, error: `Original error: ${error.message}, Sanitization error: ${cleanError.message}` };
     }
   }
 }
 
 
-// 标签ID映射辅助函数
+// Tag ID mapping helper function
 export function getDefaultTagIdsForField(fieldId) {
-  // 根据视图类型分配适当的标签ID
+  // Assign appropriate tag IDs based on view type
   switch (fieldId) {
-    case 1: // List视图
-      return [1, 2, 3, 4, 6]; // 名称、负责人、截止日期、状态、优先级
-    case 2: // Dashboard视图
-      return [1, 4, 6]; // 名称、状态、优先级
-    case 3: // File视图
-      return [1, 2]; // 名称、负责人
-    case 4: // Gantt视图
-      return [1, 2, 3, 4]; // 名称、负责人、截止日期、状态
-    case 5: // Board视图
-      return [1, 2, 3, 4, 6]; // 名称、负责人、截止日期、状态、优先级
-    case 6: // Calendar视图
-      return [1, 3, 6]; // 名称、截止日期、优先级
-    case 7: // Note视图
-      return [1, 2]; // 名称、负责人
-    case 8: // Timeline视图
-      return [1, 2, 3, 4]; // 名称、负责人、截止日期、状态
-    case 9: // Overview视图
-      return [1, 2, 3, 4, 6]; // 名称、负责人、截止日期、状态、优先级
+    case 1: // Overview
+      return [1, 2, 3, 4, 10]; // Name, Assignee, Due Date, Status, Tags
+    case 2: // List
+      return [1, 2, 3, 4, 10]; // Name, Assignee, Due Date, Status, Tags
+    case 3: // Files
+      return [1, 2, 5]; // Name, Assignee, Description
+    case 4: // Timeline
+      return [1, 2, 3, 4, 6, 9]; // Name, Assignee, Due Date, Status, Start Date, Progress
+    case 5: // Gantt
+      return [1, 2, 3, 4, 6, 8, 9]; // Name, Assignee, Due Date, Status, Start Date, Duration, Progress
+    case 6: // Kanban Board
+      return [1, 2, 3, 4, 10]; // Name, Assignee, Due Date, Status, Tags
+    case 7: // Workflow
+      return [1, 2, 3, 4, 7]; // Name, Assignee, Due Date, Status, Parent ID
+    case 8: // Calendar
+      return [1, 3, 6, 11]; // Name, Due Date, Start Date, Completed On
+    case 9: // Notion
+      return [1, 2, 5, 12]; // Name, Assignee, Description, Remarks
+    case 10: // Agile
+      return [1, 2, 3, 4, 9, 10]; // Name, Assignee, Due Date, Status, Progress, Tags
     default:
-      return []; // 默认返回空数组
+      return []; // Default empty array
   }
-} 
+}
 
-// 检查是否是邀请指令
+// Check if the instruction is an invitation
 export function isInvitationInstruction(instruction) {
   const lowerInstruction = instruction.toLowerCase();
   const inviteTerms = ['invite', 'add user', 'add member', 'join team'];
   
-  // 检查是否包含邀请相关术语
+  // Check if instruction contains invitation-related terms
   const containsInviteTerm = inviteTerms.some(term => lowerInstruction.includes(term));
   
-  // 检查是否包含邮箱
+  // Check if instruction contains an email
   const containsEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g.test(lowerInstruction);
   
   const result = containsInviteTerm && containsEmail;
@@ -96,7 +168,7 @@ export function isInvitationInstruction(instruction) {
   return result;
 } 
 
-// 创建错误响应
+// Create error response
 export function createErrorResponse(status, errorType, message) {
   return new Response(
     JSON.stringify({
@@ -112,7 +184,7 @@ export function createErrorResponse(status, errorType, message) {
   );
 }
 
-// 创建成功响应
+// Create success response
 export function createSuccessResponse(data) {
   return new Response(
     JSON.stringify(data),
