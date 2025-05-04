@@ -31,7 +31,7 @@ You must extract the following information from the user's message:
    - Assignees (if mentioned)
 
 3. Recommended project views based on project type:
-   - Select from available views: List(1), Dashboard(2), File(3), Gantt(4), Board(5), Calendar(6), Note(7), Timeline(8), Overview(9)
+   - Select from available views: Overview(1), List(2), Files(3), Timeline(4), Gantt(5), Kanban Board(6), Workflow(7), Calendar(8), Notion(9), Agile(10)
    - Choose 4-6 most suitable views for this project type
    - Order them by importance for this project type
 
@@ -54,19 +54,24 @@ Respond ONLY with the JSON object matching this format:
   },
   "tasks": [
     {
-      "title": "string",
+      "name": "string",
       "description": "string",
+      "start_date": "YYYY-MM-DD", // or null if not specified
       "due_date": "YYYY-MM-DD", // or null if not specified
-      "priority": "MEDIUM", // LOW, MEDIUM, HIGH, URGENT
+      "status":"IN PROGRESS",
+      "tag": "MEDIUM", // LOW, MEDIUM, HIGH, URGENT
       "assignees": [] // array of user IDs
     }
   ],
   "recommended_views": [
-    { "id": 5, "name": "Board", "order_index": 0 },
-    { "id": 4, "name": "Gantt", "order_index": 1 },
-    { "id": 6, "name": "Calendar", "order_index": 2 },
-    { "id": 1, "name": "List", "order_index": 3 },
-    { "id": 9, "name": "Overview", "order_index": 4 }
+    {"id": 1, "name": "Overview", "order_index": 0},
+    {"id": 2, "name": "List", "order_index": 1},
+    {"id": 3, "name": "Files", "order_index": 2},
+    {"id": 4, "name": "Timeline", "order_index": 3},
+    {"id": 5, "name": "Gantt", "order_index": 4},
+    {"id": 6, "name": "Kanban Board", "order_index": 5},
+    {"id": 7, "name": "Workflow", "order_index": 6},
+    {"id": 8, "name": "Calendar", "order_index": 7}
   ]
 }
 `;

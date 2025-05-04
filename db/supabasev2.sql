@@ -405,9 +405,12 @@ CREATE TABLE "subscription_plan" (
   "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
   "description" TEXT,
   "features" JSONB NOT NULL, -- 存储计划包含的功能列表
-  "max_members" INT NOT NULL, -- 最大团队成员数
   "max_projects" INT NOT NULL, -- 最大项目数
-  "storage_limit" BIGINT NOT NULL, -- 存储限制（字节）
+  "max_teams" INT NOT NULL, -- 最大团队数
+  "max_members" INT NOT NULL, -- 最大团队成员数
+  "max_ai_chat" INT NOT NULL, -- 最大AI聊天数
+  "max_ai_task" INT NOT NULL, -- 最大AI任务数
+  "max_ai_workflow" INT NOT NULL, -- 最大AI工作流数
   "is_active" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -422,11 +425,12 @@ CREATE TABLE "user_subscription_plan" (
   "start_date" TIMESTAMP NOT NULL,
   "end_date" TIMESTAMP NOT NULL,
   -- 使用统计
-  "current_users" INT DEFAULT 0,
   "current_projects" INT DEFAULT 0,
-  "current_ai_agents" INT DEFAULT 0,
-  "current_automation_flows" INT DEFAULT 0,
-  "current_tasks_this_month" INT DEFAULT 0,
+  "current_teams" INT DEFAULT 0,
+  "current_members" INT DEFAULT 0,
+  "current_ai_chat" INT DEFAULT 0,
+  "current_ai_task" INT DEFAULT 0,
+  "current_ai_workflow" INT DEFAULT 0,
   -- 时间戳
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -474,8 +478,6 @@ CREATE TABLE "admin_user" (
   "password_hash" VARCHAR(255) NOT NULL,
   "full_name" VARCHAR(255),
   "avatar_url" VARCHAR(255),
-  "role" VARCHAR(50) CHECK ("role" IN ('SUPER_ADMIN', 'ADMIN')) DEFAULT 'ADMIN',
-  "supabase_user_id" UUID UNIQUE,
   "is_active" BOOLEAN DEFAULT TRUE,
   "last_login" TIMESTAMP,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -487,20 +489,23 @@ CREATE TABLE "admin_permission" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) UNIQUE NOT NULL,
   "description" TEXT,
-  "resource" VARCHAR(255) NOT NULL, -- 例如: 'users', 'projects', 'teams', 'subscriptions'
-  "action" VARCHAR(255) NOT NULL, -- 例如: 'create', 'read', 'update', 'delete', 'manage'
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "category" TEXT
 );
 
--- 管理员角色权限关联表 - 将角色与权限关联
+-- 管理员角色权限关联表 - 将每个管理员与权限关联
 CREATE TABLE "admin_role_permission" (
   "id" SERIAL PRIMARY KEY,
-  "role" VARCHAR(50) NOT NULL, -- 对应 admin_user 表中的 role
+  "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
   "permission_id" INT NOT NULL REFERENCES "admin_permission"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE ("role", "permission_id")
+  "is_active" BOOLEAN DEFAULT TRUE,
+  UNIQUE ("admin_id", "permission_id")
 );
+
+
+-- 创建索引提升查询性能
+CREATE INDEX idx_admin_role_permission_admin_id ON "admin_role_permission"("admin_id");
+CREATE INDEX idx_admin_role_permission_permission_id ON "admin_role_permission"("permission_id");
+
 
 -- 管理员会话表 - 跟踪管理员登录会话
 CREATE TABLE "admin_session" (
@@ -580,17 +585,18 @@ CREATE INDEX idx_action_log_user ON "action_log"("user_id");
 CREATE INDEX idx_action_log_entity ON "action_log"("entity_type", "entity_id");
 CREATE INDEX idx_action_log_created ON "action_log"("created_at");
 
--- 为订阅相关表创建索引
-CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
-
 -- 为邀请表创建索引
 CREATE INDEX idx_team_invitation_email ON "user_team_invitation"("user_email");
 CREATE INDEX idx_team_invitation_team ON "user_team_invitation"("team_id");
 CREATE INDEX idx_team_invitation_status ON "user_team_invitation"("status");
 
--- 索引
+-- 为订阅相关表创建索引
+CREATE INDEX idx_user_subscription_plan_user_id ON "user_subscription_plan"("user_id");
+CREATE INDEX idx_user_subscription_plan_plan_id ON "user_subscription_plan"("plan_id");
+CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
 CREATE INDEX idx_user_subscription_user ON "user_subscription_plan"("user_id");
 CREATE INDEX idx_user_subscription_status ON "user_subscription_plan"("status");
+
 CREATE INDEX idx_promo_code_code ON "promo_code"("code");
 CREATE INDEX idx_promo_code_active ON "promo_code"("is_active");
 
@@ -602,7 +608,6 @@ CREATE INDEX idx_contact_created_at ON "contact"("created_at");
 
 -- 管理员表索引
 CREATE INDEX idx_admin_user_email ON "admin_user"("email");
-CREATE INDEX idx_admin_user_role ON "admin_user"("role");
 
 -- 管理员会话表索引
 CREATE INDEX idx_admin_session_admin ON "admin_session"("admin_id");

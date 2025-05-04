@@ -183,12 +183,12 @@ Format your output EXACTLY as a JSON object with the following structure:
 {
   "tasks": [
     {
-      "title": "Task Title",
+      "name": "Task Title",
       "description": "Detailed description of what needs to be done",
       "due_date": "YYYY-MM-DD", 
-      "priority": "HIGH|MEDIUM|LOW",
+      "status": "HIGH|MEDIUM|LOW",
       "assignees": ["username or email"],
-      "estimated_hours": 2,
+      "duration": 2,
       "tags": ["tag1", "tag2"]
     }
   ]

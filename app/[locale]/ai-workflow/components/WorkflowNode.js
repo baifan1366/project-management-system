@@ -86,7 +86,7 @@ function WorkflowNode({ data, selected, id }) {
     
     try {
       setIsLoadingProjects(true);
-      const response = await fetch(`/api/project?userId=${data.userId}`);
+      const response = await fetch(`/api/projects/user/${data.userId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch projects');
@@ -110,7 +110,7 @@ function WorkflowNode({ data, selected, id }) {
     
     try {
       setIsLoadingTeams(true);
-      const response = await fetch(`/api/team?projectId=${projectId}`);
+      const response = await fetch(`/api/projects/${projectId}/team?userId=${data.userId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch teams');
@@ -385,7 +385,7 @@ function WorkflowNode({ data, selected, id }) {
                         value={project.id} 
                         className="dark:text-gray-300 dark:focus:bg-[#404a40] dark:data-[highlighted]:bg-[#404a40]"
                       >
-                        {project.name}
+                        {project.project_name}
                       </SelectItem>
                     ))
                   ) : (
