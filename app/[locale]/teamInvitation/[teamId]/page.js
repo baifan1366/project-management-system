@@ -11,6 +11,7 @@ import { createTeamUser } from '@/lib/redux/features/teamUserSlice';
 import { updateInvitationStatus } from '@/lib/redux/features/teamUserInvSlice';
 import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase'; // 导入 supabase 客户端
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function TeamInvitation() {
   const t = useTranslations('TeamInvitation');
@@ -30,7 +31,7 @@ export default function TeamInvitation() {
         setError(null);
 
         // 1. 检查用户登录状态
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = useGetUser();
         
         if (userError || !user) {
           router.push(`/${params.locale}/login?redirect=${encodeURIComponent(window.location.pathname)}`);

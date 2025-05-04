@@ -2,62 +2,28 @@ import { PopoverContent } from '@/components/ui/popover';
 import { useTranslations } from 'next-intl';
 import { Button } from './button';
 import { ChevronRight, Settings, User, Zap, LogOut, Sparkles, Workflow } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import LanguageSwitcher from '../LanguageSwitcher';
 import { ThemeToggle } from './ThemeToggle';
-import { useDispatch } from 'react-redux';
-import { clearProjects } from '@/lib/redux/features/projectSlice';
-import { clearTeams } from '@/lib/redux/features/teamSlice';
-import { useLocale } from 'next-intl';
+import { useAuth } from '@/lib/hooks/useAuth';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export function ProfilePopover({ onClose }) {
   const t = useTranslations();
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const dispatch = useDispatch();
-  const locale = useLocale();
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (session?.user) {
-        // 处理Google头像URL
-        let avatarUrl = session.user.user_metadata.avatar_url;
-        if (avatarUrl?.includes('googleusercontent.com')) {
-          // 移除URL中的token部分
-          avatarUrl = avatarUrl.split('=')[0];
-          console.log(avatarUrl);
-          
-        }
-        setUser({
-          ...session.user,
-          user_metadata: {
-            ...session.user.user_metadata,
-            avatar_url: avatarUrl
-          }
-        });
-      }
-    };
-
-    getUser();
-  }, []);
+  const { user } = useGetUser();
+  const { logout } = useAuth();
 
   const handleSignOut = async () => {
     try {
-      // 先清除 Supabase 会话
-      await supabase.auth.signOut();
+      // Use the logout function from useAuth hook
+      const result = await logout();
       
-      // 然后清除 Redux store 数据
-      dispatch(clearProjects());
-      dispatch(clearTeams());
-
-      // 最后再跳转路由
-      router.push('/login');
-      
+      if (!result.success) {
+        console.error('Sign out error:', result.error);
+      }
     } catch (error) {
-      console.error('登出错误:', error);
+      console.error('Sign out error:', error);
     }
   };
 
@@ -95,10 +61,10 @@ export function ProfilePopover({ onClose }) {
         <div className="flex flex-col">
           <div className="px-4 pb-2 border-b">
             <div className="flex items-center gap-3">
-              {user.user_metadata.avatar_url ? (
+              {user.avatar_url ? (
                 <img 
-                  src={user.user_metadata.avatar_url} 
-                  alt={user.user_metadata.name} 
+                  src={user.avatar_url} 
+                  alt={user.name} 
                   className="w-10 h-8 rounded-full"
                 />
               ) : (
@@ -107,7 +73,7 @@ export function ProfilePopover({ onClose }) {
                 </div>
               )}
               <div>
-                <h4 className="font-medium text-sm">{user.user_metadata.name}</h4>
+                <h4 className="font-medium text-sm">{user.name}</h4>
                 <p className="text-sm text-muted-foreground">{user.email}</p>
               </div>
             </div>

@@ -2,9 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
 import { toast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,23 +27,26 @@ import { createProject } from '@/lib/redux/features/projectSlice';
 import { DialogFooter } from "@/components/ui/dialog"
 import { supabase } from '@/lib/supabase';
 import { getSubscriptionLimit, getSubscriptionUsage, DELTA_MAP } from '@/lib/subscriptionService';
+import useGetUser from '@/lib/hooks/useGetUser';
+import { createProjectValidationSchema, projectFormTransforms } from '@/components/validation/projectSchema';
 
 export default function CreateProjectPage() {
   const t = useTranslations('CreateProject');
+  const tValidation = useTranslations('validationRules');
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
   const dispatch = useDispatch();
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { user, error } = useGetUser();
+  const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
     async function checkSubscriptionLimit() {
       setIsLoading(true);
       try {
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user?.id) {
-          // 检查用户的项目创建限制
-          const limitInfo = await getSubscriptionLimit(userData.user.id, 'create_project');
+        if (user.id) {
+          const limitInfo = await getSubscriptionLimit(user.id, 'create_project');
           setSubscriptionInfo(limitInfo);
           console.log('Subscription info:', limitInfo);
         }
@@ -58,29 +59,27 @@ export default function CreateProjectPage() {
     checkSubscriptionLimit();
   }, []);
 
-  // Schema definition
-  const FormSchema = z.object({
-    projectName: z.string().trim().min(2, {
-      message: t('projectNameMin'),
-    }).max(50, {
-      message: t('projectNameMax'),
-    }),
-    visibility: z.string().min(1, {
-      message: t('visibilityRequired'),
-    }),
-    buttonVariant: z.string().min(1, {
-      message: t('themeColorRequired'),
-    })
-  })
+  const validationSchema = createProjectValidationSchema(tValidation);
 
   const form = useForm({
-    resolver: zodResolver(FormSchema),
     defaultValues: {
       projectName: "",
       visibility: "",
       buttonVariant: "black",
     },
-  })
+  });
+
+  const validateForm = (data) => {
+    const transformedData = {
+      projectName: projectFormTransforms.projectName(data.projectName),
+      visibility: projectFormTransforms.visibility(data.visibility),
+      buttonVariant: projectFormTransforms.buttonVariant(data.buttonVariant),
+    };
+
+    const { isValid, errors } = validationSchema.validate(transformedData);
+    setFormErrors(errors);
+    return { isValid, transformedData };
+  };
 
   const buttonVariants = [
     { value: 'black', label: '黑色' },
@@ -92,23 +91,22 @@ export default function CreateProjectPage() {
     { value: 'pink', label: '粉色' }
   ];
 
-  // Submit function
   const onSubmit = async (data) => {
+    const { isValid, transformedData } = validateForm(data);
+    if (!isValid) return;
+
     setIsCreating(true);
     
     try {
-      // 解构获取表单数据
-      const { projectName, visibility, buttonVariant } = data;
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) {
+      if (error) {
         throw new Error('Failed to get user information');
       }
-      if (!userData?.user?.id) {
+      if (!user.id) {
         throw new Error('User not authenticated');
       }
 
       // 再次检查用户是否可以创建项目
-      const limitCheck = await getSubscriptionLimit(userData.user.id, 'create_project');
+      const limitCheck = await getSubscriptionLimit(user.id, 'create_project');
       if (!limitCheck.allowed) {
         toast({
           title: '超出订阅限制',
@@ -125,16 +123,16 @@ export default function CreateProjectPage() {
 
       // 调用 Redux 的 createProject 动作
       const resultAction = await dispatch(createProject({
-        project_name: projectName.trim(),
-        visibility,
-        theme_color: buttonVariant,
-        created_by: userData.user.id,
+        project_name: transformedData.projectName,
+        visibility: transformedData.visibility,
+        theme_color: transformedData.buttonVariant,
+        created_by: user.id,
         status: "PENDING"
       }));
 
       if (createProject.fulfilled.match(resultAction)) {
         // 获取用户的订阅使用情况
-        const usageData = await getSubscriptionUsage(userData.user.id);
+        const usageData = await getSubscriptionUsage(user.id);
         
         if (!usageData) {
           console.error('Failed to fetch subscription usage data');
@@ -146,7 +144,7 @@ export default function CreateProjectPage() {
           const { error: updateError } = await supabase
             .from('user_subscription_plan')
             .update({ current_projects: currentProjects + deltaValue })
-            .eq('user_id', userData.user.id);
+            .eq('user_id', user.id);
           
           if (updateError) {
             console.error('Failed to update subscription usage:', updateError);
@@ -276,7 +274,7 @@ export default function CreateProjectPage() {
           <FormField
             control={form.control}
             name="projectName"
-            render={({ field, fieldState }) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
                   {t('projectName')}
@@ -285,15 +283,23 @@ export default function CreateProjectPage() {
                 <FormControl>
                   <Input 
                     className={`w-full px-3 py-2 border rounded-md ${
-                      fieldState.invalid ? 'border-red-500' : 'border-gray-300'
+                      formErrors.projectName ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    placeholder= {t('projectNamePlaceholder')} 
+                    placeholder={t('projectNamePlaceholder')} 
                     {...field} 
+                    onChange={(e) => {
+                      field.onChange(e);
+                      if (formErrors.projectName) {
+                        setFormErrors({...formErrors, projectName: undefined});
+                      }
+                    }}
                   />
                 </FormControl>
                 <div className="flex justify-end mt-1 min-h-[20px]">
                   <div className="flex-1">
-                    <FormMessage className="text-xs" />
+                    {formErrors.projectName && (
+                      <p className="text-xs text-red-500">{formErrors.projectName}</p>
+                    )}
                   </div>
                   <span className="text-xs text-gray-500 ml-2">{field.value.trim().length}/50</span>
                 </div>
@@ -304,20 +310,28 @@ export default function CreateProjectPage() {
           <FormField
             control={form.control}
             name="visibility"
-            render={({ field, fieldState }) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
                   {t('visibility')}
                   <span className="text-red-500">*</span>
                 </FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select 
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    if (formErrors.visibility) {
+                      setFormErrors({...formErrors, visibility: undefined});
+                    }
+                  }} 
+                  value={field.value}
+                >
                   <FormControl>
                     <SelectTrigger 
                       className={`w-full px-3 py-2 border rounded-md ${
-                        fieldState.invalid ? 'border-red-500' : 'border-gray-300'
+                        formErrors.visibility ? 'border-red-500' : 'border-gray-300'
                       }`}
                     >
-                      <SelectValue placeholder= {t('visibilityPlaceholder')} />
+                      <SelectValue placeholder={t('visibilityPlaceholder')} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -327,7 +341,9 @@ export default function CreateProjectPage() {
                 </Select>
                 <div className="flex justify-end mt-1 min-h-[20px]">
                   <div className="flex-1">
-                    <FormMessage className="text-xs" />
+                    {formErrors.visibility && (
+                      <p className="text-xs text-red-500">{formErrors.visibility}</p>
+                    )}
                   </div>
                 </div>                  
               </FormItem>
@@ -343,7 +359,6 @@ export default function CreateProjectPage() {
                   {t('themeColor')}
                   <span className="text-red-500">*</span>
                 </FormLabel>
-
                 <div className="flex gap-3 p-4 rounded-lg">
                   {buttonVariants.map((variant) => (
                     <Button
@@ -355,11 +370,18 @@ export default function CreateProjectPage() {
                           ? 'ring-2 ring-gray-400 dark:ring-gray-300' 
                           : ''
                       }`}
-                      onClick={() => field.onChange(variant.value)}
+                      onClick={() => {
+                        field.onChange(variant.value);
+                        if (formErrors.buttonVariant) {
+                          setFormErrors({...formErrors, buttonVariant: undefined});
+                        }
+                      }}
                     />
                   ))}
                 </div>
-                <FormMessage />
+                {formErrors.buttonVariant && (
+                  <p className="text-xs text-red-500">{formErrors.buttonVariant}</p>
+                )}
               </FormItem>
             )}
           />

@@ -12,11 +12,12 @@ import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { useDispatch } from 'react-redux';
 import { updateUserProfile, connectProvider, disconnectProvider } from '@/lib/redux/features/usersSlice';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function ProfilePage() {
   const t = useTranslations('profile');
   const dispatch = useDispatch();
-  const [user, setUser] = useState(null);
+  const { user, isLoading: userLoading } = useGetUser();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -30,31 +31,34 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (session?.user) {
-        updateUserData(session);
-      }
-    };
-
-    getUser();
-  }, []);
+    if (user) {
+      updateUserData(user);
+    }
+  }, [user]);
   
   const updateUserData = async (session) => {
-    if (!session?.user) return;
-    
-    setUser(session.user);
+    if (!session) return;
     setFormData({
-      name: session.user.user_metadata?.name || '',
-      bio: session.user.user_metadata?.bio || '',
-      phone: session.user.user_metadata?.phone || '',
-      email: session.user.email || ''
+      name: session.name || '',
+      bio: session.bio || '',
+      phone: session.phone || '',
+      email: session.email || ''
     });
     
-    const provider = session.user.app_metadata?.provider || '';
+    let provider = 'local';
+    let providerId = '';
+    
+    if (session.google_provider_id) {
+      provider = 'google';
+      providerId = session.google_provider_id;
+    } else if (session.github_provider_id) {
+      provider = 'github';
+      providerId = session.github_provider_id;
+    }
+    
     setProviderData({
-      provider: provider || session.user.user_metadata?.provider || 'local',
-      providerId: session.user.app_metadata?.provider_id || session.user.user_metadata?.provider_id || ''
+      provider: provider,
+      providerId: providerId
     });
   };
 
@@ -77,23 +81,12 @@ export default function ProfilePage() {
     };
     
     try {
-      const resultAction = await dispatch(updateUserProfile({ 
+      await dispatch(updateUserProfile({ 
         userId: user.id, 
         profileData 
       }));
-      
-      if (updateUserProfile.fulfilled.match(resultAction)) {
-        await supabase.auth.updateUser({
-          data: {
-            name: formData.name,
-            bio: formData.bio,
-            phone: formData.phone
-          }
-        });
-        toast.success(t('saved'));
-      } else {
-        throw new Error(resultAction.error);
-      }
+      toast.success(t('saved'));
+  
     } catch (error) {
       console.error('Error saving profile:', error);
       toast.error(t('common.error'));
@@ -129,22 +122,11 @@ export default function ProfilePage() {
         .from('avatars')
         .getPublicUrl(filePath);
 
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: { avatar_url: publicUrl }
-      });
 
       if (updateError) {
         console.error('更新用户数据错误:', updateError);
         throw new Error(`更新用户头像失败: ${updateError.message}`);
       }
-
-      setUser(prev => ({
-        ...prev,
-        user_metadata: {
-          ...prev.user_metadata,
-          avatar_url: publicUrl
-        }
-      }));
 
       const { error: dbError } = await supabase
         .from('user')
@@ -267,11 +249,11 @@ export default function ProfilePage() {
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="relative group">
-              {user?.user_metadata?.avatar_url ? (
+              {user?.avatar_url ? (
                 <>
                   <img
-                    src={user.user_metadata.avatar_url}
-                    alt={user.user_metadata.name}
+                    src={user.avatar_url}
+                    alt={user.name}
                     className="w-20 h-20 rounded-full object-cover"
                   />
                   <div 

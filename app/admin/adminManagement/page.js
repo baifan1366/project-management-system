@@ -1,62 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserShield, FaUserCog } from 'react-icons/fa';
+import { useSelector, useDispatch } from 'react-redux';
+import { checkAdminSession } from '@/lib/redux/features/adminSlice';
+import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 
 export default function AdminUserManagement() {
 
-  // Verify super admin session and fetch admin data
-  useEffect(() => {
-    const checkAdminSession = async () => {
-      try {
-        setLoading(true);
-        
-        // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
-          throw new Error('No active session found');
-        }
-        
-        // Check if user is an admin with appropriate permissions
-        const { data: admin, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', sessionData.session.user.email)
-          .eq('is_active', true)
-          .single();
-          
-        if (adminError || !admin) {
-          throw new Error('Unauthorized access');
-        }
-        
-        // Check if admin has sufficient role to manage other admins (only SUPER_ADMIN can)
-        if (admin.role !== 'SUPER_ADMIN') {
-          throw new Error('Insufficient permissions');
-        }
-        
-        setAdminData(admin);
-        
-        // Fetch admin users
-        await fetchAdminUsers();
-
-      } catch (error) {
-        console.error('Admin session check failed:', error);
-        // Redirect to admin login
-        router.replace(`/${locale}/adminLogin`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    checkAdminSession();
-  }, []);
-
   const router = useRouter();
   const params = useParams();
-  const locale = params.locale || 'en';
+  const dispatch = useDispatch();
+  // Get the admin data from Redux state
+  const { admin: reduxAdminData, isAuthenticated } = useSelector(state => state.admin);
   
   const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -68,20 +26,62 @@ export default function AdminUserManagement() {
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState('');
-  const [roles, setRoles] = useState([]);
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('');
-  const [selectedRole, setSelectedRole] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
   const [isPasswordValid, setIsPasswordValid] = useState(false)
   const [isPasswordMatch, setIsPasswordMatch] = useState(false)
   const [isEmailValid, setIsEmailValid] = useState(false)
+  const permissions = useSelector((state) => state.admin.permissions);
+  
+  // State for admin permissions management
+  const [adminPermissions, setAdminPermissions] = useState([]);
+  const [allPermissions, setAllPermissions] = useState([]);
+  const [permissionsByCategory, setPermissionsByCategory] = useState({});
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+  const [permissionError, setPermissionError] = useState(null);
+  const [adminRoles, setAdminRoles] = useState({});
+
+  // initialize the page
+  useEffect(() => {
+    const initDashboard = async () => {
+      try {
+        setLoading(true);
+        
+        // Set adminData from Redux state if available
+        if (reduxAdminData) {
+          setAdminData(reduxAdminData);
+        } else {
+          // Try to fetch admin session if not already in Redux
+          const result = await dispatch(checkAdminSession()).unwrap();
+          if (result) {
+            setAdminData(result);
+          } else {
+            // If no admin data, redirect to login
+            throw new Error('No admin session found');
+          }
+        }
+        
+        // Fetch admin users
+        await fetchAdminUsers();  
+        
+      } catch (error) {
+        console.error('Error in fetching admins data:', error);
+        // Redirect to admin login
+        router.replace(`/admin/adminLogin`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initDashboard();
+  }, [dispatch, router, reduxAdminData]);
 
   // Fetch admin users from database
-  const fetchAdminUsers = async () => {
+  const fetchAdminUsers = useCallback(async () => {
     try {
       let query = supabase
         .from('admin_user')
@@ -93,12 +93,6 @@ export default function AdminUserManagement() {
         query = query.eq('is_active', true);
       } else if (filter === 'inactive') {
         query = query.eq('is_active', false);
-      } else if (filter === 'superadmin') {
-        query = query.eq('role', 'SUPER_ADMIN');
-      } else if (filter === 'admin') {
-        query = query.eq('role', 'ADMIN');
-      } else if (filter === 'moderator') {
-        query = query.eq('role', 'MODERATOR');
       }
       
       const { data, error } = await query;
@@ -107,60 +101,71 @@ export default function AdminUserManagement() {
       
       setAdmins(data || []);
       
+      // After fetching admins, load their permissions
+      await fetchAllAdminPermissions(data);
+      
     } catch (error) {
       console.error('Error fetching admin users:', error);
     }
-  };
+  }, [filter]);
 
-  // Fetch roles from database
-  useEffect(()=>{
-    const fetchRoles = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('admin_role_permission')
-          .select('role')
-          
-        if (error) throw error;
-        
-        // Extract unique roles from the result
-        const roles = [...new Set(data.map(item => item.role))];
-        console.log(roles);
-        setRoles(roles);
-        
-        // Return the array of roles
-        return roles;
-      } catch (error) {
-        console.error('Error fetching roles:', error);
-        return ['SUPER_ADMIN', 'ADMIN', 'MODERATOR']; // Fallback to default roles
-      }
-    }
-    fetchRoles();
-  },[]);
-
-  // Handle logout
-  const handleLogout = async () => {
+  // Fetch permissions for all admins
+  const fetchAllAdminPermissions = async (adminsList) => {
     try {
-      // Log the logout action
-      if (adminData) {
-        await supabase.from('admin_activity_log').insert({
-          admin_id: adminData.id,
-          action: 'logout',
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
+      const permissionMap = {};
+      const rolesMap = {};
+      
+      // Fetch admin_permission data once to have all permission names
+      const { data: allPermissionsData, error: permError } = await supabase
+        .from('admin_permission')
+        .select('id, name');
+        
+      if (permError) throw permError;
+      
+      // Create a map of permission id to name for quick lookup
+      const permissionIdToNameMap = {};
+      allPermissionsData.forEach(perm => {
+        permissionIdToNameMap[perm.id] = perm.name;
+      });
+      
+      // For each admin, fetch their active permissions
+      for (const admin of adminsList) {
+        const { data: adminPermData, error: adminPermError } = await supabase
+          .from('admin_role_permission')
+          .select('permission_id')
+          .eq('admin_id', admin.id)
+          .eq('is_active', true);
+          
+        if (!adminPermError && adminPermData) {
+          // Convert permission IDs to permission names
+          const permissionNames = adminPermData.map(item => 
+            permissionIdToNameMap[item.permission_id]
+          ).filter(name => name); // Filter out any undefined values
+          
+          permissionMap[admin.id] = permissionNames;
+          
+          // Determine admin role based on permissions
+          const adminPermNames = ['view_admins', 'edit_admins', 'add_admins', 'delete_admins'];
+          const isSuperAdmin = adminPermNames.every(perm => 
+            permissionNames.includes(perm)
+          );
+          
+          rolesMap[admin.id] = isSuperAdmin ? 'SUPER_ADMIN' : 'ADMIN';
+        }
       }
       
-      // Sign out
-      await supabase.auth.signOut();
-      
-      // Redirect to admin login
-      router.replace(`/${locale}/adminLogin`);
+      setAdminRoles(rolesMap);
       
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.error('Error fetching admin permissions:', error);
     }
   };
-  
+
+  // Add function to verify permission access
+  const hasPermission = (permissionName) => {
+    return permissions.includes(permissionName);
+  };
+
   // Handle filter change
   const handleFilterChange = (newFilter) => {
     setFilter(newFilter);
@@ -174,10 +179,15 @@ export default function AdminUserManagement() {
   };
   
   // Open modal
-  const openModal = (type, admin = null) => {
+  const openModal = async (type, admin = null) => {
     setModalType(type);
     setSelectedAdmin(admin);
     setIsModalOpen(true);
+    
+    // If opening permission edit modal, fetch permissions
+    if (type === 'editPermission' && admin) {
+      await fetchAdminPermissions(admin.id);
+    }
   };
   
   // Close modal
@@ -189,9 +199,9 @@ export default function AdminUserManagement() {
   // Edit admin
   const editAdmin = async (newAdminData) => {
     try {
-      // Prevent non-super admins from elevating privileges
-      if (adminData.role !== 'SUPER_ADMIN') {
-        throw new Error('Only super admins can modify other admins');
+      // Verify permission
+      if (!hasPermission('edit_admins')) {
+        throw new Error('You do not have permission to edit admin users');
       }
       
       // Create a filtered version of newAdminData that only includes non-empty values
@@ -214,10 +224,6 @@ export default function AdminUserManagement() {
         filteredAdminData.password_hash = newAdminData.password_hash;
       }
       
-      if (newAdminData.role && ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(newAdminData.role)) {
-        filteredAdminData.role = newAdminData.role;
-      }
-      
       // Always update the updated_at timestamp
       filteredAdminData.updated_at = new Date().toISOString();
       
@@ -235,18 +241,21 @@ export default function AdminUserManagement() {
       
       // Log activity
       if (adminData) {
-        await supabase.from('admin_activity_log').insert({
+        await supabase.from('admin_activity_log').insert([{
           admin_id: adminData.id,
           action: 'update_admin_user',
           entity_type: 'admin_user',
-          entity_id: selectedAdmin.id,
+          entity_id: String(selectedAdmin.id),
           details: { updated_fields: Object.keys(filteredAdminData) },
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
-        });
+        }]);
       }
       
       closeModal();
+      
+      // Refresh admin data to ensure permissions are correctly displayed
+      fetchAdminUsers();
       
     } catch (error) {
       console.error('Error updating admin user:', error);
@@ -256,9 +265,9 @@ export default function AdminUserManagement() {
   // Create new admin
   const createAdmin = async (adminUserData) => {
     try {
-      // Prevent non-super admins from creating super admins
-      if (adminData.role !== 'SUPER_ADMIN' && adminUserData.role === 'SUPER_ADMIN') {
-        throw new Error('Only super admins can create other super admins');
+      // Verify permission
+      if (!hasPermission('manage_admins')) {
+        throw new Error('You do not have permission to create admin users');
       }
       
       // For simplicity, in a real app you would hash the password properly
@@ -266,7 +275,10 @@ export default function AdminUserManagement() {
       const { data, error } = await supabase
         .from('admin_user')
         .insert({
-          ...adminUserData,
+          username: adminUserData.username,
+          full_name: adminUserData.full_name,
+          email: adminUserData.email,
+          password_hash: adminUserData.password_hash,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -281,17 +293,20 @@ export default function AdminUserManagement() {
       
       // Log activity
       if (adminData) {
-        await supabase.from('admin_activity_log').insert({
+        await supabase.from('admin_activity_log').insert([{
           admin_id: adminData.id,
           action: 'create_admin_user',
           entity_type: 'admin_user',
-          entity_id: data.id,
+          entity_id: String(data.id),
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
-        });
+        }]);
       }
       
       closeModal();
+      
+      // Refresh admin data to ensure permissions are correctly displayed
+      fetchAdminUsers();
       
     } catch (error) {
       console.error('Error creating admin user:', error);
@@ -301,14 +316,14 @@ export default function AdminUserManagement() {
   // Delete admin
   const deleteAdmin = async () => {
     try {
-      // Prevent deleting your own account
-      if (selectedAdmin.id === adminData.id) {
-        throw new Error('You cannot delete your own account');
+      // Verify permission
+      if (!hasPermission('manage_admins')) {
+        throw new Error('You do not have permission to delete admin users');
       }
       
-      // Prevent non-super admins from deleting other super admins
-      if (adminData.role !== 'SUPER_ADMIN' && selectedAdmin.role === 'SUPER_ADMIN') {
-        throw new Error('Only super admins can delete other super admins');
+      // Prevent deleting your own account
+      if (adminData && selectedAdmin.id === adminData.id) {
+        throw new Error('You cannot delete your own account');
       }
       
       const { error } = await supabase
@@ -323,17 +338,20 @@ export default function AdminUserManagement() {
       
       // Log activity
       if (adminData) {
-        await supabase.from('admin_activity_log').insert({
+        await supabase.from('admin_activity_log').insert([{
           admin_id: adminData.id,
           action: 'delete_admin_user',
           entity_type: 'admin_user',
-          entity_id: selectedAdmin.id,
+          entity_id: String(selectedAdmin.id),
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
-        });
+        }]);
       }
       
       closeModal();
+      
+      // Refresh admin data to ensure permissions are correctly displayed
+      fetchAdminUsers();
       
     } catch (error) {
       console.error('Error deleting admin user:', error);
@@ -356,11 +374,25 @@ export default function AdminUserManagement() {
   // Filter admins by search query
   const filteredAdmins = admins.filter(admin => {
     const searchLower = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = (
       admin.full_name?.toLowerCase().includes(searchLower) ||
       admin.username?.toLowerCase().includes(searchLower) ||
       admin.email?.toLowerCase().includes(searchLower)
     );
+    
+    // Apply role-based filtering
+    if (filter === 'superadmin') {
+      return matchesSearch && getEffectiveRole(admin) === 'SUPER_ADMIN';
+    } else if (filter === 'admin') {
+      return matchesSearch && getEffectiveRole(admin) === 'ADMIN';
+    } else if (filter === 'active') {
+      return matchesSearch && admin.is_active;
+    } else if (filter === 'inactive') {
+      return matchesSearch && !admin.is_active;
+    }
+    
+    // Default: return all admins that match search
+    return matchesSearch;
   });
   
   // Pagination
@@ -369,20 +401,31 @@ export default function AdminUserManagement() {
   const currentAdmins = filteredAdmins.slice(indexOfFirstAdmin, indexOfLastAdmin);
   const totalPages = Math.ceil(filteredAdmins.length / adminsPerPage);
   
-  // Get role badge style
+  // Get role badge style TODO: change the validate logic
   const getRoleBadgeStyle = (role) => {
     switch (role) {
       case 'SUPER_ADMIN':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100';
       case 'ADMIN':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100';
-      case 'MODERATOR':
-        return 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
     }
   };
   
+  // Get the effective role for display purposes
+  const getEffectiveRole = (admin) => {
+    // First check if this admin is the current logged-in admin
+    if (adminData && admin.id === adminData.id) {
+      // For the current admin, check permissions from Redux
+      const requiredPermissions = ['view_admins', 'edit_admins', 'add_admins', 'delete_admins'];
+      return requiredPermissions.every(perm => permissions.includes(perm)) ? 'SUPER_ADMIN' : 'ADMIN';
+    } else {
+      // For other admins, check from our computed roles
+      return adminRoles[admin.id] || 'ADMIN';
+    }
+  };
+
   // Password validation function
   const validatePassword = (password) => {
     // Check if password meets the requirements:
@@ -418,6 +461,154 @@ export default function AdminUserManagement() {
     console.log("password matach? :", isPasswordMatch)
   }, [password, confirmPassword]);
 
+  // Fetch permissions for a specific admin
+  const fetchAdminPermissions = async (adminId) => {
+    try {
+      setLoadingPermissions(true);
+      setPermissionError(null);
+      
+      // Fetch all available permissions first
+      const { data: permissionsData, error: permissionsError } = await supabase
+        .from('admin_permission')
+        .select('*')
+        .order('id', { ascending: true });
+      
+      if (permissionsError) throw permissionsError;
+      
+      // Group permissions by category
+      const groupedPermissions = permissionsData.reduce((acc, permission) => {
+        const category = permission.category || 'Other';
+        return {
+          ...acc,
+          [category]: [...(acc[category] || []), permission]
+        };
+      }, {});
+      
+      setAllPermissions(permissionsData);
+      setPermissionsByCategory(groupedPermissions);
+      
+      // Fetch permissions assigned to this admin
+      const { data: adminPermData, error: adminPermError } = await supabase
+        .from('admin_role_permission')
+        .select('permission_id, is_active')
+        .eq('admin_id', adminId);
+      
+      if (adminPermError) throw adminPermError;
+      
+      // Map to just the permission IDs that are active
+      const activePermissionIds = adminPermData
+        .filter(p => p.is_active)
+        .map(p => p.permission_id);
+      
+      setAdminPermissions(activePermissionIds);
+      
+    } catch (error) {
+      console.error('Error fetching admin permissions:', error);
+      setPermissionError('Failed to load permissions. Please try again.');
+    } finally {
+      setLoadingPermissions(false);
+    }
+  };
+  
+  // Toggle a permission for the selected admin
+  const togglePermission = (permissionId) => {
+    setAdminPermissions(prevPermissions => {
+      if (prevPermissions.includes(permissionId)) {
+        return prevPermissions.filter(id => id !== permissionId);
+      } else {
+        return [...prevPermissions, permissionId];
+      }
+    });
+  };
+  
+  // Save updated permissions
+  const savePermissions = async () => {
+    try {
+      // Verify permission
+      if (!hasPermission('edit_admins')) {
+        throw new Error('You do not have permission to manage admin permissions');
+      }
+      
+      setSavingPermissions(true);
+      setPermissionError(null);
+      
+      // First, get current permissions to compare
+      const { data: currentPerms, error: currentError } = await supabase
+        .from('admin_role_permission')
+        .select('*')
+        .eq('admin_id', selectedAdmin.id);
+      
+      if (currentError) throw currentError;
+      
+      // Process each permission
+      for (const permission of allPermissions) {
+        const isActive = adminPermissions.includes(permission.id);
+        const existingPerm = currentPerms.find(p => p.permission_id === permission.id);
+        
+        if (existingPerm) {
+          // Update existing permission if its state changed
+          if (existingPerm.is_active !== isActive) {
+            const { error: updateError } = await supabase
+              .from('admin_role_permission')
+              .update({ is_active: isActive })
+              .eq('id', existingPerm.id);
+            
+            if (updateError) throw updateError;
+          }
+        } else if (isActive) {
+          // Insert new permission if it should be active
+          const { error: insertError } = await supabase
+            .from('admin_role_permission')
+            .insert({
+              admin_id: selectedAdmin.id,
+              permission_id: permission.id,
+              is_active: true
+            });
+          
+          if (insertError) throw insertError;
+        }
+      }
+      
+      // Log activity
+      if (adminData) {
+        await supabase.from('admin_activity_log').insert([{
+          admin_id: adminData.id,
+          action: 'update_admin_permissions',
+          entity_type: 'admin_user',
+          entity_id: String(selectedAdmin.id),
+          details: { updated_permissions: adminPermissions },
+          ip_address: '127.0.0.1',
+          user_agent: navigator.userAgent
+        }]);
+      }
+      
+      // Show success notification in a real app
+      // For now, just close the modal
+      closeModal();
+      
+      // Refresh admin users list to show the updated role
+      fetchAdminUsers();
+      
+    } catch (error) {
+      console.error('Error saving admin permissions:', error);
+      setPermissionError(error.message || 'Failed to save permissions. Please try again.');
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  // Format permission category name
+  const formatCategoryName = (category) => {
+    // First, convert camelCase to space-separated words
+    const withSpaces = category.replace(/([A-Z])/g, ' $1');
+    
+    // Then capitalize the first letter of each word
+    return withSpaces
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -431,212 +622,200 @@ export default function AdminUserManagement() {
   
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      
+
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Admin User Management</h2>
-            
-            <div className="flex items-center">
-              <button className="p-2 mr-4 text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400">
-                <FaBell />
-              </button>
-              
-              <div className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-2">
-                  {adminData?.username?.charAt(0).toUpperCase() || 'A'}
+
+        {/* Content Area */}
+        {hasPermission('view_admins') ? (
+          <div className="p-6">
+            {/* Top Controls */}
+            <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Filter */}
+                <div className="flex items-center space-x-2">
+                  <FaFilter className="text-gray-400" />
+                  <select 
+                    className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md py-1.5 px-3 text-sm"
+                    value={filter}
+                    onChange={(e) => handleFilterChange(e.target.value)}
+                  >
+                    <option value="all">All Admins</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="superadmin">Super Admins</option>
+                    <option value="admin">Admins</option>
+                  </select>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{adminData?.full_name || adminData?.username}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{adminData?.role}</p>
+                
+                {/* Search */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search admins..."
+                    className="pl-9 pr-4 py-1.5 w-full md:w-64 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-sm"
+                    value={searchQuery}
+                    onChange={handleSearch}
+                  />
+                  <FaSearch className="absolute left-3 top-2 text-gray-400" />
                 </div>
-              </div>
-            </div>
-          </div>
-        </header>
-        
-        {/* Admin Management Content */}
-        <div className="p-6">
-          {/* Top Controls */}
-          <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Filter */}
-              <div className="flex items-center space-x-2">
-                <FaFilter className="text-gray-400" />
-                <select 
-                  className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md py-1.5 px-3 text-sm"
-                  value={filter}
-                  onChange={(e) => handleFilterChange(e.target.value)}
-                >
-                  <option value="all">All Admins</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="superadmin">Super Admins</option>
-                  <option value="admin">Admins</option>
-                  <option value="moderator">Moderators</option>
-                </select>
               </div>
               
-              {/* Search */}
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search admins..."
-                  className="pl-9 pr-4 py-1.5 w-full md:w-64 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-sm"
-                  value={searchQuery}
-                  onChange={handleSearch}
-                />
-                <FaSearch className="absolute left-3 top-2 text-gray-400" />
-              </div>
+              {/* Add Admin Button */}
+              {hasPermission('manage_admins') && (
+              <button
+                onClick={() => openModal('add')}
+                className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
+              >
+                  <FaUserPlus className="mr-2" />
+                  Add New Admin
+                </button>
+              )}
             </div>
             
-            {/* Add Admin Button */}
-            <button
-              onClick={() => openModal('add')}
-              className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
-            >
-              <FaUserPlus className="mr-2" />
-              Add New Admin
-            </button>
-          </div>
-          
-          {/* Admins Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Admin
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Role
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Last Login
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {currentAdmins.length > 0 ? (
-                    currentAdmins.map((admin) => (
-                      <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
-                              {admin.full_name?.charAt(0).toUpperCase() || admin.username?.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {admin.full_name || admin.username}
+            {/* Admins Table */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Admin
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Role
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Last Login
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {currentAdmins.length > 0 ? (
+                      currentAdmins.map((admin) => (
+                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
+                                {admin.full_name?.charAt(0).toUpperCase() || admin.username?.charAt(0).toUpperCase()}
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                @{admin.username}
+                              <div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {admin.full_name || admin.username}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  @{admin.username}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {admin.email}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeStyle(admin.role)}`}>
-                            {admin.role === 'SUPER_ADMIN' && <FaUserShield className="mr-1" />}
-                            {admin.role === 'ADMIN' && <FaUserCog className="mr-1" />}
-                            {admin.role === 'MODERATOR' && <FaUsers className="mr-1" />}
-                            {admin.role}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          {admin.is_active ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                              Active
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {admin.email}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeStyle(getEffectiveRole(admin))}`}>
+                              {getEffectiveRole(admin) === 'SUPER_ADMIN' && <FaUserShield className="mr-1" />}
+                              {getEffectiveRole(admin) === 'ADMIN' && <FaUserCog className="mr-1" />}
+                              {getEffectiveRole(admin)}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
-                              Inactive
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {admin.last_login ? formatDate(admin.last_login) : 'Never logged in'}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
-                          <button
-                            onClick={() => openModal('edit', admin)}
-                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
-                            disabled={adminData.id === admin.id && adminData.role !== 'SUPER_ADMIN'}
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => openModal('delete', admin)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                            disabled={adminData.id === admin.id}
-                          >
-                            <FaTrash />
-                          </button>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            {admin.is_active ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
+                                Inactive
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {admin.last_login ? formatDate(admin.last_login) : 'Never logged in'}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
+                            {hasPermission("edit_admins") && (
+                            <button
+                              onClick={() => openModal('edit', admin)}
+                              className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
+                              disabled={adminData && adminData.id === admin.id && adminData.role !== 'SUPER_ADMIN'}
+                            >
+                              <FaEdit />
+                            </button>
+                            )}
+                            {hasPermission("delete_admins") && (
+                            <button
+                              onClick={() => openModal('delete', admin)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                              disabled={adminData && adminData.id === admin.id}
+                            >
+                              <FaTrash />
+                            </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                          {searchQuery
+                            ? 'No admin users match your search criteria'
+                            : 'No admin users found or you dont have permission to view this page'}
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="6" className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        {searchQuery
-                          ? 'No admin users match your search criteria'
-                          : 'No admin users found'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            
-            {/* Pagination */}
-            {filteredAdmins.length > adminsPerPage && (
-              <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
-                <div className="flex-1 flex justify-between items-center">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                      currentPage === 1
-                        ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
-                        : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                      currentPage === totalPages
-                        ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
-                        : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Next
-                  </button>
-                </div>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
+              
+              {/* Pagination */}
+              {filteredAdmins.length > adminsPerPage && (
+                <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex-1 flex justify-between items-center">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+                        currentPage === 1
+                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                          : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+                        currentPage === totalPages
+                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                          : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="min-h-screen flex items-center justify-center w-full">
+            <AccessRestrictedModal />
+          </div>
+        )}
       </div>
       
       {/* Modals would go here in a real implementation */}
@@ -660,8 +839,7 @@ export default function AdminUserManagement() {
               username: username,
               full_name: fullName,
               email: email,
-              password_hash: password,
-              role: selectedRole
+              password_hash: password
             };
             
             createAdmin(adminUserData);
@@ -750,28 +928,6 @@ export default function AdminUserManagement() {
                 placeholder='Enter confirm password'
                 />
               </div>
-              
-              <div>
-              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                  Role
-                </label>
-                <div className='flex items-center space-x-4'>
-                  {/*role selection*/}
-                  {roles.map(item => (
-                      <label className='inline-flex items-center' key={item}>
-                        <input
-                          type='radio'
-                          name='role'
-                          value={item}
-                          onChange={(e)=>setSelectedRole(e.target.value)}
-                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                        />
-                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>{item}</span>
-                      </label>
-                  ))}
-                </div>
-
-              </div>
 
               {password && (
                 <div className="mt-1">
@@ -822,9 +978,9 @@ export default function AdminUserManagement() {
               
               <button
                 type='submit'
-                disabled={!isPasswordValid || !isPasswordMatch || !username || !email || !selectedRole}
+                disabled={!isPasswordValid || !isPasswordMatch || !username || !email}
                 className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
-                  text-white ${isPasswordValid && isPasswordMatch && username && email && selectedRole 
+                  text-white ${isPasswordValid && isPasswordMatch && username && email
                     ? 'bg-indigo-600 hover:bg-indigo-700' 
                     : 'bg-indigo-400 cursor-not-allowed'} 
                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
@@ -857,8 +1013,7 @@ export default function AdminUserManagement() {
                 username: username,
                 full_name: fullName,
                 email: email,
-                password_hash: password ,
-                role: selectedRole,
+                password_hash: password,
                 updated_at: new Date().toISOString()
               };
               
@@ -949,32 +1104,7 @@ export default function AdminUserManagement() {
                 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                 placeholder='Enter confirm password'
                 />
-              </div>
-
-              <div>
-              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                  New Role
-                </label>
-                <div className='flex items-center space-x-4'>
-                  
-                  {roles.map(item => (
-                      <label className='inline-flex items-center' key={item}>
-                        <input
-                          type='radio'
-                          name='role'
-                          value={item}
-                          defaultChecked={selectedAdmin.role === item}
-                          onChange={(e)=>setSelectedRole(e.target.value)}
-                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                        />
-                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>{item}</span>
-                      </label>
-                  ))}
-                </div>
-
-              </div>
-               
-                
+              </div>               
                 <div className='pt-3 border-t border-gray-200 dark:border-gray-700'>
                   <p className='text-xs text-gray-500 dark:text-gray-400'>
                     Admin ID: {selectedAdmin.id}<br />
@@ -993,7 +1123,15 @@ export default function AdminUserManagement() {
                 >
                   Cancel
                 </button>
-                
+                <button
+                  type='button'
+                  onClick={() => openModal('editPermission', selectedAdmin)}
+                  className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500'
+                >
+                  Edit Permission
+                </button>
                 <button
                   type='submit'
                   className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
@@ -1092,8 +1230,204 @@ export default function AdminUserManagement() {
       </div>
     )}
 
-      {/* For brevity, I've omitted the actual modal implementation */}
-      {/* In a real app, you'd implement modals for adding, editing, and deleting admin users */}
+    {/* Edit Admin Permissions Modal */}
+    {isModalOpen && modalType === 'editPermission' && selectedAdmin && (
+      <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden'>
+          <div className='flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10'>
+            <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+              Edit Permissions for {selectedAdmin.username || selectedAdmin.email}
+            </h2>
+            <button
+              onClick={closeModal}
+              className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            >
+              &times;
+            </button>
+          </div>
+          
+          <div className='flex-1 overflow-y-auto px-6 py-4'>
+            <div className='mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800'>
+              <div className='flex items-start'>
+                <div className='flex-shrink-0 mr-3 text-blue-500 dark:text-blue-400 pt-0.5'>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className='text-sm font-medium text-blue-800 dark:text-blue-200'>Access Control Information</h3>
+                  <p className='mt-1 text-sm text-blue-700 dark:text-blue-300'>
+                    Permissions determine what actions this admin can perform in the system. Select the appropriate permissions based on their role and responsibilities.
+                  </p>
+                  
+                  <div className="mt-3 flex items-center">
+                    <span className="text-sm font-medium text-blue-800 dark:text-blue-200 mr-2">Current Role:</span>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      getEffectiveRole(selectedAdmin) === 'SUPER_ADMIN' 
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100' 
+                        : 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
+                    }`}>
+                      {getEffectiveRole(selectedAdmin)}
+                    </span>
+                  </div>
+                  
+                  <p className='mt-2 text-xs text-blue-700 dark:text-blue-300 italic'>
+                    Note: An admin with all admin management permissions (view, edit, add, delete admins) will have the SUPER_ADMIN role.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {permissionError && (
+              <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 mr-3 text-red-500 dark:text-red-400 pt-0.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+                    <p className="mt-1 text-sm text-red-700 dark:text-red-300">{permissionError}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Permission Setup */}
+            {!loadingPermissions && allPermissions.length > 0 && (
+              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-750 rounded-lg border border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quick Permission Setup</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                  Quickly set permissions based on common role patterns
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // For SUPER_ADMIN, select all admin management permissions
+                      const adminPermNames = ['view_admins', 'edit_admins', 'add_admins', 'delete_admins'];
+                      const adminPermIds = allPermissions
+                        .filter(perm => adminPermNames.includes(perm.name))
+                        .map(perm => perm.id);
+                        
+                      // Add these permissions to existing selections
+                      setAdminPermissions(prev => {
+                        const newPerms = [...prev];
+                        adminPermIds.forEach(id => {
+                          if (!newPerms.includes(id)) {
+                            newPerms.push(id);
+                          }
+                        });
+                        return newPerms;
+                      });
+                    }}
+                    className="px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-800 dark:text-purple-100 dark:hover:bg-purple-700 rounded text-xs font-medium"
+                  >
+                    Set SUPER_ADMIN permissions
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // For regular ADMIN, remove admin management permissions
+                      const adminPermNames = ['edit_admins', 'add_admins', 'delete_admins'];
+                      const adminPermIds = allPermissions
+                        .filter(perm => adminPermNames.includes(perm.name))
+                        .map(perm => perm.id);
+                        
+                      // Remove these permissions from selections
+                      setAdminPermissions(prev => prev.filter(id => !adminPermIds.includes(id)));
+                    }}
+                    className="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-800 dark:text-blue-100 dark:hover:bg-blue-700 rounded text-xs font-medium"
+                  >
+                    Set standard ADMIN permissions
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {loadingPermissions ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+                <span className="ml-3 text-gray-600 dark:text-gray-400">Loading permissions...</span>
+              </div>
+            ) : (
+              <>
+                {/* Permissions by Category */}
+                <div className='space-y-6'>
+                  {Object.entries(permissionsByCategory).map(([category, categoryPermissions]) => (
+                    <div key={category} className='border dark:border-gray-700 rounded-lg overflow-hidden'>
+                      <div className='bg-gray-50 dark:bg-gray-750 px-4 py-3 border-b border-gray-200 dark:border-gray-700'>
+                        <h3 className='text-md font-medium text-gray-700 dark:text-gray-300'>
+                          {formatCategoryName(category)}
+                        </h3>
+                      </div>
+                      <div className='p-4 grid grid-cols-1 md:grid-cols-2 gap-3'>
+                        {categoryPermissions.map(permission => (
+                          <div key={permission.id} className='flex items-center'>
+                            <input
+                              type='checkbox'
+                              id={`perm-${permission.id}`}
+                              className='h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
+                              checked={adminPermissions.includes(permission.id)}
+                              onChange={() => togglePermission(permission.id)}
+                            />
+                            <label 
+                              htmlFor={`perm-${permission.id}`} 
+                              className={`ml-2 text-sm ${
+                                ['view_admins', 'edit_admins', 'add_admins', 'delete_admins'].includes(permission.name)
+                                ? 'font-medium text-indigo-700 dark:text-indigo-300'
+                                : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              {permission.name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                              {['view_admins', 'edit_admins', 'add_admins', 'delete_admins'].includes(permission.name) && (
+                                <span className="ml-1 text-xs text-indigo-500 dark:text-indigo-400">
+                                  (affects role)
+                                </span>
+                              )}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className='p-6 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-800 z-10 flex justify-end space-x-3'>
+            <button
+              type='button'
+              onClick={closeModal}
+              className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+            >
+              Cancel
+            </button>
+            
+            <button
+              type='button'
+              onClick={savePermissions}
+              disabled={savingPermissions}
+              className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed'
+            >
+              {savingPermissions ? (
+                <>
+                  <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                  Saving...
+                </>
+              ) : (
+                'Save Permissions'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 } 

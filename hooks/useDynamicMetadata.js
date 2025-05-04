@@ -80,7 +80,7 @@ export function useDynamicMetadata({ unreadCount, currentSession }) {
         currentSession.type === 'AI' 
           ? t('aiAssistant')
           : currentSession.type === 'PRIVATE'
-            ? (currentSession.participants[0]?.name || t('privateChat'))
+            ? (currentSession.participants && currentSession.participants[0]?.name || t('privateChat'))
             : (currentSession.name || t('groupChat'))
       ) : null;
       

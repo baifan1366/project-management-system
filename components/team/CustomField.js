@@ -10,12 +10,14 @@ import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription } f
 import { fetchTeamCustomField } from '@/lib/redux/features/teamCFSlice';
 import { updateTagIds, getTags } from '@/lib/redux/features/teamCFSlice';
 import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const dataFetchedRef = useRef(false);
-  
+  const { user } = useGetUser();
+
   // 从 Redux store 获取自定义字段模板
   const availableFields = useSelector(state => state.customFields?.fields || []);
   const customFieldStatus = useSelector(state => state.customFields?.status || 'idle');
@@ -43,8 +45,7 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   // 处理字段点击事件
   const handleFieldClick = async (field) => {
     // 创建团队自定义字段
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
+    const userId = user?.id;
     
     try {
       // 先关闭对话框，避免重复触发

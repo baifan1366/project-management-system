@@ -5,26 +5,38 @@ import { Button } from "@/components/ui/button"
 import { Plus, Text, Hash, Fingerprint, CircleCheck, SquareCheck, Calendar, User, Sigma, Timer, Clock3, Pen, ClipboardList, Tag } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { useDispatch } from "react-redux"
-import { getTags, resetTagsStatus } from '@/lib/redux/features/teamCFSlice'
+import { getTags, resetTagsStatus, updateTagIds } from '@/lib/redux/features/teamCFSlice'
 import CreateTagDialog from './TagDialog'
 import { fetchAllTags } from '@/lib/redux/features/tagSlice'
 import { useTranslations } from 'next-intl'
+import { useToast } from "@/hooks/use-toast"
+import useGetUser from '@/lib/hooks/useGetUser';
 
-export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFId, onTagsUpdated }) {
+export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFId, onTagsUpdated, existingTags = [] }) {
     const t = useTranslations('CreateTag')
     const [isPopoverOpen, setPopoverOpen] = useState(false);
     const [isTagDialogOpen, setTagDialogOpen] = useState(false);
     const [tags, setTags] = useState([]);
     const [tagTypes, setTagTypes] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isAddingTag, setIsAddingTag] = useState(false); // 添加标签时的加载状态
     const dispatch = useDispatch();
+    const { toast } = useToast();
     const isTagRequestInProgress = useRef(false);
     const hasLoadedTags = useRef(false);
+    const { user } = useGetUser();
     
     const handleOpenTagDialog = () => {
         setTagDialogOpen(true);
         setPopoverOpen(false);
     };
+    
+    // 检查projectId是否有值
+    useEffect(() => {
+        if (!projectId) {
+            console.error('TagPopover: ProjectId is missing', { projectId, teamId, teamCFId });
+        }
+    }, [projectId, teamId, teamCFId]);
     
     // 加载标签数据
     const loadTag = async () => {
@@ -40,6 +52,63 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
             hasLoadedTags.current = false;
         } finally {
             isTagRequestInProgress.current = false;
+        }
+    };
+    
+    // 添加标签到团队自定义字段
+    const handleAddTag = async (tag) => {
+        if (isAddingTag || !tag || !tag.id) return;
+        
+        try {
+            setIsAddingTag(true);
+            
+            // 获取当前团队自定义字段的标签
+            const tagsResponse = await dispatch(getTags({ teamId, teamCFId })).unwrap();
+            const existingTagIds = tagsResponse.tag_ids || [];
+            
+            // 检查标签是否已经存在
+            if (existingTagIds.includes(tag.id)) {
+                toast({
+                    title: `${t('tagAlreadyExists')}`,
+                    description: `${t('tagAlreadyExistsDescription')}`,
+                    variant: "destructive",
+                });
+                return;
+            }
+            
+            // 添加新标签ID到现有标签ID列表
+            const updatedTagIds = [...existingTagIds, tag.id];
+            
+            // 更新标签关联
+            await dispatch(updateTagIds({
+                teamId: teamId,
+                teamCFId: teamCFId,
+                tagIds: updatedTagIds,
+                userId: user.id
+            })).unwrap();
+            
+            // 通知成功
+            toast({
+                title: `${t('tagAdded')}`,
+                description: `${t('tagAddedDescription')}`,
+            });
+            
+            // 关闭弹窗
+            setPopoverOpen(false);
+            
+            // 通知父组件标签已更新
+            if (onTagsUpdated) {
+                onTagsUpdated();
+            }
+        } catch (error) {
+            console.error('添加标签失败:', error);
+            toast({
+                title: `${t('tagAddFailed')}`,
+                description: error.message || `${t('tagAddFailedDescription')}`,
+                variant: "destructive",
+            });
+        } finally {
+            setIsAddingTag(false);
         }
     };
     
@@ -72,11 +141,12 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
         setIsLoading(true);
         try {
             const tagsData = await dispatch(fetchAllTags()).unwrap();
-            const uniqueTypes = [...new Set(tagsData.map(tag => tag.type))]
-            if(uniqueTypes.length > 0) {
-                setTagTypes(uniqueTypes)
-            }
-            setTags(tagsData)
+            // 过滤掉已经存在的标签
+            const filteredTags = tagsData.filter(tag => {
+                // 检查标签名是否已存在
+                return !existingTags.includes(tag.name);
+            });
+            setTags(filteredTags);
         } catch (error) {
             console.error('获取标签失败:', error);
         } finally {
@@ -107,7 +177,7 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
 
     useEffect(() => {
         fetchTags();
-    }, []);
+    }, [existingTags]);
 
     return (
         <>
@@ -127,21 +197,25 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
                         <Plus className="w-4 h-4"/>
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto h-80 p-1 flex flex-col">
+                <PopoverContent className="w-full h-full p-1 flex flex-col">
                     <div className="flex-1 overflow-auto">
-                        <h1 className="text-sm font-bold py-2 px-3">Field types</h1>
+                        <h1 className="text-sm font-bold py-2 px-3">{t('newField')}</h1>
                         {/* fetch all tags */}
                         {isLoading ? (
-                            <p className="text-sm text-gray-500 py-2 px-3">Loading...</p>
-                        ) : tagTypes.length > 0 ? (
-                            tagTypes.map(type => (
-                                <div key={type} className="flex items-center py-1 px-3 hover:bg-gray-100 rounded-md cursor-pointer">
-                                    {getTypeIcon(type)}
-                                    <p className="text-sm">{t(type)}</p>
+                            <p className="text-sm text-gray-500 py-2 px-3">{t('loading')}</p>
+                        ) : tags.length > 0 ? (
+                            tags.map(tag => (
+                                <div 
+                                    key={tag.id} 
+                                    className="flex items-center py-1 px-3 hover:bg-gray-100 rounded-md cursor-pointer"
+                                    onClick={() => handleAddTag(tag)}
+                                >
+                                    {getTypeIcon(tag.type)}
+                                    <p className="text-sm">{tag.name}</p>
                                 </div>
                             ))
                         ) : (
-                            <p className="text-sm text-gray-500 py-2 px-3">暂无标签</p>
+                            <p/>
                         )}
                     </div>
                     {/* create tag dialog */}

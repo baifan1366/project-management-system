@@ -131,66 +131,101 @@ export async function GET(request) {
     }
 
     // Fetch calendar events
-    const response = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startDate}T00:00:00Z&timeMax=${endDate}T23:59:59Z&singleEvents=true&orderBy=startTime`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    if (response.status === 401 && refreshToken) {
-      // Token expired, try to refresh
-      const tokenData = await refreshAccessToken(refreshToken);
-      if (!tokenData) {
-        return NextResponse.json(
-          { error: 'Failed to refresh access token' },
-          { status: 401 }
-        );
-      }
-
-      // Retry with new access token
-      const retryResponse = await fetch(
+    try {
+      console.log('Fetching Google Calendar events with access token:', accessToken.substring(0, 10) + '...');
+      const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startDate}T00:00:00Z&timeMax=${endDate}T23:59:59Z&singleEvents=true&orderBy=startTime`,
         {
           headers: {
-            Authorization: `Bearer ${tokenData.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         }
       );
 
-      if (!retryResponse.ok) {
+      if (response.status === 401 && refreshToken) {
+        console.log('Access token expired, attempting to refresh token');
+        // Token expired, try to refresh
+        const tokenData = await refreshAccessToken(refreshToken);
+        if (!tokenData) {
+          console.error('Failed to refresh access token');
+          return NextResponse.json(
+            { error: 'Failed to refresh access token' },
+            { status: 401 }
+          );
+        }
+
+        console.log('Token refreshed successfully, retrying request with new token');
+        // Retry with new access token
+        const retryResponse = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startDate}T00:00:00Z&timeMax=${endDate}T23:59:59Z&singleEvents=true&orderBy=startTime`,
+          {
+            headers: {
+              Authorization: `Bearer ${tokenData.access_token}`,
+            },
+          }
+        );
+
+        if (!retryResponse.ok) {
+          const errorBody = await retryResponse.text();
+          console.error('Failed to fetch calendar events after token refresh:', 
+            retryResponse.status, errorBody);
+          return NextResponse.json(
+            { error: 'Failed to fetch calendar events after token refresh', details: errorBody },
+            { status: retryResponse.status }
+          );
+        }
+
+        const events = await retryResponse.json();
+        console.log(`Successfully fetched ${events.items?.length || 0} events after token refresh`);
+
+        // 更新用户的token信息 - 使用我们自己的数据库而不是Supabase Auth
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            console.log('Updating user tokens in database');
+            const { error: updateError } = await supabase
+              .from('user')
+              .update({
+                google_access_token: tokenData.access_token,
+                google_token_expires_at: Date.now() + (tokenData.expires_in * 1000),
+                updated_at: new Date().toISOString()
+              })
+              .eq('google_provider_id', user.id);
+              
+            if (updateError) {
+              console.error('Failed to update user token:', updateError);
+            }
+          }
+        } catch (updateError) {
+          console.error('Error updating user token:', updateError);
+        }
+
+        return NextResponse.json(events);
+      }
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('Failed to fetch calendar events:', response.status, errorBody);
         return NextResponse.json(
-          { error: 'Failed to fetch calendar events' },
-          { status: retryResponse.status }
+          { error: 'Failed to fetch calendar events', details: errorBody },
+          { status: response.status }
         );
       }
 
-      const events = await retryResponse.json();
-
-      // Update user metadata with new tokens
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await updateUserMetadata(session.user.id, tokenData.access_token, refreshToken);
-      }
-
+      const events = await response.json();
+      console.log(`Successfully fetched ${events.items?.length || 0} events`);
       return NextResponse.json(events);
-    }
-
-    if (!response.ok) {
+    } catch (error) {
+      console.error('Unexpected error in Google Calendar API:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch calendar events' },
-        { status: response.status }
+        { error: 'Internal server error', message: error.message },
+        { status: 500 }
       );
     }
-
-    const events = await response.json();
-    return NextResponse.json(events);
   } catch (error) {
     console.error('Error in Google Calendar API:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', message: error.message },
       { status: 500 }
     );
   }

@@ -28,7 +28,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN, enUS } from 'date-fns/locale';
 import { Check, Trash, Bell, BellOff, Calendar, User, MessageSquare, Video } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import NotificationItem from '@/components/notifications/NotificationItem';
 
 export function NotificationDialog({ open, onOpenChange }) {
@@ -45,14 +45,14 @@ export function NotificationDialog({ open, onOpenChange }) {
   useEffect(() => {
     if (open) {
       const getUser = async () => {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (session?.user) {
-          setUser(session.user);
-          setLocale(session.user.user_metadata?.language || 'zh');
+        const { user } = useGetUser();
+        if (user) {
+          setUser(user);
+          setLocale(user.language || 'zh');
           
           // 只在没有数据或订阅时获取通知
           if (notifications.length === 0 || !isSubscribed) {
-            dispatch(fetchNotifications(session.user.id));
+            dispatch(fetchNotifications(user.id));
           }
         }
       };

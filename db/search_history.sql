@@ -13,26 +13,6 @@ CREATE INDEX IF NOT EXISTS idx_search_history_term ON "search_history"("search_t
 CREATE INDEX IF NOT EXISTS idx_search_history_user ON "search_history"("user_id");
 CREATE INDEX IF NOT EXISTS idx_search_history_count ON "search_history"("count" DESC);
 
--- 添加RLS安全策略
-ALTER TABLE "search_history" ENABLE ROW LEVEL SECURITY;
-
--- 允许经过身份验证的用户插入和更新搜索记录
-CREATE POLICY "Authenticated users can insert search history"
-  ON "search_history" FOR INSERT
-  TO authenticated
-  WITH CHECK (true);
-
-CREATE POLICY "Users can update their own search history"
-  ON "search_history" FOR UPDATE
-  TO authenticated
-  USING (user_id = auth.uid());
-
--- 允许任何人读取搜索历史（用于推荐功能）
-CREATE POLICY "Anyone can view search history"
-  ON "search_history" FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
 -- 为消息表添加全文搜索支持
 ALTER TABLE IF EXISTS "chat_message" ADD COLUMN IF NOT EXISTS tsv_content TSVECTOR;
 

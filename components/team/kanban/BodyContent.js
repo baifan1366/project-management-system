@@ -1,10 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
 import { fetchAllTags } from '@/lib/redux/features/tagSlice';
 import { useDispatch } from 'react-redux';
+
+// 为空数据创建固定引用的空对象，避免每次渲染创建新对象
+const EMPTY_OBJECT = {};
+const EMPTY_ARRAY = [];
 
 export default function BodyContent({ projectId, teamId, teamCFId }) {
     const dispatch = useDispatch();
@@ -14,74 +18,22 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
     const [tags, setTags] = useState([]);
     const [isLoaded, setIsLoaded] = useState(false);
 
-    // 默认数据（当API返回为空时使用）
-    const getDefaultColumns = () => ({
-        'doing': {
-            id: 'doing',
-            title: 'Doing',
-            taskIds: ['task-2', 'task-3']
-        },
-        'done': {
-            id: 'done',
-            title: 'Done',
-            taskIds: ['task-4', 'task-5', 'task-6']
-        },
-        'todo': {
-            id: 'todo',
-            title: 'To do',
-            taskIds: ['task-1']
-        }
-    });
-
-    const getDefaultTasks = () => ({
-        'task-1': {
-          id: 'task-1',
-          content: 'Meeting Report',
-          assignee: {
-            avatar: '/avatar-placeholder.png'
-          }
-        },
-        'task-2': {
-          id: 'task-2',
-          content: '设计首页UI',
-          assignee: null
-        },
-        'task-3': {
-          id: 'task-3',
-          content: '后端API开发',
-          assignee: null
-        },
-        'task-4': {
-          id: 'task-4',
-          content: '测试用户注册流程',
-          assignee: null
-        },
-        'task-5': {
-          id: 'task-5',
-          content: '修复登录Bug',
-          assignee: null
-        },
-        'task-6': {
-          id: 'task-6',
-          content: '优化数据库查询',
-          assignee: null
-        }
-    });
-
-    const getDefaultColumnOrder = () => ['doing', 'done', 'todo'];
-
-    const loadData = async () => {
-        if (!teamId || isLoaded) return;
+    // 使用useCallback包装loadData，确保函数引用稳定
+    const loadData = useCallback(async (forceReload = false) => {
+        if (!teamId || (isLoaded && !forceReload)) return;
         
         try {
-            setIsLoaded(true);
+            // 仅在首次加载时设置为true，强制重新加载时不改变
+            if (!isLoaded) {
+                setIsLoaded(true);
+            }
+            
             // 获取所有标签
             const tagsData = await dispatch(fetchAllTags()).unwrap();
             setTags(tagsData);
             
             // 获取该团队的所有部门
             const sections = await dispatch(getSectionByTeamId(teamId)).unwrap();
-            console.log(sections);
             
             // 构建 columns 和 columnOrder
             const tempColumns = {};
@@ -94,7 +46,6 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
                 if(section && section.id) {
                     // 获取该部门的所有任务
                     const sectionTasks = await dispatch(fetchTasksBySectionId(section.id)).unwrap();
-                    console.log(sectionTasks);
                     
                     // 构建该部门的任务ID列表
                     const taskIds = [];
@@ -118,7 +69,8 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
                             id: task.id.toString(),
                             content: taskContent,
                             assignee: task.assignee_id ? { avatar: '/avatar-placeholder.png' } : null,
-                            tag_values: task.tag_values
+                            tag_values: task.tag_values,
+                            likes: task.likes || [] // 确保包含likes字段，如果不存在则设为空数组
                         };
                         
                         // 将任务ID添加到部门的任务列表
@@ -129,7 +81,8 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
                     tempColumns[section.id] = {
                         id: section.id.toString(),
                         title: section.name,
-                        taskIds: taskIds
+                        taskIds: taskIds,
+                        originalId: section.id // 保存原始ID以便后续操作
                     };
                     
                     // 将部门ID添加到顺序列表
@@ -137,38 +90,39 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
                 }
             }
             
-            // 如果没有部门数据，使用默认数据
-            if (tempColumnOrder.length === 0) {
-                setColumns(getDefaultColumns());
-                setTasks(getDefaultTasks());
-                setColumnOrder(getDefaultColumnOrder());
-            } else {
-                // 更新状态
-                setColumns(tempColumns);
-                setTasks(tempTasks);
-                setColumnOrder(tempColumnOrder);
+            // 更新状态
+            setColumns(tempColumns);
+            setTasks(tempTasks);
+            setColumnOrder(tempColumnOrder);
+            
+            // 重置加载状态，允许强制重新加载
+            if (forceReload) {
+                console.log('重新加载看板数据完成');
             }
+            
         } catch (error) {
             console.error('加载数据失败:', error);
-            // 加载失败时使用默认数据
-            setColumns(getDefaultColumns());
-            setTasks(getDefaultTasks());
-            setColumnOrder(getDefaultColumnOrder());
         }
-    };
+    }, [teamId, dispatch]); // 移除isLoaded依赖，让forceReload生效
 
     // 使用useEffect自动加载数据
     useEffect(() => {
         if (teamId) {
             loadData();
         }
-    }, [teamId]);
+    }, [teamId, loadData]); // 更新正确的依赖项
 
-    return {
-        loadData,
-        initialColumns: Object.keys(columns).length > 0 ? columns : getDefaultColumns(),
-        initialTasks: Object.keys(tasks).length > 0 ? tasks : getDefaultTasks(),
-        initialColumnOrder: columnOrder.length > 0 ? columnOrder : getDefaultColumnOrder()
-    };
+    // 使用useMemo缓存返回值，避免每次渲染创建新的对象引用
+    const returnData = useMemo(() => {
+        return {
+            loadData,
+            // 使用对象引用检查，返回相同引用的空对象而不是每次创建新字符串
+            initialColumns: Object.keys(columns).length > 0 ? columns : EMPTY_OBJECT,
+            initialTasks: Object.keys(tasks).length > 0 ? tasks : EMPTY_OBJECT,
+            initialColumnOrder: columnOrder.length > 0 ? columnOrder : EMPTY_ARRAY
+        };
+    }, [columns, tasks, columnOrder, loadData]); // 添加loadData作为依赖项，确保其引用变化时更新返回值
+
+    return returnData;
 }
 

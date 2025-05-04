@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 // GET /api/tasks
 export async function GET(request) {
@@ -15,33 +16,65 @@ export async function GET(request) {
     
     // 获取当前登录用户
     if (userId === 'current') {
-      const { data: userData, error: userError } = await supabase.auth.getUser()
+      const { user } = useGetUser();
       
       if (userError) throw userError
       
-      if (userData && userData.user) {
-        const { data: tasksData, error: tasksError } = await supabase
+      if (user) {
+        // 获取用户创建的任务
+        const { data: createdTasks, error: createdError } = await supabase
           .from('task')
           .select('*')
-          .eq('assignee_id', userData.user.id)
+          .eq('created_by', user.id);
           
-        if (tasksError) throw tasksError
+        if (createdError) {
+          console.error('Error fetching tasks created by current user:', createdError);
+          throw createdError;
+        }
         
-        data = tasksData || []
+        // 获取所有任务，然后在代码中过滤
+        const { data: allTasks, error: allTasksError } = await supabase
+          .from('task')
+          .select('*');
+          
+        if (allTasksError) {
+          console.error('Error fetching all tasks:', allTasksError);
+          throw allTasksError;
+        }
+        
+        // 过滤出分配给当前用户的任务
+        const assignedTasks = allTasks.filter(task => 
+          task.tag_values && task.tag_values.assignee_id === user.id
+        );
+        
+        // 合并两个数组并去重
+        const allUserTasks = [...createdTasks];
+        
+        assignedTasks.forEach(task => {
+          if (!allUserTasks.some(t => t.id === task.id)) {
+            allUserTasks.push(task);
+          }
+        });
+        
+        data = allUserTasks;
       } else {
         throw new Error('User not authenticated')
       }
     }
     // 获取所有任务
     else if (fetchAll) {
+      console.log('Fetching all tasks');
       const { data: tasksData, error: tasksError } = await supabase
         .from('task')
-        .select('*')
-        .order('created_at', { ascending: false })
+        .select('*');
         
-      if (tasksError) throw tasksError
+      if (tasksError) {
+        console.error('Error fetching all tasks:', tasksError);
+        throw tasksError;
+      }
       
-      data = tasksData || []
+      data = tasksData || [];
+      console.log(`Fetched ${data.length} tasks`);
     }
     // 如果提供了特定任务ID，则只获取该任务
     else if (taskId) {
@@ -57,14 +90,47 @@ export async function GET(request) {
     } 
     // 如果提供了用户ID，则获取分配给该用户的所有任务
     else if (userId) {
-      const { data: tasksData, error: tasksError } = await supabase
+      console.log(`Fetching tasks for user: ${userId}`);
+      
+      // 获取用户创建的任务
+      const { data: createdTasks, error: createdError } = await supabase
         .from('task')
         .select('*')
-        .eq('assignee_id', userId)
+        .eq('created_by', userId);
         
-      if (tasksError) throw tasksError
+      if (createdError) {
+        console.error('Error fetching tasks created by user:', createdError);
+        throw createdError;
+      }
       
-      data = tasksData || []
+      // For tasks where the user is assigned, we need to use containment query on tag_values JSONB
+      // Unfortunately, direct equality on nested JSONB is complex in Postgres
+      // For now, we'll fetch all tasks and filter on the server side
+      const { data: allTasks, error: allTasksError } = await supabase
+        .from('task')
+        .select('*');
+        
+      if (allTasksError) {
+        console.error('Error fetching all tasks:', allTasksError);
+        throw allTasksError;
+      }
+      
+      // Filter tasks where the user is assigned in tag_values.assignee_id
+      const assignedTasks = allTasks.filter(task => 
+        task.tag_values && task.tag_values.assignee_id === userId
+      );
+      
+      // Combine created and assigned tasks, removing duplicates
+      const allUserTasks = [...createdTasks];
+      
+      assignedTasks.forEach(task => {
+        if (!allUserTasks.some(t => t.id === task.id)) {
+          allUserTasks.push(task);
+        }
+      });
+      
+      console.log(`Found ${allUserTasks.length} tasks for user`);
+      data = allUserTasks;
     }
     // 如果提供了章节ID，则获取该章节下的所有任务
     else if (sectionId) {
@@ -74,6 +140,7 @@ export async function GET(request) {
         .select('task_ids')
         .eq('id', sectionId)
         .single()
+        .order('id', { ascending: true });
         
       if (sectionError) throw sectionError
       
@@ -83,6 +150,7 @@ export async function GET(request) {
           .from('task')
           .select('*')
           .in('id', sectionData.task_ids)
+          .order('id', { ascending: true })
           
         if (tasksError) throw tasksError
         
@@ -96,6 +164,7 @@ export async function GET(request) {
         .from('section')
         .select('task_ids')
         .eq('team_id', teamId)
+        .order('id', { ascending: true })
         
       if (sectionsError) throw sectionsError
       
@@ -134,10 +203,10 @@ export async function POST(request) {
   try {
     const body = await request.json()
     
-    // Basic validation
-    if (!body || !body.title) {
+    // Basic validation - 修改验证逻辑，支持tag_values
+    if (!body || (!body.title && !body.tag_values)) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields. Need either title or tag_values' },
         { status: 400 }
       )
     }
@@ -162,8 +231,8 @@ export async function POST(request) {
   }
 }
 
-// PUT /api/tasks - Update a task
-export async function PUT(request) {
+// PATCH /api/tasks - Update a task
+export async function PATCH(request) {
   try {
     const body = await request.json()
     console.log('Update data:', body)
@@ -175,15 +244,28 @@ export async function PUT(request) {
       )
     }
 
+    // 确保 updated_at 存在
+    const updateData = {
+      ...body,
+      updated_at: body.updated_at || new Date().toISOString()
+    }
+
     const { data, error } = await supabase
       .from('task')
-      .update(body)
+      .update(updateData)
       .eq('id', body.id)
       .select()
 
     if (error) {
       console.error('Database error:', error)
       throw error
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { error: 'Task not found or update failed' },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json(data[0])

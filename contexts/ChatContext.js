@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useId} from 'react';
 import { supabase } from '@/lib/supabase';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 const ChatContext = createContext();
 
@@ -17,6 +18,25 @@ export function ChatProvider({ children }) {
   // 当前AI对话ID
   const [aiConversationId, setAiConversationId] = useState(null);
   const [chatMode, setChatMode] = useState('normal');
+  const { user:authSession, isLoading: authLoading } = useGetUser();
+
+  // Add useEffect to handle the case where authentication is taking too long
+  useEffect(() => {
+    // If auth is still loading after 5 seconds, set chat loading to false
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.log('Authentication timeout - forcing chat context to load');
+        setLoading(false);
+      }
+    }, 5000);
+    
+    // If authSession is null and auth loading is complete, set loading to false
+    if (!authLoading && !authSession) {
+      setLoading(false);
+    }
+    
+    return () => clearTimeout(timeoutId);
+  }, [authSession, authLoading, loading]);
 
   // 处理头像URL，移除token
   const processAvatarUrl = (user) => {
@@ -54,8 +74,7 @@ export function ChatProvider({ children }) {
 
   // 创建AI聊天会话
   const createAIChatSession = async (forceCreate = false) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return null;
+    if (!authSession) return null;
 
     // 如果不强制创建新会话，检查是否已经存在AI聊天会话
     if (!forceCreate) {
@@ -63,7 +82,7 @@ export function ChatProvider({ children }) {
         .from('chat_session')
         .select('*')
         .eq('type', 'AI')
-        .eq('created_by', session.user.id)
+        .eq('created_by', authSession.id)
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -86,7 +105,7 @@ export function ChatProvider({ children }) {
       .insert({
         type: 'AI',
         name: 'AI Chat Bot',
-        created_by: session.user.id
+        created_by: authSession.id
       })
       .select()
       .single();
@@ -103,7 +122,7 @@ export function ChatProvider({ children }) {
       .from('chat_participant')
       .insert({
         session_id: newSession.id,
-        user_id: session.user.id,
+        user_id: authSession.id,
         role: 'ADMIN'
       });
 
@@ -121,8 +140,8 @@ export function ChatProvider({ children }) {
   const saveAIChatMessage = async (message) => {
     if (!message?.content || !message?.role) return;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
+ 
+    if (!authSession) return;
 
     // 确保有有效的会话ID
     const conversationId = aiConversationId || `${baseId.replace(/:/g, '')}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
@@ -143,7 +162,7 @@ export function ChatProvider({ children }) {
         .from('chat_session')
         .select('*')
         .eq('type', 'AI')
-        .eq('created_by', session.user.id)
+        .eq('created_by', authSession.id)
         .limit(1);
         
       if (checkError) {
@@ -170,7 +189,7 @@ export function ChatProvider({ children }) {
     const { data, error } = await supabase
       .from('ai_chat_message')
       .insert({
-        user_id: session.user.id,
+        user_id: authSession.id,
         role: message.role,
         content: message.content,
         conversation_id: conversationId,
@@ -305,8 +324,7 @@ export function ChatProvider({ children }) {
   };
 
   // 获取聊天会话列表
-  const fetchChatSessions = async () => {
-    const { data: { session: authSession } } = await supabase.auth.getSession();
+  const fetchChatSessions = async () => {    
     if (!authSession) return;
 
     // 首先获取会话列表
@@ -341,7 +359,7 @@ export function ChatProvider({ children }) {
           last_seen_at
         )
       `)
-      .eq('user_id', authSession.user.id);
+      .eq('user_id', authSession.id);
 
     if (sessionsError) {
       console.error('Error fetching chat sessions:', sessionsError);
@@ -351,10 +369,8 @@ export function ChatProvider({ children }) {
     // 获取用户元数据中的隐藏会话
     let hiddenSessions = {};
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (!userError && userData?.user?.user_metadata?.hidden_sessions) {
-        hiddenSessions = userData.user.user_metadata.hidden_sessions;
-      }
+      // Get hidden sessions from localStorage
+      hiddenSessions = JSON.parse(localStorage.getItem('hidden_sessions') || '{}');
     } catch (err) {
       console.error('Error checking hidden sessions:', err);
     }
@@ -438,7 +454,7 @@ export function ChatProvider({ children }) {
       .from('chat_message_read_status')
       .select('message_id, chat_message!inner(session_id)')
       .is('read_at', null)
-      .eq('user_id', authSession.user.id);
+      .eq('user_id', authSession.id);
 
     if (unreadError) {
       console.error('Error fetching unread counts:', unreadError);
@@ -497,7 +513,7 @@ export function ChatProvider({ children }) {
       const lastMessage = lastMessagesBySession[item.chat_session.id];
       const otherParticipants = item.chat_session.participants
         .map(p => processAvatarUrl(p.user))
-        .filter(user => user.id !== authSession.user.id);
+        .filter(user => user.id !== authSession.id);
       
       const sessionId = item.chat_session.id;
       // 如果是当前打开的会话，未读计数为0
@@ -521,7 +537,6 @@ export function ChatProvider({ children }) {
 
   // 获取会话消息
   const fetchMessages = async (sessionId) => {
-    const { data: { session: authSession } } = await supabase.auth.getSession();
     if (!authSession) return;
     
     // 先检查用户是否有权访问此会话
@@ -529,7 +544,7 @@ export function ChatProvider({ children }) {
       .from('chat_participant')
       .select('*')
       .eq('session_id', sessionId)
-      .eq('user_id', authSession.user.id)
+      .eq('user_id', authSession.id)
       .single();
       
     if (participantError || !participant) {
@@ -538,13 +553,14 @@ export function ChatProvider({ children }) {
     }
 
     // Get user metadata for cleared chat history
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-      console.error('Error fetching user data:', userError);
+    let clearedTimestamp = null;
+    try {
+      // Get cleared history timestamp from localStorage
+      const clearedHistory = JSON.parse(localStorage.getItem('cleared_chat_history') || '{}');
+      clearedTimestamp = clearedHistory[sessionId];
+    } catch (error) {
+      console.error('Error fetching cleared history data:', error);
     }
-    
-    // Get cleared history timestamp for this session
-    const clearedTimestamp = userData?.user?.user_metadata?.cleared_chat_history?.[sessionId];
 
     const { data, error } = await supabase
       .from('chat_message')
@@ -565,6 +581,7 @@ export function ChatProvider({ children }) {
         replied_message:reply_to_message_id (
           id,
           content,
+          mentions,
           user:user_id (
             id,
             name,
@@ -599,7 +616,7 @@ export function ChatProvider({ children }) {
     })));
     
     // 标记消息为已读
-    markMessagesAsRead(sessionId, authSession.user.id);
+    markMessagesAsRead(sessionId, authSession.id);
     
     // 更新未读消息计数
     updateUnreadCount(sessionId);
@@ -607,7 +624,6 @@ export function ChatProvider({ children }) {
 
   // 更新特定会话的未读消息计数
   const updateUnreadCount = async (sessionId) => {
-    const { data: { session: authSession } } = await supabase.auth.getSession();
     if (!authSession) return;
     
     // 获取所有会话的未读消息计数
@@ -615,7 +631,7 @@ export function ChatProvider({ children }) {
       .from('chat_message_read_status')
       .select('message_id, user_id, chat_message!inner(session_id)')
       .is('read_at', null)
-      .eq('user_id', authSession.user.id);
+      .eq('user_id', authSession.id);
 
     if (error) {
       console.error('获取未读消息计数失败:', error);
@@ -678,9 +694,8 @@ export function ChatProvider({ children }) {
   };
 
   // 发送消息
-  const sendMessage = async (sessionId, content, replyToMessageId = null) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+  const sendMessage = async (sessionId, content, replyToMessageId = null, mentions = []) => {
+    if (!authSession) {
       throw new Error('User not logged in');
     }
 
@@ -689,9 +704,10 @@ export function ChatProvider({ children }) {
       .from('chat_message')
       .insert({
         session_id: sessionId,
-        user_id: session.user.id,
+        user_id: authSession.id,
         content,
-        reply_to_message_id: replyToMessageId
+        reply_to_message_id: replyToMessageId,
+        mentions: mentions.length > 0 ? mentions : null // Add mentions to the message
       })
       .select(`
         *,
@@ -710,6 +726,7 @@ export function ChatProvider({ children }) {
         replied_message:reply_to_message_id (
           id,
           content,
+          mentions,
           user:user_id (
             id,
             name,
@@ -738,7 +755,7 @@ export function ChatProvider({ children }) {
 
     // 为每个参与者创建未读记录，除了发送者自己
     const readStatusRecords = participants
-      .filter(p => p.user_id !== session.user.id)
+      .filter(p => p.user_id !== authSession.id)
       .map(p => ({
         message_id: data.id,
         user_id: p.user_id,
@@ -753,6 +770,53 @@ export function ChatProvider({ children }) {
       if (readStatusError) {
         console.error('Error creating read status records:', readStatusError);
         // 这里不抛出异常，因为这只是未读状态记录，不影响消息发送
+      }
+    }
+
+    // Create notifications for mentioned users
+    if (mentions && mentions.length > 0) {
+      try {
+        // Filter out user mentions
+        const userMentions = mentions.filter(mention => mention.type === 'user');
+        
+        if (userMentions.length > 0) {
+          // Get user IDs for the mentions where we have the name
+          const userNames = userMentions.map(mention => mention.name);
+          
+          if (userNames.length > 0) {
+            // Get actual user IDs from names
+            const { data: mentionedUsers, error: mentionedUsersError } = await supabase
+              .from('user')
+              .select('id, name')
+              .in('name', userNames);
+            
+            if (!mentionedUsersError && mentionedUsers && mentionedUsers.length > 0) {
+              // Prepare notifications for mentioned users
+              const notifications = mentionedUsers.map(user => ({
+                user_id: user.id,
+                type: 'MENTION',
+                title: `You were mentioned in a chat`,
+                content: `${authSession.name} mentioned you in a message`,
+                link: `/chat?session=${sessionId}`,
+                data: {
+                  session_id: sessionId,
+                  message_id: data.id,
+                  mentioned_by: authSession.id
+                }
+              }));
+              
+              // Insert notifications
+              if (notifications.length > 0) {
+                await supabase
+                  .from('notification')
+                  .insert(notifications);
+              }
+            }
+          }
+        }
+      } catch (notifyError) {
+        console.error('Error creating mention notifications:', notifyError);
+        // Don't throw error, just log it
       }
     }
 
@@ -792,6 +856,7 @@ export function ChatProvider({ children }) {
           replied_message:reply_to_message_id (
             id,
             content,
+            mentions,
             user:user_id (
               id,
               name,
@@ -829,9 +894,7 @@ export function ChatProvider({ children }) {
   // 删除消息的功能
   const deleteMessage = async (messageId) => {
     try {
-      // 获取当前用户会话信息
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
+      if (!authSession) {
         console.error('用户未登录，无法删除消息');
         return { success: false, error: '未登录' };
       }
@@ -849,7 +912,7 @@ export function ChatProvider({ children }) {
       }
       
       // 确认消息属于当前用户
-      if (message.user_id !== session.user.id) {
+      if (message.user_id !== authSession.id) {
         console.error('无权删除他人消息');
         return { success: false, error: '无权操作' };
       }
@@ -895,7 +958,6 @@ export function ChatProvider({ children }) {
         filter: `session_id=eq.${currentSession.id}`
       }, async (payload) => {
         // 获取当前用户
-        const { data: { session: authSession } } = await supabase.auth.getSession();
         if (!authSession) return;
         
         // 如果消息ID已在sentMessageIds中，说明是自己发的消息，忽略实时更新
@@ -923,6 +985,7 @@ export function ChatProvider({ children }) {
             replied_message:reply_to_message_id (
               id,
               content,
+              mentions,
               user:user_id (
                 id,
                 name,
@@ -972,13 +1035,13 @@ export function ChatProvider({ children }) {
         });
         
         // 如果是当前会话，且不是当前用户发送的消息，立即标记为已读
-        if (messageData.user_id !== authSession.user.id) {
+        if (messageData.user_id !== authSession.id) {
           // 查找此消息的未读状态记录
           const { data: readStatusList, error: readStatusError } = await supabase
             .from('chat_message_read_status')
             .select('message_id, user_id')
             .eq('message_id', messageData.id)
-            .eq('user_id', authSession.user.id)
+            .eq('user_id', authSession.id)
             .is('read_at', null);
             
           if (readStatusError) {
@@ -994,7 +1057,7 @@ export function ChatProvider({ children }) {
               .from('chat_message_read_status')
               .update({ read_at: new Date().toISOString() })
               .eq('message_id', messageData.id)
-              .eq('user_id', authSession.user.id);
+              .eq('user_id', authSession.id);
               
             if (updateError) {
               console.error('Error updating read status:', updateError);
@@ -1041,7 +1104,6 @@ export function ChatProvider({ children }) {
         table: 'chat_message'
       }, async (payload) => {
         // 获取当前用户
-        const { data: { session: authSession } } = await supabase.auth.getSession();
         if (!authSession) return;
         
         // 如果消息ID已在sentMessageIds中，说明是自己发的消息，直接用现有数据更新
@@ -1069,6 +1131,7 @@ export function ChatProvider({ children }) {
             replied_message:reply_to_message_id (
               id,
               content,
+              mentions,
               user:user_id (
                 id,
                 name,
@@ -1086,16 +1149,15 @@ export function ChatProvider({ children }) {
         }
         
         // 检查消息是否需要标记为未读（如果发送者不是当前用户，且不是当前打开的会话）
-        const isFromOtherUser = messageData.user_id !== authSession.user.id;
+        const isFromOtherUser = messageData.user_id !== authSession.id;
         const isNotCurrentSession = currentSession?.id !== payload.new.session_id;
         
         // 获取用户元数据，检查该会话是否被隐藏
         let isHiddenSession = false;
         try {
-          const { data: userData, error: userError } = await supabase.auth.getUser();
-          if (!userError && userData?.user?.user_metadata?.hidden_sessions) {
-            isHiddenSession = !!userData.user.user_metadata.hidden_sessions[payload.new.session_id];
-          }
+          // Check from localStorage instead of user metadata
+          const hiddenSessions = JSON.parse(localStorage.getItem('hidden_sessions') || '{}');
+          isHiddenSession = !!hiddenSessions[payload.new.session_id];
         } catch (err) {
           console.error('Error checking hidden sessions:', err);
         }
@@ -1144,7 +1206,7 @@ export function ChatProvider({ children }) {
             .from('chat_message_read_status')
             .select('message_id, user_id')
             .eq('message_id', messageData.id)
-            .eq('user_id', authSession.user.id)
+            .eq('user_id', authSession.id)
             .is('read_at', null);
             
           if (readStatusError) {
@@ -1160,7 +1222,7 @@ export function ChatProvider({ children }) {
               .from('chat_message_read_status')
               .update({ read_at: new Date().toISOString() })
               .eq('message_id', messageData.id)
-              .eq('user_id', authSession.user.id);
+              .eq('user_id', authSession.id);
               
             if (updateError) {
               console.error('Error updating read status:', updateError);
@@ -1182,7 +1244,6 @@ export function ChatProvider({ children }) {
         table: 'ai_chat_message'
       }, async (payload) => {
         // 获取当前用户
-        const { data: { session: authSession } } = await supabase.auth.getSession();
         if (!authSession) return;
         
         // 获取完整的AI消息信息
@@ -1241,11 +1302,10 @@ export function ChatProvider({ children }) {
       }, async (payload) => {
         // 当有消息标记为已读时，更新未读计数
         if (payload.new.read_at && !payload.old.read_at) {
-          const { data: { session: authSession } } = await supabase.auth.getSession();
           if (!authSession) return;
           
           // 如果是当前用户的消息读取状态
-          if (payload.new.user_id === authSession.user.id) {
+          if (payload.new.user_id === authSession.id) {
             // 获取该消息所属的会话ID
             const { data: messageData } = await supabase
               .from('chat_message')
@@ -1268,7 +1328,7 @@ export function ChatProvider({ children }) {
       supabase.removeChannel(aiMessagesChannel);
       supabase.removeChannel(readStatusChannel);
     };
-  }, []);
+  }, [authSession]);
 
   // 包装setCurrentSession，添加权限检查
   const setCurrentSessionWithCheck = (session) => {
@@ -1291,9 +1351,8 @@ export function ChatProvider({ children }) {
       
       // 立即标记该会话所有消息为已读
       const setMessagesRead = async () => {
-        const { data: { session: authSession } } = await supabase.auth.getSession();
         if (authSession) {
-          await markMessagesAsRead(session.id, authSession.user.id);
+          await markMessagesAsRead(session.id, authSession.id);
         }
       };
       

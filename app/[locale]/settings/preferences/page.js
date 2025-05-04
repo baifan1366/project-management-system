@@ -6,16 +6,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
 import { useDispatch } from 'react-redux';
 import { updateUserPreference } from '@/lib/redux/features/usersSlice';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function PreferencesPage() {
   const t = useTranslations('profile');
   const { theme, setTheme } = useTheme();
   const dispatch = useDispatch();
+  const { user: currentUser, isLoading: userLoading } = useGetUser();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     language: 'zh',
@@ -24,23 +25,18 @@ export default function PreferencesPage() {
   });
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (session?.user) {
-        updateUserData(session);
-      }
-    };
-
-    getUser();
-  }, []);
+    if (currentUser) {
+      updateUserData(currentUser);
+    }
+  }, [currentUser]);
   
-  const updateUserData = async (session) => {
-    if (!session?.user) return;
+  const updateUserData = (user) => {
+    if (!user) return;
     
     setFormData({
-      language: session.user.user_metadata?.language || 'zh',
-      timezone: session.user.user_metadata?.timezone || 'UTC+8',
-      hourFormat: session.user.user_metadata?.hourFormat || '24h'
+      language: user.language || 'zh',
+      timezone: user.timezone || 'UTC+8',
+      hourFormat: user.hour_format || '24h'
     });
   };
 
@@ -53,32 +49,23 @@ export default function PreferencesPage() {
   };
 
   const handleSavePreferences = async () => {
+    if (!currentUser) return;
     setLoading(true);
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      
+    try {      
       const preferenceData = {
         language: formData.language,
         timezone: formData.timezone,
-        hourFormat: formData.hourFormat,
+        hour_format: formData.hourFormat,
         theme
       };
       
+      // Update in database via Redux
       const resultAction = await dispatch(updateUserPreference({ 
-        userId: session.user.id, 
+        userId: currentUser.id, 
         preferenceData 
       }));
       
       if (updateUserPreference.fulfilled.match(resultAction)) {
-        await supabase.auth.updateUser({
-          data: {
-            language: formData.language,
-            timezone: formData.timezone,
-            hourFormat: formData.hourFormat,
-            theme
-          }
-        });
         toast.success(t('saved'));
       } else {
         throw new Error(resultAction.error);

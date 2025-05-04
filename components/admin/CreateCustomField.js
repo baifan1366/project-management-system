@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDispatch } from 'react-redux';
+import { useForm } from 'react-hook-form';
 import { createCustomField } from '@/lib/redux/features/customFieldSlice';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -10,33 +11,99 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { createCustomFieldSchema, customFieldFormTransforms } from '@/components/validation/customFieldSchema';
 import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function CreateCustomField({ isOpen, onClose, field, setField }) {
     const t = useTranslations('CustomField');
+    const tValidation = useTranslations('validationRules');
     const dispatch = useDispatch();
     const [isSaving, setIsSaving] = useState(false);
-    const validTypes = ['LIST', 'OVERVIEW', 'TIMELINE', 'DASHBOARD', 'NOTE', 'GANTT', 'CALENDAR', 'BOARD', 'FILES'];
-    const handleSave = async (formData) => {
+    const validTypes = ['LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'AGILE', 'WORKFLOW', 'KANBAN', 'FILES'];
+    const { user } = useGetUser();
+    
+    // 设置自定义验证器
+    const validateField = (name, value) => {
+        const schema = createCustomFieldSchema(tValidation);
+        // 应用转换
+        const transformedValue = customFieldFormTransforms[name] ? 
+            customFieldFormTransforms[name](value) : value;
+        
+        const validation = schema.validateField(name, transformedValue);
+        return validation.isValid ? true : validation.message;
+    };
+    
+    // 设置表单
+    const form = useForm({
+        defaultValues: {
+            name: '',
+            type: '',
+            description: '',
+            icon: '',
+        },
+    });
+    
+    // 当 field 或 isOpen 改变时重置表单
+    useEffect(() => {
+        if (field) {
+            form.reset({
+                name: field.name || '',
+                type: field.type || '',
+                description: field.description || '',
+                icon: field.icon || '',
+            });
+        } else {
+            form.reset({
+                name: '',
+                type: '',
+                description: '',
+                icon: '',
+            });
+        }
+    }, [field, isOpen, form]);
+
+    const onSubmit = async (data) => {
         setIsSaving(true);
+        
         try {
-            const { data: userData, error: userError } = await supabase.auth.getUser();
-            if (!userData?.user?.id) {
+            if (!user?.id) {
                 throw new Error('User not authenticated');
             }
             
-            const fieldData = {
-                name: formData.name,
-                type: formData.type,
-                description: formData.description,
-                icon: formData.icon,
-                created_by: userData.user.id,
+            // 应用转换
+            const transformedData = {
+                name: customFieldFormTransforms.name(data.name),
+                type: customFieldFormTransforms.type(data.type),
+                description: customFieldFormTransforms.description(data.description),
+                icon: customFieldFormTransforms.icon(data.icon),
             };
             
-            // If editing existing field, pass its ID
+            // 验证所有字段
+            const schema = createCustomFieldSchema(tValidation);
+            const validation = schema.validate(transformedData);
+            
+            if (!validation.isValid) {
+                // 设置表单错误
+                Object.entries(validation.errors).forEach(([field, message]) => {
+                    form.setError(field, {
+                        type: 'manual',
+                        message
+                    });
+                });
+                setIsSaving(false);
+                return;
+            }
+            
+            const fieldData = {
+                name: transformedData.name,
+                type: transformedData.type,
+                description: transformedData.description,
+                icon: transformedData.icon,
+                created_by: user.id,
+            };
+            
+            // 如果编辑现有字段，传递其 ID
             if (field?.id) {
                 fieldData.id = field.id;
             }
@@ -53,49 +120,6 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
             setIsSaving(false);
         }
     };
-
-    const FormSchema = z.object({
-        name: z.string().min(2, {
-            message: t('nameMin'),
-        }).max(50, {
-            message: t('nameMax'),
-        }),
-        type: z.enum(validTypes, {
-            message: t('typeRequired'),
-        }),
-        description: z.string().min(1, {
-            message: t('descriptionRequired'),
-        }).max(100, {
-            message: t('descriptionMax'),
-        }),
-        icon: z.string().min(1, {
-            message: t('iconRequired'),
-        }).max(50, {
-            message: t('iconMax'),
-        })
-    });
-
-    const form = useForm({
-        resolver: zodResolver(FormSchema),
-        defaultValues: {
-            name: field?.name || '',
-            type: field?.type || '',
-            description: field?.description || '',
-            icon: field?.icon || '',
-        },
-    });
-
-    // Reset form when field changes
-    useEffect(() => {
-        if (field) {
-            form.reset({
-                name: field.name || '',
-                type: field.type || '',
-                description: field.description || '',
-                icon: field.icon || '',
-            });
-        }
-    }, [field, form]);
     
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -114,14 +138,17 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         <div className="grid grid-cols-2 gap-6">
                             {/* 左列 */}
                             <div className="space-y-6">
                                 <FormField
                                     control={form.control}
                                     name="name"
-                                    render={({ field, fieldState }) => (
+                                    rules={{
+                                        validate: (value) => validateField('name', value)
+                                    }}
+                                    render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
                                                 {t('Name')}
@@ -129,59 +156,60 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                                             </FormLabel>
                                             <FormControl>
                                                 <Input 
-                                                    className={`w-full px-3 py-2 border rounded-md ${
-                                                        fieldState.invalid ? 'border-red-500' : 'border-gray-300'
-                                                    }`}
-                                                    placeholder= {t('namePlaceholder')} 
-                                                    {...field} 
+                                                    className="w-full px-3 py-2 border rounded-md"
+                                                    placeholder={t('namePlaceholder')} 
+                                                    {...field}
                                                 />
                                             </FormControl>
-                                            <div className="flex justify-end mt-1 min-h-[20px]">
+                                            <div className="flex justify-between mt-1 min-h-[20px]">
                                                 <div className="flex-1">
-                                                    <FormMessage className="text-xs" />
+                                                    <FormMessage className="text-xs text-red-500" />
                                                 </div>
-                                                <span className="text-xs text-gray-500 ml-2">{field.value.trim().length}/50</span>
+                                                <span className="text-xs text-gray-500 ml-2">{field.value?.trim()?.length || 0}/50</span>
                                             </div>
                                         </FormItem>
                                     )}
-                                />  
+                                />
+                                
                                 <FormField
                                     control={form.control}
                                     name="type"
-                                    render={({ field, fieldState }) => (
+                                    rules={{
+                                        validate: (value) => validateField('type', value)
+                                    }}
+                                    render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
                                                 {t('Type')}
                                                 <span className="text-red-500">*</span>
                                             </FormLabel>
-                                            <FormControl>
-                                                <Select 
-                                                    onValueChange={field.onChange} 
-                                                    value={field.value}
-                                                    defaultValue={field.value}
-                                                >
-                                                    <SelectTrigger 
-                                                        className={`w-full px-3 py-2 border rounded-md ${
-                                                            fieldState.invalid ? 'border-red-500' : 'border-gray-300'
-                                                        }`}
-                                                    >
+                                            <Select 
+                                                onValueChange={field.onChange} 
+                                                defaultValue={field.value}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger className="w-full px-3 py-2 border rounded-md">
                                                         <SelectValue placeholder={t('typePlaceholder')} />
                                                     </SelectTrigger>
-                                                    <SelectContent>
-                                                        {validTypes.map((type) => (
-                                                            <SelectItem key={type} value={type}>{t(type)}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </FormControl>
-                                            <FormMessage className="text-xs" />
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {validTypes.map((type) => (
+                                                        <SelectItem key={type} value={type}>{t(type)}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage className="text-xs text-red-500 mt-1" />
                                         </FormItem>
                                     )}
                                 />
+                                
                                 <FormField
                                     control={form.control}
                                     name="icon"
-                                    render={({ field, fieldState }) => (
+                                    rules={{
+                                        validate: (value) => validateField('icon', value)
+                                    }}
+                                    render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
                                                 {t('Icon')}
@@ -189,18 +217,16 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                                             </FormLabel>
                                             <FormControl>
                                                 <Input 
-                                                    className={`w-full px-3 py-2 border rounded-md ${
-                                                        fieldState.invalid ? 'border-red-500' : 'border-gray-300'
-                                                    }`}
-                                                    placeholder= {t('iconPlaceholder')} 
-                                                    {...field} 
+                                                    className="w-full px-3 py-2 border rounded-md"
+                                                    placeholder={t('iconPlaceholder')} 
+                                                    {...field}
                                                 />
                                             </FormControl>
-                                            <div className="flex justify-end mt-1 min-h-[20px]">
+                                            <div className="flex justify-between mt-1 min-h-[20px]">
                                                 <div className="flex-1">
-                                                    <FormMessage className="text-xs" />
+                                                    <FormMessage className="text-xs text-red-500" />
                                                 </div>
-                                                <span className="text-xs text-gray-500 ml-2">{field.value.trim().length}/50</span>
+                                                <span className="text-xs text-gray-500 ml-2">{field.value?.trim()?.length || 0}/50</span>
                                             </div>
                                         </FormItem>
                                     )}
@@ -212,51 +238,51 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                                 <FormField
                                     control={form.control}
                                     name="description"
-                                    render={({ field, fieldState }) => (
+                                    rules={{
+                                        validate: (value) => validateField('description', value)
+                                    }}
+                                    render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
                                                 {t('Description')}
                                                 <span className="text-red-500">*</span>
                                             </FormLabel>
-                                            <FormControl>  
+                                            <FormControl>
                                                 <Textarea 
-                                                    className={`w-full px-3 py-2 border rounded-md ${
-                                                        fieldState.invalid ? 'border-red-500' : 'border-gray-300'
-                                                    }`}
-                                                    placeholder= {t('descriptionPlaceholder')} 
-                                                    {...field} 
+                                                    className="w-full px-3 py-2 border rounded-md"
+                                                    placeholder={t('descriptionPlaceholder')} 
+                                                    {...field}
                                                 />
                                             </FormControl>
-                                            <div className="flex justify-end mt-1 min-h-[20px]">
+                                            <div className="flex justify-between mt-1 min-h-[20px]">
                                                 <div className="flex-1">
-                                                    <FormMessage className="text-xs" />
+                                                    <FormMessage className="text-xs text-red-500" />
                                                 </div>
-                                                <span className="text-xs text-gray-500 ml-2">{field.value.trim().length}/100</span>
+                                                <span className="text-xs text-gray-500 ml-2">{field.value?.trim()?.length || 0}/100</span>
                                             </div>
                                         </FormItem>
                                     )}
                                 />
                             </div>
                         </div>
+
+                        <DialogFooter className="mt-8 flex justify-end gap-3">
+                            <Button
+                                type="button"
+                                onClick={onClose}
+                                disabled={isSaving}
+                            >
+                                {t('cancel')}
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={isSaving}
+                            >
+                                {isSaving ? t('adding') : t('add_field')}
+                            </Button>
+                        </DialogFooter>
                     </form>
                 </Form>
-
-                <DialogFooter className="mt-8 flex justify-end gap-3">
-                    <Button
-                        type="button"
-                        onClick={onClose}
-                        disabled={isSaving}
-                    >
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={isSaving}
-                        onClick={form.handleSubmit(handleSave)}
-                    >
-                        {isSaving ? t('adding') : t('add_field')}
-                    </Button>
-                </DialogFooter>
             </DialogContent>   
         </Dialog>
     )

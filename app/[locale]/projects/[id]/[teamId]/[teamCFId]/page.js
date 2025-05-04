@@ -1,24 +1,28 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Plus, Pen, Filter, SortAsc, Grid, MoreHorizontal, Share2, Star, StarOff, ChevronDown, Circle, Link, Archive, Trash, Palette, Settings2, List, LayoutGrid, Calendar, GanttChart, LayoutDashboard, ArrowLeft, Users, Check, TextQuote, CircleCheck, FileUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useEffect, useState, useMemo } from 'react';
-import { fetchTeamById, fetchProjectTeams, updateTeamStar } from '@/lib/redux/features/teamSlice';
+import { fetchTeamById, fetchProjectTeams, updateTeamStar, updateTeam, fetchUserTeams } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
+import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
+import { store } from '@/lib/redux/store';
+import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useConfirm } from '@/hooks/use-confirm';
 import TaskTab from "@/components/team/TaskTab"
 import InvitationDialog from '@/components/team/InvitationDialog';
-import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
+import EditTeamDialog from '@/components/team/EditTeamDialog';
 import TaskList from '@/components/team/list/TaskList';
 import TaskGantt from '@/components/team/gantt/TaskGantt';
 import TaskKanban from '@/components/team/kanban/TaskKanban';
 import TaskFile from '@/components/team/file/TaskFile';
 import TaskWorkflow from '@/components/team/workflow/TaskWorkflow';
 import TaskOverview from '@/components/team/overview/TaskOverview';
-import { store } from '@/lib/redux/store';
+import TaskTimeline from '@/components/team/timeline/TaskTimeline';
 
 // 创建记忆化的选择器
 const selectTeams = state => state.teams.teams;
@@ -36,22 +40,76 @@ export default function TeamCustomFieldPage() {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const params = useParams();
-  
+  const tConfirm = useTranslations('confirmation');
+  const router = useRouter();
   // 从URL参数中获取projectId、teamId和teamCFId
   const projectId = params?.id;
   const teamId = params?.teamId;
   const teamCFId = params?.teamCFId;
-  
   // 使用记忆化的选择器
   const teamsError = useSelector(selectTeamError);
   const selectedTeam = useSelector(state => selectTeamById(state, teamId));
-  
+  const { user } = useGetUser();
+  const { confirm } = useConfirm();
   const { currentItem, status: cfStatus, error: cfError } = useSelector((state) => state.teamCF);
-  
   const [isLoading, setIsLoading] = useState(false);
   const [currentView, setCurrentView] = useState('list');
   const [open, setOpen] = useState(false);
-  const [addButtonText, setAddButtonText] = useState('addTask');
+  const [editTeamOpen, setEditTeamOpen] = useState(false);
+  const [editTeamActiveTab, setEditTeamActiveTab] = useState("details");
+  const [addButtonText, setAddButtonText] = useState('addTask');  
+  const [onClose, setOnClose] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
+  const isStarred = selectedTeam?.star || false;  
+  
+  // 定义团队状态及对应颜色
+  const statusColors = {
+    PENDING: "text-yellow-500",
+    IN_PROGRESS: "text-blue-500",
+    COMPLETED: "text-green-500",
+    CANCELLED: "text-red-500",
+    ON_HOLD: "text-gray-500"
+  };
+  
+  const statusBgColors = {
+    PENDING: "bg-transparent",
+    IN_PROGRESS: "bg-transparent",
+    COMPLETED: "bg-transparent",
+    CANCELLED: "bg-transparent",
+    ON_HOLD: "bg-transparent"
+  };
+
+  const statusFocusColors = {
+    PENDING: "focus:bg-yellow-100 focus:text-yellow-700",
+    IN_PROGRESS: "focus:bg-blue-100 focus:text-blue-700",
+    COMPLETED: "focus:bg-green-100 focus:text-green-700",
+    CANCELLED: "focus:bg-red-100 focus:text-red-700",
+    ON_HOLD: "focus:bg-gray-100 focus:text-gray-700"
+  }
+
+  const statusTopHoverColors = {
+    PENDING: "hover:bg-accent",
+    IN_PROGRESS: "hover:bg-accent",
+    COMPLETED: "hover:bg-accent",
+    CANCELLED: "hover:bg-accent",
+    ON_HOLD: "hover:bg-accent"
+  };
+
+  const statusHoverColors = {
+    PENDING: "hover:bg-yellow-100",
+    IN_PROGRESS: "hover:bg-blue-100",
+    COMPLETED: "hover:bg-green-100",
+    CANCELLED: "hover:bg-red-100",
+    ON_HOLD: "hover:bg-gray-100"
+  };
+
+  const handleEditSuccess = () => {
+    setRefreshKey(prev => {
+      const newValue = prev + 1;
+      return newValue;
+    }); // 每次编辑后递增
+  };
 
   useEffect(() => {
     let unsubscribe = null;
@@ -87,6 +145,9 @@ export default function TeamCustomFieldPage() {
               teamId,
               teamCFId
             })).unwrap();
+            
+            // 数据加载完成后，更新刷新键以触发customFieldContent重新渲染
+            setRefreshKey(prev => prev + 1);
           }
         } else {
           // 如果未加载完成，则监听状态变化
@@ -96,7 +157,10 @@ export default function TeamCustomFieldPage() {
               dispatch(fetchTeamCustomFieldById({
                 teamId,
                 teamCFId
-              }));
+              })).then(() => {
+                // 数据加载完成后，更新刷新键以触发重新渲染
+                setRefreshKey(prev => prev + 1);
+              });
               
               if (unsubscribe) {
                 unsubscribe();
@@ -128,8 +192,16 @@ export default function TeamCustomFieldPage() {
     };
   }, [dispatch, projectId, teamId, teamCFId]);
 
-  // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
-  const isStarred = selectedTeam?.star || false;
+  useEffect(() => {
+    // 如果团队已归档，立即跳转到项目主页
+    if (selectedTeam?.archive) {
+      // NOTE: This navigation is triggered because the team has been archived.
+      router.replace(`/projects/${projectId}`);
+      return;
+    }
+    // 只要团队数据变化就刷新页面（可选，通常只需依赖 selectedTeam.archive）
+    // router.replace(router.asPath); // 如果你想强制刷新页面，可以取消注释
+  }, [selectedTeam, projectId, router]);
 
   // 使用 useMemo 缓存自定义字段内容渲染结果
   const customFieldContent = useMemo(() => {
@@ -146,26 +218,31 @@ export default function TeamCustomFieldPage() {
     }
     const fieldType = currentItem.custom_field?.type;
     if (fieldType === 'LIST') {
-      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} />;
+      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'GANTT') {
-      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     if (fieldType === 'KANBAN') {
-      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     if (fieldType === 'FILES') {
-      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     if (fieldType === 'WORKFLOW') {
-      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     if (fieldType === 'OVERVIEW') {
-      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} />
+      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} />
     }
-    
+    if (fieldType === 'TIMELINE') {
+      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+    }
+    if (fieldType === 'CALENDAR') {
+      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+    }
     return <div>暂不支持的字段类型: {fieldType}</div>;
-  }, [currentItem]);
+  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey]);
 
   // 处理加载状态
   if (isLoading) {
@@ -203,8 +280,53 @@ export default function TeamCustomFieldPage() {
         teamId: selectedTeam.id, 
         star: newStarStatus 
       })).unwrap();
+      setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error updating star status:', error);
+    }
+  };
+
+  const handleArchiveTeam = async () => {
+    confirm({
+      title: tConfirm('confirmArchiveTeam'),
+      description: `${tConfirm('team')} "${selectedTeam.name}" ${tConfirm('willBeArchived')}`,
+      variant: 'error',
+      onConfirm: async () => {
+        const userId = user?.id;
+        // Await the updateTeam dispatch to ensure the archive operation completes before fetching user teams
+        await dispatch(updateTeam({ 
+          teamId, 
+          data: {
+            archive: true
+          },
+          user_id: userId,
+          old_values: selectedTeam,
+          updated_at: new Date().toISOString()
+        }));
+        console.log("confirm archive");
+        setRefreshKey(prev => prev + 1);
+        // Await fetching the updated user teams list
+        await dispatch(fetchUserTeams({ userId, projectId }));
+        setOnClose(true);
+      }
+    });
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    try {
+      const userId = user?.id;
+      await dispatch(updateTeam({ 
+        teamId, 
+        data: {
+          status: newStatus
+        },
+        user_id: userId,
+        old_values: selectedTeam,
+        updated_at: new Date().toISOString()
+      })).unwrap();
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error updating team status:', error);
     }
   };
 
@@ -221,50 +343,108 @@ export default function TeamCustomFieldPage() {
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 p-1">
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
+                <DropdownMenuContent className="w-60 p-1">
+                  <DropdownMenuItem 
+                    className="flex items-center px-3 py-2 text-sm"
+                    onClick={() => {
+                      setEditTeamActiveTab("details");
+                      setEditTeamOpen(true);
+                    }}
+                  >
                     <Pen className="h-4 w-4 mr-2" />
                     {t('editTeamDetails')}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
-                    <Palette className="h-4 w-4 mr-2" />
-                    {t('setColorAndIcon')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
-                    <Link className="h-4 w-4 mr-2" />
-                    {t('copyTeamLink')}
-                  </DropdownMenuItem>
-                  <hr className="my-1" />
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
+                  <DropdownMenuItem 
+                    className="flex items-center px-3 py-2 text-sm"
+                    onClick={() => {
+                      setEditTeamActiveTab("members");
+                      setEditTeamOpen(true);
+                    }}
+                  >
                     <Users className="h-4 w-4 mr-2" />
                     {t('manageMembers')}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
+                  <DropdownMenuItem 
+                    className="flex items-center px-3 py-2 text-sm"
+                    onClick={() => {
+                      setEditTeamActiveTab("access");
+                      setEditTeamOpen(true);
+                    }}
+                  >
                     <Settings2 className="h-4 w-4 mr-2" />
-                    {t('manageTeamPermissions')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm">
-                    <Grid className="h-4 w-4 mr-2" />
-                    {t('manageDependencies')}
+                    {t('editTeamAccess')}
                   </DropdownMenuItem>
                   <hr className="my-1" />
-                  <DropdownMenuItem className="text-red-500 flex items-center px-3 py-2 text-sm">
+                  <DropdownMenuItem 
+                    className="text-red-500 flex items-center px-3 py-2 text-sm focus:text-red-500"
+                    onClick={handleArchiveTeam}
+                    onClose={() => onClose(false)}
+                  >
                     <Archive className="h-4 w-4 mr-2" />
                     {t('archiveTeam')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-red-500 flex items-center px-3 py-2 text-sm">
-                    <Trash className="h-4 w-4 mr-2" />
-                    {t('deleteTeam')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button variant="ghost" size="icon" onClick={handleStarClick}>
                 {isStarred ? <Star className="h-4 w-4" /> : <StarOff className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="sm">
-                <Circle className="h-4 w-4 mr-2" />
-                {t('setStatus')}
-              </Button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    size="sm"
+                    className={selectedTeam?.status ? `flex items-center px-3 py-2 text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200` : ""}
+                  >
+                    <Circle 
+                      className="h-4 w-4" 
+                      style={selectedTeam?.status ? {fill: 'currentColor'} : {}} 
+                    />
+                    {selectedTeam?.status ? t(selectedTeam.status) : t('setStatus')}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-55 p-1">
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.PENDING} ${statusHoverColors.PENDING} transition-colors duration-200 ${statusFocusColors.PENDING}`}
+                    onClick={() => handleStatusChange('PENDING')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('PENDING')}
+                    {selectedTeam?.status === 'PENDING' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.IN_PROGRESS} ${statusHoverColors.IN_PROGRESS} transition-colors duration-200 ${statusFocusColors.IN_PROGRESS}`}
+                    onClick={() => handleStatusChange('IN_PROGRESS')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('IN_PROGRESS')}
+                    {selectedTeam?.status === 'IN_PROGRESS' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.COMPLETED} ${statusHoverColors.COMPLETED} transition-colors duration-200 ${statusFocusColors.COMPLETED}`}
+                    onClick={() => handleStatusChange('COMPLETED')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('COMPLETED')}
+                    {selectedTeam?.status === 'COMPLETED' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.CANCELLED} ${statusHoverColors.CANCELLED} transition-colors duration-200 ${statusFocusColors.CANCELLED}`}
+                    onClick={() => handleStatusChange('CANCELLED')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('CANCELLED')}
+                    {selectedTeam?.status === 'CANCELLED' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.ON_HOLD} ${statusHoverColors.ON_HOLD} transition-colors duration-200 ${statusFocusColors.ON_HOLD}`}
+                    onClick={() => handleStatusChange('ON_HOLD')}
+                  >
+                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    {t('ON_HOLD')}
+                    {selectedTeam?.status === 'ON_HOLD' && <Check className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
@@ -274,9 +454,6 @@ export default function TeamCustomFieldPage() {
                 open={open}
                 onClose={() => setOpen(false)}
               />
-              <Button variant="ghost" size="icon">
-                <Palette className="h-4 w-4" />
-              </Button>
             </div>
           </div>
           <div className="overflow-x-auto" style={{ 
@@ -316,11 +493,11 @@ export default function TeamCustomFieldPage() {
                       <span className="text-sm">{t('section')}</span>
                       {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
+                    {/* <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
                       <FileUp className="h-4 w-4 mr-1" />
                       <span className="text-sm">{t('attachment')}</span>
                       {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
-                    </DropdownMenuItem>
+                    </DropdownMenuItem> */}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -338,16 +515,6 @@ export default function TeamCustomFieldPage() {
                 <Grid className="h-4 w-4 mr-1" />
                 {t('group')}
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem>{t('options')}</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -355,6 +522,14 @@ export default function TeamCustomFieldPage() {
           {customFieldContent}
         </div>
       </div>
+      <EditTeamDialog 
+        open={editTeamOpen} 
+        onClose={() => setEditTeamOpen(false)} 
+        team={selectedTeam}
+        activeTab={editTeamActiveTab}
+        onSuccess={handleEditSuccess}
+        projectId={projectId}
+      />
     </div>
   );
 }

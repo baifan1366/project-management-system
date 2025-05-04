@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Loader } from 'lucide-react';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function DefaultPage() {
     const t = useTranslations('Default');
@@ -79,13 +80,13 @@ export default function DefaultPage() {
     const handleSave = async (defaultItem) => {
         try {
             setIsLoading(true);
-            const { data: userData, error: userError } = await supabase.auth.getUser();
+            const { user: userData, error: userError } = useGetUser();
             
             if (userError) {
                 throw new Error('认证错误');
             }
 
-            const userId = userData?.user?.id;
+            const userId = userData?.id;
             
             if (!userId) {
                 throw new Error('无法获取用户 ID');

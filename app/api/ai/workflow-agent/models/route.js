@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAvailableModels } from '../workflow-service';
+import { getAvailableModels } from '../../../../[locale]/ai-workflow/workflow-service';
 
 export async function GET(request) {
   try {

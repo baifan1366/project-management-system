@@ -1,0 +1,338 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
+import { Pen, Users, Settings2, Trash2, Plus, Lock, Eye, Pencil, Unlock } from "lucide-react";
+import { useDispatch, useSelector } from 'react-redux';
+import { updateTeam, deleteTeam, fetchUserTeams } from '@/lib/redux/features/teamSlice';
+import { deleteTeamUserByTeamId } from '@/lib/redux/features/teamUserSlice';
+import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useRouter } from 'next/navigation';
+
+const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }) => {
+  const { user } = useGetUser();    
+  const { projects } = useSelector((state) => state.projects)
+  const t = useTranslations('Team');
+  const tConfirm = useTranslations('confirmation');
+  const dispatch = useDispatch();
+  const router = useRouter();
+  const userId = user?.id;
+  const project = projects.find(p => String(p.id) === String(projectId))
+
+  // 状态管理
+  const [currentTab, setCurrentTab] = useState(activeTab);
+  const [teamName, setTeamName] = useState('');
+  const [teamDescription, setTeamDescription] = useState('');
+  const [teamAccess, setTeamAccess] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [saving, setIsSaving] = useState(false);
+
+  const formReset = () => {
+    setDeleteConfirmText('');
+  }
+
+  // 加载团队数据
+  useEffect(() => {
+    if (team) {
+      setTeamName(team.name || '');
+      setTeamDescription(team.description || '');
+      setTeamAccess(team.access || '');
+      setCurrentTab(activeTab);
+    }
+  }, [team, activeTab]);
+  
+  // 更新团队详情
+  const handleUpdateTeam = async () => {
+    setIsSaving(true);
+    if (!teamName.trim()) return;
+    
+    try {
+      const name = teamName;
+      const description = teamDescription;
+      const access = teamAccess;
+      const update = await dispatch(updateTeam({ 
+        teamId: team.id, 
+        data: {name, description, access},
+        user_id: userId,
+        old_values: team,
+        updated_at: new Date().toISOString()
+      })).unwrap();
+      
+      // 更新成功后，刷新用户团队列表
+      await dispatch(fetchUserTeams({ userId, projectId })).unwrap();
+      
+      onSuccess(); // 确保在成功时调用onSuccess
+    } catch (error) {
+      console.error('更新团队时出错:', error);
+    } finally {
+      setIsSaving(false);
+      onClose();
+    }
+  };
+  
+  // 删除团队
+  const handleDeleteTeam = async () => {
+    if (deleteConfirmText !== team?.name) return;
+    try {
+      // 这里调用删除团队的API并等待操作完成
+      const teamId = team?.id;
+      // console.log(team);
+      
+      // Delete all team members first to avoid orphaned records
+      // This ensures proper cleanup of user associations before removing the team
+      await dispatch(deleteTeamUserByTeamId({userId, teamId})).unwrap();
+      
+      // Then delete the team itself
+      await dispatch(deleteTeam({userId, teamId})).unwrap();
+      
+      // 删除成功后，刷新用户团队列表
+      await dispatch(fetchUserTeams({ userId, projectId })).unwrap();
+      
+      setConfirmDelete(false);
+      onClose();
+      router.replace(`/projects/${projectId}`);
+    } catch (error) {
+      console.error('删除团队失败:', error);
+    }
+  };
+  
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent 
+            className="sm:max-w-[600px]"
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>{t('editTeam')}</DialogTitle>
+            <DialogDescription/>
+          </DialogHeader>
+          
+          <Tabs defaultValue={currentTab} onValueChange={setCurrentTab} className="w-full">
+            <TabsList className="grid grid-cols-3 mb-4">
+              <TabsTrigger value="details" className="flex items-center">
+                <Pen className="h-4 w-4 mr-1" />
+                {t('details')}
+              </TabsTrigger>
+              <TabsTrigger value="members" className="flex items-center">
+                <Users className="h-4 w-4 mr-1" />
+                {t('members')}
+              </TabsTrigger>
+              <TabsTrigger value="access" className="flex items-center">
+                <Settings2 className="h-4 w-4 mr-1" />
+                {t('access')}
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* 团队详情标签内容 */}
+            <TabsContent value="details" className="space-y-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="teamName">{t('teamName')}</Label>
+                  <Input 
+                    id="teamName" 
+                    value={teamName} 
+                    onChange={(e) => setTeamName(e.target.value)} 
+                    placeholder={t('enterTeamName')}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="teamDescription">{t('teamDescription')}</Label>
+                  <Textarea 
+                    id="teamDescription" 
+                    value={teamDescription} 
+                    onChange={(e) => setTeamDescription(e.target.value)} 
+                    placeholder={t('enterTeamDescription')}
+                    rows={4}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+            
+            {/* 成员管理标签内容 */}
+            <TabsContent value="members" className="space-y-4">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">{t('teamMembers')}</h3>
+                {/* 这里添加成员列表和管理界面 */}
+                <div className="text-sm text-muted-foreground">
+                  {t('membersManagementDescription')}
+                </div>
+                <Button>
+                  <Plus className="h-4 w-4 mr-1" />
+                </Button>
+                {/* 成员列表示例 */}
+                <div className="border rounded-md p-4">
+                  <p>{t('membersListPlaceholder')}</p>
+                </div>
+              </div>
+            </TabsContent>
+            
+            {/* 权限管理标签内容 */}
+            <TabsContent value="access" className="space-y-4">
+              <div className="space-y-4">
+                {/* 权限设置 */}
+                <div className="space-y-2">
+                  <Label htmlFor="teamAccess">{t('teamAccess')}</Label>
+                  <Select
+                    value={teamAccess}
+                    onValueChange={(value) => setTeamAccess(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={t('teamAccessPlaceholder')}>
+                        {teamAccess ? (
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center">
+                              {teamAccess === 'invite_only' && <Lock className="w-4 h-4 mr-2 text-gray-500" />}
+                              {teamAccess === 'can_edit' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
+                              {teamAccess === 'can_check' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
+                              {teamAccess === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500" />}
+                              <span>
+                                {teamAccess === 'invite_only' && t('inviteOnly')}
+                                {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}
+                                {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}
+                                {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project.project_name })}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          ''
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="invite_only" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                        <div className="flex items-center w-full">
+                          <Lock className="w-5 h-5 mr-3 text-gray-500" />
+                          <div className="flex-1">
+                            <div className="font-medium">{t('inviteOnly')}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {t('inviteOnlyDescription')}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="can_edit" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                        <div className="flex items-center w-full">
+                          <Pencil className="w-5 h-5 mr-3 text-gray-500" />
+                          <div className="flex-1">
+                            <div className="font-medium">{t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {t('everyoneCanEditDescription')}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="can_check" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                        <div className="flex items-center w-full">
+                          <Eye className="w-5 h-5 mr-3 text-gray-500" />
+                          <div className="flex-1">
+                            <div className="font-medium">{t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {t('everyoneCanCheckDescription')}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="can_view" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                        <div className="flex items-center w-full">
+                          <Unlock className="w-5 h-5 mr-3 text-gray-500" />
+                          <div className="flex-1">
+                            <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName: project.project_name })}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {t('everyoneCanViewDescription')}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {t('accessManagementDescription')}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          <DialogFooter className="flex justify-between w-full pt-4">
+            {currentTab === "details" && (
+                <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    {t('deleteTeam')}
+                </Button>
+            )}
+            
+            <div className="flex-1 flex justify-end gap-2">
+              {/* The cancel button is disabled while saving to prevent duplicate actions */}
+              <Button 
+                variant="outline" 
+                onClick={onClose} 
+                disabled={saving}
+              >
+                {t('cancel')}
+              </Button>
+              {/* The save button is disabled and shows "Saving..." while saving to provide user feedback and prevent duplicate submissions */}
+              <Button 
+                variant="green" 
+                onClick={handleUpdateTeam} 
+                disabled={saving}
+              >
+                {saving ? t('saving') : t('saveChanges')}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* 删除确认对话框 */}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tConfirm('deleteTeamConfirmation')}</AlertDialogTitle>
+            <AlertDialogDescription>
+                <Label htmlFor="confirmDelete" className="text-sm font-medium">
+                  {tConfirm('type{teamName}ToConfirm', { teamName: team?.name })}
+                
+                  <Input 
+                    id="confirmDelete"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    className="mt-2"
+                    placeholder={team?.name}
+                  />
+                </Label>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={formReset}
+            >
+              {tConfirm('cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteTeam} 
+              className="bg-red-700 hover:bg-red-800 text-white"
+              disabled={deleteConfirmText !== team?.name}
+            >
+              {tConfirm('permanentlyDelete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
+export default EditTeamDialog;

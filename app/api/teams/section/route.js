@@ -55,21 +55,38 @@ export async function POST(request) {
 //update section taskIds
 export async function PATCH(request) {
     const body = await request.json();
-    if(body.sectionName) {
-        const { sectionId, sectionName, updatedBy, teamId } = body;
+    console.log('接收到的请求体:', body);
+    
+    if(body.sectionData) {
+        const { sectionId, sectionData, teamId } = body;
+        console.log('更新分区名称:', { sectionId, teamId, sectionData });
+        
+        // 确保 ID 是数字
+        const numericSectionId = Number(sectionId);
+        const numericTeamId = Number(teamId);
+        
+        if (isNaN(numericSectionId) || isNaN(numericTeamId)) {
+            return NextResponse.json({ error: '无效的ID参数' }, { status: 400 });
+        }
+        
         const { data: section, error } = await supabase
             .from('section')
-        .update({
-            name: sectionName,
-            updated_by: updatedBy
-        })
-        .eq('id', sectionId)
-        .eq('team_id', teamId)
-        .select()
-        .single()
+            .update({
+                name: sectionData,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', numericSectionId)
+            .eq('team_id', numericTeamId)
+            .select()
+            .single()
+            
         if (error) {
+            console.error('更新分区错误:', error);
             return NextResponse.json({ error: error.message }, { status: 500 })
         }
+        
+        console.log('更新分区成功:', section);
+        return NextResponse.json(section)
     }
     if(body.newTaskIds) {
         const { sectionId, newTaskIds, teamId } = body;
@@ -82,7 +99,8 @@ export async function PATCH(request) {
         const { data: section, error: taskIdsError } = await supabase
             .from('section')
             .update({
-                task_ids: newTaskIds
+                task_ids: newTaskIds,
+                updated_at: new Date().toISOString()
             })
             .eq('team_id', teamId)
             .eq('id', sectionId)
@@ -109,11 +127,12 @@ export async function PATCH(request) {
 
 export async function DELETE(request) {
     const body = await request.json();
-    const { sectionId } = body;
+    const { teamId, sectionId } = body;
     const { data: section, error } = await supabase
         .from('section')
         .delete()
         .eq('id', sectionId)
+        .eq('team_id', teamId)
         .select()
         .single();
     if (error) {

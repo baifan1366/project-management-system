@@ -15,7 +15,7 @@ import { useDispatch } from "react-redux";
 import { fetchTeamUsers } from "@/lib/redux/features/teamUserSlice";
 import { createTeamUserInv } from "@/lib/redux/features/teamUserInvSlice";
 import { createSelector } from '@reduxjs/toolkit';
-import { supabase } from '@/lib/supabase'
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 // 创建记忆化的选择器
 const selectTeam = createSelector(
@@ -41,7 +41,8 @@ export default function InvitationDialog({ open, onClose }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const dispatch = useDispatch()
-  
+  const { user } = useGetUser()
+
   // 使用记忆化的选择器
   const team = useSelector(state => selectTeam(state, teamId));
   const teamUsers = useSelector(state => selectTeamUsers(state, teamId));
@@ -124,11 +125,9 @@ export default function InvitationDialog({ open, onClose }) {
       setIsLoading(true);
       setError(null);
 
-      // 1. 先获取当前用户信息
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      
+      // 1. 先获取当前用户信息      
       // 检查用户是否已登录
-      if (userError || !userData?.user?.id) {
+      if (!user?.id) {
         throw new Error('未授权的操作，请先登录');
       }
 
@@ -143,7 +142,7 @@ export default function InvitationDialog({ open, onClose }) {
           invitationDetails: {
             teamId: teamId,
             permission: permission,
-            created_by: userData.user.id,
+            created_by: user.id,
             teamName: team?.name || '',
           }
         }),
@@ -159,7 +158,7 @@ export default function InvitationDialog({ open, onClose }) {
         teamId: Number(teamId),
         userEmail: email,
         role: permission,
-        created_by: userData.user.id
+        created_by: user.id
       }));
 
       setEmail('');
@@ -333,7 +332,7 @@ export default function InvitationDialog({ open, onClose }) {
               type="submit" 
               className="w-full"
               variant={themeColor}
-              disabled={!email}
+              disabled={!email || isLoading}
             >
               {t('sendInvite')}
             </Button>

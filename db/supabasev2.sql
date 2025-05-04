@@ -7,8 +7,12 @@ CREATE TABLE "user" (
   "avatar_url" VARCHAR(255),
   "language" VARCHAR(10) DEFAULT 'en',
   "theme" VARCHAR(50) CHECK ("theme" IN ('light', 'dark', 'system')) DEFAULT 'system',
-  "provider" VARCHAR(50) CHECK ("provider" IN ('local', 'google', 'github')) DEFAULT 'local',
-  "provider_id" VARCHAR(255) UNIQUE, -- 绑定 OAuth 的唯一 ID（如 Google/GitHub UID）
+  "timezone" VARCHAR(50) DEFAULT 'UTC+0', -- User's timezone setting
+  "hour_format" VARCHAR(10) CHECK ("hour_format" IN ('12h', '24h')) DEFAULT '24h', -- User's hour format preference
+  "google_provider_id" VARCHAR(255),
+  "github_provider_id" VARCHAR(255),
+  "connected_providers" TEXT DEFAULT '[]',
+  "last_login_provider" VARCHAR(50),
   "mfa_secret" VARCHAR(255), -- TOTP 秘钥
   "is_mfa_enabled" BOOLEAN DEFAULT FALSE,
   "notifications_enabled" BOOLEAN DEFAULT TRUE,
@@ -18,8 +22,20 @@ CREATE TABLE "user" (
   "verification_token" VARCHAR(255),
   "verification_token_expires" TIMESTAMP,
   "last_seen_at" TIMESTAMP,
-  "is_online" BOOLEAN DEFAULT FALSE
+  "is_online" BOOLEAN DEFAULT FALSE,
+  "reset_password_token" VARCHAR(255),
+  "reset_password_expires" TIMESTAMP,
+  "password_hash" VARCHAR(255),
+  "google_access_token" VARCHAR(2048),
+  "google_refresh_token" VARCHAR(2048),
+  "google_token_expires_at" BIGINT,
+  "github_access_token" VARCHAR(2048),
+  "github_refresh_token" VARCHAR(2048),
 );
+
+-- 添加索引以提高查询性能
+CREATE INDEX IF NOT EXISTS idx_user_google_provider_id ON "user" (google_provider_id) WHERE google_provider_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_user_github_provider_id ON "user" (github_provider_id) WHERE github_provider_id IS NOT NULL;
 
 -- 默认字段表
 CREATE TABLE "default" (
@@ -54,7 +70,9 @@ CREATE TABLE "team" (
   "order_index" INT DEFAULT 0,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "star" BOOL DEFAULT FALSE
+  "star" BOOL DEFAULT FALSE,
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD')) DEFAULT 'PENDING',
+  "archive" BOOL DEFAULT FALSE
 );
 
 -- 用户与团队的关系表（多对多）
@@ -97,6 +115,7 @@ CREATE TABLE "task" (
   "id" SERIAL PRIMARY KEY,
   "tag_values" JSONB DEFAULT '{}',
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
+  "like" UUID[] DEFAULT '{}',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -107,7 +126,8 @@ CREATE TABLE "tag" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "description" TEXT,
-  "type" TEXT NOT NULL CHECK ("type" IN ('NAME','ASIGNEE', 'DUE-DATE', 'PRIORITY', 'STATUS', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'FORMULA', 'ID', 'TIME-TRACKING', 'PROJECTS', 'TAGS', 'COMPLETED-ON', 'LAST-MODIFIED-ON', 'CREATED-AT', 'CREATED-BY')),
+  "default" BOOLEAN DEFAULT FALSE,
+  "type" TEXT NOT NULL CHECK ("type" IN ('SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'ID', 'TAGS')), 
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -129,7 +149,7 @@ CREATE TABLE "time_entry" (
 CREATE TABLE "custom_field" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'DASHBOARD', 'NOTE', 'GANTT', 'CALENDAR', 'WORKFLOW', 'KANBAN', 'AGILE', 'FILES')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'WORKFLOW', 'KANBAN', 'AGILE', 'FILES')),
   "description" TEXT,
   "icon" VARCHAR(255),
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -227,6 +247,8 @@ CREATE TABLE "notification" (
   "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('TASK_ASSIGNED', 'COMMENT_ADDED', 'MENTION', 'DUE_DATE', 'TEAM_INVITATION', 'SYSTEM')),
   "related_entity_type" VARCHAR(50), -- 例如：'task', 'project', 'team', 'comment'
   "related_entity_id" VARCHAR(255), -- 相关实体的ID
+  "data" JSONB,
+  "link" VARCHAR(255),
   "is_read" BOOLEAN DEFAULT FALSE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -259,10 +281,13 @@ CREATE TABLE "chat_message" (
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "content" TEXT NOT NULL,
   "reply_to_message_id" INT REFERENCES "chat_message"("id") ON DELETE SET NULL,
+  "mentions" JSONB,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "is_deleted" BOOLEAN DEFAULT FALSE,
+  "is_deleted" BOOLEAN DEFAULT FALSE
 );
+
+CREATE INDEX IF NOT EXISTS chat_message_mentions_idx ON chat_message USING GIN (mentions);
 
 -- 聊天消息已读状态表
 CREATE TABLE "chat_message_read_status" (
@@ -328,7 +353,7 @@ CREATE TABLE IF NOT EXISTS workflows (
     is_public BOOLEAN NOT NULL DEFAULT FALSE,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     icon VARCHAR(10),
-    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES "user"("id") ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
@@ -343,14 +368,15 @@ CREATE INDEX IF NOT EXISTS idx_workflows_is_deleted ON workflows (is_deleted);
 CREATE TABLE IF NOT EXISTS workflow_executions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     workflow_id UUID REFERENCES workflows(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES "user"("id") ON DELETE SET NULL,
     model_id VARCHAR(255),
     inputs JSONB,
     result JSONB,
     status VARCHAR(50) NOT NULL,
     output_formats TEXT[] DEFAULT '{}'::text[],
     document_urls JSONB DEFAULT '{}'::jsonb,
-    executed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+    executed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    api_responses JSONB DEFAULT '{}'::jsonb
 );
 
 -- Create index for faster queries
@@ -379,9 +405,12 @@ CREATE TABLE "subscription_plan" (
   "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
   "description" TEXT,
   "features" JSONB NOT NULL, -- 存储计划包含的功能列表
-  "max_members" INT NOT NULL, -- 最大团队成员数
   "max_projects" INT NOT NULL, -- 最大项目数
-  "storage_limit" BIGINT NOT NULL, -- 存储限制（字节）
+  "max_teams" INT NOT NULL, -- 最大团队数
+  "max_members" INT NOT NULL, -- 最大团队成员数
+  "max_ai_chat" INT NOT NULL, -- 最大AI聊天数
+  "max_ai_task" INT NOT NULL, -- 最大AI任务数
+  "max_ai_workflow" INT NOT NULL, -- 最大AI工作流数
   "is_active" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -396,11 +425,12 @@ CREATE TABLE "user_subscription_plan" (
   "start_date" TIMESTAMP NOT NULL,
   "end_date" TIMESTAMP NOT NULL,
   -- 使用统计
-  "current_users" INT DEFAULT 0,
   "current_projects" INT DEFAULT 0,
-  "current_ai_agents" INT DEFAULT 0,
-  "current_automation_flows" INT DEFAULT 0,
-  "current_tasks_this_month" INT DEFAULT 0,
+  "current_teams" INT DEFAULT 0,
+  "current_members" INT DEFAULT 0,
+  "current_ai_chat" INT DEFAULT 0,
+  "current_ai_task" INT DEFAULT 0,
+  "current_ai_workflow" INT DEFAULT 0,
   -- 时间戳
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -448,8 +478,6 @@ CREATE TABLE "admin_user" (
   "password_hash" VARCHAR(255) NOT NULL,
   "full_name" VARCHAR(255),
   "avatar_url" VARCHAR(255),
-  "role" VARCHAR(50) CHECK ("role" IN ('SUPER_ADMIN', 'ADMIN')) DEFAULT 'ADMIN',
-  "supabase_user_id" UUID UNIQUE,
   "is_active" BOOLEAN DEFAULT TRUE,
   "last_login" TIMESTAMP,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -461,20 +489,23 @@ CREATE TABLE "admin_permission" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) UNIQUE NOT NULL,
   "description" TEXT,
-  "resource" VARCHAR(255) NOT NULL, -- 例如: 'users', 'projects', 'teams', 'subscriptions'
-  "action" VARCHAR(255) NOT NULL, -- 例如: 'create', 'read', 'update', 'delete', 'manage'
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "category" TEXT
 );
 
--- 管理员角色权限关联表 - 将角色与权限关联
+-- 管理员角色权限关联表 - 将每个管理员与权限关联
 CREATE TABLE "admin_role_permission" (
   "id" SERIAL PRIMARY KEY,
-  "role" VARCHAR(50) NOT NULL, -- 对应 admin_user 表中的 role
+  "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
   "permission_id" INT NOT NULL REFERENCES "admin_permission"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE ("role", "permission_id")
+  "is_active" BOOLEAN DEFAULT TRUE,
+  UNIQUE ("admin_id", "permission_id")
 );
+
+
+-- 创建索引提升查询性能
+CREATE INDEX idx_admin_role_permission_admin_id ON "admin_role_permission"("admin_id");
+CREATE INDEX idx_admin_role_permission_permission_id ON "admin_role_permission"("permission_id");
+
 
 -- 管理员会话表 - 跟踪管理员登录会话
 CREATE TABLE "admin_session" (
@@ -554,20 +585,18 @@ CREATE INDEX idx_action_log_user ON "action_log"("user_id");
 CREATE INDEX idx_action_log_entity ON "action_log"("entity_type", "entity_id");
 CREATE INDEX idx_action_log_created ON "action_log"("created_at");
 
--- 为订阅相关表创建索引
-CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
-CREATE INDEX idx_team_subscription_team ON "team_subscription"("team_id");
-CREATE INDEX idx_team_subscription_status ON "team_subscription"("status");
-CREATE INDEX idx_subscription_payment_subscription ON "subscription_payment"("team_subscription_id");
-
 -- 为邀请表创建索引
 CREATE INDEX idx_team_invitation_email ON "user_team_invitation"("user_email");
 CREATE INDEX idx_team_invitation_team ON "user_team_invitation"("team_id");
 CREATE INDEX idx_team_invitation_status ON "user_team_invitation"("status");
 
--- 索引
+-- 为订阅相关表创建索引
+CREATE INDEX idx_user_subscription_plan_user_id ON "user_subscription_plan"("user_id");
+CREATE INDEX idx_user_subscription_plan_plan_id ON "user_subscription_plan"("plan_id");
+CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
 CREATE INDEX idx_user_subscription_user ON "user_subscription_plan"("user_id");
 CREATE INDEX idx_user_subscription_status ON "user_subscription_plan"("status");
+
 CREATE INDEX idx_promo_code_code ON "promo_code"("code");
 CREATE INDEX idx_promo_code_active ON "promo_code"("is_active");
 
@@ -579,7 +608,6 @@ CREATE INDEX idx_contact_created_at ON "contact"("created_at");
 
 -- 管理员表索引
 CREATE INDEX idx_admin_user_email ON "admin_user"("email");
-CREATE INDEX idx_admin_user_role ON "admin_user"("role");
 
 -- 管理员会话表索引
 CREATE INDEX idx_admin_session_admin ON "admin_session"("admin_id");
@@ -644,3 +672,14 @@ CREATE TABLE "payment" (
 
 -- For better performance when querying payment by user
 CREATE INDEX idx_payment_user_id ON "payment"("user_id");
+
+CREATE TABLE task_links (
+    id SERIAL PRIMARY KEY,  -- 自增主键
+    source_task_id INT NOT NULL,
+    target_task_id INT NOT NULL,
+    link_type INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (source_task_id) REFERENCES task(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_task_id) REFERENCES task(id) ON DELETE CASCADE
+);

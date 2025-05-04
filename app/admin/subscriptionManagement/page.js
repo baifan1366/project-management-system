@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaPlus, FaEdit, FaTrash, FaCheck, FaToggleOn, FaToggleOff, FaTimes } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import { clsx } from 'clsx';
+import { useSelector, useDispatch } from 'react-redux';
+import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 
 export default function AdminSubscriptions() {
   const router = useRouter();
@@ -51,36 +53,25 @@ export default function AdminSubscriptions() {
   const [totalPayments, setTotalPayments] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-
-  // Verify admin session
+  const dispatch = useDispatch();
+  const permissions = useSelector((state) => state.admin.permissions);
+  const [userSubscriptions, setUserSubscriptions] = useState([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('all');
+  const [planTypeFilter, setPlanTypeFilter] = useState('all');
+  
+  // initialize the page
   useEffect(() => {
-    const checkAdminSession = async () => {
+    const initAdminSubscriptions = async () => {
       try {
         setLoading(true);
-        
-        // Get current session
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !sessionData.session) {
-          throw new Error('No active session found');
-        }
-        
-        // Check if user is an admin
-        const { data: admin, error: adminError } = await supabase
-          .from('admin_user')
-          .select('*')
-          .eq('email', sessionData.session.user.email)
-          .eq('is_active', true)
-          .single();
-          
-        if (adminError || !admin) {
-          throw new Error('Unauthorized access');
-        }
-        
-        setAdminData(admin);
-        
+
+        await fetchSubscriptionPlans();
+        await fetchPromoCodes();  
+        await fetchUserSubscriptions();
+
       } catch (error) {
-        console.error('Admin session check failed:', error);
+        console.error('Errror in fetching subscription plans:', error);
         // Redirect to admin login
         router.replace(`/admin/adminLogin`);
       } finally {
@@ -88,8 +79,13 @@ export default function AdminSubscriptions() {
       }
     };
     
-    checkAdminSession();
-  }, []);
+    initAdminSubscriptions();
+  }, [dispatch, router]);
+
+  // Add function to verify permission access TODO: 模块化这个代码
+  const hasPermission = (permissionName) => {
+    return permissions.includes(permissionName);
+  };
 
   const fetchSubscriptionPlans = async () => {
     try {
@@ -127,6 +123,45 @@ export default function AdminSubscriptions() {
     }
   };
 
+  const fetchUserSubscriptions = async () => {
+    try {
+      // Build the query with joins to get both user and plan details
+      let query = supabase
+        .from('user_subscription_plan')
+        .select(`
+          *,
+          user:user_id (id, email, name),
+          plan:plan_id (id, name, type, max_members, max_projects, max_teams, max_ai_chat, max_ai_task, max_ai_workflow)
+        `)
+        .order('created_at', { ascending: false });
+      
+      // Apply filters if they are set
+      if (subscriptionStatusFilter !== 'all') {
+        query = query.eq('status', subscriptionStatusFilter);
+      }
+      
+      if (userSearchQuery) {
+        query = query.or(`user.email.ilike.%${userSearchQuery}%,user.name.ilike.%${userSearchQuery}%`);
+      }
+      
+      if (planTypeFilter !== 'all') {
+        query = query.eq('plan.type', planTypeFilter);
+      }
+        
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching user subscriptions:', error);
+        return;
+      }
+      
+      console.log('User subscriptions fetched successfully:', data);
+      setUserSubscriptions(data || []);
+    } catch (error) {
+      console.error('Error in fetchUserSubscriptions:', error);
+    }
+  };
+
   // Function to parse features from different formats
   const parseFeatures = (featuresData) => {
     try {
@@ -150,12 +185,6 @@ export default function AdminSubscriptions() {
       return [];
     }
   };
-
-  // use useEffect to fetch subscription plans and promo codes
-  useEffect(() => {
-    fetchSubscriptionPlans();
-    fetchPromoCodes();  
-  }, []);
   
   // Open modal
   const openModal = ({type, plan = null, code = null}) => {
@@ -336,30 +365,6 @@ export default function AdminSubscriptions() {
       console.error('Error in toggleActive:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Handle admin logout
-  const handleLogout = async () => {
-    try {
-      // Log the logout action
-      if (adminData) {
-        await supabase.from('admin_activity_log').insert({
-          admin_id: adminData.id,
-          action: 'logout',
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
-      }
-      
-      // Sign out
-      await supabase.auth.signOut();
-      
-      // Redirect to admin login
-      router.replace(`/admin/adminLogin`);
-      
-    } catch (error) {
-      console.error('Error during logout:', error);
     }
   };
   
@@ -578,6 +583,20 @@ export default function AdminSubscriptions() {
     }
   };
 
+  // Calculate remaining usage based on plan limits and current usage
+  const calculateRemainingUsage = (current, max) => {
+    // If max is -1, it means unlimited
+    if (max === -1) return "∞";
+    return max - current;
+  };
+
+  // Apply filters when they change
+  useEffect(() => {
+    if (activeTab === 'userSubscriptions') {
+      fetchUserSubscriptions();
+    }
+  }, [activeTab, userSearchQuery, subscriptionStatusFilter, planTypeFilter]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -594,34 +613,17 @@ export default function AdminSubscriptions() {
       
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Subscription Management</h2>
-            
-            <div className="flex items-center">
-              <button className="p-2 mr-4 text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400">
-                <FaBell />
-              </button>
-              
-              <div className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-2">
-                  {adminData?.username?.charAt(0).toUpperCase() || 'A'}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{adminData?.full_name || adminData?.username}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{adminData?.role}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
         
-        {/* Subscription Management Content */}
+        {/* Subscription Managment Content */}
+        {(hasPermission('view_subscription_plans') || 
+          hasPermission('view_promo_codes') || 
+          hasPermission('view_user_subscriptions') || 
+          hasPermission('view_payment_history')) ? (
         <main className="p-6">
           {/* Tabs */}
           <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
             <ul className="flex flex-wrap -mb-px">
+            {hasPermission('view_subscription_plans') && (
               <li className="mr-2">
                 <button 
                   className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab === "subscriptionPlans" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
@@ -630,6 +632,8 @@ export default function AdminSubscriptions() {
                   Subscription Plans
                 </button>
               </li>
+            )}
+            {hasPermission('view_promo_codes') && (
               <li className="mr-2">
                 <button 
                   className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab === "promoCodes" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
@@ -638,6 +642,8 @@ export default function AdminSubscriptions() {
                   Promo Codes
                 </button>
               </li>
+            )}
+            {hasPermission('view_user_subscriptions') && (
               <li className="mr-2">
                 <button 
                   className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab === "userSubscriptions" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
@@ -646,6 +652,8 @@ export default function AdminSubscriptions() {
                   User Subscriptions
                 </button>
               </li>
+            )}
+            {hasPermission('view_payment_history') && (
               <li className="mr-2">
                 <button 
                   className={`inline-block py-2 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium ${activeTab === "paymentHistory" ? "text-indigo-600 border-b-2 border-indigo-600 dark:border-indigo-400" : ""}`}
@@ -654,24 +662,15 @@ export default function AdminSubscriptions() {
                   Payment History
                 </button>
               </li>
+            )}
             </ul>
           </div>
           
           {/* Subscription Plans Section */}
-          {activeTab === "subscriptionPlans" && (
-            <>
+          { hasPermission('view_subscription_plans') && activeTab === "subscriptionPlans" && (
+            <div>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Subscription Plans</h3>
-                
-                {/* <div className="flex space-x-2">
-                  <button 
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg flex items-center"
-                    onClick={() => openModal({type: 'add'})}
-                  >
-                    <FaPlus className="mr-2" />
-                    Add New Plan
-                  </button>
-                </div> */}
               </div>
               
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-8">
@@ -742,7 +741,9 @@ export default function AdminSubscriptions() {
                             <div className="text-xs text-gray-500 dark:text-gray-400">
                               <div>Projects: {plan.max_projects === -1 ? 'Unlimited' : plan.max_projects}</div>
                               <div>Members: {plan.max_members === -1 ? 'Unlimited' : plan.max_members}</div>
-                              <div>Storage: {formatStorage(plan.storage_limit)}</div>
+                              <div>AI Chat: {plan.max_ai_chat === -1 ? 'Unlimited' : plan.max_ai_chat}</div>
+                              <div>AI Task: {plan.max_ai_task === -1 ? 'Unlimited' : plan.max_ai_task}</div>
+                              <div>AI Workflow: {plan.max_ai_workflow === -1 ? 'Unlimited' : plan.max_ai_workflow}</div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -761,12 +762,15 @@ export default function AdminSubscriptions() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex justify-end space-x-3">
+                              {hasPermission('edit_sub_plans') && (
                               <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300" 
                                 onClick={() => openModal({type: 'edit', plan})}
                               >
                                 <FaEdit />
                               </button>
+                              )}
                               {/* toggle active button */}
+                              {hasPermission('toggle_sub_status') && (
                               <button
                                 onClick={() => toggleActive(plan.id, !plan.is_active, 'subscription_plan')}
                                 className={clsx(
@@ -778,6 +782,7 @@ export default function AdminSubscriptions() {
                               >
                                 {plan.is_active ? <FaToggleOn /> : <FaToggleOff />}
                               </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -786,16 +791,17 @@ export default function AdminSubscriptions() {
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* Promo Codes Section */}
           {activeTab === "promoCodes" && (
-            <>
+            <div>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Promo Codes</h3>
                 
                 <div className="flex space-x-2">
+                  {hasPermission('add_promo_codes') && (
                   <button 
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg flex items-center"
                     onClick={() => openModal({type: 'add'})}
@@ -803,6 +809,7 @@ export default function AdminSubscriptions() {
                     <FaPlus className="mr-2" />
                     Add New Code
                   </button>
+                  )}
                 </div>
               </div>
               
@@ -867,12 +874,15 @@ export default function AdminSubscriptions() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex justify-end space-x-2">
+                              {hasPermission('edit_promo_codes') && (
                               <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                                 onClick={() => openModal({type:'edit', code})}
                               >
                                 <FaEdit />
                               </button>
+                              )}
                               {/* toggle active button */}
+                              {hasPermission('toggle_code_status') && (
                               <button
                                 onClick={() => toggleActive(code.id, !code.is_active, 'promo_code')}
                                 className={clsx(
@@ -884,13 +894,16 @@ export default function AdminSubscriptions() {
                               >
                                 {code.is_active ? <FaToggleOn /> : <FaToggleOff />}
                               </button>
+                              )}
                               {/* delete button */}
+                              {hasPermission('delete_promo_codes') && (
                               <button
                                 onClick={() => deletePromoCode(code.id)}
                                 className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                               >
                                 <FaTrash />
                               </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -899,25 +912,402 @@ export default function AdminSubscriptions() {
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* User Subscriptions Section */}
           {activeTab === "userSubscriptions" && (
-            <>
+            <div>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">User Subscriptions</h3>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    placeholder="Search by user email or name"
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                  />
+                  <select 
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                    value={planTypeFilter}
+                    onChange={(e) => setPlanTypeFilter(e.target.value)}
+                  >
+                    <option value="all">All Plans</option>
+                    <option value="FREE">Free</option>
+                    <option value="PRO">Pro</option>
+                    <option value="ENTERPRISE">Enterprise</option>
+                  </select>
+                  <select 
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                    value={subscriptionStatusFilter}
+                    onChange={(e) => setSubscriptionStatusFilter(e.target.value)}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="CANCELED">Canceled</option>
+                    <option value="EXPIRED">Expired</option>
+                  </select>
+                </div>
               </div>
               
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 text-center">
-                <p className="text-gray-500 dark:text-gray-400">User subscription management coming soon.</p>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+                {userSubscriptions.length === 0 ? (
+                  <div className="p-6 text-center">
+                    <p className="text-gray-500 dark:text-gray-400">
+                      {userSearchQuery || subscriptionStatusFilter !== 'all' || planTypeFilter !== 'all' 
+                        ? 'No subscriptions found matching your filters.'
+                        : 'No subscriptions found in the system.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            User
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Plan
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Date Range
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Projects Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Members Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            AI Chat Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            AI Task Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            AI Workflow Usage
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {userSubscriptions.map((subscription) => {
+                          return (
+                            <tr key={subscription.id} className={subscription.status !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-3">
+                                    {subscription.user?.name?.charAt(0).toUpperCase() || subscription.user?.email?.charAt(0).toUpperCase() || 'U'}
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {subscription.user?.name || 'Unknown'}
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                      {subscription.user?.email || 'No email'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                  ${subscription.plan?.type === 'FREE' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : 
+                                    subscription.plan?.type === 'PRO' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
+                                    'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}
+                                >
+                                  {subscription.plan?.name || subscription.plan?.type || 'Unknown'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {formatDate(subscription.start_date)} - {formatDate(subscription.end_date)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_projects} / {subscription.plan?.max_projects === -1 ? '∞' : subscription.plan?.max_projects}
+                                  </span>
+                                  {subscription.plan?.max_projects !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          subscription.current_projects / subscription.plan?.max_projects > 0.8 
+                                            ? 'bg-red-500' 
+                                            : subscription.current_projects / subscription.plan?.max_projects > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, (subscription.current_projects / subscription.plan?.max_projects * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_members} / {subscription.plan?.max_members === -1 ? '∞' : subscription.plan?.max_members}
+                                  </span>
+                                  {subscription.plan?.max_members !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          subscription.current_members / subscription.plan?.max_members > 0.8 
+                                            ? 'bg-red-500' 
+                                            : subscription.current_members / subscription.plan?.max_members > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, (subscription.current_members / subscription.plan?.max_members * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              {/* AI Chat Usage */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_ai_chat || 0} / {subscription.plan?.max_ai_chat === -1 ? '∞' : subscription.plan?.max_ai_chat}
+                                  </span>
+                                  {subscription.plan?.max_ai_chat !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          (subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat > 0.8 
+                                            ? 'bg-red-500' 
+                                            : (subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, ((subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              {/* AI Task Usage */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_ai_task || 0} / {subscription.plan?.max_ai_task === -1 ? '∞' : subscription.plan?.max_ai_task}
+                                  </span>
+                                  {subscription.plan?.max_ai_task !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          (subscription.current_ai_task || 0) / subscription.plan?.max_ai_task > 0.8 
+                                            ? 'bg-red-500' 
+                                            : (subscription.current_ai_task || 0) / subscription.plan?.max_ai_task > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, ((subscription.current_ai_task || 0) / subscription.plan?.max_ai_task * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              {/* AI Workflow Usage */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white flex flex-col">
+                                  <span className="mb-1">
+                                    {subscription.current_ai_workflow || 0} / {subscription.plan?.max_ai_workflow === -1 ? '∞' : subscription.plan?.max_ai_workflow}
+                                  </span>
+                                  {subscription.plan?.max_ai_workflow !== -1 && (
+                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full ${
+                                          (subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow > 0.8 
+                                            ? 'bg-red-500' 
+                                            : (subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow > 0.5 
+                                            ? 'bg-yellow-500' 
+                                            : 'bg-green-500'
+                                        }`} 
+                                        style={{ width: `${Math.min(100, ((subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow * 100))}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div>
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    ${subscription.status === 'ACTIVE' 
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
+                                      : subscription.status === 'CANCELED'
+                                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                                    }`}
+                                  >
+                                    {subscription.status}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  {subscription.auto_renew ? (
+                                    <span className="text-green-600 dark:text-green-400">
+                                      <FaCheck className="inline mr-1" /> Auto-renew
+                                    </span>
+                                  ) : (
+                                    <span className="text-red-600 dark:text-red-400">
+                                      <FaTimes className="inline mr-1" /> No renewal
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div className="flex justify-end space-x-3">
+                                  <button 
+                                    className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                    title="Edit subscription"
+                                  >
+                                    <FaEdit />
+                                  </button>
+                                  {subscription.status === 'ACTIVE' ? (
+                                    <button 
+                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                      title="Cancel subscription"
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+                                      title="Reactivate subscription"
+                                    >
+                                      <FaCheck />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                {/* Pagination will be added when needed */}
               </div>
-            </>
+              
+              {/* Subscription Analytics */}
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                  <h4 className="text-base font-medium text-gray-800 dark:text-white mb-4">Subscription Distribution</h4>
+                  <div className="flex flex-col space-y-4">
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Free</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">45%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div className="bg-gray-500 dark:bg-gray-500 h-2 rounded-full" style={{ width: '45%' }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Pro</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">35%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div className="bg-blue-500 dark:bg-blue-500 h-2 rounded-full" style={{ width: '35%' }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Enterprise</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">20%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div className="bg-purple-500 dark:bg-purple-500 h-2 rounded-full" style={{ width: '20%' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                  <h4 className="text-base font-medium text-gray-800 dark:text-white mb-4">Subscription Stats</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Total Active</p>
+                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">243</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Total Revenue</p>
+                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">$12,540</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Monthly</p>
+                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">167</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Yearly</p>
+                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">76</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                  <h4 className="text-base font-medium text-gray-800 dark:text-white mb-4">Recent Activity</h4>
+                  <div className="space-y-4">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <span className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                          <span className="text-green-600 dark:text-green-400">
+                            <FaCheck className="h-4 w-4" />
+                          </span>
+                        </span>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">New subscription</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Alice Smith upgraded to Enterprise</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">2 hours ago</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <span className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                          <span className="text-red-600 dark:text-red-400">
+                            <FaTimes className="h-4 w-4" />
+                          </span>
+                        </span>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">Subscription canceled</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Bob Johnson canceled Pro plan</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">5 hours ago</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <span className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                          <span className="text-blue-600 dark:text-blue-400">
+                            <FaMoneyBillWave className="h-4 w-4" />
+                          </span>
+                        </span>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">Payment processed</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">John Doe renewed Pro plan</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">1 day ago</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Payment History Section */}
           {activeTab === "paymentHistory" && (
-            <>
+            <div>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Payment History</h3>
                 <div className="flex space-x-2">
@@ -1134,374 +1524,17 @@ export default function AdminSubscriptions() {
                   </>
                 )}
               </div>
-            </>
+            </div>
           )}
         </main>
+        ) : (
+        <div className="min-h-screen flex items-center justify-center w-full">
+          <AccessRestrictedModal />
+        </div>
+        )}
       </div>
 
       {/* SUBSCRIPTION MODALS */}
-      {/*subscription add modal*/}
-      {isModalOpen && modalType === 'add' && (
-        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
-          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>
-            <div className='flex justify-between items-center mb-4'>
-              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
-                {modalFor === "promoCode" ? "Add New Promo Code" : "Add New Subscription Plan"}
-              </h2>
-              <button
-                onClick={closeModal}
-                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              >
-                &times;
-              </button>
-            </div>
-            
-            {modalFor === "promoCode" ? (
-              // Promo code form
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                const codeData = {
-                  code: codeName,
-                  discount_type: codeType,
-                  discount_value: parseFloat(codeValue),
-                  description: codeDescription,
-                  is_active: codeIsActive === 'true',
-                  start_date: new Date(startDate).toISOString(),
-                  end_date: new Date(endDate).toISOString(),
-                  current_uses: 0,
-                  max_uses: parseInt(maxUses) || 0
-                };
-                
-                // Add promo code and only close if successful
-                const success = await addPromoCode(codeData);
-                if (success) {
-                  closeModal();
-                }
-              }}>
-                <div className='space-y-4'>
-                  <div>
-                    <label htmlFor='add-code-name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Promo Code
-                    </label>
-                    <input
-                      type='text'
-                      id='add-code-name'
-                      name='code'
-                      required
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter promo code'
-                      onChange={(e) => setCodeName(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-code-type' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Discount Type
-                    </label>
-                    <select
-                      id='add-code-type'
-                      name='discount_type'
-                      required
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setCodeType(e.target.value)}
-                    >
-                      <option value=''>Select discount type</option>
-                      <option value='PERCENTAGE'>Percentage</option>
-                      <option value='FIXED_AMOUNT'>Fixed Amount</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-code-value' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Discount Value
-                    </label>
-                    <input
-                      type='number'
-                      id='add-code-value'
-                      name='discount_value'
-                      required
-                      min='0'
-                      step='0.01'
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder={codeType === 'PERCENTAGE' ? 'Enter discount percentage' : 'Enter discount amount'}
-                      onChange={(e) => setCodeValue(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-code-description' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Description
-                    </label>
-                    <textarea
-                      id='add-code-description'
-                      name='description'
-                      rows='3'
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter promo code description'
-                      onChange={(e) => setCodeDescription(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-max-uses' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Max Usage Count
-                    </label>
-                    <input
-                      type='number'
-                      id='add-max-uses'
-                      name='max_uses'
-                      required
-                      min='0'
-                      value={maxUses}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter maximum number of uses'
-                      onChange={(e) => setMaxUses(e.target.value)}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Enter 0 for unlimited uses</p>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-start-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Start Date
-                    </label>
-                    <input
-                      type='date'
-                      id='add-start-date'
-                      name='start_date'
-                      required
-                      value={startDate}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-end-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      End Date
-                    </label>
-                    <input
-                      type='date'
-                      id='add-end-date'
-                      name='end_date'
-                      required
-                      value={endDate}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Status
-                    </label>
-                    <div className='flex items-center space-x-4'>
-                      <label className='inline-flex items-center'>
-                        <input
-                          type='radio'
-                          name='is_active'
-                          value='true'
-                          checked={codeIsActive === 'true'}
-                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                          onChange={() => setCodeIsActive('true')}
-                        />
-                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Active</span>
-                      </label>
-                      
-                      <label className='inline-flex items-center'>
-                        <input
-                          type='radio'
-                          name='is_active'
-                          value='false'
-                          checked={codeIsActive === 'false'}
-                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                          onChange={() => setCodeIsActive('false')}
-                        />
-                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Inactive</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className='mt-6 flex justify-end space-x-3'>
-                  <button
-                    type='button'
-                    onClick={closeModal}
-                    className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
-                      text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-                  >
-                    Cancel
-                  </button>
-                  
-                  <button
-                    type='submit'
-                    className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
-                      text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                      focus:ring-offset-2 focus:ring-indigo-500'
-                  >
-                    Add Code
-                  </button>
-                </div>
-              </form>
-            ) : (
-              // Subscription plan form
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const planData = {
-                  name: planName,
-                  type: planType,
-                  price: parseFloat(planPrice),
-                  billing_interval: planBilling,
-                  description: description,
-                  features: { features: features },
-                  max_members: parseInt(planMaxMembers),
-                  max_projects: parseInt(planMaxProjects),
-                  storage_limit: parseInt(planMaxStorage),
-                  is_active: planIsActive === 'true',
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                };
-                
-                // Add subscription plan logic here
-                // addSubscriptionPlan(planData);
-                closeModal();
-              }}>
-                <div className='space-y-4'>
-                  <div>
-                    <label htmlFor='add-name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Plan Name
-                    </label>
-                    <input
-                      type='text'
-                      id='add-name'
-                      name='name'
-                      required
-                      value={planName}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter plan name'
-                      onChange={(e) => setPlanName(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-type' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Plan Type
-                    </label>
-                    <select
-                      id='add-type'
-                      name='type'
-                      required
-                      value={planType}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setPlanType(e.target.value)}
-                    >
-                      <option value=''>Select plan type</option>
-                      <option value='FREE'>Free</option>
-                      <option value='PRO'>Pro</option>
-                      <option value='ENTERPRISE'>Enterprise</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-price' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Price
-                    </label>
-                    <input
-                      type='number'
-                      id='add-price'
-                      name='price'
-                      required
-                      min='0'
-                      step='0.01'
-                      value={planPrice}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter price'
-                      onChange={(e) => setPrice(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-billing' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Billing Interval
-                    </label>
-                    <select
-                      id='add-billing'
-                      name='billing_interval'
-                      required
-                      value={planBilling}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      onChange={(e) => setPlanBilling(e.target.value)}
-                    >
-                      <option value=''>Select billing interval</option>
-                      <option value='MONTHLY'>Monthly</option>
-                      <option value='YEARLY'>Yearly</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor='add-description' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Description
-                    </label>
-                    <textarea
-                      id='add-description'
-                      name='description'
-                      rows='3'
-                      value={description}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter plan description'
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
-                <div className='mt-6 flex justify-end space-x-3'>
-                  <button
-                    type='button'
-                    onClick={closeModal}
-                    className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
-                      text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-                  >
-                    Cancel
-                  </button>
-                  
-                  <button
-                    type='submit'
-                    className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
-                      text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                      focus:ring-offset-2 focus:ring-indigo-500'
-                  >
-                    Add Plan
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-
       {/*subscription edit modal*/}
       {isModalOpen && modalType === 'edit' && isPlanSelected && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
@@ -1843,7 +1876,7 @@ export default function AdminSubscriptions() {
         </div>
       )}
 
-      {/*edit*/}
+      {/* promo code edit modal*/}
       {isModalOpen && modalType === 'edit' && isCodeSelected && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
           <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>

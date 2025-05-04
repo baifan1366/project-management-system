@@ -1,0 +1,116 @@
+html, body, #root,#root div:only-child, .gantt-container {
+    height: 92%;
+  }
+  
+  .gantt_task_area,
+  .gantt_task_rows,
+  .gantt_row,
+  .gantt_row.odd,
+  .gantt_task_bg,
+  .gantt_grid_data,
+  .gantt_container,
+  .gantt_grid_scale,
+  .gantt_task_row {
+    background-color: hsl(var(--background)) !important; /* or black */
+    border-color: hsl(var(--border) / 1);
+  }
+
+  .gantt_scale_cell {
+    border: none;
+  }
+  
+  /* Task styling */
+  .gantt_task_line, .gantt_task_link_control {
+    background-color: var(--task-color);
+    border-color: var(--task-color);
+    transition: opacity 0.2s ease-out;
+  }
+  
+  .gantt_task_line:hover {
+    opacity: 0.8;
+  }
+  
+  .gantt_link_arrow {
+    border-color: var(--task-color);
+  }
+  
+  .gantt_task_progress {
+    background-color: var(--task-color);
+    opacity: 0.8;
+  }
+  
+  /* Grid and scales */
+  /* .gantt_grid_scale,
+  .gantt_task_scale { */
+    /* background-color: hsl(var(--background)); */
+    /* color: hsl(var(--foreground)); */
+    /* border-color: hsl(var(--border)); */
+  /* } */
+  
+  /* .gantt_grid_data,
+  .gantt_task_bg {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  } */
+  
+  /* Grid elements */
+  /* .gantt_grid {
+    border-color: hsl(var(--border));
+  } */
+  
+  /* .gantt_row { */
+    /* border-color: hsl(var(--border)); */
+    /* background-color: transparent;
+  } */
+  
+  /* .gantt_row.odd {
+    background-color: transparent;
+  } */
+  
+  /* 修改行悬停效果 */
+  .gantt_grid_data .gantt_row:hover {
+    background-color: hsl(var(--muted) / 0.3);
+  }
+  
+  /* 当对话框打开时禁用悬停效果 */
+  body:has(.fixed.inset-0) .gantt_grid_data .gantt_row {
+    pointer-events: none;
+  }
+  
+  /* Headers */
+  .gantt_grid_scale .gantt_grid_head_cell,
+  .gantt_task_scale .gantt_scale_cell {
+    color: hsl(var(--muted-foreground));
+    border: none;
+    font-weight: 500;
+    background-color: hsl(var(--muted-background));
+  }
+  
+  /* Task cells */
+  .gantt_task_cell {
+    border-color: hsl(var(--border) / 0.5);
+  }
+  
+  .gantt_task_content {
+    color: hsl(var(--primary-foreground));
+    font-weight: 500;
+  }
+  
+  /* Today marker */
+  .gantt_today {
+    background-color: hsl(var(--primary) / 0.1);
+  }
+  
+  /* Weekend cells */
+  .gantt_task_cell.week_end {
+    background-color: hsl(var(--muted) / 0.2);
+  }
+  
+  /* Task links */
+  .gantt_task_link .gantt_line_wrapper div {
+    background-color: hsl(var(--primary));
+  }
+  
+  .gantt_link_arrow {
+    border-color: hsl(var(--primary));
+  }

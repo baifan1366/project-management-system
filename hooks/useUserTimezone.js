@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 /**
- * 将UTC格式的时区转换为IANA标准时区名称
- * @param {string} utcOffset - 格式如 "UTC+8" 的时区
- * @returns {string} IANA标准时区名称，转换失败则返回系统默认时区
+ * Convert UTC format timezone to IANA standard timezone name
+ * @param {string} utcOffset - Timezone format like "UTC+8"
+ * @returns {string} IANA standard timezone name, or system default if conversion fails
  */
 const convertToIANATimezone = (utcOffset) => {
   if (!utcOffset || typeof utcOffset !== 'string') {
@@ -14,35 +14,35 @@ const convertToIANATimezone = (utcOffset) => {
   }
   
   try {
-    // 匹配UTC+/-格式的时区字符串
+    // Match UTC+/- format timezone string
     const match = utcOffset.match(/^UTC([+-])(\d+)$/);
     if (!match) {
       return Intl.DateTimeFormat().resolvedOptions().timeZone;
     }
     
-    const sign = match[1]; // + 或 -
+    const sign = match[1]; // + or -
     const hours = parseInt(match[2], 10);
     
-    // 常用时区映射
+    // Common timezone mappings
     const timezoneMap = {
-      'UTC+8': 'Asia/Shanghai',    // 中国标准时间
-      'UTC+0': 'Europe/London',    // 格林威治标准时间
-      'UTC-8': 'America/Los_Angeles', // 太平洋标准时间
-      'UTC-5': 'America/New_York',  // 东部标准时间
-      'UTC+1': 'Europe/Paris',      // 中欧标准时间
-      'UTC+9': 'Asia/Tokyo',        // 日本标准时间
-      'UTC+10': 'Australia/Sydney', // 澳大利亚东部标准时间
-      'UTC+5.5': 'Asia/Kolkata',    // 印度标准时间
-      'UTC+7': 'Asia/Bangkok',      // 东南亚标准时间
-      'UTC+3': 'Europe/Moscow'      // 莫斯科标准时间
+      'UTC+8': 'Asia/Shanghai',    // China Standard Time
+      'UTC+0': 'Europe/London',    // Greenwich Mean Time
+      'UTC-8': 'America/Los_Angeles', // Pacific Standard Time
+      'UTC-5': 'America/New_York',  // Eastern Standard Time
+      'UTC+1': 'Europe/Paris',      // Central European Time
+      'UTC+9': 'Asia/Tokyo',        // Japan Standard Time
+      'UTC+10': 'Australia/Sydney', // Australian Eastern Standard Time
+      'UTC+5.5': 'Asia/Kolkata',    // India Standard Time
+      'UTC+7': 'Asia/Bangkok',      // Southeast Asia Time
+      'UTC+3': 'Europe/Moscow'      // Moscow Standard Time
     };
     
-    // 尝试从映射中获取时区
+    // Try to get timezone from mapping
     if (timezoneMap[utcOffset]) {
       return timezoneMap[utcOffset];
     }
     
-    // 如果没有精确匹配，尝试根据偏移量猜测一个合理的时区
+    // If no exact match, try to guess a reasonable timezone based on offset
     if (sign === '+') {
       if (hours >= 8 && hours <= 9) return 'Asia/Shanghai';
       if (hours >= 0 && hours <= 1) return 'Europe/London';
@@ -53,18 +53,18 @@ const convertToIANATimezone = (utcOffset) => {
       if (hours >= 4 && hours <= 5) return 'America/New_York';
     }
     
-    // 默认返回系统时区
+    // Default to system timezone
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
   } catch (error) {
-    console.error('时区转换错误:', error);
+    console.error('Timezone conversion error:', error);
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
   }
 };
 
 /**
- * 获取UTC偏移量的小时数
- * @param {string} utcOffset - 格式如 "UTC+8" 的时区
- * @returns {number} 小时偏移量，如 +8 或 -5
+ * Get hour offset from UTC timezone string
+ * @param {string} utcOffset - Timezone format like "UTC+8"
+ * @returns {number} Hour offset, like +8 or -5
  */
 const getHourOffset = (utcOffset) => {
   if (!utcOffset || typeof utcOffset !== 'string') {
@@ -79,51 +79,57 @@ const getHourOffset = (utcOffset) => {
 };
 
 /**
- * 获取用户的时区设置
- * @returns {Object} 包含用户时区和相关函数的对象
+ * Get user's timezone settings
+ * @returns {Object} Object containing user timezone and related functions
  */
 export function useUserTimezone() {
   const [userTimezone, setUserTimezone] = useState(null);
   const [utcOffset, setUtcOffset] = useState("");
-  const [hourFormat, setHourFormat] = useState('24h'); // 默认24小时制
+  const [hourFormat, setHourFormat] = useState('24h'); // Default 24-hour format
   const [loading, setLoading] = useState(true);
+  
+  // Get user information from the useGetUser hook
+  const { user, isLoading } = useGetUser();
 
-  // 从用户 metadata 获取时区设置
+  // Get timezone settings from user data
   useEffect(() => {
-    const fetchUserTimezone = async () => {
+    const setupUserTimezone = () => {
       try {
-        setLoading(true);
-        // 直接从auth获取用户信息，包含metadata
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError || !user) {
-          console.error('获取用户信息失败:', userError);
-          // 使用系统默认时区作为回退
-          setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
-          setUtcOffset("");
+        // Wait until useGetUser finishes loading
+        if (isLoading) {
           return;
         }
         
-        // 从用户metadata中获取时区设置
-        if (user.user_metadata?.timezone) {
-          // 保存原始UTC偏移量
-          setUtcOffset(user.user_metadata.timezone);
+        setLoading(true);
+        
+        if (!user) {
+          // Use system default timezone as fallback
+          setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+          setUtcOffset("");
+          setLoading(false);
+          return;
+        }
+        
+        // Get timezone from user data
+        if (user.timezone) {
+          // Save original UTC offset
+          setUtcOffset(user.timezone);
           
-          // 设置时间格式（12/24小时制）
-          if (user.user_metadata?.hourFormat) {
-            setHourFormat(user.user_metadata.hourFormat);
+          // Set time format (12/24 hour)
+          if (user.hour_format) {
+            setHourFormat(user.hour_format);
           }
           
-          // 将UTC格式的时区转换为IANA标准时区名称
-          const ianaTimezone = convertToIANATimezone(user.user_metadata.timezone);
+          // Convert UTC format timezone to IANA standard timezone name
+          const ianaTimezone = convertToIANATimezone(user.timezone);
           setUserTimezone(ianaTimezone);
         } else {
-          // 如果用户没有设置时区，使用系统默认时区
+          // If user hasn't set timezone, use system default
           setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
           setUtcOffset("");
         }
       } catch (error) {
-        console.error('获取时区时出错:', error);
+        console.error('Error getting timezone:', error);
         setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
         setUtcOffset("");
       } finally {
@@ -131,84 +137,84 @@ export function useUserTimezone() {
       }
     };
     
-    fetchUserTimezone();
-  }, []);
+    setupUserTimezone();
+  }, [user, isLoading]);
   
   /**
-   * 直接使用UTC偏移量手动调整时间，而不依赖于timeZone参数
-   * @param {Date|string} dateInput - 日期对象或日期字符串
-   * @returns {Date} 调整后的日期对象
+   * Manually adjust time using UTC offset instead of relying on timeZone parameter
+   * @param {Date|string} dateInput - Date object or date string
+   * @returns {Date} Adjusted date object
    */
   const adjustTimeByOffset = (dateInput) => {
     if (!dateInput) return new Date();
     
     const date = new Date(dateInput);
     
-    // 如果没有指定UTC偏移量，则返回原始日期
+    // If no UTC offset specified, return original date
     if (!utcOffset) return date;
     
     try {
-      // 获取UTC偏移量的小时数
+      // Get hour offset from UTC timezone string
       const offsetHours = getHourOffset(utcOffset);
       
-      // 创建一个新的UTC日期
+      // Create new UTC date
       const utcDate = new Date(date.toUTCString());
       
-      // 根据偏移量调整小时
+      // Adjust hours based on offset
       utcDate.setUTCHours(utcDate.getUTCHours() + offsetHours);
       
       return utcDate;
     } catch (error) {
-      console.error('时间调整错误:', error);
+      console.error('Time adjustment error:', error);
       return date;
     }
   };
   
-  // 格式化时间为用户时区的本地时间字符串
+  // Format time to user timezone's local time string
   const formatToUserTimezone = (timestamp, options = {}) => {
     if (!timestamp) return '';
     
     try {
-      // 手动根据UTC偏移量调整时间
+      // Manually adjust time using UTC offset
       const adjustedDate = adjustTimeByOffset(timestamp);
       
-      // 默认显示时间选项
+      // Default time display options
       const defaultOptions = { 
         hour: '2-digit', 
         minute: '2-digit',
-        hour12: hourFormat === '12h' // 根据用户偏好设置12/24小时制
+        hour12: hourFormat === '12h' // Use 12/24 hour format based on user preference
       };
       
-      // 不使用timeZone参数，因为我们已经手动调整了时间
+      // Don't use timeZone parameter as we've already manually adjusted the time
       return adjustedDate.toLocaleTimeString(undefined, { ...defaultOptions, ...options });
     } catch (error) {
-      console.error('格式化时间错误:', error);
+      console.error('Format time error:', error);
       return new Date(timestamp).toLocaleTimeString();
     }
   };
   
-  // 格式化完整日期和时间
+  // Format full date and time
   const formatDateToUserTimezone = (timestamp, options = {}) => {
     if (!timestamp) return '';
     
     try {
-      // 手动根据UTC偏移量调整时间
+      // Manually adjust time using UTC offset
       const adjustedDate = adjustTimeByOffset(timestamp);
       
-      // 默认显示日期和时间选项
+      // Default date and time display options
       const defaultOptions = { 
         year: 'numeric',
         month: 'short',
         day: 'numeric',
         hour: '2-digit', 
         minute: '2-digit',
-        hour12: hourFormat === '12h' // 根据用户偏好设置12/24小时制
+        hour12: hourFormat === '12h' // Use 12/24 hour format based on user preference
       };
       
-      // 不使用timeZone参数，因为我们已经手动调整了时间
+      // Don't use timeZone parameter as we've already manually adjusted the time
       return adjustedDate.toLocaleString(undefined, { ...defaultOptions, ...options });
     } catch (error) {
-      console.error('格式化日期时间错误:', error);
+      console.error('Format date-time error:', error);
       return new Date(timestamp).toLocaleString();
     }
   };

@@ -6,41 +6,60 @@ import { supabase } from '@/lib/supabase';
 // 调用AI解析用户指令
 export async function parseInstruction(instruction) {
   console.log("正在调用AI解析指令...");
-  const completion = await openai.chat.completions.create({
-    model: "google/gemini-2.0-flash-exp:free",//Gemini Flash 2.0 offers a significantly faster time to first token (TTFT) compared to Gemini Flash 1.5, while maintaining quality on par with larger models like Gemini Pro 1.5. It introduces notable enhancements in multimodal understanding, coding capabilities, complex instruction following, and function calling. These advancements come together to deliver more seamless and robust agentic experiences.
-    //model: "qwen/qwen2.5-vl-32b-instruct:free",//Qwen2.5-VL is proficient in recognizing common objects such as flowers, birds, fish, and insects. It is also highly capable of analyzing texts, charts, icons, graphics, and layouts within images.
-    //model: "qwen/qwq-32b:free",//QwQ is the reasoning model of the Qwen series. Compared with conventional instruction-tuned models, QwQ, which is capable of thinking and reasoning, can achieve significantly enhanced performance in downstream tasks, especially hard problems. QwQ-32B is the medium-sized reasoning model, which is capable of achieving competitive performance against state-of-the-art reasoning models, e.g., DeepSeek-R1, o1-mini.
-    //model: "deepseek/deepseek-v3-base:free",//Note that this is a base model mostly meant for testing, you need to provide detailed prompts for the model to return useful responses.DeepSeek-V3 Base is a 671B parameter open Mixture-of-Experts (MoE) language model with 37B active parameters per forward pass and a context length of 128K tokens. Trained on 14.8T tokens using FP8 mixed precision, it achieves high training efficiency and stability, with strong performance across language, reasoning, math, and coding tasks.
-    //model: "deepseek/deepseek-chat-v3-0324:free", //DeepSeek V3, a 685B-parameter, mixture-of-experts model, is the latest iteration of the flagship chat model family from the DeepSeek team.It succeeds the DeepSeek V3 model and performs really well on a variety of tasks.
-    //model: "deepseek/deepseek-r1:free", //DeepSeek R1 is here: Performance on par with OpenAI o1, but open-sourced and with fully open reasoning tokens. It's 671B parameters in size, with 37B active in an inference pass.
-    //model: "microsoft/mai-ds-r1:free",//MAI-DS-R1 is a post-trained variant of DeepSeek-R1 developed by the Microsoft AI team to improve the model’s responsiveness on previously blocked topics while enhancing its safety profile. Built on top of DeepSeek-R1’s reasoning foundation, it integrates 110k examples from the Tulu-3 SFT dataset and 350k internally curated multilingual safety-alignment samples. The model retains strong reasoning, coding, and problem-solving capabilities, while unblocking a wide range of prompts previously restricted in R1.
-    //model: "thudm/glm-4-32b:free",GLM-4-32B-0414 is a 32B bilingual (Chinese-English) open-weight language model optimized for code generation, function calling, and agent-style tasks. Pretrained on 15T of high-quality and reasoning-heavy data, it was further refined using human preference alignment, rejection sampling, and reinforcement learning. The model excels in complex reasoning, artifact generation, and structured output tasks, achieving performance comparable to GPT-4o and DeepSeek-V3-0324 across several benchmarks.
-    //model: "agentica-org/deepcoder-14b-preview:free",//DeepCoder-14B-Preview is a 14B parameter code generation model fine-tuned from DeepSeek-R1-Distill-Qwen-14B using reinforcement learning with GRPO+ and iterative context lengthening. It is optimized for long-context program synthesis and achieves strong performance across coding benchmarks
-    //model: "google/gemma-3-27b-it:free",//Gemma 3 introduces multimodality, supporting vision-language input and text outputs. It handles context windows up to 128k tokens, understands over 140 languages, and offers improved math, reasoning, and chat capabilities, including structured outputs and function calling.
-    //model: "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",//Llama-3.1-Nemotron-Ultra-253B-v1 is a large language model (LLM) optimized for advanced reasoning, human-interactive chat, retrieval-augmented generation (RAG), and tool-calling tasks. Derived from Meta’s Llama-3.1-405B-Instruct, it has been significantly customized using Neural Architecture Search (NAS), resulting in enhanced efficiency, reduced memory usage, and improved inference latency. 
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: instruction }
-    ],
-    temperature: 0.1,
-    max_tokens: 1500,
-    response_format: { type: "json_object" },
-    // 添加明确指示，确保响应是纯JSON
-    //user: "IMPORTANT: Respond with valid JSON only. Do not add any text before or after the JSON object."
-  });
-  
-  // 提取并安全解析AI的响应
-  const aiContent = completion.choices[0]?.message?.content || "";
-  console.log("AI响应:", aiContent.substring(0, 200) + "...");
-  
-  const { data: aiResponse, error: parseError } = safeParseJSON(aiContent);
-  
-  if (parseError || !aiResponse) {
-    console.error("AI响应解析失败:", parseError, "原始内容:", aiContent);
-    throw new Error('Failed to parse AI response: ' + (parseError || 'Invalid response format'));
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "qwen/qwen2.5-vl-32b-instruct:free",
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: instruction }
+      ],
+      temperature: 0.1,
+      max_tokens: 5000,
+      response_format: { type: "json_object" },
+      user: "IMPORTANT: Respond with valid JSON only. Do not add any text before or after the JSON object."
+    });
+    
+    // 提取并安全解析AI的响应
+    // Handle different API response structures (OpenAI vs Google)
+    let aiContent = "";
+    
+    if (completion.choices && completion.choices[0]?.message?.content) {
+      // OpenAI response format
+      aiContent = completion.choices[0].message.content;
+    } else if (completion.candidates && completion.candidates[0]?.content?.parts) {
+      // Google Gemini response format
+      aiContent = completion.candidates[0].content.parts[0]?.text || "";
+    } else if (typeof completion.text === 'string') {
+      // Direct text response
+      aiContent = completion.text;
+    } else if (typeof completion === 'string') {
+      // Fallback if the entire response is a string
+      aiContent = completion;
+    } else {
+      // Log the response structure for debugging
+      console.log("Unexpected API response structure:", JSON.stringify(completion).substring(0, 500) + "...");
+      aiContent = "";
+    }
+    
+    console.log("AI响应:", aiContent.substring(0, 200) + "...");
+    
+    // Use safeParseJSON utility to parse the response
+    const { data: aiResponse, error: parseError } = safeParseJSON(aiContent);
+    
+    if (parseError) {
+      console.error("AI响应解析失败:", parseError, "原始内容:", aiContent);
+      throw new Error('Failed to parse AI response: ' + parseError);
+    }
+    
+    if (!aiResponse) {
+      throw new Error('Empty response after parsing');
+    }
+    
+    return aiResponse;
+  } catch (error) {
+    console.error("调用AI服务失败:", error.message);
+    throw new Error('Failed to call AI service: ' + error.message);
   }
-  
-  return aiResponse;
 }
 
 // 处理创建项目和任务
@@ -68,12 +87,16 @@ export async function createProjectAndTasks(
     
     // 定义要关联的字段ID和排序，使用AI推荐或默认配置
     const customFieldsToAssociate = aiResponse.recommended_views || [
-      { id: 1, name: "List", order_index: 0 },      // List视图
-      { id: 5, name: "Board", order_index: 1 },     // 看板视图
-      { id: 6, name: "Calendar", order_index: 2 },  // 日历视图
-      { id: 4, name: "Gantt", order_index: 3 },     // 甘特图视图
-      { id: 8, name: "Timeline", order_index: 4 },  // 时间线视图
-      { id: 9, name: "Overview", order_index: 5 }   // 概览
+      { "id": 1, "name": "Overview", "order_index": 0 },
+      { "id": 2, "name": "List", "order_index": 1 },
+      { "id": 3, "name": "Files", "order_index": 2 },
+      { "id": 4, "name": "Timeline", "order_index": 3 }, 
+      { "id": 5, "name": "Gantt", "order_index": 4 },
+      { "id": 6, "name": "Kanban Board", "order_index": 5 },
+      { "id": 7, "name": "Workflow", "order_index": 6 },
+      { "id": 8, "name": "Calendar", "order_index": 7 },
+      //{ "id": 9, "name": "Notion", "order_index": 8 },
+      //{ "id": 10, "name": "Agile", "order_index": 9 }
     ];
     
     console.log("将使用以下自定义字段:", customFieldsToAssociate);
@@ -91,13 +114,23 @@ export async function createProjectAndTasks(
     }
     
     // 添加用户到团队
-    await dbService.addUserToTeam(userId, teamId);
+    try {
+      await dbService.addUserToTeam(userId, teamId);
+    } catch (error) {
+      console.error("Failed to add user to team, but continuing process:", error);
+      // Don't rethrow, continue with task creation
+    }
     
     // 添加团队成员（如果有）
     if (aiResponse.team_members && Array.isArray(aiResponse.team_members) && aiResponse.team_members.length > 0) {
       for (const member of aiResponse.team_members) {
         if (member && member.email) {
-          await dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId);
+          try {
+            await dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId);
+          } catch (error) {
+            console.error(`Failed to invite member ${member.email}, but continuing:`, error);
+            // Don't rethrow, continue with next member
+          }
         }
       }
     }
@@ -116,8 +149,14 @@ export async function createProjectAndTasks(
     if (!sectionData || sectionData.length === 0) {
       console.log("未找到现有分区，创建新分区");
       // 创建默认分区
-      const newSection = await dbService.createSection(teamId, userId);
-      var sectionId = newSection.id;
+      try {
+        const newSection = await dbService.createSection(teamId, userId);
+        var sectionId = newSection.id;
+      } catch (error) {
+        console.error("Failed to create section, but continuing process:", error);
+        // Create a temporary section ID if needed
+        var sectionId = 0;
+      }
     } else {
       console.log(`找到 ${sectionData.length} 个分区，使用第一个分区`);
       var sectionId = sectionData[0].id;
@@ -176,7 +215,12 @@ export async function createProjectAndTasks(
     if (aiResponse.team_members && Array.isArray(aiResponse.team_members) && aiResponse.team_members.length > 0) {
       for (const member of aiResponse.team_members) {
         if (member && member.email) {
-          await dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId);
+          try {
+            await dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId);
+          } catch (error) {
+            console.error(`Failed to invite member ${member.email}, but continuing:`, error);
+            // Don't rethrow, continue with next member
+          }
         }
       }
     }

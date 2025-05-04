@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 const supabaseUrl = 'https://xvvuzblglnbbsrmzgexp.supabase.co'
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2dnV6YmxnbG5iYnNybXpnZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4NjA4NjgsImV4cCI6MjA1NTQzNjg2OH0.S9--0XYykXk_lyTIcaSuF2psp9Zeb69U0orCys8SD7U'
@@ -43,10 +43,7 @@ export async function POST(request) {
     const body = await request.json()
 
     // Verify admin status (you'll need to implement this based on your auth system)
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { user, error:authError } = useGetUser();
 
     if (authError || !user) {
       return NextResponse.json(
@@ -108,10 +105,7 @@ export async function PATCH(request) {
     }
 
     // Verify admin status
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { user, error:authError } = useGetUser();
 
     if (authError || !user) {
       return NextResponse.json(
@@ -153,10 +147,7 @@ export async function DELETE(request) {
     }
 
     // Verify admin status
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { user, error:authError } = useGetUser();
 
     if (authError || !user) {
       return NextResponse.json(

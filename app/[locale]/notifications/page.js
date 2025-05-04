@@ -35,6 +35,7 @@ import {
 } from '@/lib/redux/features/notificationSlice';
 import NotificationItem from '@/components/notifications/NotificationItem';
 import { useRouter } from 'next/navigation';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function NotificationsPage() {
   const t = useTranslations();
@@ -46,43 +47,17 @@ export default function NotificationsPage() {
   const isSubscribed = useSelector(selectIsSubscribed);
   const [activeTab, setActiveTab] = useState('all');
   const [filterType, setFilterType] = useState('all');
-  const [user, setUser] = useState(null);
-  const [error, setError] = useState(null);
+  const { user , error} = useGetUser();
 
   useEffect(() => {
-    const getUser = async () => {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          throw sessionError;
-        }
-        
-        if (!session || !session.user) {
-          console.warn('用户未登录，重定向到登录页面');
-          router.push('/login');
-          return;
-        }
-        
-        console.log('获取到用户ID:', session.user.id);
-        setUser(session.user);
-        
-        // 直接获取通知，同时会建立订阅
-        dispatch(fetchNotifications(session.user.id));
-      } catch (err) {
-        console.error('获取用户会话失败:', err);
-        setError(err.message);
-      }
-    };
-    
-    getUser();
-    
+      dispatch(fetchNotifications(user.id));
+
     // 组件卸载时清理订阅
     return () => {
       console.log('通知页面卸载，清理订阅');
       dispatch(unsubscribeFromNotifications());
     };
-  }, [dispatch, router]);
+  }, [dispatch]);
 
   const handleMarkAllAsRead = () => {
     if (user) {

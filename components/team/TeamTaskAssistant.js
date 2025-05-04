@@ -15,7 +15,7 @@ import {
 import { toast } from 'sonner';
 import { Loader2, Sparkles } from "lucide-react";
 import { useTranslations } from 'next-intl';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { Badge } from "@/components/ui/badge";
 
 export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTasksCreated }) {
@@ -24,7 +24,8 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
   const [isOpen, setIsOpen] = useState(false);
   const [userId, setUserId] = useState(null);
   const t = useTranslations();
-  
+  const { user } = useGetUser();
+
   // Predefined prompt templates
   const promptTemplates = [
     {
@@ -67,13 +68,8 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
   useEffect(() => {
     async function getUserId() {
       try {
-        const { data, error } = await supabase.auth.getUser();
-        if (error) {
-          console.error('Error getting user:', error);
-          return;
-        }
-        if (data?.user) {
-          setUserId(data.user.id);
+        if (user) {
+          setUserId(user.id);
         }
       } catch (error) {
         console.error('Failed to get user ID:', error);

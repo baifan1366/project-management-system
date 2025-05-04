@@ -1,31 +1,13 @@
 'use client';
 
 import { updateTeam, fetchTeamById } from '@/lib/redux/features/teamSlice';
-import { useDispatch } from 'react-redux';
-import { supabase } from '@/lib/supabase'
-import { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useGetUser } from '@/lib/hooks/useGetUser';
+import { store } from '@/lib/redux/store';
 
 export default function TeamDescription({ teamId }) {
     const dispatch = useDispatch();
-    const [teamOldValues, setTeamOldValues] = useState(null);
-    
-    // 添加 useEffect 以确保加载团队数据
-    useEffect(() => {
-        const fetchTeam = async () => {
-            try {
-                const response = await dispatch(fetchTeamById(teamId)).unwrap();
-                // 确保始终读取团队数据的[0]层
-                const oldValues = Array.isArray(response) && response.length > 0 
-                    ? response[0] 
-                    : response;
-                setTeamOldValues(oldValues);
-            } catch (error) {
-                console.error('获取团队数据失败:', error);
-            }
-        };
-        
-        fetchTeam();
-    }, [teamId, dispatch]);
+    const { user } = useGetUser();
 
     // 处理富文本HTML内容，确保可以被JSON序列化并保留格式
     const sanitizeHtmlForStorage = (html) => {
@@ -58,14 +40,18 @@ export default function TeamDescription({ teamId }) {
                 ...teamData,
                 description: sanitizeHtmlForStorage(teamData.description)
             };
-            const { data: userData } = await supabase.auth.getUser();
-            const userId = userData?.user?.id;
+            const userId = user?.id;
+            
+            // 直接从 Store 获取当前团队数据作为 old_values
+            const state = store.getState();
+            const oldValues = state.teams.teams.find(team => String(team.id) === String(teamId));
+            
             // 更新团队描述到数据库
             dispatch(updateTeam({ 
                 teamId, 
                 data: sanitizedData,
                 user_id: userId,
-                old_values: teamOldValues,
+                old_values: oldValues,
                 updated_at: new Date().toISOString()
             }));
             

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useParams } from 'next/navigation';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchTasksByUserId, updateTask } from '@/lib/redux/features/taskSlice';
@@ -14,18 +13,12 @@ import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/lib/supabase';
+import useGetUser from '@/lib/hooks/useGetUser';
+import React from 'react';
 
 // 任务看板视图组件
 export default function MyTasksPage() {
-  const t = useTranslations('CreateTask');
   const t_tasks = useTranslations('myTasks');
   const t_common = useTranslations('common');
   const dispatch = useDispatch();
@@ -36,50 +29,185 @@ export default function MyTasksPage() {
   const [selectedType, setSelectedType] = useState('upcoming');
   const [selectedAssignee, setSelectedAssignee] = useState('me');
   const [selectedWorkspace, setSelectedWorkspace] = useState('workspace');
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const { user } = useGetUser();
 
-  // 获取当前用户
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('获取当前用户会话失败:', error);
-          return;
-        }
-        
-        if (session && session.user) {
-          setCurrentUserId(session.user.id);
-        }
-      } catch (error) {
-        console.error('获取用户信息时出错:', error);
-      }
+  // 根据字段名找到对应的数字键
+  const getKeyForField = React.useCallback((fieldName, tagValues) => {
+    // 通过分析示例数据，推断数字键与字段的映射关系
+    const fieldKeyMap = {
+      'title': 1,        // 1 对应标题/描述
+      'description': 2,  // 2 可能是额外描述
+      'due_date': 3,     // 3 对应日期
+      'priority': 4,     // 4 对应优先级
+      'status': 12,      // 12 对应状态
+      'assignee_id': 5,  // 假设5对应assignee_id
+      'project_id': 6,   // 假设6对应project_id
     };
     
-    fetchCurrentUser();
+    // 首先检查是否有这个映射
+    const mappedKey = fieldKeyMap[fieldName];
+    if (mappedKey !== undefined) {
+      return mappedKey;
+    }
+    
+    // 如果没有预定义映射，尝试在tag_values中查找这个值
+    // 这是为了处理可能的不同数据结构
+    if (tagValues && typeof tagValues === 'object') {
+      // 检查是否有直接匹配的键
+      if (fieldName in tagValues) {
+        return fieldName;
+      }
+      
+      // 检查是否有键的值匹配我们要找的字段
+      for (const [key, value] of Object.entries(tagValues)) {
+        if (value === fieldName) {
+          return key;
+        }
+      }
+    }
+    
+    return null;
+  }, []);
+  
+  // 检查任务是否有分配者
+  const hasAssignee = React.useCallback((task) => {
+    // 假设任何不是创建者的用户ID都是被分配者
+    if (!task?.tag_values) return false;
+    
+    // 检查tag_values中是否有任何值是合法的用户ID（UUID格式）
+    return Object.values(task.tag_values).some(
+      value => typeof value === 'string' && 
+      value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) &&
+      value !== task.created_by
+    );
+  }, []);
+  
+  // 获取任务的状态
+  const getTaskStatus = React.useCallback((task) => {
+    if (!task?.tag_values) return null;
+    
+    // 记录可能的状态值
+    const statusValues = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+    
+    // 遍历所有tag_values，查找任何匹配状态的值
+    for (const [key, value] of Object.entries(task.tag_values)) {
+      if (statusValues.includes(value)) {
+        return value;
+      }
+    }
+    
+    // 对于键12，我们假设它可能是状态
+    if ('12' in task.tag_values) {
+      return task.tag_values['12'];
+    }
+    
+    // 如果没有找到明确的状态，默认为TODO
+    return 'TODO';
+  }, []);
+  
+  // 获取任务的执行者
+  const getTaskAssignee = React.useCallback((task) => {
+    if (!task?.tag_values) return null;
+    const assigneeKey = getKeyForField('assignee_id', task.tag_values);
+    return assigneeKey ? task.tag_values[assigneeKey] : null;
+  }, [getKeyForField]);
+  
+  // 获取任务的标题
+  const getTaskTitle = React.useCallback((task) => {
+    if (!task?.tag_values) return null;
+    const titleKey = getKeyForField('title', task.tag_values);
+    return titleKey ? task.tag_values[titleKey] : null;
+  }, [getKeyForField]);
+  
+  // 获取任务的描述
+  const getTaskDescription = React.useCallback((task) => {
+    if (!task?.tag_values) return null;
+    const descKey = getKeyForField('description', task.tag_values);
+    return descKey ? task.tag_values[descKey] : null;
+  }, [getKeyForField]);
+  
+  // 获取任务的优先级
+  const getTaskPriority = React.useCallback((task) => {
+    if (!task?.tag_values) return null;
+    const priorityKey = getKeyForField('priority', task.tag_values);
+    return priorityKey ? task.tag_values[priorityKey] : null;
+  }, [getKeyForField]);
+  
+  // 获取任务的项目ID
+  const getTaskProjectId = React.useCallback((task) => {
+    if (!task?.tag_values) return null;
+    const projectKey = getKeyForField('project_id', task.tag_values);
+    return projectKey ? task.tag_values[projectKey] : null;
+  }, [getKeyForField]);
+  
+  // 获取任务的截止日期
+  const getTaskDueDate = React.useCallback((task) => {
+    if (!task?.tag_values) return null;
+    const dueDateKey = getKeyForField('due_date', task.tag_values);
+    return dueDateKey ? task.tag_values[dueDateKey] : null;
+  }, [getKeyForField]);
+  
+  // 从列ID获取对应的任务状态
+  const getStatusFromColumnId = React.useCallback((columnId) => {
+    const statusMap = {
+      'unassigned': 'TODO', // 将未分配任务默认设置为TODO状态
+      'todo': 'TODO',
+      'in_progress': 'IN_PROGRESS',
+      'in_review': 'IN_REVIEW',
+      'done': 'DONE'
+    };
+    return statusMap[columnId];
   }, []);
 
   // 获取所有任务
   useEffect(() => {
-    if (currentUserId) {
-      // 使用实际的用户ID而不是'current'标识符
-      dispatch(fetchTasksByUserId(currentUserId));
+    if (user) {
+      dispatch(fetchTasksByUserId(user.id));
     }
-  }, [dispatch, currentUserId]);
+  }, [dispatch, user]);
+
+  // 调试任务数据结构
+  useEffect(() => {
+    if (tasks && tasks.length > 0) {
+      console.log('Task data structure example:', tasks[0]);
+      
+      // 检查tag_values结构
+      const tagValues = tasks[0].tag_values || {};
+      
+      // 尝试识别哪个键对应状态
+      const potentialStatusValues = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+      Object.entries(tagValues).forEach(([key, value]) => {
+        if (potentialStatusValues.includes(value)) {
+          console.log(`Found status field: key=${key}, value=${value}`);
+        }
+      });
+    }
+  }, []); // 空依赖数组，确保只运行一次
 
   // 在前端过滤出分配给当前用户的任务
   useEffect(() => {
-    if (tasks && tasks.length > 0 && currentUserId) {
+    if (tasks && tasks.length > 0 && user?.id) {
       // 找出分配给当前用户的任务
-      const userTasks = tasks.filter(task => 
-        // 用户创建的任务或分配给用户的任务
-        task.created_by === currentUserId || 
-        (task.tag_values && task.tag_values.assignee_id === currentUserId)
-      );
+      const userTasks = tasks.filter(task => {
+        // 用户创建的任务
+        const isUserCreated = task.created_by === user.id;
+        
+        // 检查是否分配给当前用户
+        let isAssignedToUser = false;
+        
+        if (task.tag_values) {
+          // 检查是否有任何字段的值匹配用户ID
+          isAssignedToUser = Object.values(task.tag_values).some(
+            value => value === user.id
+          );
+        }
+        
+        return isUserCreated || isAssignedToUser;
+      });
       
       setFilteredTasks(userTasks);
     }
-  }, [tasks, currentUserId]);
+  }, [tasks, user?.id]);
 
   // 任务数据处理和分列
   useEffect(() => {
@@ -99,33 +227,33 @@ export default function MyTasksPage() {
         unassigned: {
           id: 'unassigned',
           title: t_tasks('assignedTo.unassigned'),
-          tasks: tasksAfterSearch.filter(task => !task.tag_values?.assignee_id)
+          tasks: tasksAfterSearch.filter(task => !hasAssignee(task))
         },
         todo: {
           id: 'todo',
           title: t_tasks('status.todo'),
-          tasks: tasksAfterSearch.filter(task => task.tag_values?.status === 'TODO' && task.tag_values?.assignee_id)
+          tasks: tasksAfterSearch.filter(task => getTaskStatus(task) === 'TODO' && hasAssignee(task))
         },
         in_progress: {
           id: 'in_progress',
           title: t_tasks('status.in_progress'),
-          tasks: tasksAfterSearch.filter(task => task.tag_values?.status === 'IN_PROGRESS' && task.tag_values?.assignee_id)
+          tasks: tasksAfterSearch.filter(task => getTaskStatus(task) === 'IN_PROGRESS' && hasAssignee(task))
         },
         in_review: {
           id: 'in_review',
           title: t_tasks('status.in_review'),
-          tasks: tasksAfterSearch.filter(task => task.tag_values?.status === 'IN_REVIEW' && task.tag_values?.assignee_id)
+          tasks: tasksAfterSearch.filter(task => getTaskStatus(task) === 'IN_REVIEW' && hasAssignee(task))
         },
         done: {
           id: 'done',
           title: t_tasks('status.done'),
-          tasks: tasksAfterSearch.filter(task => task.tag_values?.status === 'DONE' && task.tag_values?.assignee_id)
+          tasks: tasksAfterSearch.filter(task => getTaskStatus(task) === 'DONE' && hasAssignee(task))
         }
       };
       
       setColumns(newColumns);
     }
-  }, [filteredTasks, searchQuery, t_tasks]);
+  }, [filteredTasks, searchQuery, t_tasks, hasAssignee, getTaskStatus]);
 
   // 处理拖放结束事件
   const onDragEnd = (result) => {
@@ -167,25 +295,34 @@ export default function MyTasksPage() {
 
         // 更新任务状态
         const newStatus = getStatusFromColumnId(destination.droppableId);
-        if (newStatus && task.tag_values?.status !== newStatus) {
+        const currentStatus = getTaskStatus(task);
+        
+        if (newStatus && currentStatus !== newStatus) {
           // 获取当前任务的tag_values或创建一个新的对象
           const currentTagValues = task.tag_values || {};
-          const section_id = currentTagValues.section_id;
           
-          if (!section_id) {
-            console.error('无法更新任务状态：缺少section_id', task);
-            return;
+          // 找到对应status的数字键
+          let statusKey = null;
+          
+          // 首先尝试查找现有的状态键
+          for (const [key, value] of Object.entries(currentTagValues)) {
+            if (['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'].includes(value)) {
+              statusKey = key;
+              break;
+            }
           }
           
-          // 创建一个新的tag_values对象，更新status
-          const newTagValues = {
-            ...currentTagValues,
-            status: newStatus
-          };
+          // 如果没找到，使用12作为默认键
+          if (!statusKey) {
+            statusKey = '12';
+          }
+          
+          // 创建一个新的tag_values对象，更新状态值
+          const newTagValues = { ...currentTagValues };
+          newTagValues[statusKey] = newStatus;
           
           // 更新Redux中的任务状态
           dispatch(updateTask({
-            sectionId: section_id,
             taskId: task.id,
             taskData: { tag_values: newTagValues }
           }));
@@ -214,20 +351,8 @@ export default function MyTasksPage() {
     }
   };
 
-  // 从列ID获取对应的任务状态
-  const getStatusFromColumnId = (columnId) => {
-    const statusMap = {
-      'unassigned': 'TODO', // 将未分配任务默认设置为TODO状态
-      'todo': 'TODO',
-      'in_progress': 'IN_PROGRESS',
-      'in_review': 'IN_REVIEW',
-      'done': 'DONE'
-    };
-    return statusMap[columnId];
-  };
-
   // 更新任务分配状态
-  const handleTaskAssignment = (taskId, destinationColumnId) => {
+  const handleTaskAssignment = React.useCallback((taskId, destinationColumnId) => {
     const allTasks = tasks; // 使用来自Redux的任务数组
     const task = allTasks.find(t => t.id === taskId);
     
@@ -238,49 +363,55 @@ export default function MyTasksPage() {
     
     // 获取当前任务的tag_values或创建一个新的对象
     const currentTagValues = task.tag_values || {};
-    const section_id = currentTagValues.section_id;
     
-    if (!section_id) {
-      console.error('无法更新任务分配：缺少section_id', taskId);
-      return;
+    // 分配给谁的字段标识 - 由于我们不知道具体的键，需要找到一个合适的
+    let assigneeKey = '5'; // 假设5是assignee_id对应的键
+    
+    // 查找现有的assignee字段
+    for (const [key, value] of Object.entries(currentTagValues)) {
+      // 如果值是一个UUID格式的字符串且不是created_by，那很可能是assignee_id
+      if (typeof value === 'string' && 
+          value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) &&
+          value !== task.created_by) {
+        assigneeKey = key;
+        break;
+      }
     }
     
     // 如果拖动到未分配列，则移除任务的assignee_id
     if (destinationColumnId === 'unassigned') {
-      // 创建一个新的tag_values对象，移除assignee_id
-      const newTagValues = { ...currentTagValues };
-      delete newTagValues.assignee_id;
-      
-      dispatch(updateTask({
-        sectionId: section_id,
-        taskId: taskId,
-        taskData: { tag_values: newTagValues }
-      }));
+      // 检查是否存在assignee值
+      if (currentTagValues[assigneeKey]) {
+        const newTagValues = { ...currentTagValues };
+        delete newTagValues[assigneeKey];
+        
+        dispatch(updateTask({
+          taskId,
+          taskData: { tag_values: newTagValues }
+        }));
+      }
     } 
     // 如果从未分配列拖到其他列，则分配给当前用户
     else {
       // 使用实际的用户ID而不是'current'标识符
-      if (!currentUserId) {
+      if (!user?.id) {
         console.error('无法分配任务：找不到当前用户ID');
         return;
       }
       
       // 创建一个新的tag_values对象，添加或更新assignee_id
-      const newTagValues = { 
-        ...currentTagValues,
-        assignee_id: currentUserId
-      };
+      const newTagValues = { ...currentTagValues };
+      newTagValues[assigneeKey] = user.id;
       
       dispatch(updateTask({
-        sectionId: section_id,
-        taskId: taskId,
+        taskId,
         taskData: { tag_values: newTagValues }
       }));
     }
-  };
+  }, [tasks, user?.id, dispatch]);
 
   // 获取任务优先级对应的样式
-  const getPriorityVariant = (priority) => {
+  const getPriorityVariant = React.useCallback((priority) => {
     switch (priority) {
       case 'HIGH':
       case 'URGENT':
@@ -290,7 +421,7 @@ export default function MyTasksPage() {
       default:
         return 'secondary';
     }
-  };
+  }, []);
 
   // 渲染过滤器项
   const renderFilterItem = (key, value, selectedValue, setSelectedFunc) => {
@@ -341,9 +472,9 @@ export default function MyTasksPage() {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
         <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">加载任务时出错</h2>
+          <h2 className="text-xl font-semibold mb-2">{t_tasks('errors.loadingFailed')}</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <Button onClick={() => dispatch(fetchTasksByUserId(currentUserId))}>重试</Button>
+          <Button onClick={() => dispatch(fetchTasksByUserId(user.id))}>{t_common('retry')}</Button>
         </div>
       </div>
     );
@@ -365,7 +496,7 @@ export default function MyTasksPage() {
           </div>
           <Button>
             <PlusCircle className="h-4 w-4 mr-2" />
-            {t('addTask')}
+            {t_common('create')}
           </Button>
         </div>
       </div>
@@ -446,30 +577,30 @@ export default function MyTasksPage() {
                                 >
                                   <div className="mb-2 flex justify-between">
                                     <h3 className="font-medium text-sm">
-                                      {task.tag_values?.title || t_tasks('noTitle')}
+                                      {getTaskTitle(task) || t_tasks('noTitle')}
                                     </h3>
-                                    <Badge variant={getPriorityVariant(task.tag_values?.priority)}>
-                                      {task.tag_values?.priority?.toLowerCase() || 'low'}
+                                    <Badge variant={getPriorityVariant(getTaskPriority(task))}>
+                                      {getTaskPriority(task)?.toLowerCase() || 'low'}
                                     </Badge>
                                   </div>
-                                  {task.tag_values?.description && (
+                                  {getTaskDescription(task) && (
                                     <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                                      {task.tag_values.description}
+                                      {getTaskDescription(task)}
                                     </p>
                                   )}
                                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                                     <div className="flex items-center gap-2">
-                                      {task.tag_values?.project_id && (
+                                      {getTaskProjectId(task) && (
                                         <div className="text-xs">
-                                          #{task.tag_values.project_id}
+                                          #{getTaskProjectId(task)}
                                         </div>
                                       )}
                                     </div>
                                     <div className="flex items-center gap-3">
-                                      {task.tag_values?.due_date && (
+                                      {getTaskDueDate(task) && (
                                         <div className="flex items-center gap-1">
                                           <Calendar className="w-3 h-3" />
-                                          <span>{format(new Date(task.tag_values.due_date), 'yyyy-MM-dd')}</span>
+                                          <span>{format(new Date(getTaskDueDate(task)), 'yyyy-MM-dd')}</span>
                                         </div>
                                       )}
                                     </div>

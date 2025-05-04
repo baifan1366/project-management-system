@@ -22,7 +22,7 @@ const buttonVariants = cva(
         black: "bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90",
         red: "bg-[#c72c41] text-white hover:bg-[#c72c41]/90 dark:bg-[#c72c41] dark:text-white dark:hover:bg-[#c72c41]/90",
         orange: "bg-[#d76d2b] text-white hover:bg-[#d76d2b]/90 dark:bg-[#d76d2b] dark:text-white dark:hover:bg-[#d76d2b]/90",
-        green: "bg-[#2b7a3e] text-white hover:bg-[#2b7a3e]/90 dark:bg-[#2b7a3e] dark:text-white dark:hover:bg-[#2b7a3e]/90",
+        green: "bg-[#008000] text-white hover:bg-[#008000]/90 dark:bg-[#008000] dark:text-white dark:hover:bg-[#008000]/90",
         blue: "bg-[#3b6dbf] text-white hover:bg-[#3b6dbf]/90 dark:bg-[#3b6dbf] dark:text-white dark:hover:bg-[#3b6dbf]/90",
         purple: "bg-[#5c4b8a] text-white hover:bg-[#5c4b8a]/90 dark:bg-[#5c4b8a] dark:text-white dark:hover:bg-[#5c4b8a]/90",
         pink: "bg-[#d83c5e] text-white hover:bg-[#d83c5e]/90 dark:bg-[#d83c5e] dark:text-white dark:hover:bg-[#d83c5e]/90",

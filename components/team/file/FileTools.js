@@ -13,21 +13,25 @@ import {
 import { Button } from '@/components/ui/button'
 import { Upload, File, X, FileText, Sheet, Film, Music, Eye, ChevronLeft } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { supabase } from '@/lib/supabase'
+import { useToast } from '@/hooks/use-toast'
 
-export default function FileTools({ isOpen, onClose }) {
+export default function FileTools({ isOpen, onClose, taskId, currentPath = '/', onFilesUploaded }) {
   const t = useTranslations('CreateTask')
+  const { toast } = useToast()
   const [files, setFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
   const [previewFile, setPreviewFile] = useState(null)
+  const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef(null)
 
-  // 处理文件选择
+  // Handle file selection
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files || [])
     addFiles(selectedFiles)
   }
 
-  // 添加文件到列表
+  // Add files to the list
   const addFiles = (selectedFiles) => {
     const newFiles = selectedFiles.map(file => ({
       id: Date.now() + Math.random(),
@@ -41,12 +45,12 @@ export default function FileTools({ isOpen, onClose }) {
     setFiles(prev => [...prev, ...newFiles])
   }
 
-  // 移除文件
+  // Remove file
   const removeFile = (id) => {
     setFiles(files => {
       const updatedFiles = files.filter(file => file.id !== id)
       
-      // 清理URL对象
+      // Clean up URL object
       const fileToRemove = files.find(file => file.id === id)
       if (fileToRemove && fileToRemove.preview) {
         URL.revokeObjectURL(fileToRemove.preview)
@@ -56,7 +60,7 @@ export default function FileTools({ isOpen, onClose }) {
     })
   }
 
-  // 处理拖放
+  // Handle drag and drop
   const handleDragEnter = (e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -83,12 +87,12 @@ export default function FileTools({ isOpen, onClose }) {
     addFiles(droppedFiles)
   }
 
-  // 触发文件选择
+  // Trigger file selection
   const handleSelectFilesClick = () => {
     fileInputRef.current?.click()
   }
 
-  // 格式化文件大小
+  // Format file size
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -97,9 +101,9 @@ export default function FileTools({ isOpen, onClose }) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  // 获取文件图标
+  // Get file icon
   const getFileIcon = (fileType) => {
-    // 根据文件类型返回对应图标
+    // Return appropriate icon based on file type
     if (fileType.includes('pdf')) {
       return <File className="w-5 h-5 text-red-500" />
     } else if (fileType.includes('word') || fileType.includes('doc')) {
@@ -117,21 +121,21 @@ export default function FileTools({ isOpen, onClose }) {
     }
   }
 
-  // 打开文件预览
+  // Open file preview
   const openPreview = (file) => {
     setPreviewFile(file)
   }
 
-  // 关闭文件预览
+  // Close file preview
   const closePreview = () => {
     setPreviewFile(null)
   }
 
-  // 渲染文件预览内容
+  // Render preview content
   const renderPreviewContent = () => {
     if (!previewFile) return null
 
-    // 根据文件类型渲染不同的预览组件
+    // Render different preview components based on file type
     if (previewFile.type.startsWith('image/')) {
       return (
         <img 
@@ -169,10 +173,10 @@ export default function FileTools({ isOpen, onClose }) {
               previewFile.type.includes('json') || 
               previewFile.type.includes('html') || 
               previewFile.type.includes('css')) {
-      // 为文本文件创建预览
+      // Create a preview for text files
       const [textContent, setTextContent] = useState(t('loading'))
       
-      // 读取文本内容
+      // Read text content
       useEffect(() => {
         const reader = new FileReader()
         reader.onload = (e) => {
@@ -192,7 +196,7 @@ export default function FileTools({ isOpen, onClose }) {
         </div>
       )
     } else {
-      // 对于其他无法预览的文件类型
+      // For other file types that cannot be previewed
       return (
         <div className="text-center py-8">
           <div className="mx-auto w-16 h-16 mb-4 flex items-center justify-center">
@@ -219,23 +223,119 @@ export default function FileTools({ isOpen, onClose }) {
     }
   }
 
-  // 确认上传
-  const handleConfirmUpload = () => {
-    // 这里可以实现实际的文件上传逻辑
-    console.log('Files to upload:', files)
+  // Confirm upload
+  const handleConfirmUpload = async () => {
+    if (!files.length) return
+    if (!taskId) {
+      toast({
+        title: t('uploadError'),
+        description: t('noTaskIdProvided'),
+        variant: 'destructive'
+      })
+      return
+    }
     
-    // 上传完成后清理
-    files.forEach(file => {
-      if (file.preview) {
-        URL.revokeObjectURL(file.preview)
+    try {
+      setIsUploading(true)
+      
+      // Get current task data to access attachment_ids
+      const { data: taskData, error: taskError } = await supabase
+        .from('task')
+        .select('attachment_ids')
+        .eq('id', taskId)
+        .single()
+      
+      if (taskError) throw taskError
+      
+      const attachmentIds = taskData?.attachment_ids || []
+      const newAttachmentIds = []
+      
+      // Upload each file
+      for (const fileItem of files) {
+        // Generate a unique file path
+        const timestamp = new Date().getTime()
+        const fileExt = fileItem.name.split('.').pop()
+        const fileName = `${timestamp}_${fileItem.name}`
+        const filePath = `tasks/${taskId}/${fileName}`
+        
+        // Upload file to Supabase storage
+        const { data: storageData, error: storageError } = await supabase.storage
+          .from('attachments')
+          .upload(filePath, fileItem.file)
+        
+        if (storageError) throw storageError
+        
+        // Get public URL
+        const { data: publicUrlData } = supabase.storage
+          .from('attachments')
+          .getPublicUrl(filePath)
+          
+        const publicUrl = publicUrlData.publicUrl
+        
+        // Insert record into attachment table
+        const { data: attachmentData, error: attachmentError } = await supabase
+          .from('attachment')
+          .insert({
+            file_name: fileItem.name,
+            file_url: publicUrl,
+            task_id: taskId,
+            uploaded_by: '/* user id from context */', // Replace with authenticated user ID
+            file_path: currentPath,
+            file_type: fileItem.type,
+            size: fileItem.size
+          })
+          .select()
+        
+        if (attachmentError) throw attachmentError
+        
+        newAttachmentIds.push(attachmentData[0].id)
       }
-    })
-    
-    setFiles([])
-    onClose()
+      
+      // Update task with new attachment IDs
+      const { error: updateError } = await supabase
+        .from('task')
+        .update({ 
+          attachment_ids: [...attachmentIds, ...newAttachmentIds],
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', taskId)
+      
+      if (updateError) throw updateError
+      
+      // Clean up
+      files.forEach(file => {
+        if (file.preview) {
+          URL.revokeObjectURL(file.preview)
+        }
+      })
+      
+      setFiles([])
+      
+      toast({
+        title: t('uploadSuccess'),
+        description: t('filesUploadedSuccessfully'),
+        variant: 'default'
+      })
+      
+      // Call callback function if provided
+      if (typeof onFilesUploaded === 'function') {
+        onFilesUploaded()
+      }
+      
+      onClose()
+    } catch (error) {
+      console.error('Upload error:', error)
+      toast({
+        title: t('uploadError'),
+        description: error.message,
+        variant: 'destructive'
+      })
+    } finally {
+      setIsUploading(false)
+    }
   }
 
-  // 关闭对话框时清理
+  // Clean up on dialog close
   const handleClose = () => {
     files.forEach(file => {
       if (file.preview) {
@@ -274,7 +374,9 @@ export default function FileTools({ isOpen, onClose }) {
           <>
             <DialogHeader>
               <DialogTitle>{t('uploadFile')}</DialogTitle>
-              <DialogDescription>{t('uploadFileDescription')}</DialogDescription>
+              <DialogDescription>
+                {currentPath === '/' ? t('uploadToRootFolder') : t('uploadingTo') + ` ${currentPath}`}
+              </DialogDescription>
             </DialogHeader>
             
             <div 
@@ -363,9 +465,9 @@ export default function FileTools({ isOpen, onClose }) {
               <Button 
                 type="button" 
                 onClick={handleConfirmUpload}
-                disabled={files.length === 0}
+                disabled={files.length === 0 || isUploading}
               >
-                {t('upload')}
+                {isUploading ? t('uploading') : t('upload')}
               </Button>
             </DialogFooter>
           </>

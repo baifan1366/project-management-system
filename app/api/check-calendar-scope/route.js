@@ -39,27 +39,33 @@ async function checkCalendarScope(accessToken) {
 // 刷新访问令牌
 async function refreshAccessToken(refreshToken) {
   try {
+    // 添加日志以便调试
+    console.log('正在尝试刷新Google令牌...');
+    
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: process.env.NEXT_PUBLIC_SUPABASE_GOOGLE_CLIENT_ID,
-        client_secret: process.env.NEXT_PUBLIC_SUPABASE_GOOGLE_CLIENT_SECRET,
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        client_secret: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
       }),
     });
     
     if (!response.ok) {
+      const errorData = await response.json();
+      console.error('刷新令牌失败:', errorData);
       throw new Error('Failed to refresh access token');
     }
     
     const data = await response.json();
+    console.log('令牌刷新成功');
     return data.access_token;
   } catch (error) {
-    console.error('Error refreshing access token:', error);
+    console.error('刷新访问令牌时出错:', error);
     throw error;
   }
 }

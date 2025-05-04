@@ -7,7 +7,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN, enUS } from 'date-fns/locale';
 import { useParams } from 'next/navigation';
 import { Clock, FilePlus, FileText, MessageSquare, User, CheckCircle, XCircle, Edit, Trash2, Plus } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function ActivityLog() {
   const t = useTranslations('Projects');
@@ -18,12 +18,12 @@ export default function ActivityLog() {
   const [error, setError] = useState(null);
   const locale = params.locale || 'en';
   const [userId, setUserId] = useState(null);
+  const { user } = useGetUser(); 
   
   // 获取当前用户ID
   useEffect(() => {
     async function getCurrentUser() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           setUserId(user.id);
         }

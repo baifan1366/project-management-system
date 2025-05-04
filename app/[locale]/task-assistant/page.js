@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import TaskManagerAgent from '@/components/ui/TaskManagerAgent';
 import { useTranslations } from 'next-intl';
-import { supabase } from '@/lib/supabase';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -11,20 +11,20 @@ export default function TaskAssistantPage() {
   const t = useTranslations();
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { user:data, error } = useGetUser();
   
   useEffect(() => {
     async function getUserInfo() {
       try {
         setLoading(true);
-        const { data, error } = await supabase.auth.getUser();
         
         if (error) {
           console.error('Error getting user:', error);
           return;
         }
         
-        if (data?.user) {
-          setUserId(data.user.id);
+        if (data) {
+          setUserId(data.id);
         }
       } catch (error) {
         console.error('Failed to get user info:', error);
@@ -34,7 +34,7 @@ export default function TaskAssistantPage() {
     }
     
     getUserInfo();
-  }, []);
+  }, [data]);
   
   if (loading) {
     return (
@@ -47,8 +47,8 @@ export default function TaskAssistantPage() {
   if (!userId) {
     return (
       <div className="container w-full py-12 px-4 md:px-6 h-[calc(100vh-64px)] overflow-auto">
-        <div className="text-center space-y-3">
-          <div className="flex justify-center mb-4">
+        <div className="text-center space-y-3 w-full">
+          <div className="flex justify-center mb-4  w-full">
             <Image 
               src="/pengy assistant.png" 
               alt="Pengy Assistant" 
