@@ -5,10 +5,11 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { PlusIcon, MoreHorizontal , Pen, Trash2, Check, User} from 'lucide-react';
 import { Button } from '../../ui/button';
 import { useTranslations } from 'next-intl';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu';
 import BodyContent from './BodyContent';
 import HandleSection from './HandleSection';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu';
 import LikeTask from './LikeTask';
+import HandleTask from './HandleTask';
 
 export default function TaskKanban({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
@@ -24,6 +25,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
       loadData(true);
     } 
   });
+  const { DeleteTask, selectTask } = HandleTask({ teamId });
   
   // 使用useRef跟踪是否已初始化，避免重复初始化引起的循环
   const isInitialized = useRef(false);
@@ -162,6 +164,16 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     });
   };
 
+  const handleDeleteTask = ({columnId, taskId}) => {
+    // 先选中要删除的任务
+    selectTask(tasks[taskId]);
+    // 删除任务并在成功后刷新看板
+    DeleteTask(columnId, taskId, () => {
+      // 使用loadData强制刷新看板数据
+      loadData(true);
+    });
+  }
+
   const handleAddSection = () => {
     setIsAddingSection(true);
     setNewSectionTitle('');
@@ -235,6 +247,13 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
       document.removeEventListener('click', handleClickOutside);
     };
   }, []);
+
+  // 添加任务点击处理函数
+  const handleTaskClick = (task) => {
+    // 选中任务
+    selectTask(task);
+    // 这里可以添加额外的操作，比如显示任务详情等
+  };
 
   return (
     <div className="p-2">
@@ -335,13 +354,12 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                           {...provided.draggableProps}
                                           {...provided.dragHandleProps}
                                           className="p-3 rounded-md hover:bg-gray-200 hover:dark:bg-accent relative group"
+                                          onClick={() => handleTaskClick(task)}
                                         >
                                           {/* 顶部栏 */}
                                           <div className="flex justify-between items-center">
                                             <div className="flex items-center">
-                                              {/* <button className="mr-2 h-4 w-4 rounded-full flex items-center justify-center border border-gray-300 hover:bg-gray-200">
-                                                <Check size={12} className="text-gray-500" />
-                                              </button> */}
+                                              <LikeTask task={task} onLikeUpdate={() => {}} />
                                               <span className="text-sm text-black dark:text-white">{task.content}</span>
                                             </div>
                                             <button className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black">
@@ -354,7 +372,17 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                             <div>
                                               <User size={14} className="text-gray-500" />
                                             </div>
-                                            <LikeTask task={task} onLikeUpdate={() => {}} />
+                                            <div>
+                                              <button 
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDeleteTask({columnId: column?.id, taskId: task.id});
+                                                }}
+                                                className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black"
+                                              >
+                                                <Trash2 size={14} className="text-red-500" />
+                                              </button>
+                                            </div>
                                           </div>
                                         </div>
                                       )}

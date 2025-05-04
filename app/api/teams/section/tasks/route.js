@@ -283,10 +283,18 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const teamId = searchParams.get('teamId')
     
     if (!id) {
       return NextResponse.json(
         { error: 'Task ID is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!teamId) {
+      return NextResponse.json(
+        { error: '团队ID是必需参数' },
         { status: 400 }
       )
     }

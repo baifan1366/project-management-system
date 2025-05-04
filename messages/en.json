@@ -461,7 +461,8 @@
     "teamNotFound": "The team associated with this project was not found",
     "noTeamsInProject": "This project has no associated teams",
     "multipleTeamsFound": "Multiple teams were found for this project",
-    "deleteFailed": "Failed to delete message"
+    "deleteFailed": "Failed to delete message",
+    "teamIdRequired": "Team ID is required"
   },
   "Pricing": {
     "title": "Plans and Pricing",
@@ -678,7 +679,6 @@
     "confirmDeleteLink": "Confirm Delete Link",
     "confirmDeleteTask": "Confirm Delete Task",
     "link": "Link",
-    "willBeDeleted": "will be deleted",
     "pleaseFillInTheFollowingInformationToCreateANewTask": "Please fill in the following information to create a new task",
     "add": "Add",
     "adding": "Adding...",
@@ -736,7 +736,9 @@
     "enterDuration": "Enter duration",
     "totalLikes": "Total likes",
     "likedThisTask": "liked this task",
-    "loadingUsers": "Loading users..."
+    "loadingUsers": "Loading users...",
+    "taskDeleted": "Task deleted successfully",
+    "deleteError": "Error deleting task"
   },
   "ChatDialog": {
     "privateMessages": "Private Messages",

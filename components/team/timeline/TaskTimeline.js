@@ -288,7 +288,8 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
             sectionId: null, // API会处理从部分中删除任务ID
             userId: user?.id,
             oldValues: editTask,
-            taskId: editTask.id
+            taskId: editTask.id,
+            teamId: teamId
           })).unwrap();
           
           gantt.refreshData();

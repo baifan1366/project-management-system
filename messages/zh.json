@@ -490,7 +490,9 @@
     "field_required_description": "字段是否必填",
     "field_placeholder_description": "字段的占位符",
     "field_description_description": "字段的描述",
-    "field_options_description": "字段的选项"
+    "field_options_description": "字段的选项",
+    "taskDeleted": "任务已成功删除",
+    "deleteError": "删除任务时出错"
   },
   "ChatDialog": {
     "privateMessages": "私人消息",
@@ -957,7 +959,8 @@
     }
   },
   "Errors": {
-    "deleteFailed": "撤回消息失败"
+    "deleteFailed": "撤回消息失败",
+    "teamIdRequired": "团队ID是必需参数"
   },
   "AI_Workflow": {
     "title": "AI 工作流",

@@ -407,7 +407,7 @@ export default function TeamCustomFieldPage() {
                     className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.PENDING} ${statusHoverColors.PENDING} transition-colors duration-200 ${statusFocusColors.PENDING}`}
                     onClick={() => handleStatusChange('PENDING')}
                   >
-                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
                     {t('PENDING')}
                     {selectedTeam?.status === 'PENDING' && <Check className="h-4 w-4 ml-auto" />}
                   </DropdownMenuItem>
@@ -415,7 +415,7 @@ export default function TeamCustomFieldPage() {
                     className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.IN_PROGRESS} ${statusHoverColors.IN_PROGRESS} transition-colors duration-200 ${statusFocusColors.IN_PROGRESS}`}
                     onClick={() => handleStatusChange('IN_PROGRESS')}
                   >
-                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
                     {t('IN_PROGRESS')}
                     {selectedTeam?.status === 'IN_PROGRESS' && <Check className="h-4 w-4 ml-auto" />}
                   </DropdownMenuItem>
@@ -423,7 +423,7 @@ export default function TeamCustomFieldPage() {
                     className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.COMPLETED} ${statusHoverColors.COMPLETED} transition-colors duration-200 ${statusFocusColors.COMPLETED}`}
                     onClick={() => handleStatusChange('COMPLETED')}
                   >
-                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
                     {t('COMPLETED')}
                     {selectedTeam?.status === 'COMPLETED' && <Check className="h-4 w-4 ml-auto" />}
                   </DropdownMenuItem>
@@ -431,7 +431,7 @@ export default function TeamCustomFieldPage() {
                     className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.CANCELLED} ${statusHoverColors.CANCELLED} transition-colors duration-200 ${statusFocusColors.CANCELLED}`}
                     onClick={() => handleStatusChange('CANCELLED')}
                   >
-                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
                     {t('CANCELLED')}
                     {selectedTeam?.status === 'CANCELLED' && <Check className="h-4 w-4 ml-auto" />}
                   </DropdownMenuItem>
@@ -439,7 +439,7 @@ export default function TeamCustomFieldPage() {
                     className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.ON_HOLD} ${statusHoverColors.ON_HOLD} transition-colors duration-200 ${statusFocusColors.ON_HOLD}`}
                     onClick={() => handleStatusChange('ON_HOLD')}
                   >
-                    <Circle className="h-4 w-4 mr-2" style={{fill: 'currentColor'}} />
+                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
                     {t('ON_HOLD')}
                     {selectedTeam?.status === 'ON_HOLD' && <Check className="h-4 w-4 ml-auto" />}
                   </DropdownMenuItem>

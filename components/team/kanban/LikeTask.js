@@ -32,21 +32,22 @@ import { createSelector } from '@reduxjs/toolkit';
 /**
  * 创建选择器工厂函数
  * 为每个组件实例创建一个独立的选择器，避免跨实例共享状态
+ * 优化了记忆化过程，确保转换逻辑在结果函数内部，避免不必要的重新渲染
+ * @returns {Function} 返回一个记忆化的选择器函数
  */
 const createLikedUsersSelector = () => {
+  // 先创建两个基础选择器
   const selectUsers = state => state.users?.users;
-  // 第一层记忆化 - 提取出users数组
-  const usersSelector = createSelector(
-    selectUsers,
-    users => users || []
-  );
+  const selectLikes = (_, likes) => likes;
   
-  // 使用createSelector记忆整个结果
+  // 创建记忆化选择器，确保转换逻辑在结果函数内部
   return createSelector(
-    [usersSelector, (_, likes) => likes],
+    [selectUsers, selectLikes],
     (users, likes) => {
       // 处理边界情况
-      if (!users.length || !likes || !likes.length) return [];
+      if (!users || !Array.isArray(users) || !likes || !Array.isArray(likes) || !likes.length) {
+        return [];
+      }
       
       // 对于每个like的id，找到对应的用户并过滤掉未找到的结果
       return likes
@@ -152,7 +153,7 @@ export default function LikeTask({ task, onLikeUpdate }) {
       <Tooltip open={isHovering && likes.length > 0}>
         <TooltipTrigger asChild>
           <button 
-            className={`p-1 rounded-md hover:bg-white hover:dark:bg-black group-hover:visible ${isLiked ? 'text-blue-500 visible' : 'text-gray-500 invisible'}`}
+            className={`p-1 rounded-md hover:bg-white hover:dark:bg-black ${isLiked ? 'text-blue-500 visible' : 'text-gray-500 visible'}`}
             onClick={handleLike}
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
