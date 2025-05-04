@@ -92,6 +92,7 @@ function formatGanttDate(date) {
 export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }) {
   const ganttContainer = useRef(null);
   const t = useTranslations('CreateTask');
+  const tConfirm = useTranslations('confirmation')
   const { confirm } = useConfirm();
   const project = useSelector(state => 
     state.projects.projects.find(p => p.id.toString() === projectId.toString())
@@ -259,8 +260,8 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
 
   const handleDeleteTask = async () => {
     confirm({
-      title: t('confirmDeleteTask'),
-      description: `${t('task')} "${editTask.text}" ${t('willBeDeleted')}`,
+      title: tConfirm('confirmDeleteTask'),
+      description: `${tConfirm('task')} "${editTask.text}" ${tConfirm('willBeDeleted')}`,
       variant: 'error',
       onConfirm: async () => {
         try {

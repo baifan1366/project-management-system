@@ -25,7 +25,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
       loadData(true);
     } 
   });
-  const { DeleteTask, selectTask } = HandleTask({ teamId });
+  const { DeleteTask, selectTask, UpdateTask, CreateTask } = HandleTask({ teamId });
   
   // 使用useRef跟踪是否已初始化，避免重复初始化引起的循环
   const isInitialized = useRef(false);
@@ -41,6 +41,14 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
   // 跟踪当前正在编辑的列
   const [editingColumnId, setEditingColumnId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
+  
+  // 跟踪当前正在编辑的任务
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editingTaskContent, setEditingTaskContent] = useState('');
+  
+  // 跟踪新创建的任务
+  const [newTaskId, setNewTaskId] = useState(null);
+  const [newTaskContent, setNewTaskContent] = useState('');
   
   // 跟踪新分区的添加状态
   const [isAddingSection, setIsAddingSection] = useState(false);
@@ -137,23 +145,23 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
   
   // 添加新任务的处理函数
   const handleAddTask = (columnId) => {
-    const newTaskId = `task-${Date.now()}`;
+    const tempTaskId = `task-${Date.now()}`;
     const newTask = {
-      id: newTaskId,
-      content: '新任务',
+      id: tempTaskId,
+      content: '',  // 初始内容为空，供用户输入
       assignee: null
     };
 
     // 更新任务列表
     setTasks({
       ...tasks,
-      [newTaskId]: newTask
+      [tempTaskId]: newTask
     });
 
     // 更新列
     const column = columns[columnId];
     const newTaskIds = Array.from(column.taskIds);
-    newTaskIds.push(newTaskId);
+    newTaskIds.push(tempTaskId);
 
     setColumns({
       ...columns,
@@ -162,7 +170,32 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
         taskIds: newTaskIds
       }
     });
+    
+    // 设置为正在编辑的新任务
+    setNewTaskId(tempTaskId);
+    setNewTaskContent('');
   };
+
+  const handleUpdateTask = (taskId) => {
+    // 如果已经处于编辑状态，则直接返回
+    if (editingTaskId === taskId) {
+      return;
+    }
+    
+    // 获取任务对象
+    const task = tasks[taskId];
+    if (!task) {
+      console.error('任务不存在:', taskId);
+      return;
+    }
+    
+    // 设置当前正在编辑的任务
+    setEditingTaskId(taskId);
+    setEditingTaskContent(task.content || '');
+    
+    // 选中任务
+    selectTask(task);
+  }
 
   const handleDeleteTask = ({columnId, taskId}) => {
     // 先选中要删除的任务
@@ -253,6 +286,113 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     // 选中任务
     selectTask(task);
     // 这里可以添加额外的操作，比如显示任务详情等
+  };
+
+  // 保存编辑后的任务
+  const saveEditedTask = () => {
+    if (editingTaskId && editingTaskContent.trim()) {
+      const trimmedContent = editingTaskContent.trim();
+      
+      // 更新本地状态
+      const updatedTask = {
+        ...tasks[editingTaskId],
+        content: trimmedContent
+      };
+      
+      setTasks({
+        ...tasks,
+        [editingTaskId]: updatedTask
+      });
+      
+      // 先选中更新后的任务
+      selectTask(updatedTask);
+      
+      // 调用后端API更新任务，传递新的内容
+      UpdateTask(editingTaskId, () => {
+        // 成功后刷新看板
+        loadData(true);
+      }, trimmedContent);
+    }
+    // 退出编辑模式
+    setEditingTaskId(null);
+  };
+
+  // 取消编辑任务
+  const cancelEditTask = () => {
+    setEditingTaskId(null);
+  };
+
+  // 保存新创建的任务
+  const saveNewTask = () => {
+    if (newTaskId && newTaskContent.trim()) {
+      // 更新本地状态
+      const updatedTask = {
+        ...tasks[newTaskId],
+        content: newTaskContent.trim()
+      };
+      
+      setTasks({
+        ...tasks,
+        [newTaskId]: updatedTask
+      });
+      
+      // 调用 CreateTask API 保存到服务器
+      // 获取任务所在的列（分区）
+      const columnId = Object.keys(columns).find(colId => 
+        columns[colId].taskIds.includes(newTaskId)
+      );
+      
+      if (columnId) {
+        // 获取分区的原始ID
+        const sectionId = columns[columnId].originalId || columnId;
+        
+        // 调用 CreateTask API
+        CreateTask({
+          sectionId,
+          content: newTaskContent.trim(),
+          tempId: newTaskId
+        }, () => {
+          // 成功后刷新看板
+          loadData(true);
+        });
+      }
+    }
+    
+    // 重置新任务状态
+    setNewTaskId(null);
+    setNewTaskContent('');
+  };
+  
+  // 取消新任务创建
+  const cancelNewTask = () => {
+    if (newTaskId) {
+      // 从任务列表中移除临时任务
+      const newTasks = { ...tasks };
+      delete newTasks[newTaskId];
+      setTasks(newTasks);
+      
+      // 从列的任务ID列表中移除
+      const columnId = Object.keys(columns).find(colId => 
+        columns[colId].taskIds.includes(newTaskId)
+      );
+      
+      if (columnId) {
+        const column = columns[columnId];
+        const updatedTaskIds = column.taskIds.filter(id => id !== newTaskId);
+        
+        setColumns({
+          ...columns,
+          [columnId]: {
+            ...column,
+            taskIds: updatedTaskIds
+          }
+        });
+      }
+    }
+    
+    // 重置新任务状态
+    setNewTaskId(null);
+    setNewTaskContent('');
   };
 
   return (
@@ -360,9 +500,52 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                           <div className="flex justify-between items-center">
                                             <div className="flex items-center">
                                               <LikeTask task={task} onLikeUpdate={() => {}} />
-                                              <span className="text-sm text-black dark:text-white">{task.content}</span>
+                                              {editingTaskId === task.id ? (
+                                                <input
+                                                  type="text"
+                                                  value={editingTaskContent}
+                                                  onChange={(e) => setEditingTaskContent(e.target.value)}
+                                                  className="w-full bg-white dark:bg-black border border-border rounded px-2 py-1 text-sm text-black dark:text-white"
+                                                  autoFocus
+                                                  onBlur={saveEditedTask}
+                                                  onKeyPress={(e) => e.key === 'Enter' && saveEditedTask()}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Escape') {
+                                                      e.stopPropagation();
+                                                      cancelEditTask();
+                                                    }
+                                                  }}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                />
+                                              ) : newTaskId === task.id ? (
+                                                <input
+                                                  type="text"
+                                                  value={newTaskContent}
+                                                  onChange={(e) => setNewTaskContent(e.target.value)}
+                                                  className="w-full bg-white dark:bg-black border border-border rounded px-2 py-1 text-sm text-black dark:text-white"
+                                                  autoFocus
+                                                  placeholder={t('enterTaskName')}
+                                                  onBlur={saveNewTask}
+                                                  onKeyPress={(e) => e.key === 'Enter' && saveNewTask()}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Escape') {
+                                                      e.stopPropagation();
+                                                      cancelNewTask();
+                                                    }
+                                                  }}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                />
+                                              ) : (
+                                                <span className="text-sm text-black dark:text-white">{task.content}</span>
+                                              )}
                                             </div>
-                                            <button className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black">
+                                            <button 
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleUpdateTask(task.id);
+                                              }}
+                                              className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black"
+                                            >
                                               <Pen size={14} className="text-gray-500" />
                                             </button>
                                           </div>

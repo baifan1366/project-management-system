@@ -568,6 +568,7 @@
     "taskCreated": "Your task has been created successfully.",
     "createError": "Error creating task.",
     "pleaseTryAgain": "Something went wrong. Please try again.",
+    "enterNewTaskName": "Enter new task name",
     "setStatus": "Set Status",
     "PENDING": "Pending",
     "IN_PROGRESS": "In Progress",
@@ -1559,7 +1560,8 @@
     "deleteTeamConfirmation": "Confirm Delete Team",
     "deleteTeamWarning": "Warning",
     "type{teamName}ToConfirm": "Type {teamName} to Confirm",
-    "permanentlyDelete": "Delete"
+    "permanentlyDelete": "Delete",
+    "task": "Task"
   },
   "validationRules": {
     "teamNameMin": "Team Name must be at least 2 characters.",
