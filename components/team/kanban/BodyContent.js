@@ -69,7 +69,8 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
                             id: task.id.toString(),
                             content: taskContent,
                             assignee: task.assignee_id ? { avatar: '/avatar-placeholder.png' } : null,
-                            tag_values: task.tag_values
+                            tag_values: task.tag_values,
+                            likes: task.likes || [] // 确保包含likes字段，如果不存在则设为空数组
                         };
                         
                         // 将任务ID添加到部门的任务列表
