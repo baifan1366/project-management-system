@@ -29,12 +29,14 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
     const tValidation = useTranslations('validationRules')
     const [isLoading, setIsLoading] = useState(false)
     const dispatch = useDispatch()
-    const [themeColor, setThemeColor] = useState('#64748b')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [showDescription, setShowDescription] = useState(false)
     const { user } = useGetUser();
     const [tagTypes, setTagTypes] = useState(['TEXT', 'NUMBER', 'ID', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TAGS'])
-
+    const [themeColor, setThemeColor] = useState('#64748b')
+    const project = useSelector(state => 
+      state.projects.projects.find(p => String(p.id) === String(projectId))
+    );
     const validationSchema = createTagValidationSchema(tValidation, { 
         requireDescription: showDescription 
     });
@@ -91,30 +93,15 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
     };
 
     useEffect(() => {
-        if (!projectId) {
-            console.error('ProjectId is missing', { projectId, teamId, teamCFId });
+        if (project?.theme_color) {
+          setThemeColor(project.theme_color);
         }
-    }, [projectId, teamId, teamCFId]);
+      }, [project]);
 
     useEffect(() => {
-        const loadProjectData = async () => {
-            if (!projectId) {
-                console.error('ProjectId is required for loading project data');
-                return;
-            }
-            try {
-                const projectData = await dispatch(fetchProjectById(projectId)).unwrap()
-                setThemeColor(projectData?.theme_color ?? '#64748b');
-            } catch (error) {
-                console.error('获取项目数据失败:', error);
-                // 使用默认主题色
-                setThemeColor('#64748b');
-            }
-        }
         if(isOpen) {
             form.reset()
             form.clearErrors()
-            loadProjectData()
         }
     }, [isOpen, dispatch, projectId]);
 
@@ -340,7 +327,7 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
                                 type="button"
                                 onClick={onClose}
                                 disabled={isSubmitting}
-                                variant={themeColor}
+                                variant="outline"
                             >
                                 {t('cancel')}
                             </Button>

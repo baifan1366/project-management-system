@@ -1149,5 +1149,13 @@
     "selectTeamToViewKnowledgeBase": "请选择一个团队以查看其知识库。",
     "goBack": "返回",
     "subpages": "子页面"
+  },
+  "File": {
+    "editInGridView": "切换到网格视图",
+    "listView": "切换到列表视图",
+    "folderDeleted": "文件夹已删除",
+    "folderAndContentsDeleted": "文件夹及其内容已删除",
+    "deletingFolderContents": "正在删除文件夹内容...",
+    "errorDeletingFolderContents": "删除文件夹内容时出错"
   }
 }

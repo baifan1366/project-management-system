@@ -23,6 +23,8 @@ import TaskFile from '@/components/team/file/TaskFile';
 import TaskWorkflow from '@/components/team/workflow/TaskWorkflow';
 import TaskOverview from '@/components/team/overview/TaskOverview';
 import TaskTimeline from '@/components/team/timeline/TaskTimeline';
+import TaskNotion from '@/components/team/notion/TaskNotion';
+import TaskCalendar from '@/components/team/calendar/TaskCalendar';
 
 // 创建记忆化的选择器
 const selectTeams = state => state.teams.teams;
@@ -241,6 +243,9 @@ export default function TeamCustomFieldPage() {
     if (fieldType === 'CALENDAR') {
       return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
+    if (fieldType === 'NOTE') {
+      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+    }
     return <div>暂不支持的字段类型: {fieldType}</div>;
   }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey]);
 
@@ -335,7 +340,7 @@ export default function TeamCustomFieldPage() {
       <div className="max-w-none border-0 bg-background text-foreground flex flex-col flex-grow">
         <div>
           <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <h2 className="text-xl font-semibold">{selectedTeam?.name}</h2>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -393,7 +398,7 @@ export default function TeamCustomFieldPage() {
                 <DropdownMenuTrigger asChild>
                   <Button 
                     size="sm"
-                    className={selectedTeam?.status ? `flex items-center px-3 py-2 text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200` : ""}
+                    className={selectedTeam?.status ? `border-transparent shadow-none flex items-center px-3 py-2 text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200` : ""}
                   >
                     <Circle 
                       className="h-4 w-4" 
