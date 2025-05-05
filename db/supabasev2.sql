@@ -30,7 +30,7 @@ CREATE TABLE "user" (
   "google_refresh_token" VARCHAR(2048),
   "google_token_expires_at" BIGINT,
   "github_access_token" VARCHAR(2048),
-  "github_refresh_token" VARCHAR(2048),
+  "github_refresh_token" VARCHAR(2048)
 );
 
 -- 添加索引以提高查询性能

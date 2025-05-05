@@ -369,6 +369,37 @@ export async function GET(request) {
           console.error('Error creating user:', insertError);
           throw new Error('Failed to create user');
         }
+        
+        // Create free subscription plan for the user
+        const now = new Date();
+        const oneYearFromNow = new Date(now);
+        oneYearFromNow.setFullYear(now.getFullYear() + 1);
+        
+        try {
+          console.log('Creating free subscription plan for OAuth user:', userId);
+          const { data: subscriptionData, error: subscriptionError } = await supabase
+            .from('user_subscription_plan')
+            .insert([
+              {
+                user_id: userId,
+                plan_id: 1, // Free plan ID
+                status: 'active',
+                start_date: now.toISOString(),
+                end_date: oneYearFromNow.toISOString()
+              },
+            ])
+            .select();
+          
+          if (subscriptionError) {
+            console.error('Error creating subscription for OAuth user:', subscriptionError);
+            // Continue with login despite subscription error
+          } else {
+            console.log('Subscription created successfully for OAuth user:', subscriptionData);
+          }
+        } catch (subscriptionCreateError) {
+          console.error('Exception during subscription creation for OAuth user:', subscriptionCreateError);
+          // Continue with login despite error
+        }
       }
     } catch (dbError) {
       console.error('Database error:', dbError);
