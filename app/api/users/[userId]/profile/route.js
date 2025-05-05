@@ -5,7 +5,7 @@ export async function PATCH(request, { params }) {
   try {
     const { userId } = params;
     const data = await request.json();
-    const { name, bio, language, timezone, phone, theme, provider, provider_id } = data;
+    const { name, language, timezone, phone, theme, google_provider_id, github_provider_id, last_login_provider } = data;
 
     // 更新用户表
     const { data: userData, error: userError } = await supabase
@@ -15,8 +15,9 @@ export async function PATCH(request, { params }) {
         language,
         phone,
         theme,
-        provider,
-        provider_id,
+        google_provider_id,
+        github_provider_id,
+        last_login_provider,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId)

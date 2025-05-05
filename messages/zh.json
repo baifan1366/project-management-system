@@ -183,7 +183,12 @@
         "compare": "比较计划",
         "contactSales": "联系销售"
       }
-    }
+    },
+    "connectProviderFailed": "连接{provider}失败",
+    "disconnectProviderFailed": "断开{provider}连接失败",
+    "googleAuthError": "谷歌授权错误: {error}",
+    "authError": "{provider}授权错误: {error}",
+    "authorizationStarted": "{provider}授权已开始，请在弹出窗口中继续"
   },
   "Projects": {
     "create": "创建项目",
@@ -424,6 +429,7 @@
     "taskCreated": "您的任务已成功创建",
     "createError": "创建任务时出错",
     "pleaseTryAgain": "出现问题，请重试",
+    "enterNewTaskName": "请输入新的任务名称",
     "setStatus": "设置状态",
     "editTeamDetails": "编辑团队详情",
     "manageTeamPermissions": "管理团队权限",
@@ -490,7 +496,9 @@
     "field_required_description": "字段是否必填",
     "field_placeholder_description": "字段的占位符",
     "field_description_description": "字段的描述",
-    "field_options_description": "字段的选项"
+    "field_options_description": "字段的选项",
+    "taskDeleted": "任务已成功删除",
+    "deleteError": "删除任务时出错"
   },
   "ChatDialog": {
     "privateMessages": "私人消息",
@@ -645,7 +653,6 @@
     "projects": "项目",
     "tasks": "任务",
     "loading": "加载中...",
-    "noResults": "未找到结果",
     "mentionSomebody": "提及某人...",
     "mentionPrompt": "输入@可提及用户、项目或任务",
     "mentionedYou": "提及了您",
@@ -957,7 +964,8 @@
     }
   },
   "Errors": {
-    "deleteFailed": "撤回消息失败"
+    "deleteFailed": "撤回消息失败",
+    "teamIdRequired": "团队ID是必需参数"
   },
   "AI_Workflow": {
     "title": "AI 工作流",
@@ -1146,5 +1154,13 @@
     "selectTeamToViewKnowledgeBase": "请选择一个团队以查看其知识库。",
     "goBack": "返回",
     "subpages": "子页面"
+  },
+  "File": {
+    "editInGridView": "切换到网格视图",
+    "listView": "切换到列表视图",
+    "folderDeleted": "文件夹已删除",
+    "folderAndContentsDeleted": "文件夹及其内容已删除",
+    "deletingFolderContents": "正在删除文件夹内容...",
+    "errorDeletingFolderContents": "删除文件夹内容时出错"
   }
 }

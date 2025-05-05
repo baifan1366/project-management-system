@@ -21,13 +21,14 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    bio: '',
     phone: '',
     email: ''
   });
   const [providerData, setProviderData] = useState({
-    provider: '',
-    providerId: ''
+    googleConnected: false,
+    githubConnected: false,
+    googleProviderId: '',
+    githubProviderId: ''
   });
 
   useEffect(() => {
@@ -40,25 +41,15 @@ export default function ProfilePage() {
     if (!session) return;
     setFormData({
       name: session.name || '',
-      bio: session.bio || '',
       phone: session.phone || '',
       email: session.email || ''
     });
     
-    let provider = 'local';
-    let providerId = '';
-    
-    if (session.google_provider_id) {
-      provider = 'google';
-      providerId = session.google_provider_id;
-    } else if (session.github_provider_id) {
-      provider = 'github';
-      providerId = session.github_provider_id;
-    }
-    
     setProviderData({
-      provider: provider,
-      providerId: providerId
+      googleConnected: !!session.google_provider_id,
+      githubConnected: !!session.github_provider_id,
+      googleProviderId: session.google_provider_id || '',
+      githubProviderId: session.github_provider_id || ''
     });
   };
 
@@ -76,7 +67,6 @@ export default function ProfilePage() {
     
     const profileData = {
       name: formData.name,
-      bio: formData.bio,
       phone: formData.phone
     };
     
@@ -99,18 +89,25 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    let toastId;
     try {
       setLoading(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-avatar.${fileExt}`;
-      const filePath = `user_${user.id}/${fileName}`;
+      toastId = toast.loading(t('uploading'));
       
-      const { error: uploadError, data } = await supabase.storage
+      // 1. Upload the file to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      // Generate random 8-character alphanumeric string
+      const randomString = Array(8).fill(0).map(() => Math.random().toString(36).charAt(2)).join('');
+      const fileName = `avatar-${user.id}-${randomString}.${fileExt}`;
+      const filePath = fileName;
+      
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { 
           upsert: true,
           contentType: file.type,
-          cacheControl: '3600'
+          cacheControl: '3600',
+          public: true
         });
 
       if (uploadError) {
@@ -118,28 +115,36 @@ export default function ProfilePage() {
         throw new Error(`上传头像失败: ${uploadError.message}`);
       }
 
+      // 2. Get the public URL for the uploaded file
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
+      // 3. Update avatar URL via the API endpoint instead of direct DB update
+      const response = await fetch(`/api/users/${user.id}/avatar`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ avatar_url: publicUrl }),
+      });
 
-      if (updateError) {
-        console.error('更新用户数据错误:', updateError);
-        throw new Error(`更新用户头像失败: ${updateError.message}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`更新用户头像失败: ${error.message || response.statusText}`);
       }
 
-      const { error: dbError } = await supabase
-        .from('user')
-        .update({ avatar_url: publicUrl })
-        .eq('id', user.id);
-
-      if (dbError) {
-        console.error('数据库更新错误:', dbError);
-      }
-
+      // 4. Update the user state
+      dispatch(updateUserProfile({ 
+        userId: user.id, 
+        profileData: { avatar_url: publicUrl }
+      }));
+      
+      toast.dismiss(toastId);
       toast.success(t('avatarUpdated'));
     } catch (error) {
       console.error('头像上传失败:', error);
+      toast.dismiss(toastId);
       toast.error(error.message || t('common.error'));
     } finally {
       setLoading(false);
@@ -149,40 +154,43 @@ export default function ProfilePage() {
   const handleConnectProvider = async (provider, withCalendarScope = false) => {
     if (!user) return;
     
-    if (provider === 'google') {
+    // For OAuth providers, use custom OAuth APIs
+    if (provider === 'google' || provider === 'github') {
       try {
-        toast.loading(t('connectingProvider', { provider: 'Google' }));
+        toast.loading(t('connectingProvider', { provider: provider === 'google' ? 'Google' : 'GitHub' }));
         
-        const scopes = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
+        // Build the redirect URL
+        let redirectUrl = `/api/auth/${provider.toLowerCase()}`;
+        const searchParams = new URLSearchParams();
         
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: `${window.location.origin}/${window.location.pathname.split('/')[1]}/settings/profile`,
-            scopes: scopes,
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent',
-            },
-          },
-        });
+        // Add redirectTo parameter to return to profile page
+        searchParams.append('redirectTo', `${window.location.origin}/${window.location.pathname.split('/')[1]}/settings/profile`);
         
-        if (error) {
-          console.error('谷歌授权错误:', error);
-          toast.error(t('googleAuthError', { error: error.message }));
-          throw error;
+        // Add calendar scope if requested for Google
+        if (provider === 'google' && withCalendarScope) {
+          // Add calendar flag to request calendar permissions
+          searchParams.append('calendar', 'true');
         }
         
-        // 授权开始提示
-        toast.success(t('authorizationStarted', { provider: 'Google' }));
+        // Append search params to redirect URL
+        redirectUrl += `?${searchParams.toString()}`;
+        
+        // Redirect to the OAuth endpoint
+        window.location.href = redirectUrl;
+        
+        // Show authorization started toast
+        toast.success(t('authorizationStarted', { provider: provider === 'google' ? 'Google' : 'GitHub' }));
+        
       } catch (err) {
-        console.error('Google sign in error:', err);
-        toast.error(t('connectProviderFailed', { provider: 'Google' }));
+        console.error(`${provider} sign in error:`, err);
+        toast.error(t('connectProviderFailed', { provider: provider === 'google' ? 'Google' : 'GitHub' }));
       }
       return;
     }
     
+    // For other providers (fallback, should not be used)
     const providerId = `sample-${provider}-id`;
+    const providerIdField = provider === 'google' ? 'google_provider_id' : 'github_provider_id';
     
     setLoading(true);
     try {
@@ -191,14 +199,16 @@ export default function ProfilePage() {
       const resultAction = await dispatch(connectProvider({ 
         userId: user.id, 
         provider, 
-        providerId 
+        providerId,
+        providerIdField
       }));
       
       if (connectProvider.fulfilled.match(resultAction)) {
-        setProviderData({
-          provider,
-          providerId
-        });
+        setProviderData(prev => ({
+          ...prev,
+          [provider === 'google' ? 'googleConnected' : 'githubConnected']: true,
+          [provider === 'google' ? 'googleProviderId' : 'githubProviderId']: providerId
+        }));
         toast.success(t('providerConnected', { provider }));
       } else {
         throw new Error(resultAction.error);
@@ -217,16 +227,20 @@ export default function ProfilePage() {
     try {
       toast.loading(t('disconnectingProvider', { provider }));
       
+      const providerIdField = provider === 'google' ? 'google_provider_id' : 'github_provider_id';
+      
       const resultAction = await dispatch(disconnectProvider({
         userId: user.id,
-        provider
+        provider,
+        providerIdField
       }));
       
       if (disconnectProvider.fulfilled.match(resultAction)) {
-        setProviderData({
-          provider: 'local',
-          providerId: ''
-        });
+        setProviderData(prev => ({
+          ...prev,
+          [provider === 'google' ? 'googleConnected' : 'githubConnected']: false,
+          [provider === 'google' ? 'googleProviderId' : 'githubProviderId']: ''
+        }));
         toast.success(t('providerDisconnected', { provider }));
       } else {
         throw new Error(resultAction.error);
@@ -317,16 +331,6 @@ export default function ProfilePage() {
                     placeholder={t('phone')}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bio">{t('bio')}</Label>
-                  <Input
-                    id="bio"
-                    name="bio"
-                    value={formData.bio}
-                    onChange={handleInputChange}
-                    placeholder={t('bio')}
-                  />
-                </div>
               </div>
             </div>
           </div>
@@ -363,13 +367,13 @@ export default function ProfilePage() {
               <div>
                 <p className="font-medium">GitHub</p>
                 <p className="text-sm text-muted-foreground">
-                  {providerData.provider === 'github' 
+                  {providerData.githubConnected 
                     ? t('connected') 
                     : t('notConnected')}
                 </p>
               </div>
             </div>
-            {providerData.provider === 'github' ? (
+            {providerData.githubConnected ? (
               <Button 
                 variant="outline" 
                 onClick={() => handleDisconnectProvider('github')}
@@ -401,13 +405,13 @@ export default function ProfilePage() {
               <div>
                 <p className="font-medium">Google</p>
                 <p className="text-sm text-muted-foreground">
-                  {providerData.provider === 'google' 
+                  {providerData.googleConnected
                     ? t('connected') 
                     : t('notConnected')}
                 </p>
               </div>
             </div>
-            {providerData.provider === 'google' ? (
+            {providerData.googleConnected ? (
               <Button 
                 variant="outline" 
                 onClick={() => handleDisconnectProvider('google')}
@@ -434,18 +438,18 @@ export default function ProfilePage() {
           <CardDescription>{t('authorizationsDesc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {(providerData.provider === 'google') && (
+          {providerData.googleConnected && (
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <CalendarIcon className="w-6 h-6 text-red-500" />
                 <div>
                   <p className="font-medium">{t('googleCalendar')}</p>
                   <p className="text-sm text-muted-foreground">
-                    {providerData.provider === 'google' ? t('calendarConnected') : t('calendarNotConnected')}
+                    {providerData.googleConnected ? t('calendarConnected') : t('calendarNotConnected')}
                   </p>
                 </div>
               </div>
-              {providerData.provider === 'google' ? (
+              {providerData.googleConnected ? (
                 <Button 
                   variant="outline"
                   disabled
@@ -463,7 +467,7 @@ export default function ProfilePage() {
             </div>
           )}
           
-          {providerData.provider !== 'google' && (
+          {!providerData.googleConnected && (
             <div className="text-center py-4 text-muted-foreground">
               <p>{t('connectGoogleFirst')}</p>
               <Button 

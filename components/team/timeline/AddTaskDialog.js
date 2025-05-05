@@ -346,7 +346,7 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
             <DialogFooter className="flex justify-end gap-2 pt-4">
               <Button 
                 type="button"
-                variant={taskColor}
+                variant="outline"
                 onClick={() => setShowTaskForm(false)}
                 disabled={isLoading}
               >
