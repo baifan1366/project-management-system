@@ -183,7 +183,12 @@
         "compare": "比较计划",
         "contactSales": "联系销售"
       }
-    }
+    },
+    "connectProviderFailed": "连接{provider}失败",
+    "disconnectProviderFailed": "断开{provider}连接失败",
+    "googleAuthError": "谷歌授权错误: {error}",
+    "authError": "{provider}授权错误: {error}",
+    "authorizationStarted": "{provider}授权已开始，请在弹出窗口中继续"
   },
   "Projects": {
     "create": "创建项目",
