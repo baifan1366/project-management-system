@@ -243,7 +243,7 @@ export default function NotionTools({
                   <SelectValue placeholder={t('noParent')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t('noParent')}</SelectItem>
+                  {/* <SelectItem value="">{t('noParent')}</SelectItem> */}
                   {pages.map((page) => (
                     <SelectItem key={page.id} value={page.id.toString()}>
                       {page.title}
