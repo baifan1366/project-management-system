@@ -65,6 +65,13 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
   // 获取标签宽度
   const { getTagWidth } = useResizeTools();
 
+  // 获取Name标签的ID
+  const nameTagId = useMemo(() => {
+    if (!tagsData?.length) return null;
+    const nameTag = tagsData.find(tag => tag.name === 'Name');
+    return nameTag?.id?.toString();
+  }, [tagsData]);
+
   // 处理部门数据
   const sectionInfo = useMemo(() => {
     if (!sections || !sections.length) return [];
@@ -113,14 +120,39 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
       // 创建新的任务数据对象，不依赖于之前的状态
       const newTasksData = {};
       
+      // 获取标签数组
+      const tags = tagsData?.tags || tagsData || [];
+      console.log('当前标签数据:', tags);
+      
       // 为每个部门加载任务
       for (let i = 0; i < sections.length; i++) {
         const section = sections[i];
         if (section && section.id) {
           try {
             const taskData = await dispatch(fetchTasksBySectionId(section.id)).unwrap();
-            // 将任务数据直接添加到新对象中
-            newTasksData[section.id] = taskData;
+            console.log(`部门 ${section.id} 原始任务数据:`, taskData);
+            
+            // 过滤掉没有名称的任务
+            const filteredTasks = taskData.filter(task => {
+              // 确保task和tag_values存在
+              if (!task || !task.tag_values) return false;
+              
+              // 遍历task的tag_values
+              for (const [tagId, value] of Object.entries(task.tag_values)) {
+                // 检查这个tag是否是Name类型
+                const tag = tags.find(t => t.id.toString() === tagId);
+                if (tag?.name === 'Name' && value) {
+                  console.log(`找到有Name值的任务:`, task);
+                  return true;
+                }
+              }
+              return false;
+            });
+            
+            console.log(`部门 ${section.id} 过滤后任务数据:`, filteredTasks);
+            
+            // 将过滤后的任务数据添加到新对象中
+            newTasksData[section.id] = filteredTasks;
           } catch (sectionError) {
             console.error(`加载部门 ${section.id} 的任务失败:`, sectionError);
             // 为失败的部门设置空数组
@@ -128,6 +160,8 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
           }
         }
       }
+      
+      console.log('最终处理的任务数据:', newTasksData);
       
       // 一次性更新所有任务数据，替换旧数据
       setLocalTasks(newTasksData);

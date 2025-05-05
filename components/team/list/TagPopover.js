@@ -88,10 +88,10 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
             })).unwrap();
             
             // 通知成功
-            toast({
-                title: `${t('tagAdded')}`,
-                description: `${t('tagAddedDescription')}`,
-            });
+            // toast({
+            //     title: `${t('tagAdded')}`,
+            //     description: `${t('tagAddedDescription')}`,
+            // });
             
             // 关闭弹窗
             setPopoverOpen(false);
