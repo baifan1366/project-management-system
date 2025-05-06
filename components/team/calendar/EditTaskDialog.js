@@ -22,6 +22,8 @@ import { Badge } from '@/components/ui/badge'
 import { useConfirm } from '@/hooks/use-confirm'
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { getTagByName } from '@/lib/redux/features/tagSlice'
+import { useParams } from "next/navigation";
+import { useSelector } from "react-redux";
 
 export default function EditTaskDialog({
   isOpen,
@@ -31,11 +33,14 @@ export default function EditTaskDialog({
   teamMembers,
   onTaskUpdated
 }) {
-  const t = useTranslations('TaskDialog')
+  const t = useTranslations('Calendar')
+  const tConfirm = useTranslations('confirmation')
   const dispatch = useDispatch()
   const { confirm } = useConfirm()
   const { user } = useGetUser();
-
+  const params = useParams()
+  const { id: projectId } = params
+  const [themeColor, setThemeColor] = useState('#64748b')
   // 状态
   const [name, setName] = useState(task.name || '')
   const [description, setDescription] = useState(task.description || '')
@@ -43,7 +48,9 @@ export default function EditTaskDialog({
   const [selectedAssignees, setSelectedAssignees] = useState(task.assigneeId ? [task.assigneeId] : [])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
   // 处理提交
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -113,9 +120,9 @@ export default function EditTaskDialog({
     }
 
     const confirmed = await confirm({
-      title: t('deleteTaskConfirmTitle'),
+      title: tConfirm('deleteTaskConfirmTitle'),
       variant: "error",
-      description: t('deleteTaskConfirmDescription')
+      description: tConfirm('deleteTaskConfirmDescription')
     })
 
     if (!confirmed) return
@@ -169,6 +176,11 @@ export default function EditTaskDialog({
       return [...prev, userId]
     })
   }
+  useEffect(() => {
+    if (project?.theme_color) {
+      setThemeColor(project.theme_color);
+    }
+  }, [project]);
   
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -324,7 +336,7 @@ export default function EditTaskDialog({
               >
                 {t('cancel')}
               </Button>
-              <Button type="submit" disabled={isSubmitting || isDeleting}>
+              <Button type="submit" disabled={isSubmitting || isDeleting} variant={themeColor}>
                 {isSubmitting ? t('updating') : t('update')}
               </Button>
             </div>

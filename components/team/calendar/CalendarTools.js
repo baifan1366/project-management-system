@@ -35,6 +35,7 @@ import { getSectionByTeamId, updateTaskIds } from '@/lib/redux/features/sectionS
 import { getTagByName } from '@/lib/redux/features/tagSlice'
 import { toast } from 'sonner'
 import { useGetUser } from '@/lib/hooks/useGetUser'
+import { useParams } from "next/navigation";
 
 export default function CalendarTools({ 
   isOpen,
@@ -47,18 +48,26 @@ export default function CalendarTools({
   const t = useTranslations('Calendar')
   const { user: currentUser } = useGetUser()
   const dispatch = useDispatch()
-  
+  const params = useParams()
+  const { id: projectId } = params
+  const [themeColor, setThemeColor] = useState('#64748b')
   // Redux state
   const sections = useSelector(state => state.sections.sections)
   const taskStatus = useSelector(state => state.tasks.status)
-  
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
   // Form state
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState(selectedDate || new Date())
   const [selectedAssignees, setSelectedAssignees] = useState([])
   const [selectedSection, setSelectedSection] = useState(null)
-  
+  useEffect(() => {
+    if (project?.theme_color) {
+      setThemeColor(project.theme_color);
+    }
+  }, [project]);
   // Fetch team sections
   useEffect(() => {
     if (teamId) {
@@ -361,6 +370,7 @@ export default function CalendarTools({
             </Button>
             <Button 
               type="submit"
+              variant={themeColor}
               disabled={taskStatus === 'loading'}
             >
               {taskStatus === 'loading' ? t('creating') : t('create')}

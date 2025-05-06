@@ -1,5 +1,5 @@
 import React from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useTranslations } from 'next-intl'
 import { format } from 'date-fns'
@@ -15,7 +15,7 @@ export default function DayTasksDialog({ isOpen, setIsOpen, date, tasks, teamMem
         onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>
-            {t('tasksFor')} {format(date, 'yyyy年MM月dd日')}
+            {t('tasksFor')} {format(date, 'yyyy-MM-dd')}
           </DialogTitle>
           <DialogDescription/>
         </DialogHeader>

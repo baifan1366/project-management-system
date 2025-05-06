@@ -179,10 +179,12 @@ const FileItem = ({ file, handleSelectFile, selectedFiles, openFileMenu, navigat
                 {t('download')}
               </DropdownMenuItem>
             )}
+            {file.type !== 'folder' && (
             <DropdownMenuItem className="cursor-pointer" onClick={() => openShareFile(file)}>
               <Send className="mr-2 h-4 w-4" />
               {t('share')}
             </DropdownMenuItem>
+            )}
             {currentPath !== '/' && (
               <DropdownMenuItem className="cursor-pointer" onClick={() => moveFileToParentFolder(file)}>
                 <FolderUp className="mr-2 h-4 w-4" />

@@ -28,7 +28,7 @@ import { store } from '@/lib/redux/store'
 import { fetchTeamById } from '@/lib/redux/features/teamSlice'
 import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice'
 import DayTasksDialog from './DayTasksDialog'
-
+import { useParams } from "next/navigation";
 // 在组件顶部添加数据转换函数
 const formatUsers = (users) => {
   if (!users) return [];
@@ -81,12 +81,16 @@ export default function TaskCalendar({ teamId }) {
   const t = useTranslations('Calendar')
   const dispatch = useDispatch()
   const { user: currentUser, isLoading: userLoading } = useGetUser()
-  
+  const params = useParams()
+  const { id: projectId } = params
+  const [themeColor, setThemeColor] = useState('#64748b')
   // Redux state
   const tasks = useSelector(state => state.tasks.tasks)
   const sections = useSelector(state => state.sections.sections)
   const currentTag = useSelector(state => state.tags.currentTag)
-  
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
   // 标签IDs
   const [tagIdName, setTagIdName] = useState(null)
   const [tagIdDueDate, setTagIdDueDate] = useState(null)
@@ -110,7 +114,11 @@ export default function TaskCalendar({ teamId }) {
   const [isDayTasksOpen, setIsDayTasksOpen] = useState(false)
   const [selectedDayTasks, setSelectedDayTasks] = useState([])
   const [selectedDayDate, setSelectedDayDate] = useState(null)
-
+  useEffect(() => {
+    if (project?.theme_color) {
+      setThemeColor(project.theme_color);
+    }
+  }, [project]);
   // Fetch team details
   useEffect(() => {
     async function fetchTeamDetails() {
@@ -604,7 +612,7 @@ export default function TaskCalendar({ teamId }) {
         </Tabs>
       </div>
       
-      <Button onClick={() => handleOpenCreateTask()}>
+      <Button variant={themeColor} onClick={() => handleOpenCreateTask()}>
         <Plus className="h-4 w-4 mr-2" />
         {t('newTask')}
       </Button>
