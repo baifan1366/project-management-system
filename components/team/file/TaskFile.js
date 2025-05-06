@@ -25,6 +25,7 @@ import { useParams } from "next/navigation";
 import { useConfirm } from '@/hooks/use-confirm'
 import ShareFile from './ShareFile'
 import GridView from './GridView'
+import { createSection } from '@/lib/redux/features/sectionSlice';
 
 // 文件项组件 - 移除DnD包装
 const FileItem = ({ file, handleSelectFile, selectedFiles, openFileMenu, navigateToFolder, moveFileToParentFolder, currentPath, openFilePreview, downloadFile, onDragStart, onDragOver, onDragLeave, onDrop, handleDeleteSelected, confirmAndDeleteFiles, confirm, openShareFile }) => {
@@ -645,6 +646,8 @@ export default function TaskFile({ taskId, teamId }) {
       }
       
       // 1. Get File tag ID
+      const tagName = await api.tags.getByName('Name')
+      const nameTagId = tagName.id
       const tagResponse = await api.tags.getByName('File')
       const fileTagId = tagResponse.id
       
@@ -657,17 +660,27 @@ export default function TaskFile({ taskId, teamId }) {
         sectionId = sections[0].id
       } else {
         // Create new section
-        const newSection = await api.teams.teamSection.create(teamId, {
-          name: 'New Section',
-          task_ids: []
-        })
-        sectionId = newSection.id
+        try {
+          const newSection = await dispatch(createSection({
+            teamId: teamId,
+            sectionData: {
+                teamId: teamId,
+                sectionName: 'New Section',
+                createdBy: userId
+            }
+          }));
+          sectionId = newSection.id
+        } catch (error) {
+          console.error('创建section失败:', error)
+          throw new Error(`创建section失败: ${error.message}`)
+        }
       }
       
       // 3. Create new task, include file tag value
       const taskData = {
         created_by: userId,
         tag_values: {
+          [nameTagId]: newFolderName,
           [fileTagId]: newFolderName
         }
       }

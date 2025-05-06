@@ -291,51 +291,41 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
     
     // 2. 根据名称获取File标签ID
     let fileTagId
-    try {
-      const tagResponse = await api.tags.getByName('File')
-      fileTagId = tagResponse.id
-    } catch (error) {
-      console.error('Error getting File tag:', error)
-      throw new Error(t('errorGettingFileTag'))
-    }
+    const tagName = await api.tags.getByName('Name')
+    const nameTagId = tagName.id
+    const tagResponse = await api.tags.getByName('File')
+    fileTagId = tagResponse.id
     
     // 3. 检查当前团队是否有section，如果没有则创建一个
     let sectionId
-    try {
-      const sections = await api.teams.teamSection.getSectionByTeamId(teamId)
+    const sections = await api.teams.teamSection.getSectionByTeamId(teamId)
       
-      if (sections && sections.length > 0) {
-        // 使用第一个section
-        sectionId = sections[0].id
-      } else {
-        // 创建新section
-        const newSection = await api.teams.teamSection.create(teamId, {
-          name: 'New Section',
-          task_ids: []
-        })
-        sectionId = newSection.id
-      }
-    } catch (error) {
-      console.error('Error checking/creating section:', error)
-      throw new Error(t('errorCheckingSection'))
+    if (sections && sections.length > 0) {
+      // 使用第一个section
+      sectionId = sections[0].id
+    } else {
+      // 创建新section
+      const sectionData = {
+        teamId: teamId,
+        sectionName: 'New Section',
+        createdBy: userId
+      };
+      const newSection = await api.teams.teamSection.create(teamId, sectionData);
+      sectionId = newSection.id
     }
     
     // 4. 创建新任务，只包含必要的标签值
     let taskId
-    try {
-      const taskData = {
-        created_by: userId,
-        tag_values: {
-          [fileTagId]: fileName
-        }
+    const taskData = {
+      created_by: userId,
+      tag_values: {
+        [nameTagId]: fileName,
+        [fileTagId]: fileName
       }
-      
-      const taskResponse = await api.teams.teamSectionTasks.create(taskData)
-      taskId = taskResponse.id
-    } catch (error) {
-      console.error('Error creating task:', error)
-      throw new Error(t('errorCreatingTask'))
     }
+    
+    const taskResponse = await api.teams.teamSectionTasks.create(taskData)
+    taskId = taskResponse.id
     
     // 5. 更新section的task_ids
     try {
