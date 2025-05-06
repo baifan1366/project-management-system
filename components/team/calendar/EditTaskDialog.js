@@ -1,192 +1,166 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter,
-  DialogDescription 
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { format } from 'date-fns'
-import { CalendarIcon, UserPlus } from 'lucide-react'
+import { CalendarIcon, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { useDispatch } from 'react-redux'
+import { updateTask, deleteTask, fetchTaskById } from '@/lib/redux/features/taskSlice'
+import { getSectionByTeamId, updateTaskIds } from '@/lib/redux/features/sectionSlice'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
-import { useDispatch, useSelector } from 'react-redux'
-import { createTask } from '@/lib/redux/features/taskSlice'
-import { getSectionByTeamId, updateTaskIds } from '@/lib/redux/features/sectionSlice'
+import { useConfirm } from '@/hooks/use-confirm'
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import { getTagByName } from '@/lib/redux/features/tagSlice'
-import { toast } from 'sonner'
-import { useGetUser } from '@/lib/hooks/useGetUser'
 
-export default function CalendarTools({ 
+export default function EditTaskDialog({
   isOpen,
   setIsOpen,
-  selectedDate,
+  task,
   teamId,
-  teamMembers = [],
-  onTaskCreated
+  teamMembers,
+  onTaskUpdated
 }) {
-  const t = useTranslations('Calendar')
-  const { user: currentUser } = useGetUser()
+  const t = useTranslations('TaskDialog')
   const dispatch = useDispatch()
-  
-  // Redux state
-  const sections = useSelector(state => state.sections.sections)
-  const taskStatus = useSelector(state => state.tasks.status)
-  
-  // Form state
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [dueDate, setDueDate] = useState(selectedDate || new Date())
-  const [selectedAssignees, setSelectedAssignees] = useState([])
-  const [selectedSection, setSelectedSection] = useState(null)
-  
-  // Fetch team sections
-  useEffect(() => {
-    if (teamId) {
-      dispatch(getSectionByTeamId(teamId))
-    }
-  }, [teamId, dispatch])
-  
-  // Set selected date when it changes
-  useEffect(() => {
-    if (selectedDate) {
-      setDueDate(selectedDate)
-    }
-  }, [selectedDate])
-  
-  // Reset form state when dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      setTitle('')
-      setDescription('')
-      setDueDate(selectedDate || new Date())
-      setSelectedAssignees([])
-      if (sections.length > 0) {
-        setSelectedSection(sections[0].id)
-      }
-    }
-  }, [isOpen, selectedDate, sections])
+  const { confirm } = useConfirm()
+  const { user } = useGetUser();
 
-  // Handle form submission
+  // 状态
+  const [name, setName] = useState(task.name || '')
+  const [description, setDescription] = useState(task.description || '')
+  const [dueDate, setDueDate] = useState(task.dueDate ? new Date(task.dueDate) : new Date())
+  const [selectedAssignees, setSelectedAssignees] = useState(task.assigneeId ? [task.assigneeId] : [])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  
+  // 处理提交
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    if (!title.trim()) {
-      toast.error(t('titleRequired'))
+    if (!name.trim()) {
+      toast.error(t('nameRequired'))
       return
     }
     
-    if (!selectedSection) {
-      toast.error(t('sectionRequired'))
+    if (!task.id) {
+      toast.error(t('taskIdRequired'))
       return
     }
     
-    if (!currentUser) {
-      toast.error(t('userNotLoggedIn'))
-      return
-    }
+    setIsSubmitting(true)
     
     try {
       // 获取标签IDs
       const titleTagId = await dispatch(getTagByName("Name")).unwrap()
       const descriptionTagId = await dispatch(getTagByName("Description")).unwrap()
       const dueDateTagId = await dispatch(getTagByName("Due Date")).unwrap()
-      const assigneesTagId = await dispatch(getTagByName("Assignee")).unwrap()
+      const assigneeTagId = await dispatch(getTagByName("Assignee")).unwrap()
       
-      console.log('获取到的标签IDs:', {
-        titleTagId, descriptionTagId, dueDateTagId, 
-        assigneesTagId
-      })
+      // 获取当前任务数据
+      const previousTaskData = await dispatch(fetchTaskById(task.id)).unwrap()
       
-      // 准备任务数据
-      const taskData = {
+      // 准备更新的数据
+      const updatedTaskData = {
         tag_values: {
-          [titleTagId]: title.trim(),
-        },
-        created_by: currentUser.id
+          [titleTagId]: name.trim(),
+          [dueDateTagId]: format(dueDate, 'yyyy-MM-dd')
+        }
       }
       
       // 添加可选字段
       if (description.trim()) {
-        taskData.tag_values[descriptionTagId] = description.trim()
+        updatedTaskData.tag_values[descriptionTagId] = description.trim()
       }
-      
-      taskData.tag_values[dueDateTagId] = format(dueDate, 'yyyy-MM-dd')
       
       if (selectedAssignees.length > 0) {
-        taskData.tag_values[assigneesTagId] = selectedAssignees
+        updatedTaskData.tag_values[assigneeTagId] = selectedAssignees[0] // 目前只支持单个分配者
       }
       
-      console.log('准备创建的任务数据:', taskData)
+      // 更新任务
+      await dispatch(updateTask({
+        taskId: task.id,
+        taskData: updatedTaskData,
+        oldTask: previousTaskData
+      })).unwrap()
       
-      // 创建任务
-      const result = await dispatch(createTask(taskData)).unwrap()
-      console.log('任务创建结果:', result)
-      
-      // 如果任务创建成功且有分区ID，将任务添加到分区的task_ids中
-      if (result && result.id && selectedSection) {
-        try {
-          // 获取分区数据
-          const sectionsResult = await dispatch(getSectionByTeamId(teamId)).unwrap()
-          
-          // 找到对应的分区
-          const section = sectionsResult.find(s => 
-            s.id === parseInt(selectedSection) || 
-            s.id === selectedSection
-          )
-          
-          if (section) {
-            // 添加新任务ID到task_ids数组
-            const updatedTaskIds = [...(section.task_ids || []), result.id]
-            
-            // 使用updateTaskIds更新分区的task_ids数组
-            await dispatch(updateTaskIds({
-              sectionId: section.id,
-              teamId: teamId,
-              newTaskIds: updatedTaskIds
-            })).unwrap()
-            
-            console.log(`已将任务 ${result.id} 添加到分区 ${section.id} 的task_ids中`)
-          } else {
-            console.error(`未找到ID为 ${selectedSection} 的分区`)
-          }
-        } catch (error) {
-          console.error('将任务添加到分区时出错:', error)
-        }
-      }
-      
-      toast.success(t('taskCreated'))
-      
-      if (typeof onTaskCreated === 'function') {
-        onTaskCreated()
-      }
-      
+      toast.success(t('taskUpdated'))
+      onTaskUpdated()
       setIsOpen(false)
     } catch (error) {
-      console.error('Error creating task:', error)
-      toast.error(t('errorCreatingTask'))
+      console.error('Error updating task:', error)
+      toast.error(t('errorUpdatingTask'))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
+  // 处理删除
+  const handleDelete = async () => {
+    if (!task.id) {
+      toast.error(t('taskIdRequired'))
+      return
+    }
+
+    const confirmed = await confirm({
+      title: t('deleteTaskConfirmTitle'),
+      variant: "error",
+      description: t('deleteTaskConfirmDescription')
+    })
+
+    if (!confirmed) return
+
+    setIsDeleting(true)
+    try {
+      // 获取所有分区
+      const sectionsResult = await dispatch(getSectionByTeamId(teamId)).unwrap()
+      
+      // 检查每个分区是否包含要删除的任务ID
+      for (const section of sectionsResult) {
+        if (section.task_ids && section.task_ids.includes(parseInt(task.id))) {
+          // 从task_ids数组中移除该任务ID
+          const updatedTaskIds = section.task_ids.filter(id => id !== parseInt(task.id))
+          
+          // 更新分区的task_ids
+          await dispatch(updateTaskIds({
+            sectionId: section.id,
+            teamId: teamId,
+            newTaskIds: updatedTaskIds
+          }))
+        }
+      }
+
+      // 删除任务
+      await dispatch(deleteTask({
+        sectionId: null, // API会处理从部分中删除任务ID
+        userId: user?.id,
+        oldValues: task,
+        taskId: task.id,
+        teamId: teamId
+      })).unwrap()
+      
+      toast.success(t('taskDeleted'))
+      onTaskUpdated()
+      setIsOpen(false)
+    } catch (error) {
+      console.error('Error deleting task:', error)
+      toast.error(t('errorDeletingTask'))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // 处理分配者选择
   const handleToggleAssignee = (userId) => {
     setSelectedAssignees(prev => {
       if (prev.includes(userId)) {
@@ -195,55 +169,34 @@ export default function CalendarTools({
       return [...prev, userId]
     })
   }
-
+  
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[600px]" onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>{t('createTask')}</DialogTitle>
+          <DialogTitle>{t('editTask')}</DialogTitle>
           <DialogDescription>
-            {t('createTaskDescription')}
+            {t('editTaskDescription')}
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">
-                {t('title')} *
+              <Label htmlFor="name" className="text-right">
+                {t('taskName')} *
               </Label>
               <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={t('taskTitlePlaceholder')}
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('enterTaskName')}
                 className="col-span-3"
                 required
               />
             </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="section" className="text-right">
-                {t('section')} *
-              </Label>
-              <Select 
-                value={selectedSection?.toString() || ''} 
-                onValueChange={(value) => setSelectedSection(parseInt(value))}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={t('selectSection')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {sections.map((section) => (
-                    <SelectItem key={section.id} value={section.id.toString()}>
-                      {section.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
+
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="description" className="text-right pt-2">
                 {t('description')}
@@ -271,23 +224,23 @@ export default function CalendarTools({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate ? format(dueDate, 'PPP') : <span>{t('selectDate')}</span>}
+                    {dueDate ? format(dueDate, 'PPP') : <span>{t('pickDate')}</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
                     selected={dueDate}
-                    onSelect={(date) => setDueDate(date || new Date())}
+                    onSelect={setDueDate}
                     initialFocus
                   />
                 </PopoverContent>
               </Popover>
-            </div>            
+            </div>
             
             <div className="grid grid-cols-4 items-start gap-4">
               <Label className="text-right pt-2">
-                {t('assignees')}
+                {t('assignTo')}
               </Label>
               <div className="col-span-3">
                 <div className="flex flex-wrap gap-2 mb-2">
@@ -350,21 +303,31 @@ export default function CalendarTools({
             </div>
           </div>
           
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setIsOpen(false)}
-              disabled={taskStatus === 'loading'}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isSubmitting || isDeleting}
+              className="mr-auto"
             >
-              {t('cancel')}
+              <Trash2 className="h-4 w-4 mr-2" />
+              {t('deleteTask')}
             </Button>
-            <Button 
-              type="submit"
-              disabled={taskStatus === 'loading'}
-            >
-              {taskStatus === 'loading' ? t('creating') : t('create')}
-            </Button>
+            
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsOpen(false)}
+                disabled={isSubmitting || isDeleting}
+              >
+                {t('cancel')}
+              </Button>
+              <Button type="submit" disabled={isSubmitting || isDeleting}>
+                {isSubmitting ? t('updating') : t('update')}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

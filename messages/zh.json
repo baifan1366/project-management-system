@@ -804,7 +804,21 @@
     "hasMeetLink": "点击打开Google Meet",
     "accept": "接受",
     "decline": "拒绝",
-    "meetingDeclined": "已拒绝会议邀请"
+    "meetingDeclined": "已拒绝会议邀请",
+    "newTask": "新建任务",
+    "addTask": "添加任务",
+    "teamMembers": "团队成员",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "untitledTask": "无标题任务",
+    "errorFetchingTeamMembers": "获取团队成员失败",
+    "errorLoadingTasks": "加载任务失败",
+    "weekView": "周视图",
+    "weekViewDescription": "周视图显示一周内的所有任务",
+    "dayView": "日视图",
+    "dayViewDescription": "日视图显示当天的所有任务",
+    "tasksFor": "任务列表 -",
+    "noTasksForThisDay": "当天暂无任务"
   },
   "notificationCenter": {
     "title": "通知中心",
@@ -1162,5 +1176,20 @@
     "folderAndContentsDeleted": "文件夹及其内容已删除",
     "deletingFolderContents": "正在删除文件夹内容...",
     "errorDeletingFolderContents": "删除文件夹内容时出错"
+  },
+  "TaskDialog": {
+    "editTask": "编辑任务",
+    "taskName": "任务名称",
+    "enterTaskName": "请输入任务名称",
+    "dueDate": "截止日期",
+    "pickDate": "选择日期",
+    "assignTo": "分配给",
+    "selectAssignee": "选择负责人",
+    "cancel": "取消",
+    "update": "更新",
+    "updating": "更新中...",
+    "nameRequired": "请输入任务名称",
+    "taskUpdated": "任务已更新",
+    "errorUpdatingTask": "更新任务失败"
   }
 }
