@@ -79,7 +79,9 @@ VALUES
 ('9', 'Progress', 'Used to label the progress value.', 'TRUE', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
 ('10', 'Tags', 'Used to label the tags.', 'TRUE', 'TAGS', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
 ('11', 'Completed On', 'Used to label the completion date.', 'TRUE', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('12', 'Remarks', 'Used to label the remarks.', 'TRUE', 'MULTI-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00');
+('12', 'Remarks', 'Used to label the remarks.', 'TRUE', 'MULTI-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'),
+('13', 'File', 'Used to label the file.', 'TRUE', 'FILE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'),
+('14', 'Content', 'Used to label the content.', 'TRUE', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00');
 
 -- Insert comment data
 INSERT INTO "comment" (id, text, task_id, user_id, created_at, updated_at)

@@ -1167,7 +1167,18 @@
     "noTeamKnowledgeBase": "无团队知识库",
     "selectTeamToViewKnowledgeBase": "请选择一个团队以查看其知识库。",
     "goBack": "返回",
-    "subpages": "子页面"
+    "subpages": "子页面",
+    "createNewPage": "创建新页面",
+    "recentlyViewed": "最近查看",
+    "allPages": "所有页面",
+    "coverImagePlaceholder": "输入图片URL",
+    "pageTitle": "页面标题",
+    "pageContent": "页面内容",
+    "favorite": "收藏",
+    "unfavorite": "取消收藏",
+    "confirm": "确认",
+    "confirmDelete": "确认删除",
+    "confirmDeleteDesc": "您确定要删除此页面吗？此操作不可撤销。"
   },
   "File": {
     "editInGridView": "切换到网格视图",

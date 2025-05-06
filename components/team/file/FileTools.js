@@ -326,6 +326,24 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
     
     const taskResponse = await api.teams.teamSectionTasks.create(taskData)
     taskId = taskResponse.id
+    //it may also create a notion_page, then update the notion_page id into the task table, page_id column
+    const { data: notionPageData, error: notionPageError } = await supabase
+      .from('notion_page')
+      .insert({
+        created_by: userId,
+        last_edited_by: userId
+      })
+      .select()
+      .single();
+    console.log(notionPageData);
+    //update the notion_page id into the task table, page_id column
+    const { data: newTaskData, error: taskError } = await supabase
+      .from('task')
+      .update({
+        page_id: notionPageData.id
+      })
+      .eq('id', taskId);
+    console.log(newTaskData);
     
     // 5. 更新section的task_ids
     try {

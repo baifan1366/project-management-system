@@ -36,6 +36,7 @@ import { getTagByName } from '@/lib/redux/features/tagSlice'
 import { toast } from 'sonner'
 import { useGetUser } from '@/lib/hooks/useGetUser'
 import { useParams } from "next/navigation";
+import { supabase } from '@/lib/supabase';
 
 export default function CalendarTools({ 
   isOpen,
@@ -149,7 +150,24 @@ export default function CalendarTools({
       
       // 创建任务
       const result = await dispatch(createTask(taskData)).unwrap()
-      console.log('任务创建结果:', result)
+      //it may also create a notion_page, then update the notion_page id into the task table, page_id column
+      const { data: notionPageData, error: notionPageError } = await supabase
+        .from('notion_page')
+        .insert({
+          created_by: currentUser.id,
+          last_edited_by: currentUser.id
+        })
+        .select()
+        .single();
+      console.log(notionPageData);
+      //update the notion_page id into the task table, page_id column
+      const { data: newTaskData, error: taskError } = await supabase
+        .from('task')
+        .update({
+          page_id: notionPageData.id
+        })
+        .eq('id', result.id);
+      console.log(newTaskData);
       
       // 如果任务创建成功且有分区ID，将任务添加到分区的task_ids中
       if (result && result.id && selectedSection) {

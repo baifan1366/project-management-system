@@ -116,6 +116,7 @@ CREATE TABLE "task" (
   "tag_values" JSONB DEFAULT '{}',
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "like" UUID[] DEFAULT '{}',
+  "page_id" INT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -127,7 +128,7 @@ CREATE TABLE "tag" (
   "name" VARCHAR(255) NOT NULL,
   "description" TEXT,
   "default" BOOLEAN DEFAULT FALSE,
-  "type" TEXT NOT NULL CHECK ("type" IN ('SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'ID', 'TAGS')), 
+  "type" TEXT NOT NULL CHECK ("type" IN ('SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'ID', 'TAGS', 'FILE')), 
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
