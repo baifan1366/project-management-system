@@ -47,6 +47,113 @@ import { useDispatch, useSelector } from 'react-redux'
 import { createTask, updateTask, deleteTask } from '@/lib/redux/features/taskSlice'
 import { getTagByName } from '@/lib/redux/features/tagSlice'
 import { getPagesByTeamId, resetPagesState } from '@/lib/redux/features/pageSlice'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+
+// 创建部分对话框组件
+function CreateSectionDialog({ isOpen, setIsOpen, teamId, onSectionCreated }) {
+  const t = useTranslations('Notion')
+  const { user } = useGetUser()
+  const [name, setName] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    if (!name.trim()) {
+      toast.error(t('sectionNameRequired'))
+      return
+    }
+    
+    if (!user) {
+      toast.error(t('userNotLoggedIn'))
+      return
+    }
+    
+    setIsSubmitting(true)
+    
+    try {
+      // 创建新部分
+      const { data, error } = await supabase
+        .from('section')
+        .insert({
+          team_id: teamId,
+          name: name.trim(),
+          task_ids: [],
+          created_by: user.id
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      toast.success(t('sectionCreated'))
+      setName('')
+      setIsOpen(false)
+      
+      if (onSectionCreated) {
+        onSectionCreated()
+      }
+    } catch (error) {
+      console.error('Error creating section:', error)
+      toast.error(t('errorCreatingSection'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>{t('createSection')}</DialogTitle>
+          <DialogDescription>
+            {t('createSectionDescription')}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                {t('sectionName')} *
+              </Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('sectionNamePlaceholder')}
+                className="col-span-3"
+                required
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setIsOpen(false)}
+              disabled={isSubmitting}
+            >
+              {t('cancel')}
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? t('creating') : t('create')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export default function TaskNotion({ teamId }) {
   const t = useTranslations('Notion')
@@ -75,6 +182,8 @@ export default function TaskNotion({ teamId }) {
   const [favorites, setFavorites] = useState([])
   const [recentlyViewed, setRecentlyViewed] = useState([])
   const [selectedSectionId, setSelectedSectionId] = useState(null)
+  const [isCreateSectionOpen, setIsCreateSectionOpen] = useState(false)
+  const [isFavoritesExpanded, setIsFavoritesExpanded] = useState(true)
   
   // Fetch team details
   useEffect(() => {
@@ -479,13 +588,17 @@ export default function TaskNotion({ teamId }) {
           .from('notion_page_favorite')
           .insert({
             user_id: currentUser.id,
-            page_id: pageId
+            page_id: pageId,
+            created_at: new Date().toISOString()
           })
         
         if (error) throw error
         
         setFavorites(prev => [...prev, pageId])
         toast.success(t('addedToFavorites'))
+        
+        // 展开收藏夹部分，如果它是折叠的
+        setIsFavoritesExpanded(true)
       }
     } catch (error) {
       console.error('Error toggling favorite:', error)
@@ -496,157 +609,253 @@ export default function TaskNotion({ teamId }) {
   // Handler for page deletion
   const handleDeletePage = async (pageId) => {
     try {
-      // 创建一个确认对话框
-      const confirmResult = confirm({
-        title: t('confirmDeletePage'),
-        variant: "error",
-        description: t('deletePageDescription')
+      // 创建一个Promise来处理确认对话框的结果
+      const confirmResult = await new Promise((resolve) => {
+        const { onConfirm, onCancel } = confirm({
+          title: t('confirmDeletePage'),
+          description: t('deletePageDescription'),
+          variant: "error",
+          // 覆盖默认的确认和取消处理函数
+          onConfirm: () => resolve(true),
+          onCancel: () => resolve(false)
+        });
       });
       
-      // 定义处理确认结果的函数
-      const handleConfirmation = async (isConfirmed) => {
-        // 如果用户没有确认，则直接返回
-        if (!isConfirmed) {
-          return;
-        }
+      // 如果用户没有确认，则直接返回
+      if (!confirmResult) {
+        return;
+      }
+      
+      // 显示正在删除的提示
+      const toastId = toast.loading(t('deletingPage'));
+      
+      // 获取所有后代页面
+      const getDescendantIds = (pageId) => {
+        const directChildren = pages.filter(p => p.parent_id === pageId).map(p => p.id);
+        let allDescendants = [...directChildren];
         
-        // 显示正在删除的提示
-        const toastId = toast.loading(t('deletingPage'));
+        directChildren.forEach(childId => {
+          allDescendants = [...allDescendants, ...getDescendantIds(childId)];
+        });
         
-        try {
-          // 获取所有后代页面
-          const getDescendantIds = (pageId) => {
-            const directChildren = pages.filter(p => p.parent_id === pageId).map(p => p.id);
-            let allDescendants = [...directChildren];
-            
-            directChildren.forEach(childId => {
-              allDescendants = [...allDescendants, ...getDescendantIds(childId)];
-            });
-            
-            return allDescendants;
-          };
-          
-          const descendantIds = getDescendantIds(pageId);
-          const allPageIds = [pageId, ...descendantIds];
-          
-          // 1. 查找与这些页面关联的所有任务
-          const { data: relatedTasks, error: tasksError } = await supabase
-            .from('task')
-            .select('id, page_id')
-            .in('page_id', allPageIds);
-            
-          if (tasksError) throw tasksError;
-          
-          const taskIds = relatedTasks ? relatedTasks.map(task => task.id) : [];
-          
-          // 2. 从各个section的task_ids中移除这些任务ID (updateTaskIds)
-          if (taskIds.length > 0) {
-            // 查询所有包含这些任务ID的section
-            const { data: sectionsData, error: sectionsError } = await supabase
-              .from('section')
-              .select('id, task_ids')
-              .eq('team_id', teamId);
-              
-            if (sectionsError) throw sectionsError;
-            
-            // 更新每个section的task_ids
-            for (const section of sectionsData) {
-              if (section.task_ids && section.task_ids.some(id => taskIds.includes(id))) {
-                const updatedTaskIds = section.task_ids.filter(id => !taskIds.includes(id));
-                
-                // 更新数据库中的section记录
-                await supabase
-                  .from('section')
-                  .update({ task_ids: updatedTaskIds })
-                  .eq('id', section.id);
-                  
-                // 同步更新Redux中的数据(可选)
-                // 这里可以使用Redux action更新section状态
-              }
-            }
-            
-            // 3. 删除与这些页面关联的任务 (deleteTask)
-            const { error: deleteTasksError } = await supabase
-              .from('task')
-              .delete()
-              .in('page_id', allPageIds);
-              
-            if (deleteTasksError) throw deleteTasksError;
-            
-            // 同步更新Redux状态 - 删除任务
-            for (const taskId of taskIds) {
-              dispatch(deleteTask(taskId));
-            }
-          }
-          
-          // 4. 删除页面收藏记录
-          const { error: deleteFavoritesError } = await supabase
-            .from('notion_page_favorite')
-            .delete()
-            .in('page_id', allPageIds);
-            
-          if (deleteFavoritesError) {
-            console.warn('删除收藏记录时出错:', deleteFavoritesError);
-          }
-          
-          // 5. 删除页面记录 (deleteNotionPage)
-          const { error: deletePageError } = await supabase
-            .from('notion_page')
-            .delete()
-            .in('id', allPageIds);
-            
-          if (deletePageError) throw deletePageError;
-          
-          // 更新UI
-          setPages(prev => prev.filter(p => !allPageIds.includes(p.id)));
-          
-          // 如果删除的页面是当前选中的页面，选择另一个页面
-          if (selectedPageId === pageId) {
-            const rootPages = pages.filter(p => !p.parent_id && !allPageIds.includes(p.id));
-            if (rootPages.length > 0) {
-              setSelectedPageId(rootPages[0].id);
-            } else {
-              setSelectedPageId(null);
-            }
-          }
-          
-          // 从收藏中移除已删除的页面
-          setFavorites(prev => prev.filter(id => !allPageIds.includes(id)));
-          
-          // 从最近查看的页面中移除已删除的页面
-          setRecentlyViewed(prev => prev.filter(p => !allPageIds.includes(p.id)));
-          
-          // 更新成功提示
-          toast.dismiss(toastId);
-          toast.success(t('pageDeleted'));
-          
-          // 刷新页面列表
-          dispatch(getPagesByTeamId(teamId));
-        } catch (error) {
-          console.error('删除页面过程中出错:', error);
-          toast.dismiss(toastId);
-          toast.error(t('errorDeletingPage'));
-        }
+        return allDescendants;
       };
       
-      // 检查confirm返回值中是否有确认信息
-      if (confirmResult && typeof confirmResult.then === 'function') {
-        // 如果confirm返回了一个类Promise对象，使用then处理
-        confirmResult.then(handleConfirmation).catch(error => {
-          console.error('确认对话框处理出错:', error);
-          toast.error(t('errorDeletingPage'));
-        });
-      } else {
-        // 传统处理方式，通过事件监听器处理结果
-        document.addEventListener('confirm-dialog-response', (e) => {
-          if (e.detail && e.detail.id === confirmResult.id) {
-            handleConfirmation(e.detail.confirmed);
+      const descendantIds = getDescendantIds(pageId);
+      const allPageIds = [pageId, ...descendantIds];
+      
+      // 1. 查找与这些页面关联的所有任务
+      const { data: relatedTasks, error: tasksError } = await supabase
+        .from('task')
+        .select('id, page_id')
+        .in('page_id', allPageIds);
+        
+      if (tasksError) throw tasksError;
+      
+      const taskIds = relatedTasks ? relatedTasks.map(task => task.id) : [];
+      
+      // 2. 从各个section的task_ids中移除这些任务ID
+      if (taskIds.length > 0) {
+        // 查询所有包含这些任务ID的section
+        const { data: sectionsData, error: sectionsError } = await supabase
+          .from('section')
+          .select('id, task_ids')
+          .eq('team_id', teamId);
+          
+        if (sectionsError) throw sectionsError;
+        
+        // 更新每个section的task_ids
+        for (const section of sectionsData) {
+          if (section.task_ids && section.task_ids.some(id => taskIds.includes(id))) {
+            const updatedTaskIds = section.task_ids.filter(id => !taskIds.includes(id));
+            
+            // 更新数据库中的section记录
+            await supabase
+              .from('section')
+              .update({ task_ids: updatedTaskIds })
+              .eq('id', section.id);
           }
-        }, { once: true });
+        }
+        
+        // 3. 删除与这些页面关联的任务
+        const { error: deleteTasksError } = await supabase
+          .from('task')
+          .delete()
+          .in('page_id', allPageIds);
+          
+        if (deleteTasksError) throw deleteTasksError;
+        
+        // 同步更新Redux状态 - 删除任务
+        for (const taskId of taskIds) {
+          dispatch(deleteTask(taskId));
+        }
       }
+      
+      // 4. 删除页面收藏记录
+      const { error: deleteFavoritesError } = await supabase
+        .from('notion_page_favorite')
+        .delete()
+        .in('page_id', allPageIds);
+        
+      if (deleteFavoritesError) {
+        console.warn('删除收藏记录时出错:', deleteFavoritesError);
+      }
+      
+      // 5. 删除页面记录
+      const { error: deletePageError } = await supabase
+        .from('notion_page')
+        .delete()
+        .in('id', allPageIds);
+        
+      if (deletePageError) throw deletePageError;
+      
+      // 更新UI
+      setPages(prev => prev.filter(p => !allPageIds.includes(p.id)));
+      
+      // 如果删除的页面是当前选中的页面，选择另一个页面
+      if (selectedPageId === pageId) {
+        const rootPages = pages.filter(p => !p.parent_id && !allPageIds.includes(p.id));
+        if (rootPages.length > 0) {
+          setSelectedPageId(rootPages[0].id);
+        } else {
+          setSelectedPageId(null);
+        }
+      }
+      
+      // 从收藏中移除已删除的页面
+      setFavorites(prev => prev.filter(id => !allPageIds.includes(id)));
+      
+      // 从最近查看的页面中移除已删除的页面
+      setRecentlyViewed(prev => prev.filter(p => !allPageIds.includes(p.id)));
+      
+      // 更新成功提示
+      toast.dismiss(toastId);
+      toast.success(t('pageDeleted'));
+      
+      // 刷新页面列表
+      dispatch(getPagesByTeamId(teamId));
     } catch (error) {
       console.error('删除页面过程中出错:', error);
       toast.error(t('errorDeletingPage'));
+    }
+  };
+  
+  // 处理页面复制
+  const handleDuplicatePage = async (pageId) => {
+    if (!currentUser) {
+      toast.error(t('userNotLoggedIn'));
+      return;
+    }
+    
+    const toastId = toast.loading(t('duplicatingPage'));
+    
+    try {
+      // 1. 获取原始页面数据和关联的任务
+      const { data: originalPage, error: pageError } = await supabase
+        .from('notion_page')
+        .select('*')
+        .eq('id', pageId)
+        .single();
+        
+      if (pageError) throw pageError;
+      
+      const { data: originalTask, error: taskError } = await supabase
+        .from('task')
+        .select('*')
+        .eq('page_id', pageId)
+        .single();
+        
+      if (taskError) throw taskError;
+      
+      // 2. 创建新页面
+      const { data: newPage, error: newPageError } = await supabase
+        .from('notion_page')
+        .insert({
+          parent_id: originalPage.parent_id,
+          icon: originalPage.icon,
+          cover_image: originalPage.cover_image,
+          created_by: currentUser.id,
+          last_edited_by: currentUser.id
+        })
+        .select()
+        .single();
+        
+      if (newPageError) throw newPageError;
+      
+      // 3. 创建新任务，复制原任务数据
+      const { data: newTask, error: newTaskError } = await supabase
+        .from('task')
+        .insert({
+          page_id: newPage.id,
+          tag_values: originalTask.tag_values,
+          created_by: currentUser.id
+        })
+        .select()
+        .single();
+        
+      if (newTaskError) throw newTaskError;
+      
+      // 4. 修改标题，添加"副本"后缀
+      if (newTask.tag_values) {
+        // 获取Name标签ID
+        const { data: nameTag } = await supabase
+          .from('tag')
+          .select('id')
+          .eq('name', 'Name')
+          .single();
+          
+        if (nameTag && nameTag.id) {
+          const nameTagId = nameTag.id;
+          const updatedTagValues = {...newTask.tag_values};
+          
+          if (updatedTagValues[nameTagId]) {
+            updatedTagValues[nameTagId] = `${updatedTagValues[nameTagId]} ${t('copy')}`;
+            
+            // 更新任务的tag_values
+            await supabase
+              .from('task')
+              .update({
+                tag_values: updatedTagValues
+              })
+              .eq('id', newTask.id);
+          }
+        }
+      }
+      
+      // 5. 将新页面添加到相同的section
+      // 查找原任务所在的section
+      const { data: sections } = await supabase
+        .from('section')
+        .select('id, task_ids')
+        .eq('team_id', teamId);
+        
+      for (const section of sections) {
+        if (section.task_ids && section.task_ids.includes(originalTask.id)) {
+          // 将新任务添加到相同的section
+          const taskIds = [...section.task_ids, newTask.id];
+          await supabase
+            .from('section')
+            .update({
+              task_ids: taskIds
+            })
+            .eq('id', section.id);
+            
+          break;
+        }
+      }
+      
+      // 6. 刷新页面列表
+      dispatch(getPagesByTeamId(teamId));
+      
+      toast.dismiss(toastId);
+      toast.success(t('pageDuplicated'));
+      
+      // 选择新创建的页面
+      setSelectedPageId(newPage.id);
+    } catch (error) {
+      console.error('Error duplicating page:', error);
+      toast.dismiss(toastId);
+      toast.error(t('errorDuplicatingPage'));
     }
   };
   
@@ -974,30 +1183,44 @@ export default function TaskNotion({ teamId }) {
           {/* Favorites section */}
           {favorites.length > 0 && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium mb-1 text-muted-foreground">
-                {t('favorites')}
-              </h3>
-              <ScrollArea className="h-24">
-                {pages
-                  .filter(page => favorites.includes(page.id))
-                  .map(page => (
-                    <div 
-                      key={`fav-${page.id}`}
-                      className={cn(
-                        "flex items-center py-1 px-2 rounded-md my-0.5",
-                        selectedPageId === page.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50 cursor-pointer"
-                      )}
-                      onClick={() => setSelectedPageId(page.id)}
-                    >
-                      <span className="mr-2 text-lg">
-                        {page.icon || <FileText className="h-4 w-4" />}
-                      </span>
-                      <span className="truncate text-sm">{page.title}</span>
-                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 ml-auto" />
-                    </div>
-                  ))
-                }
-              </ScrollArea>
+              <div 
+                className="flex items-center justify-between cursor-pointer mb-1"
+                onClick={() => setIsFavoritesExpanded(prev => !prev)}
+              >
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  {t('favorites')}
+                </h3>
+                {isFavoritesExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+              
+              {isFavoritesExpanded && (
+                <ScrollArea className="h-24">
+                  {pages
+                    .filter(page => favorites.includes(page.id))
+                    .sort((a, b) => a.title.localeCompare(b.title))
+                    .map(page => (
+                      <div 
+                        key={`fav-${page.id}`}
+                        className={cn(
+                          "flex items-center py-1 px-2 rounded-md my-0.5",
+                          selectedPageId === page.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50 cursor-pointer"
+                        )}
+                        onClick={() => setSelectedPageId(page.id)}
+                      >
+                        <span className="mr-2 text-lg">
+                          {page.icon || <FileText className="h-4 w-4" />}
+                        </span>
+                        <span className="truncate text-sm">{page.title}</span>
+                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 ml-auto" />
+                      </div>
+                    ))
+                  }
+                </ScrollArea>
+              )}
             </div>
           )}
           
@@ -1034,6 +1257,11 @@ export default function TaskNotion({ teamId }) {
                       {t('noSections')}
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setIsCreateSectionOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t('createSection')}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -1127,7 +1355,7 @@ export default function TaskNotion({ teamId }) {
                         {t('createSubpage')}
                       </DropdownMenuItem>
                       
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDuplicatePage(selectedPage.id)}>
                         <Copy className="h-4 w-4 mr-2" />
                         {t('duplicate')}
                       </DropdownMenuItem>
@@ -1246,6 +1474,17 @@ export default function TaskNotion({ teamId }) {
         editingPage={selectedPage}
         onPageUpdated={handlePageUpdated}
         selectedSectionId={selectedSectionId}
+      />
+      
+      {/* Create Section dialog */}
+      <CreateSectionDialog
+        isOpen={isCreateSectionOpen}
+        setIsOpen={setIsCreateSectionOpen}
+        teamId={teamId}
+        onSectionCreated={() => {
+          // Refresh sections
+          dispatch(getSectionByTeamId(teamId));
+        }}
       />
     </div>
   )

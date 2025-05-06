@@ -85,6 +85,105 @@ export default function NotionTools({
     if (!teamId) return
     
     try {
+      // 如果指定了section，则只获取该section中的页面
+      if (selectedSectionId) {
+        // 1. 获取指定section的任务ID
+        const { data: section, error: sectionError } = await supabase
+          .from('section')
+          .select('task_ids')
+          .eq('id', selectedSectionId)
+          .single();
+          
+        if (sectionError) throw sectionError;
+        
+        if (!section || !section.task_ids || section.task_ids.length === 0) {
+          setPages([]);
+          return;
+        }
+        
+        // 2. 获取这些任务的page_id
+        const { data: tasks, error: tasksError } = await supabase
+          .from('task')
+          .select('page_id')
+          .in('id', section.task_ids)
+          .not('page_id', 'is', null);
+          
+        if (tasksError) throw tasksError;
+        
+        if (!tasks || tasks.length === 0) {
+          setPages([]);
+          return;
+        }
+        
+        // 3. 获取Name标签ID
+        const { data: nameTag, error: nameTagError } = await supabase
+          .from('tag')
+          .select('id')
+          .eq('name', 'Name')
+          .single();
+          
+        if (nameTagError) throw nameTagError;
+        
+        const nameTagId = nameTag?.id;
+        
+        // 4. 获取这些页面的详细信息
+        const pageIds = tasks.map(task => task.page_id).filter(id => id != null);
+        
+        const { data: pages, error: pagesError } = await supabase
+          .from('notion_page')
+          .select('id, parent_id')
+          .in('id', pageIds)
+          .eq('is_archived', false);
+          
+        if (pagesError) throw pagesError;
+        
+        // 5. 获取与页面相关联的任务，以获取标题
+        const { data: pagesWithTasks, error: pagesWithTasksError } = await supabase
+          .from('task')
+          .select('id, page_id, tag_values')
+          .in('page_id', pages.map(p => p.id));
+          
+        if (pagesWithTasksError) throw pagesWithTasksError;
+        
+        // 6. 组合页面数据与任务中的标题
+        const pagesWithTitles = pages.map(page => {
+          const relatedTask = pagesWithTasks.find(task => task.page_id === page.id);
+          let title = "无标题";
+          
+          if (relatedTask && relatedTask.tag_values && nameTagId && relatedTask.tag_values[nameTagId]) {
+            title = relatedTask.tag_values[nameTagId];
+          }
+          
+          return {
+            ...page,
+            title
+          };
+        }).sort((a, b) => a.title.localeCompare(b.title));
+        
+        // Don't allow selecting the current page or its descendants as parent
+        let filteredPages = pagesWithTitles;
+        if (editingPage) {
+          // Function to get all descendant IDs of a page
+          const getDescendantIds = (pageId) => {
+            const directChildren = pagesWithTitles.filter(p => p.parent_id === pageId).map(p => p.id)
+            let allDescendants = [...directChildren]
+            
+            directChildren.forEach(childId => {
+              allDescendants = [...allDescendants, ...getDescendantIds(childId)]
+            })
+            
+            return allDescendants
+          }
+          
+          const excludeIds = [editingPage.id, ...getDescendantIds(editingPage.id)]
+          filteredPages = pagesWithTitles.filter(p => !excludeIds.includes(p.id))
+        }
+        
+        setPages(filteredPages)
+        return;
+      }
+      
+      // 如果没有选定section，则获取所有页面（原有逻辑）
       // 1. 获取团队所有部分(section)
       const { data: sections, error: sectionsError } = await supabase
         .from('section')
