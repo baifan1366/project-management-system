@@ -6,10 +6,23 @@ export async function PATCH(request, { params }) {
     const { userId } = params;
     const notifications = await request.json();
 
-    // 更新用户表中的通知设置
+    // Create a notifications object to store all settings
+    const notificationsData = {
+      emailNotifications: notifications.emailNotifications,
+      pushNotifications: notifications.pushNotifications,
+      weeklyDigest: notifications.weeklyDigest,
+      mentionNotifications: notifications.mentionNotifications,
+      taskAssignments: notifications.taskAssignments,
+      taskComments: notifications.taskComments,
+      dueDates: notifications.dueDates,
+      teamInvitations: notifications.teamInvitations
+    };
+
+    // Update the user table with the JSONB notifications field
     const { data: userData, error: userError } = await supabase
       .from('user')
       .update({
+        notifications_settings: notificationsData,
         notifications_enabled: notifications.emailNotifications || notifications.pushNotifications,
         updated_at: new Date().toISOString()
       })
@@ -18,20 +31,6 @@ export async function PATCH(request, { params }) {
       .single();
 
     if (userError) throw userError;
-
-    // 存储详细的通知偏好设置
-    const { error: prefError } = await supabase
-      .from('user_preferences')
-      .upsert({
-        user_id: userId,
-        email_notifications: notifications.emailNotifications,
-        push_notifications: notifications.pushNotifications,
-        weekly_digest: notifications.weeklyDigest,
-        mention_notifications: notifications.mentionNotifications,
-        updated_at: new Date().toISOString()
-      });
-
-    if (prefError) throw prefError;
 
     return NextResponse.json({ 
       message: 'Notification settings updated successfully',

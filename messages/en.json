@@ -102,6 +102,27 @@
     "passwordChanged": "Password has been changed successfully",
     "timezone": "Timezone",
     "timeFormat": "Time Format",
+    "languages": {
+      "chinese": "Chinese",
+      "english": "English",
+      "malay": "Malay"
+    },
+    "hourFormats": {
+      "format24h": "24-hour format (14:30)",
+      "format12h": "12-hour format (2:30 PM)"
+    },
+    "timezones": {
+      "utc8": "China Standard Time (UTC+8)",
+      "utc0": "Greenwich Mean Time (UTC+0)",
+      "utc-8": "Pacific Standard Time (UTC-8)",
+      "utc-5": "Eastern Standard Time (UTC-5)",
+      "utc1": "Central European Time (UTC+1)",
+      "utc9": "Japan Standard Time (UTC+9)",
+      "utc10": "Australian Eastern Standard Time (UTC+10)",
+      "utc55": "Indian Standard Time (UTC+5.5)",
+      "utc7": "Southeast Asia Standard Time (UTC+7)",
+      "utc3": "Moscow Standard Time (UTC+3)"
+    },
     "emailNotifications": "Email Notifications",
     "emailNotificationsDesc": "Receive emails for important updates and alerts",
     "pushNotifications": "Push Notifications",
@@ -376,6 +397,7 @@
     "createdBy": "Created by",
     "assignee": "Assignee",
     "loading": "Loading tasks...",
+    "invalidDate": "Invalid date",
     "priority": {
       "label": "Priority",
       "low": "Low",
