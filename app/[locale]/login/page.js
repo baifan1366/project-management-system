@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -33,27 +33,58 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
-  const { user } = useGetUser();
+  const { user, isLoading: userLoading } = useGetUser();
   // Use our custom auth hook
   const { login, error: authError } = useAuth();
+
+  // 添加自动重定向检查
+  useEffect(() => {
+    // 如果用户已登录且不在加载中，检查是否需要重定向
+    if (user && !userLoading) {
+      console.log('检测到用户已登录，检查重定向参数:', { redirect });
+      // 添加小延迟确保页面完全加载
+      const timer = setTimeout(() => {
+        if (redirect === 'payment' && planId) {
+          console.log('重定向到支付页面，计划ID:', planId);
+          router.push(`/${locale}/payment?plan_id=${planId}`);
+        } else if (redirect && redirect.includes('teamInvitation')) {
+          // 如果是团队邀请页面，重定向回邀请页面
+          // 确保路径格式正确（添加前导斜杠如果没有）
+          const redirectPath = redirect.startsWith('/') ? redirect : `/${redirect}`;
+          console.log('重定向到团队邀请页面:', redirectPath);
+          router.push(`/${locale}${redirectPath}`);
+        } else {
+          // 默认重定向到项目页面
+          console.log('重定向到项目页面');
+          router.replace(`/${locale}/projects`);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [user, userLoading, redirect, planId, locale, router]);
 
   // 处理重定向逻辑
   const handleRedirect = (user) => {
     if (!user) return;
     
+    console.log('处理重定向，redirect值:', redirect);
+    
     // 如果有重定向参数，并且是支付页面，且有计划ID
     if (redirect === 'payment' && planId) {
       console.log('重定向到支付页面，计划ID:', planId);
-      
-      // 只传递计划ID
       router.push(`/${locale}/payment?plan_id=${planId}`);
+    } else if (redirect && redirect.includes('teamInvitation')) {
+      // 如果是团队邀请页面，重定向回邀请页面
+      // 确保路径格式正确（添加前导斜杠如果没有）
+      const redirectPath = redirect.startsWith('/') ? redirect : `/${redirect}`;
+      console.log('重定向到团队邀请页面:', redirectPath);
+      router.push(`/${locale}${redirectPath}`);
     } else {
       // 默认重定向到项目页面
       console.log('重定向到项目页面');
       router.replace(`/${locale}/projects`);
     }
   };
-
 
   // 构建重定向 URL，只包含计划ID
   const buildRedirectUrl = () => {
@@ -114,10 +145,24 @@ export default function LoginPage() {
       // Redirect to our custom Google OAuth endpoint
       let url = `/api/auth/google`;
       
+      // 构建查询参数
+      const params = new URLSearchParams();
+      
       // Add redirect and plan_id parameters if needed
       if (redirect === 'payment' && planId) {
-        url += `?redirect=payment&plan_id=${planId}`;
+        params.append('redirect', 'payment');
+        params.append('plan_id', planId);
+      } else if (redirect) {
+        // 传递任何重定向URL，包括团队邀请
+        params.append('redirect', redirect);
       }
+      
+      // 添加查询参数到URL
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      console.log('Google登录重定向URL:', url);
       
       // Redirect to our custom OAuth endpoint
       window.location.href = url;
@@ -135,10 +180,24 @@ export default function LoginPage() {
       // Redirect to our custom GitHub OAuth endpoint
       let url = `/api/auth/github`;
       
+      // 构建查询参数
+      const params = new URLSearchParams();
+      
       // Add redirect and plan_id parameters if needed
       if (redirect === 'payment' && planId) {
-        url += `?redirect=payment&plan_id=${planId}`;
+        params.append('redirect', 'payment');
+        params.append('plan_id', planId);
+      } else if (redirect) {
+        // 传递任何重定向URL，包括团队邀请
+        params.append('redirect', redirect);
       }
+      
+      // 添加查询参数到URL
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      console.log('Github登录重定向URL:', url);
       
       // Redirect to our custom OAuth endpoint
       window.location.href = url;

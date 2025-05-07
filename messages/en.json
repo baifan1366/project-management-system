@@ -939,7 +939,12 @@
     "invitationAlreadyDeclined": "Invitation Already Declined",
     "CAN_VIEW": "Viewer",
     "CAN_CHECK": "Checker",
-    "CAN_EDIT": "Editor"
+    "CAN_EDIT": "Editor",
+    "invitationNoLongerValid": "Invitation no longer valid",
+    "alreadyMember": "You are already a member of this team",
+    "alreadyTeamMember": "You are already a team member",
+    "invitationDeclined": "Invitation Declined",
+    "declining": "Declining..."
   },
   "CustomField": {
     "title": "Custom Fields",
