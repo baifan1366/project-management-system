@@ -3,7 +3,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { ChevronRight, ChevronDown, MoreHorizontal, Plus, Circle, Trash, Loader2 } from 'lucide-react';
+import { 
+  ChevronRight, 
+  ChevronDown, 
+  MoreHorizontal, 
+  Plus, 
+  Circle, 
+  Trash, 
+  Loader2,
+  FileText, 
+  File, 
+  Sheet,
+  FileCode
+} from 'lucide-react';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
 import { Button } from '@/components/ui/button';
@@ -20,6 +32,16 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { updateSection, deleteSection } from '@/lib/redux/features/sectionSlice';
 import { useTableContext } from './TableProvider';
 import { useResizeTools } from './ResizeTools';
+import { 
+  isFileColumn, 
+  getFileIcon, 
+  renderFileCell, 
+  isNumberType, 
+  isNumberColumn, 
+  renderNumberCell,
+  isPeopleColumn,
+  renderPeopleCell
+} from './TagConfig';
 
 export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading) {
   const t = useTranslations('CreateTask');
@@ -511,7 +533,47 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                   />
                                 ) : (
                                   <div className="w-full overflow-hidden truncate">
-                                    {currentValue}
+                                    {/* 检查是否为文件列 */}
+                                    {isFileColumn(tag) && currentValue ? (
+                                      renderFileCell(currentValue, (e) => {
+                                        e.stopPropagation();
+                                        // 如果需要，这里可以添加文件点击处理
+                                      })
+                                    ) : isPeopleColumn(tag) ? (
+                                      // 检查是否为人员列
+                                      <div onClick={(e) => e.stopPropagation()}>
+                                        {console.log('检测到人员列，标签:', tag, '值:', currentValue, '类型:', typeof currentValue, Array.isArray(currentValue))}
+                                        {/* 如果值是字符串形式，直接传递；如果已经是数组形式，转换为字符串格式 */}
+                                        {typeof currentValue === 'string' 
+                                          ? renderPeopleCell(currentValue)
+                                          : Array.isArray(currentValue)
+                                            ? renderPeopleCell(currentValue) // 已修改parseUserIds支持数组
+                                            : renderPeopleCell('')
+                                        }
+                                      </div>
+                                    ) : (() => {
+                                      // 尝试从tagsData中获取标签对象
+                                      const tagObj = tagsData?.tags?.find(t => 
+                                        t.id.toString() === tagId || 
+                                        t.name === tag
+                                      );
+                                      
+                                      // 检查是否为数字类型
+                                      if ((tagObj && isNumberType(tagObj)) || isNumberColumn(tag)) {
+                                        return (
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            {renderNumberCell(
+                                              currentValue,
+                                              (value) => handleTaskValueChange(task.id, tagId, value + 1),
+                                              (value) => handleTaskValueChange(task.id, tagId, value - 1),
+                                              (value) => handleTaskValueChange(task.id, tagId, value)
+                                            )}
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      return currentValue;
+                                    })()}
                                   </div>
                                 )}
                               </div>

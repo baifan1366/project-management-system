@@ -31,50 +31,13 @@ import DayTasksDialog from './DayTasksDialog'
 import { useParams } from "next/navigation";
 // 在组件顶部添加数据转换函数
 const formatUsers = (users) => {
-  if (!users) return [];
+  if (!users || users.length === 0) return [];
   
-  // 如果已经是数组，处理每个用户对象
-  if (Array.isArray(users)) {
-    return users.map(user => {
-      // 如果是简单的用户ID
-      if (typeof user === 'string' || typeof user === 'number') {
-        return user;
-      }
-      
-      // 如果是完整的用户对象
-      if (user.user_id) {
-        return user.user_id;
-      }
-      
-      // 如果是用户对象但结构不同
-      if (user.id) {
-        return user.id;
-      }
-      
-      return null;
-    }).filter(Boolean);
-  }
+  // 确保是数组
+  const userArray = Array.isArray(users) ? users : [users];
   
-  // 如果是单个用户对象
-  if (typeof users === 'object') {
-    if (users.user_id) {
-      return [users.user_id];
-    }
-    if (users.id) {
-      return [users.id];
-    }
-    // 如果是对象但没有预期的ID字段，尝试获取所有值
-    return Object.values(users).filter(value => 
-      typeof value === 'string' || typeof value === 'number'
-    );
-  }
-  
-  // 如果是单个ID
-  if (typeof users === 'string' || typeof users === 'number') {
-    return [users];
-  }
-  
-  return [];
+  // 返回唯一ID数组
+  return [...new Set(userArray)];
 };
 
 export default function TaskCalendar({ teamId }) {
@@ -198,7 +161,7 @@ export default function TaskCalendar({ teamId }) {
     fetchTeamMembers()
   }, [teamId, dispatch, t])
 
-  // 获取重要标签IDs
+  // 获取Assignee标签ID，与其他标签合并处理
   useEffect(() => {    
     const fetchTags = async (retryCount = 0) => {
       try {        
@@ -211,6 +174,7 @@ export default function TaskCalendar({ teamId }) {
         // 创建一个处理单个标签的函数
         const processTag = (tag, tagName) => {
           if (tag) {
+            console.log(`获取到${tagName}标签ID:`, tag);
             return tag
           }
           return null
@@ -338,6 +302,7 @@ export default function TaskCalendar({ teamId }) {
         // 获取各个标签值
         const name = tagValues[tagIdName] || '未命名任务'
         const dueDate = tagValues[tagIdDueDate]
+        // 获取assigneeId，保持原始格式（可能是数组或单个值）
         const assigneeId = tagValues[tagIdAssignee]
 
         return {
@@ -355,9 +320,22 @@ export default function TaskCalendar({ teamId }) {
 
         // 检查分配者
         if (selectedMembers.length > 0 && task.assigneeId) {
-          const isAssigneeSelected = selectedMembers.includes(task.assigneeId)
-          if (!isAssigneeSelected) {
-            return false
+          // 处理assigneeId可能是数组的情况
+          if (Array.isArray(task.assigneeId)) {
+            // 检查是否有任何一个选中的成员在assigneeId数组中
+            const hasSelectedAssignee = task.assigneeId.some(id => 
+              selectedMembers.includes(id)
+            );
+            
+            if (!hasSelectedAssignee) {
+              return false;
+            }
+          } else {
+            // 原有的单个assigneeId处理逻辑
+            const isAssigneeSelected = selectedMembers.includes(task.assigneeId);
+            if (!isAssigneeSelected) {
+              return false;
+            }
           }
         }
 
@@ -705,7 +683,11 @@ export default function TaskCalendar({ teamId }) {
                 const taskName = task.name || t('untitledTask')
                 
                 // 获取任务分配人 - 使用formatUsers函数处理
-                const assignees = task.assigneeId ? formatUsers([task.assigneeId]) : []
+                const assignees = task.assigneeId ? (
+                  Array.isArray(task.assigneeId) 
+                    ? formatUsers(task.assigneeId) 
+                    : formatUsers([task.assigneeId])
+                ) : []
                 
                 return (
                   <div 

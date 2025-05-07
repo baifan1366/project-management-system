@@ -15,7 +15,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
 
   // 将BodyContent作为组件使用，获取返回的数据
-  const { initialColumns, initialTasks, initialColumnOrder, loadData } = BodyContent({ projectId, teamId, teamCFId });
+  const { initialColumns, initialTasks, initialColumnOrder, loadData, assigneeTagId } = BodyContent({ projectId, teamId, teamCFId });
   const { CreateSection, UpdateSection, DeleteSection } = HandleSection({ 
     teamId, 
     // 添加刷新回调
@@ -72,6 +72,13 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
       }
     }
   }, [initialTasks, initialColumns, initialColumnOrder]);
+  
+  // 记录当前使用的assignee标签ID，用于调试
+  useEffect(() => {
+    if (assigneeTagId) {
+      console.log('正在使用的assignee标签ID:', assigneeTagId);
+    }
+  }, [assigneeTagId]);
   
   // 处理拖拽结束事件
   const onDragEnd = (result) => {
@@ -552,8 +559,25 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                           
                                           {/* 底部栏 */}
                                           <div className="flex justify-between items-center mt-2">
-                                            <div>
-                                              <User size={14} className="text-gray-500" />
+                                            <div className="flex items-center">
+                                              <User size={14} className="text-gray-500 mr-1" />
+                                              {/* 显示assignee信息 */}
+                                              {task.assignee ? (
+                                                <div className="flex items-center">
+                                                  {/* 处理多个assignee的情况 */}
+                                                  {task.assignee.assignees ? (
+                                                    <span className="text-xs text-gray-500">
+                                                      {task.assignee.assignees.length} {t('assignees')}
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-xs text-gray-500">
+                                                      {task.assignee.assignee || t('assigned')}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <span className="text-xs text-gray-500">{t('unassigned')}</span>
+                                              )}
                                             </div>
                                             <div>
                                               <button 

@@ -1201,5 +1201,13 @@
     "nameRequired": "请输入任务名称",
     "taskUpdated": "任务已更新",
     "errorUpdatingTask": "更新任务失败"
+  },
+  "FilePreview": {
+    "videoNotSupported": "您的浏览器不支持视频标签。",
+    "downloadFile": "下载文件",
+    "previewFile": "预览文件",
+    "openInNewTab": "在新标签页中打开",
+    "fileNotFound": "未找到文件",
+    "closePreview": "关闭预览"
   }
 }

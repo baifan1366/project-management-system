@@ -650,6 +650,7 @@
     "LIST": "List",
     "kanban board": "Kanban Board",
     "Kanban": "Kanban",
+    "kanban": "Kanban",
     "OVERVIEW": "Overview",
     "DASHBOARD": "Dashboard",
     "NOTE": "Note",
@@ -1146,6 +1147,7 @@
     "TIME-TRACKING": "Time Tracking",
     "PROJECTS": "Projects",
     "TAGS": "Tags",
+    "FILE": "File",
     "COMPLETED-ON": "Completed On",
     "LAST-MODIFIED-ON": "Last Modified On",
     "CREATED-AT": "Created At",
@@ -1646,6 +1648,7 @@
   },
   "Team": {
     "details": "Details",
+    "unassigned": "Unassigned",
     "members": "Members",
     "access": "Access",
     "teamName": "Team Name",
@@ -1875,5 +1878,13 @@
     "folderAndContentsDeleted": "Folder and its contents will be deleted",
     "deletingFolderContents": "Deleting folder contents...",
     "errorDeletingFolderContents": "Error deleting folder contents"
+  },
+  "FilePreview": {
+    "videoNotSupported": "Your browser does not support the video tag.",
+    "downloadFile": "Download File",
+    "previewFile": "Preview File",
+    "openInNewTab": "Open in New Tab",
+    "fileNotFound": "File not found",
+    "closePreview": "Close Preview"
   }
 }

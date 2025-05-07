@@ -23,8 +23,6 @@ export default function DayTasksDialog({ isOpen, setIsOpen, date, tasks, teamMem
         <ScrollArea className="max-h-[60vh] mt-4">
           <div className="space-y-2">
             {tasks.map((task) => {
-              const assignee = task.assigneeId ? teamMembers.find(m => m.id === task.assigneeId) : null
-              
               return (
                 <div
                   key={task.id}
@@ -37,14 +35,38 @@ export default function DayTasksDialog({ isOpen, setIsOpen, date, tasks, teamMem
                     </div>
                     
                     <div className="flex items-center">
-                      {assignee && (
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={assignee.avatar} alt={assignee.name} />
-                          <AvatarFallback>
-                            {assignee.name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
+                      {/* 分配人 */}
+                      <div className="flex flex-wrap gap-1">
+                        {task.assigneeId ? (
+                          Array.isArray(task.assigneeId) ? (
+                            // 处理多个分配人
+                            task.assigneeId.map((id, idx) => {
+                              const assignee = teamMembers.find(m => m.id === id);
+                              return assignee ? (
+                                <Avatar key={idx} className="h-6 w-6 text-xs">
+                                  <AvatarImage src={assignee.avatar} alt={assignee.name} />
+                                  <AvatarFallback>
+                                    {assignee.name.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                              ) : null;
+                            })
+                          ) : (
+                            // 处理单个分配人
+                            (() => {
+                              const assignee = teamMembers.find(m => m.id === task.assigneeId);
+                              return assignee ? (
+                                <Avatar className="h-6 w-6 text-xs">
+                                  <AvatarImage src={assignee.avatar} alt={assignee.name} />
+                                  <AvatarFallback>
+                                    {assignee.name.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                              ) : null;
+                            })()
+                          )
+                        ) : null}
+                      </div>
                       <ChevronRight className="h-4 w-4 ml-2 text-muted-foreground" />
                     </div>
                   </div>
