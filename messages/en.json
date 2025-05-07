@@ -771,6 +771,8 @@
     "searchPlaceholder": "Search chats",
     "subtitle": "Chat with your team members",
     "newChat": "New Chat",
+    "newPrivateChat": "New Private Chat",
+    "newGroupChat": "New Group Chat",
     "noMessages": "No messages yet",
     "inputPlaceholder": "Type a message here...",
     "send": "Send",
@@ -844,6 +846,8 @@
     "chatCreated": "Chat created",
     "groupCreated": "Group created",
     "creating": "Creating chat...",
+    "startedChatWithYou": "{name} started a chat with you",
+    "addedYouToGroup": "{name} added you to group \"{groupName}\"",
     "sun": "Sunday",
     "mon": "Monday",
     "tue": "Tuesday",
@@ -912,7 +916,29 @@
     "mentionInChat": "mentioned you in a chat message",
     "clickToViewMention": "Click to view the message",
     "errorFetchingMentions": "Error fetching mention suggestions",
-    "privateChat":"Private Chat"
+    "privateChat": "Private Chat",
+    "newContact": "New contact",
+    "hoursAgo": "{hours} hour(s) ago",
+    "justNow": "Just now",
+    "minutesAgo": "{minutes} minutes ago",
+    "daysAgo": "{days} days ago",
+    "previousMessages": "Showing the most recent {count} messages",
+    "mentionSystem": {
+      "userMention": "User mention",
+      "projectMention": "Project mention",
+      "taskMention": "Task mention",
+      "searchMentions": "Search for users, projects or tasks"
+    },
+    "fileErrors": {
+      "uploadSizeLimitExceeded": "File size exceeds the allowed limit",
+      "invalidFileType": "Invalid file type"
+    },
+    "timeFormats": {
+      "justNow": "Just now",
+      "minutesAgo": "{minutes} minutes ago",
+      "hoursAgo": "{hours} hours ago",
+      "daysAgo": "{days} days ago"
+    }
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

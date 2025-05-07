@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 /**
- * 根据用户ID获取用户基本信息
- * @param {Object} request - 请求对象
- * @param {Object} params - 包含userId的路由参数
- * @returns {Promise<NextResponse>} 包含用户数据的响应
+ * Get user basic information by ID or username
+ * @param {Object} request - Request object
+ * @param {Object} params - Route parameters containing userId
+ * @returns {Promise<NextResponse>} Response containing user data
  */
 export async function GET(request, { params }) {
   try {
@@ -14,29 +14,39 @@ export async function GET(request, { params }) {
     if (!userId) {
       return NextResponse.json({ 
         success: false, 
-        error: '用户ID不能为空' 
+        error: 'User ID cannot be empty' 
       }, { status: 400 });
     }
 
-    // 从supabase获取用户数据，只返回需要的字段
-    const { data, error } = await supabase
+    // Check if userId is numeric (ID) or string (username)
+    const isNumeric = /^\d+$/.test(userId);
+    
+    let query = supabase
       .from('user')
-      .select('id, name, avatar_url, email')
-      .eq('id', userId)
-      .single();
+      .select('id, name, avatar_url, email');
+    
+    // Apply appropriate filter based on whether userId is numeric or a username
+    if (isNumeric) {
+      query = query.eq('id', userId);
+    } else {
+      // If not numeric, treat as username
+      query = query.ilike('name', userId);
+    }
+    
+    const { data, error } = await query.single();
 
     if (error) {
-      console.error('获取用户数据失败:', error);
+      console.error('Failed to get user data:', error);
       return NextResponse.json({ 
         success: false, 
-        error: '获取用户数据失败' 
+        error: 'Failed to get user data' 
       }, { status: 500 });
     }
 
     if (!data) {
       return NextResponse.json({ 
         success: false, 
-        error: '用户不存在' 
+        error: 'User not found' 
       }, { status: 404 });
     }
 
@@ -45,10 +55,10 @@ export async function GET(request, { params }) {
       data 
     });
   } catch (error) {
-    console.error('服务器错误:', error);
+    console.error('Server error:', error);
     return NextResponse.json({ 
       success: false, 
-      error: '服务器内部错误' 
+      error: 'Internal server error' 
     }, { status: 500 });
   }
 }

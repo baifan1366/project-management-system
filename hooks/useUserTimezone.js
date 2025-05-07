@@ -103,9 +103,9 @@ export function useUserTimezone() {
         setLoading(true);
         
         if (!user) {
-          // Use system default timezone as fallback
-          setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
-          setUtcOffset("");
+          // Set UTC+8 as default timezone when no user data is available
+          setUserTimezone('Asia/Shanghai');
+          setUtcOffset("UTC+8");
           setLoading(false);
           return;
         }
@@ -124,14 +124,14 @@ export function useUserTimezone() {
           const ianaTimezone = convertToIANATimezone(user.timezone);
           setUserTimezone(ianaTimezone);
         } else {
-          // If user hasn't set timezone, use system default
-          setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
-          setUtcOffset("");
+          // If user hasn't set timezone, use UTC+8 as default
+          setUserTimezone('Asia/Shanghai');
+          setUtcOffset("UTC+8");
         }
       } catch (error) {
         console.error('Error getting timezone:', error);
-        setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
-        setUtcOffset("");
+        setUserTimezone('Asia/Shanghai');
+        setUtcOffset("UTC+8");
       } finally {
         setLoading(false);
       }
@@ -150,12 +150,13 @@ export function useUserTimezone() {
     
     const date = new Date(dateInput);
     
-    // If no UTC offset specified, return original date
-    if (!utcOffset) return date;
+    // If no UTC offset specified, use UTC+8 as default for displaying to users
+    // This ensures users in UTC+8 timezone see correct times even without profile settings
+    const userUtcOffset = utcOffset || "UTC+8";
     
     try {
       // Get hour offset from UTC timezone string
-      const offsetHours = getHourOffset(utcOffset);
+      const offsetHours = getHourOffset(userUtcOffset);
       
       // Create new UTC date
       const utcDate = new Date(date.toUTCString());
@@ -166,7 +167,10 @@ export function useUserTimezone() {
       return utcDate;
     } catch (error) {
       console.error('Time adjustment error:', error);
-      return date;
+      // If error occurs, apply UTC+8 offset directly as fallback
+      const fallbackDate = new Date(date.toUTCString());
+      fallbackDate.setUTCHours(fallbackDate.getUTCHours() + 8);
+      return fallbackDate;
     }
   };
   

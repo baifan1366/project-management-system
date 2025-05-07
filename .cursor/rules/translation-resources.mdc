@@ -1,7 +1,7 @@
 ---
-description: 
+description: Translation Resources Rule
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 # Translation Resources Rule
 
