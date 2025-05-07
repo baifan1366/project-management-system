@@ -65,6 +65,13 @@ export default function TeamCustomFieldPage() {
   // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
   const isStarred = selectedTeam?.star || false;  
   
+  // 当视图切换时，触发refreshKey更新
+  const handleViewChange = (newView) => {
+    setCurrentView(newView);
+    // 增加refreshKey强制重新加载数据
+    setRefreshKey(prev => prev + 1);
+  };
+  
   // 定义团队状态及对应颜色
   const statusColors = {
     PENDING: "text-yellow-500",
@@ -391,7 +398,7 @@ export default function TeamCustomFieldPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button variant="ghost" size="icon" onClick={handleStarClick}>
-                {isStarred ? <Star className="h-4 w-4" /> : <StarOff className="h-4 w-4" />}
+                {isStarred ? <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /> : <Star className="h-4 w-4" />}
               </Button>
               
               <DropdownMenu>
@@ -470,7 +477,7 @@ export default function TeamCustomFieldPage() {
                 display: none;
               }
             `}</style>
-            <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
+            <TaskTab projectId={projectId} teamId={teamId} onViewChange={handleViewChange} />
           </div>
         </div>
         <div className="w-full p-0">

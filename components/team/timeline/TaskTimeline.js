@@ -121,6 +121,11 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
 
   const dispatch = useDispatch();
 
+  // 当外部传入的refreshKey变化时，强制更新内部的refreshFlag
+  useEffect(() => {
+    setRefreshFlag(prev => prev + 1);
+  }, [refreshKey]);
+
   // Apply zoom level
   const setZoom = (value) => {
     applyZoom(value, setCurrentZoom);
