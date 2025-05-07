@@ -1697,6 +1697,9 @@
   "Team": {
     "details": "Details",
     "unassigned": "Unassigned",
+    "assigned_users": "Assigned Users",
+    "unknown_user": "Unknown User",
+    "loading": "Loading...",
     "members": "Members",
     "access": "Access",
     "teamName": "Team Name",
@@ -1722,7 +1725,15 @@
     "inviteOnlyDescription": "This project will only be visible to you and people or groups you invite.",
     "everyoneCanEditDescription": "Project viewers will remain viewers.",
     "everyoneCanCheckDescription": "Project editors will be downgraded to checkers.",
-    "everyoneCanViewDescription": "Project editors will be downgraded to viewers."
+    "everyoneCanViewDescription": "Project editors will be downgraded to viewers.",
+    "noDate": "No Date",
+    "clear": "Clear",
+    "noID": "No ID",
+    "copyID": "Copy ID",
+    "copyIDSuccess": "ID copied successfully",
+    "identifier": "Identifier",
+    "copied": "Copied",
+    "clickToCopy": "Click to copy"
   },
   "Notion": {
     "knowledgeBase": "Knowledge Base",
