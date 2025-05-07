@@ -5,6 +5,7 @@ import { Providers } from '@/app/providers';
 import { Header } from './Header';
 import { PricingHeader } from './PricingHeader';
 import { usePathname } from 'next/navigation';
+import SubscriptionLimitModal from './SubscriptionLimitModal';
 
 export function RootLayoutClient({ children, locale, messages }) {
   const pathname = usePathname();
@@ -20,6 +21,7 @@ export function RootLayoutClient({ children, locale, messages }) {
           <main className={`flex-1 w-full ${!isAuthPage && !isPricingPage ? 'pl-16' : ''}`}>
             {children}
           </main>
+          <SubscriptionLimitModal />
         </div>
       </Providers>
     </NextIntlClientProvider>
