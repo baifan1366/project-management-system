@@ -16,6 +16,7 @@ CREATE TABLE "user" (
   "mfa_secret" VARCHAR(255), -- TOTP 秘钥
   "is_mfa_enabled" BOOLEAN DEFAULT FALSE,
   "notifications_enabled" BOOLEAN DEFAULT TRUE,
+  "notifications_settings" JSONB DEFAULT '{"emailNotifications": true, "pushNotifications": true, "weeklyDigest": true, "mentionNotifications": true, "taskAssignments": true, "taskComments": true, "dueDates": true, "teamInvitations": true}',
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "email_verified" BOOLEAN DEFAULT FALSE,
@@ -30,7 +31,7 @@ CREATE TABLE "user" (
   "google_refresh_token" VARCHAR(2048),
   "google_token_expires_at" BIGINT,
   "github_access_token" VARCHAR(2048),
-  "github_refresh_token" VARCHAR(2048),
+  "github_refresh_token" VARCHAR(2048)
 );
 
 -- 添加索引以提高查询性能

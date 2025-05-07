@@ -209,8 +209,8 @@ export default function NewChatPopover() {
               user_id: user.id,
               title: selectedUsers.length === 1 ? t('newPrivateChat') : t('newGroupChat'),
               content: selectedUsers.length === 1 
-                ? `${currentUser.name || currentUser.email} ${t('startedChatWithYou')}` 
-                : `${currentUser.name || currentUser.email} ${t('addedYouToGroup')} "${chatName}"`,
+                ? t('startedChatWithYou', { name: currentUser.name || currentUser.email })
+                : t('addedYouToGroup', { name: currentUser.name || currentUser.email, groupName: chatName }),
               type: 'SYSTEM',
               related_entity_type: 'chat_session',
               related_entity_id: chatSession.id,

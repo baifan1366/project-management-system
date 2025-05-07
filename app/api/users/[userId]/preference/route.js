@@ -13,6 +13,7 @@ export async function PATCH(request, { params }) {
       .update({
         language,
         theme,
+        timezone,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId)

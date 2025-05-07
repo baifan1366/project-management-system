@@ -1,14 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Briefcase, ListChecks } from 'lucide-react';
+import { User, Briefcase, ListChecks, Mail, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchUserById } from '@/lib/redux/features/usersSlice';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 /**
  * MentionItem component
  * Displays a mention in a message with the appropriate styling
+ * Shows a popover with user details on hover for user mentions
  */
 const MentionItem = ({ 
   type, 
@@ -19,6 +23,34 @@ const MentionItem = ({
   className
 }) => {
   const t = useTranslations('Chat');
+  const dispatch = useDispatch();
+  const [isHovering, setIsHovering] = useState(false);
+  const [userData, setUserData] = useState(null);
+  
+  // Get users from Redux store
+  const users = useSelector(state => state.users.users);
+  const user = users.find(u => u.id === id);
+  
+  // Fetch user data when hovering over a user mention
+  useEffect(() => {
+    if (type === 'user' && isHovering && !user) {
+      // Only attempt to fetch if we have an id to fetch
+      if (id) {
+        try {
+          dispatch(fetchUserById(id));
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      }
+    }
+  }, [type, id, isHovering, user, dispatch]);
+  
+  // Update local state when user data is available in Redux
+  useEffect(() => {
+    if (user) {
+      setUserData(user);
+    }
+  }, [user]);
   
   // Determine the styling based on mention type
   const getTypeStyles = () => {
@@ -76,20 +108,90 @@ const MentionItem = ({
     }
   };
 
-  return (
-    <Link href={getLinkUrl()}>
-      <span 
-        className={cn(
-          "inline-flex items-center gap-1 py-0.5 px-1.5 rounded text-xs font-medium",
-          getTypeStyles(),
-          className
-        )}
-      >
-        {showIcon && getIcon()}
-        <span>{getDisplayText()}</span>
-      </span>
-    </Link>
-  );
+  // Render user popover content
+  const renderUserPopover = () => {
+    if (type !== 'user') return null;
+    
+    return (
+      <Popover open={isHovering} onOpenChange={setIsHovering}>
+        <PopoverTrigger asChild>
+          <span 
+            className={cn(
+              "inline-flex items-center gap-1 py-0.5 px-1.5 rounded text-xs font-medium",
+              getTypeStyles(),
+              className
+            )}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+          >
+            {showIcon && getIcon()}
+            <span>{getDisplayText()}</span>
+          </span>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-3" side="top">
+          {userData ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                {userData.avatar_url ? (
+                  <img 
+                    src={userData.avatar_url} 
+                    alt={userData.name} 
+                    className="w-10 h-10 rounded-full"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                    <User className="w-6 h-6 text-gray-500" />
+                  </div>
+                )}
+                <div>
+                  <h4 className="font-medium">{userData.name}</h4>
+                </div>
+              </div>
+              
+              {userData.email && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4" />
+                  <span>{userData.email}</span>
+                </div>
+              )}
+              
+              {userData.phone && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4" />
+                  <span>{userData.phone}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  // For non-user mentions, use the standard Link
+  if (type !== 'user') {
+    return (
+      <Link href={getLinkUrl()}>
+        <span 
+          className={cn(
+            "inline-flex items-center gap-1 py-0.5 px-1.5 rounded text-xs font-medium",
+            getTypeStyles(),
+            className
+          )}
+        >
+          {showIcon && getIcon()}
+          <span>{getDisplayText()}</span>
+        </span>
+      </Link>
+    );
+  }
+
+  // For user mentions, use the popover
+  return renderUserPopover();
 };
 
 export default MentionItem; 
