@@ -19,7 +19,10 @@ export default function Home({ params }) {
   // 使用React.use解包params对象
   const projectParams = use(params);
   const projectId = projectParams.id;
-  
+  const [themeColor, setThemeColor] = useState('#64748b')
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
   const t = useTranslations('Projects');
   const t_pengy = useTranslations('pengy');
   const [activeTab, setActiveTab] = useState('overview');
@@ -41,7 +44,11 @@ export default function Home({ params }) {
 
   // 获取当前用户信息
   const [userId, setUserId] = useState(null);
-  
+  useEffect(() => {
+    if (project?.theme_color) {
+      setThemeColor(project.theme_color);
+    }
+  }, [project]);
   useEffect(() => {
     async function getCurrentUser() {
       try {
@@ -139,7 +146,7 @@ export default function Home({ params }) {
               <TaskManagerAgent userId={userId} projectId={projectId} />
             </DialogContent>
           </Dialog>
-          <Button className="bg-primary text-white hover:bg-primary/90">
+          <Button variant={themeColor}>
             <Plus className="mr-2 h-4 w-4" />
             {t('createTask')}
           </Button>

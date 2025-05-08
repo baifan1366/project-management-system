@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
-import { fetchAllTags } from '@/lib/redux/features/tagSlice';
+import { fetchAllTags, getTagByName } from '@/lib/redux/features/tagSlice';
 import { useDispatch } from 'react-redux';
 
 // 为空数据创建固定引用的空对象，避免每次渲染创建新对象
@@ -17,6 +17,33 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
     const [columnOrder, setColumnOrder] = useState([]);
     const [tags, setTags] = useState([]);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [assigneeTagId, setAssigneeTagId] = useState(null);
+    const [nameTagId, setNameTagId] = useState(null);
+
+    // 获取Assignee和Name标签ID
+    useEffect(() => {
+        async function fetchTagIds() {
+            try {
+                // 获取Assignee标签ID
+                const assigneeTag = await dispatch(getTagByName("Assignee")).unwrap();
+                if (assigneeTag) {
+                    setAssigneeTagId(assigneeTag);
+                    console.log('获取到Assignee标签ID:', assigneeTag);
+                }
+
+                // 获取Name标签ID
+                const nameTag = await dispatch(getTagByName("Name")).unwrap();
+                if (nameTag) {
+                    setNameTagId(nameTag);
+                    console.log('获取到Name标签ID:', nameTag);
+                }
+            } catch (error) {
+                console.error('获取标签ID失败:', error);
+            }
+        }
+
+        fetchTagIds();
+    }, [dispatch]);
 
     // 使用useCallback包装loadData，确保函数引用稳定
     const loadData = useCallback(async (forceReload = false) => {
@@ -57,10 +84,15 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
                         
                         // 如果任务有标签值
                         if (task.tag_values) {
-                            // 查找类型为"Name"的标签
-                            const nameTag = tagsData.find(tag => tag.name === "Name");
-                            if (nameTag && task.tag_values[nameTag.id]) {
-                                taskContent = task.tag_values[nameTag.id];
+                            // 使用动态获取的nameTagId
+                            if (nameTagId && task.tag_values[nameTagId]) {
+                                taskContent = task.tag_values[nameTagId];
+                            } else {
+                                // 查找类型为"Name"的标签
+                                const nameTag = tagsData.find(tag => tag.name === "Name");
+                                if (nameTag && task.tag_values[nameTag.id]) {
+                                    taskContent = task.tag_values[nameTag.id];
+                                }
                             }
                         }
                         
@@ -68,7 +100,40 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
                         tempTasks[task.id] = {
                             id: task.id.toString(),
                             content: taskContent,
-                            assignee: task.assignee_id ? { avatar: '/avatar-placeholder.png' } : null,
+                            // 处理assignee，使用动态获取的assigneeTagId
+                            assignee: (() => {
+                                // 检查是否有tag_values
+                                if (!task.tag_values) return null;
+
+                                // 尝试使用动态获取的assigneeTagId
+                                let assigneeValue = null;
+                                if (assigneeTagId && task.tag_values[assigneeTagId]) {
+                                    assigneeValue = task.tag_values[assigneeTagId];
+                                } else {
+                                    // 尝试使用旧的固定值"2"作为后备
+                                    assigneeValue = task.tag_values["2"];
+                                }
+
+                                // 如果找到assignee值
+                                if (assigneeValue) {
+                                    // 处理assignee为数组的情况
+                                    if (Array.isArray(assigneeValue)) {
+                                        // 返回带有assignees属性的对象，表示多个指派人
+                                        return { 
+                                            avatar: '/avatar-placeholder.png',
+                                            assignees: assigneeValue
+                                        };
+                                    }
+                                    // 处理assignee为单个值的情况
+                                    return { 
+                                        avatar: '/avatar-placeholder.png',
+                                        assignee: assigneeValue 
+                                    };
+                                }
+                                
+                                // 兼容旧数据，检查assignee_id字段
+                                return task.assignee_id ? { avatar: '/avatar-placeholder.png' } : null;
+                            })(),
                             tag_values: task.tag_values,
                             likes: task.likes || [] // 确保包含likes字段，如果不存在则设为空数组
                         };
@@ -103,7 +168,7 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
         } catch (error) {
             console.error('加载数据失败:', error);
         }
-    }, [teamId, dispatch]); // 移除isLoaded依赖，让forceReload生效
+    }, [teamId, dispatch, isLoaded, nameTagId, assigneeTagId]); // 添加nameTagId和assigneeTagId作为依赖项
 
     // 使用useEffect自动加载数据
     useEffect(() => {
@@ -119,9 +184,11 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
             // 使用对象引用检查，返回相同引用的空对象而不是每次创建新字符串
             initialColumns: Object.keys(columns).length > 0 ? columns : EMPTY_OBJECT,
             initialTasks: Object.keys(tasks).length > 0 ? tasks : EMPTY_OBJECT,
-            initialColumnOrder: columnOrder.length > 0 ? columnOrder : EMPTY_ARRAY
+            initialColumnOrder: columnOrder.length > 0 ? columnOrder : EMPTY_ARRAY,
+            // 返回标签ID供其他组件使用
+            assigneeTagId
         };
-    }, [columns, tasks, columnOrder, loadData]); // 添加loadData作为依赖项，确保其引用变化时更新返回值
+    }, [columns, tasks, columnOrder, loadData, assigneeTagId]); // 添加assigneeTagId作为依赖项
 
     return returnData;
 }

@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/lib/supabase';
 
 export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInputRef }) {
   const dispatch = useDispatch();
@@ -131,7 +132,24 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
       
       // 创建任务
       const result = await dispatch(createTask(taskData)).unwrap();
-      
+      //it may also create a notion_page, then update the notion_page id into the task table, page_id column
+      const { data: notionPageData, error: notionPageError } = await supabase
+        .from('notion_page')
+        .insert({
+          created_by: userId,
+          last_edited_by: userId
+        })
+        .select()
+        .single();
+      console.log(notionPageData);
+      //update the notion_page id into the task table, page_id column
+      const { data: newTaskData, error: taskError } = await supabase
+        .from('task')
+        .update({
+          page_id: notionPageData.id
+        })
+        .eq('id', result.id);
+      console.log(newTaskData);
       // 更新本地任务列表
       setLocalTasks(prevTasks => ({
         ...prevTasks,

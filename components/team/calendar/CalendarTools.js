@@ -27,12 +27,16 @@ import { format } from 'date-fns'
 import { CalendarIcon, UserPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { supabase } from '@/lib/supabase'
-import { toast } from 'sonner'
-import { useGetUser } from '@/lib/hooks/useGetUser'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
+import { useDispatch, useSelector } from 'react-redux'
+import { createTask } from '@/lib/redux/features/taskSlice'
+import { getSectionByTeamId, updateTaskIds } from '@/lib/redux/features/sectionSlice'
+import { getTagByName } from '@/lib/redux/features/tagSlice'
+import { toast } from 'sonner'
+import { useGetUser } from '@/lib/hooks/useGetUser'
+import { useParams } from "next/navigation";
+import { supabase } from '@/lib/supabase';
 
 export default function CalendarTools({ 
   isOpen,
@@ -44,44 +48,33 @@ export default function CalendarTools({
 }) {
   const t = useTranslations('Calendar')
   const { user: currentUser } = useGetUser()
-  
+  const dispatch = useDispatch()
+  const params = useParams()
+  const { id: projectId } = params
+  const [themeColor, setThemeColor] = useState('#64748b')
+  // Redux state
+  const sections = useSelector(state => state.sections.sections)
+  const taskStatus = useSelector(state => state.tasks.status)
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
   // Form state
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState(selectedDate || new Date())
-  const [priority, setPriority] = useState('MEDIUM')
-  const [status, setStatus] = useState('PENDING')
   const [selectedAssignees, setSelectedAssignees] = useState([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [sections, setSections] = useState([])
   const [selectedSection, setSelectedSection] = useState(null)
-  
+  useEffect(() => {
+    if (project?.theme_color) {
+      setThemeColor(project.theme_color);
+    }
+  }, [project]);
   // Fetch team sections
   useEffect(() => {
-    async function fetchSections() {
-      if (!teamId) return
-      
-      try {
-        const { data, error } = await supabase
-          .from('section')
-          .select('id, name')
-          .eq('team_id', teamId)
-        
-        if (error) throw error
-        
-        if (data) {
-          setSections(data)
-          if (data.length > 0) {
-            setSelectedSection(data[0].id)
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching sections:', error)
-      }
+    if (teamId) {
+      dispatch(getSectionByTeamId(teamId))
     }
-    
-    fetchSections()
-  }, [teamId])
+  }, [teamId, dispatch])
   
   // Set selected date when it changes
   useEffect(() => {
@@ -96,12 +89,12 @@ export default function CalendarTools({
       setTitle('')
       setDescription('')
       setDueDate(selectedDate || new Date())
-      setPriority('MEDIUM')
-      setStatus('PENDING')
       setSelectedAssignees([])
-      setIsSubmitting(false)
+      if (sections.length > 0) {
+        setSelectedSection(sections[0].id)
+      }
     }
-  }, [isOpen, selectedDate])
+  }, [isOpen, selectedDate, sections])
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -122,53 +115,94 @@ export default function CalendarTools({
       return
     }
     
-    setIsSubmitting(true)
-    
     try {
-      // Create task with tag values
-      const { data: taskData, error: taskError } = await supabase
-        .from('task')
+      // 获取标签IDs
+      const titleTagId = await dispatch(getTagByName("Name")).unwrap()
+      const descriptionTagId = await dispatch(getTagByName("Description")).unwrap()
+      const dueDateTagId = await dispatch(getTagByName("Due Date")).unwrap()
+      const assigneesTagId = await dispatch(getTagByName("Assignee")).unwrap()
+      
+      console.log('获取到的标签IDs:', {
+        titleTagId, descriptionTagId, dueDateTagId, 
+        assigneesTagId
+      })
+      
+      // 准备任务数据
+      const taskData = {
+        tag_values: {
+          [titleTagId]: title.trim(),
+        },
+        created_by: currentUser.id
+      }
+      
+      // 添加可选字段
+      if (description.trim()) {
+        taskData.tag_values[descriptionTagId] = description.trim()
+      }
+      
+      taskData.tag_values[dueDateTagId] = format(dueDate, 'yyyy-MM-dd')
+      
+      if (selectedAssignees.length > 0) {
+        taskData.tag_values[assigneesTagId] = selectedAssignees
+      }
+      
+      console.log('准备创建的任务数据:', taskData)
+      
+      // 创建任务
+      const result = await dispatch(createTask(taskData)).unwrap()
+      //it may also create a notion_page, then update the notion_page id into the task table, page_id column
+      const { data: notionPageData, error: notionPageError } = await supabase
+        .from('notion_page')
         .insert({
-          tag_values: {
-            title,
-            description,
-            due_date: format(dueDate, 'yyyy-MM-dd'),
-            priority,
-            status,
-            assignees: selectedAssignees
-          },
-          created_by: currentUser.id
+          created_by: currentUser.id,
+          last_edited_by: currentUser.id
         })
         .select()
+        .single();
+      console.log(notionPageData);
+      //update the notion_page id into the task table, page_id column
+      const { data: newTaskData, error: taskError } = await supabase
+        .from('task')
+        .update({
+          page_id: notionPageData.id
+        })
+        .eq('id', result.id);
+      console.log(newTaskData);
       
-      if (taskError) throw taskError
-      
-      // Get the task ID from the newly created task
-      const taskId = taskData[0].id
-      
-      // Get the current section
-      const { data: sectionData, error: sectionError } = await supabase
-        .from('section')
-        .select('task_ids')
-        .eq('id', selectedSection)
-        .single()
-      
-      if (sectionError) throw sectionError
-      
-      // Add the new task ID to the section's task_ids array
-      const updatedTaskIds = [...(sectionData.task_ids || []), taskId]
-      
-      // Update the section with the new task_ids array
-      const { error: updateError } = await supabase
-        .from('section')
-        .update({ task_ids: updatedTaskIds })
-        .eq('id', selectedSection)
-      
-      if (updateError) throw updateError
+      // 如果任务创建成功且有分区ID，将任务添加到分区的task_ids中
+      if (result && result.id && selectedSection) {
+        try {
+          // 获取分区数据
+          const sectionsResult = await dispatch(getSectionByTeamId(teamId)).unwrap()
+          
+          // 找到对应的分区
+          const section = sectionsResult.find(s => 
+            s.id === parseInt(selectedSection) || 
+            s.id === selectedSection
+          )
+          
+          if (section) {
+            // 添加新任务ID到task_ids数组
+            const updatedTaskIds = [...(section.task_ids || []), result.id]
+            
+            // 使用updateTaskIds更新分区的task_ids数组
+            await dispatch(updateTaskIds({
+              sectionId: section.id,
+              teamId: teamId,
+              newTaskIds: updatedTaskIds
+            })).unwrap()
+            
+            console.log(`已将任务 ${result.id} 添加到分区 ${section.id} 的task_ids中`)
+          } else {
+            console.error(`未找到ID为 ${selectedSection} 的分区`)
+          }
+        } catch (error) {
+          console.error('将任务添加到分区时出错:', error)
+        }
+      }
       
       toast.success(t('taskCreated'))
       
-      // Call the onTaskCreated callback
       if (typeof onTaskCreated === 'function') {
         onTaskCreated()
       }
@@ -177,8 +211,6 @@ export default function CalendarTools({
     } catch (error) {
       console.error('Error creating task:', error)
       toast.error(t('errorCreatingTask'))
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -193,7 +225,8 @@ export default function CalendarTools({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px]" onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{t('createTask')}</DialogTitle>
           <DialogDescription>
@@ -277,42 +310,7 @@ export default function CalendarTools({
                   />
                 </PopoverContent>
               </Popover>
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="priority" className="text-right">
-                {t('priority')}
-              </Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={t('selectPriority')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LOW">{t('low')}</SelectItem>
-                  <SelectItem value="MEDIUM">{t('medium')}</SelectItem>
-                  <SelectItem value="HIGH">{t('high')}</SelectItem>
-                  <SelectItem value="URGENT">{t('urgent')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">
-                {t('status')}
-              </Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={t('selectStatus')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PENDING">{t('pending')}</SelectItem>
-                  <SelectItem value="IN_PROGRESS">{t('inProgress')}</SelectItem>
-                  <SelectItem value="COMPLETED">{t('completed')}</SelectItem>
-                  <SelectItem value="CANCELLED">{t('cancelled')}</SelectItem>
-                  <SelectItem value="ON_HOLD">{t('onHold')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            </div>            
             
             <div className="grid grid-cols-4 items-start gap-4">
               <Label className="text-right pt-2">
@@ -384,15 +382,16 @@ export default function CalendarTools({
               type="button" 
               variant="outline" 
               onClick={() => setIsOpen(false)}
-              disabled={isSubmitting}
+              disabled={taskStatus === 'loading'}
             >
               {t('cancel')}
             </Button>
             <Button 
               type="submit"
-              disabled={isSubmitting}
+              variant={themeColor}
+              disabled={taskStatus === 'loading'}
             >
-              {isSubmitting ? t('creating') : t('create')}
+              {taskStatus === 'loading' ? t('creating') : t('create')}
             </Button>
           </DialogFooter>
         </form>

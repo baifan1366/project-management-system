@@ -167,6 +167,11 @@ export async function POST(request) {
             Join Us
           </a>
 
+          <!-- Note for non-recognizing users -->
+          <p style="color: #6b7280; font-size: 14px; line-height: 20px; margin: 0 0 8px 0;">
+            If you’re not sure why you received this invitation, you can safely ignore this email.
+          </p>
+
           <div style="color: #6b7280; font-size: 14px">
             If you have any questions, please contact our support team.
           </div>

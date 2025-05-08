@@ -18,15 +18,15 @@ export async function GET(request, { params }) {
       }, { status: 400 });
     }
 
-    // Check if userId is numeric (ID) or string (username)
-    const isNumeric = /^\d+$/.test(userId);
+    // Check if userId is a valid UUID
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
     
     let query = supabase
       .from('user')
       .select('id, name, avatar_url, email');
     
     // Apply appropriate filter based on whether userId is numeric or a username
-    if (isNumeric) {
+    if (isValidUUID) {
       query = query.eq('id', userId);
     } else {
       // If not numeric, treat as username

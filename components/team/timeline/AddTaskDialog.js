@@ -13,6 +13,7 @@ import { createSection, updateTaskIds, getSectionByTeamId } from '@/lib/redux/fe
 import useGetUser from "@/lib/hooks/useGetUser";
 import { useDispatch } from "react-redux";
 import { getTagByName } from '@/lib/redux/features/tagSlice';
+import { supabase } from '@/lib/supabase';
 
 /**
  * 格式化日期为Gantt图所需的标准格式
@@ -159,6 +160,24 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
         created_by: userId
       }
       const result = await dispatch(createTask(taskData)).unwrap();
+      //it may also create a notion_page, then update the notion_page id into the task table, page_id column
+      const { data: notionPageData, error: notionPageError } = await supabase
+        .from('notion_page')
+        .insert({
+          created_by: userId,
+          last_edited_by: userId
+        })
+        .select()
+        .single();
+      console.log(notionPageData);
+      //update the notion_page id into the task table, page_id column
+      const { data: newTaskData, error: taskError } = await supabase
+        .from('task')
+        .update({
+          page_id: notionPageData.id
+        })
+        .eq('id', result.id);
+      console.log(newTaskData);
 
       //updateTaskIds
       //check whether this team has section or not

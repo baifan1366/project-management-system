@@ -7,6 +7,8 @@ export async function GET(request) {
     const planId = searchParams.get('plan_id');
     const redirectTo = searchParams.get('redirectTo');
     
+    console.log('Github OAuth请求参数:', { redirect, planId, redirectTo });
+    
     // Build GitHub OAuth URL
     const githubOAuthEndpoint = 'https://github.com/login/oauth/authorize';
     
@@ -18,6 +20,10 @@ export async function GET(request) {
     if (redirect === 'payment' && planId) {
       callbackParams.append('redirect', 'payment');
       callbackParams.append('plan_id', planId);
+    } 
+    // 处理团队邀请页面的重定向
+    else if (redirect && redirect.includes('teamInvitation')) {
+      callbackParams.append('redirect', redirect);
     }
     
     // If a custom redirect is provided, use that

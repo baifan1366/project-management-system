@@ -58,93 +58,30 @@ VALUES
     '2023-01-15T09:45:00Z'
   );
 
--- Insert project data
-INSERT INTO "project" (id, project_name, description, visibility, theme_color, status, created_by, created_at, updated_at)
-VALUES 
-  (1, 'Website Redesign', 'Comprehensive improvement of company website for better UX and performance', 'public', 'blue', 'IN_PROGRESS', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-01T10:00:00Z', '2023-02-01T10:00:00Z'),
-  (2, 'Mobile App Development', 'Create cross-platform mobile app for Android and iOS', 'private', 'green', 'PENDING', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-05T14:30:00Z', '2023-02-05T14:30:00Z');
-
--- Insert team data
-INSERT INTO "team" (id, name, description, access, created_by, project_id, order_index, created_at, updated_at, star, status, archive)
-VALUES 
-  (1, 'Frontend Team', 'Responsible for UI/UX development', 'invite_only', '75cb09ec-f11e-4b34-a1e5-327e90026b94', 1, 1, '2023-02-02T09:15:00Z', '2023-02-02T09:15:00Z', TRUE, 'PENDING', FALSE),
-  (2, 'Backend Team', 'Responsible for API and database development', 'can_edit', '75cb09ec-f11e-4b34-a1e5-327e90026b94', 1, 2, '2023-02-02T09:30:00Z', '2023-02-02T09:30:00Z', FALSE, 'PENDING', FALSE),
-  (3, 'Mobile Team', 'Responsible for mobile app development and testing', 'invite_only', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 2, 1, '2023-02-06T10:00:00Z', '2023-02-06T10:00:00Z', TRUE, 'PENDING', FALSE);
-
--- Insert user-team relationships
-INSERT INTO "user_team" (id, user_id, team_id, role, created_at, updated_at, created_by)
-VALUES 
-  (1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 1, 'OWNER', '2023-02-02T09:15:00Z', '2023-02-02T09:15:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 2, 'OWNER', '2023-02-02T09:30:00Z', '2023-02-02T09:30:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (3, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 1, 'CAN_EDIT', '2023-02-03T11:00:00Z', '2023-02-03T11:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (4, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 2, 'CAN_VIEW', '2023-02-03T11:15:00Z', '2023-02-03T11:15:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (5, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', 3, 'OWNER', '2023-02-06T10:00:00Z', '2023-02-06T10:00:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'),
-  (6, '75cb09ec-f11e-4b34-a1e5-327e90026b94', 3, 'CAN_EDIT', '2023-02-07T09:00:00Z', '2023-02-07T09:00:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254');
-
--- Insert team invitation data
-INSERT INTO "user_team_invitation" (id, user_email, team_id, role, status, expires_at, created_at, updated_at, created_by)
-VALUES 
-  (1, 'mike.wilson@example.com', 1, 'CAN_EDIT', 'PENDING', '2023-02-09T09:15:00Z', '2023-02-02T09:15:00Z', '2023-02-02T09:15:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 'sarah.brown@example.com', 3, 'CAN_VIEW', 'ACCEPTED', '2023-02-13T10:00:00Z', '2023-02-06T10:00:00Z', '2023-02-07T11:00:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254');
-
 -- Insert default data
 INSERT INTO "default" (id, name, qty, updated_at, edited_by)
 VALUES
   (1, 'custom_field', 2, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
   (2, 'tag', 4, '2023-02-01T00:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
   
--- Insert section data
-INSERT INTO "section" (id, name, team_id, created_by, created_at, updated_at, task_ids)
-VALUES 
-  (1, '设计', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T10:00:00Z', '2023-02-03T10:00:00Z', '{1}'),
-  (2, '开发', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T10:15:00Z', '2023-02-03T10:15:00Z', '{2}'),
-  (3, '测试', 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T11:00:00Z', '2023-02-04T11:00:00Z', '{3}'),
-  (4, 'API开发', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T14:00:00Z', '2023-02-03T14:00:00Z', '{4}');
-
 -- Insert tag data
 INSERT INTO "tag" 
 ("id", "name", "description", "default", "type", "created_by", "created_at", "updated_at") 
 VALUES 
-('1', 'Name', '用于标记名字', 'TRUE', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('2', 'Asignee', '用于标记负责人', 'TRUE', 'PEOPLE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('3', 'Status', '用于标记状态', 'TRUE', 'SINGLE-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('4', 'Due Date', '用于标记截至日期','TRUE', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('5', 'Description', '用于标记描述', 'TRUE', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('6', 'Start Date', '用于标记开始日期', 'TRUE', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('7', 'Parent ID', '用于标记父级ID', 'TRUE', 'ID', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'),
-('8', 'Duration', '用于标记时长', 'TRUE', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('9', 'Progress', '用于标记进度值', 'TRUE', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('10', 'Tags', '用于标记标签', 'TRUE', 'TAGS', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('11', 'Completed On', '用于标记完成日期', 'TRUE', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
-('12', 'Remarks', '用于标记备注', 'TRUE', 'MULTI-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00');
-
--- Insert task data
-INSERT INTO "task" (
-  id, tag_values, attachment_ids, created_by, created_at, updated_at
-) VALUES (
-  1,
-  '{"name":"Proposal of the project","asignee":"75cb09ec-f11e-4b34-a1e5-327e90026b94","dueDate":"2023-02-15T17:00:00Z"}',
-  '{1}',
-  '75cb09ec-f11e-4b34-a1e5-327e90026b94',
-  '2023-02-03T11:00:00Z',
-  '2023-02-03T11:00:00Z'
-),
-(
-  2,
-  '{"name":"Research on the project","asignee":"75cb09ec-f11e-4b34-a1e5-327e90026b94","dueDate":"2023-02-15T17:00:00Z"}',
-  '{1}',
-  '75cb09ec-f11e-4b34-a1e5-327e90026b94',
-  '2023-02-03T11:00:00Z',
-  '2023-02-03T11:00:00Z'
-),
-(
-  3,
-  '{"name":"Create a wireframe","asignee":"75cb09ec-f11e-4b34-a1e5-327e90026b94","dueDate":"2023-02-15T17:00:00Z"}',
-  '{1}',
-  '75cb09ec-f11e-4b34-a1e5-327e90026b94',
-  '2023-02-03T11:00:00Z',
-  '2023-02-03T11:00:00Z'
-);
+('1', 'Name', 'Used to label the name.', 'TRUE', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('2', 'Assignee', 'Used to label the person responsible.', 'TRUE', 'PEOPLE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('3', 'Status', 'Used to label the status.', 'TRUE', 'SINGLE-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('4', 'Due Date', 'Used to label the due date.', 'TRUE', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('5', 'Description', 'Used to label the description.', 'TRUE', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('6', 'Start Date', 'Used to label the start date.', 'TRUE', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('7', 'Parent ID', 'Used to label the parent ID.', 'TRUE', 'ID', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'),
+('8', 'Duration', 'Used to label the duration.', 'TRUE', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('9', 'Progress', 'Used to label the progress value.', 'TRUE', 'NUMBER', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('10', 'Tags', 'Used to label the tags.', 'TRUE', 'TAGS', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('11', 'Completed On', 'Used to label the completion date.', 'TRUE', 'DATE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'), 
+('12', 'Remarks', 'Used to label the remarks.', 'TRUE', 'MULTI-SELECT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'),
+('13', 'File', 'Used to label the file.', 'TRUE', 'FILE', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00'),
+('14', 'Content', 'Used to label the content.', 'TRUE', 'TEXT', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-02 10:00:00', '2023-02-02 10:00:00');
 
 -- Insert comment data
 INSERT INTO "comment" (id, text, task_id, user_id, created_at, updated_at)
@@ -156,45 +93,20 @@ VALUES
   (5, 'We need to decide on authentication method. JWT or session-based?', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-05T09:00:00Z', '2023-02-05T09:00:00Z'),
   (6, 'I think JWT would be better for this project.', 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-05T09:30:00Z', '2023-02-05T09:30:00Z');
 
--- Insert attachment data
-INSERT INTO "attachment" (id, file_url, file_name, task_id, uploaded_by, created_at, updated_at)
-VALUES 
-  (1, 'https://example.com/files/homepage-wireframe.png', 'homepage-wireframe.png', 1, '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-04T10:00:00Z', '2023-02-04T10:00:00Z'),
-  (2, 'https://example.com/files/responsive-design-spec.pdf', 'responsive-design-spec.pdf', 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T11:30:00Z', '2023-02-04T11:30:00Z'),
-  (3, 'https://example.com/files/api-documentation.pdf', 'api-documentation.pdf', 1, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-04T14:30:00Z', '2023-02-04T14:30:00Z'),
-  (4, 'https://example.com/files/app-mockup-v1.png', 'app-mockup-v1.png', 2, 'a9d61763-843c-4c7b-894a-fd8d8a5fc254', '2023-02-07T13:00:00Z', '2023-02-07T13:00:00Z');
-
 -- Insert custom field data
 INSERT INTO "custom_field" (id, name, type, description, icon, created_at, updated_at, created_by)
 VALUES 
-  ('1', 'Overview', 'OVERVIEW', 'A high-level overview of project progress and key metrics', 'LayoutGrid', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  ('2', 'List', 'LIST', 'A simple list format for displaying tasks', 'List', '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('3', 'Files', 'FILES', 'Manage task-related files, enabling users to upload and organize documents associated with tasks', 'Files', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('4', 'Timeline', 'TIMELINE', 'Display tasks in timeline format, allowing users to visualize task progress over time', 'SquareChartGantt', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('5', 'Gantt', 'GANTT', 'Project progress in Gantt chart format, providing a visual representation of project timelines and dependencies', 'ChartGantt', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('6', 'Kanban Board', 'KANBAN', 'Display tasks in kanban board format', 'LayoutDashboard', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('7', 'Workflow', 'WORKFLOW', 'Display tasks in workflow format', 'LayoutDashboard', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  ('8', 'Calendar', 'CALENDAR', 'A calendar view for scheduling and tracking tasks', 'CalendarRange', '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('9', 'Notion', 'NOTE', 'A text field for adding notes related to tasks', 'Text', '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('10', 'Agile', 'AGILE', 'Agile board for managing tasks in an agile workflow', 'Pen', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
-
--- Insert team custom field association data
-INSERT INTO "team_custom_field" (id, team_id, custom_field_id, order_index, tag_ids, created_at, updated_at, created_by)
-VALUES 
-  (1, 1, 1, 1, '{1}', '2023-02-02T12:00:00Z', '2023-02-02T12:00:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 1, 2, 2, '{2}', '2023-02-02T12:10:00Z', '2023-02-02T12:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (3, 2, 1, 1, '{1,2}', '2023-02-02T14:10:00Z', '2023-02-02T14:10:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (4, 3, 1, 1, '{1}', '2023-02-06T13:10:00Z', '2023-02-06T13:10:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'),
-  (5, 3, 4, 2, '{2}', '2023-02-06T13:20:00Z', '2023-02-06T13:20:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254');
-
--- Insert team custom field value data
-INSERT INTO "team_custom_field_value" (id, team_custom_field_id, name, description, icon, value, created_at, updated_at, created_by)
-VALUES 
-  (1, 1, 'Frontend Board', 'Frontend team task board', 'LayoutDashboard', '{"defaultView":"board"}', '2023-02-02T12:30:00Z', '2023-02-02T12:30:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (2, 2, 'Frontend Timeline', 'Frontend team timeline view', 'GanttChart', '{"showMilestones":true}', '2023-02-02T12:40:00Z', '2023-02-02T12:40:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (3, 3, 'Backend Board', 'Backend team task board', 'LayoutDashboard', '{"defaultView":"board"}', '2023-02-02T14:30:00Z', '2023-02-02T14:30:00Z', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  (4, 4, 'Mobile Board', 'Mobile team task board', 'LayoutDashboard', '{"defaultView":"board"}', '2023-02-06T13:30:00Z', '2023-02-06T13:30:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254'),
-  (5, 5, 'Mobile Gantt', 'Mobile team Gantt chart', 'GanttChart', '{"showCriticalPath":true}', '2023-02-06T13:40:00Z', '2023-02-06T13:40:00Z', 'a9d61763-843c-4c7b-894a-fd8d8a5fc254');
+  ('1', 'Overview', 'OVERVIEW', 'Provides a high-level summary of overall project progress and key metrics.', 'LayoutGrid', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  ('2', 'List', 'LIST', 'Presents tasks in a straightforward, linear list for easy tracking.', 'List', '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('3', 'Timeline', 'TIMELINE', 'A simplified version of Gantt that visualizes tasks along a timeline.', 'CalendarClock', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('4', 'Kanban', 'KANBAN', 'Visualizes tasks in a kanban board layout for status-based task tracking.', 'SquareKanban', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('5', 'Calendar', 'CALENDAR', 'Uses a calendar view to plan, schedule, and track tasks by date.', 'CalendarRange', '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('6', 'Posts', 'POSTS', 'Used for publishing and managing project-related posts and announcements.', 'Pen', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('7', 'Files', 'FILES', 'Allows users to upload, manage, and organize task-related documents.', 'Files', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('8', 'Gantt', 'GANTT', 'Displays tasks in a Gantt chart with timelines and dependencies for project planning.', 'ChartGantt', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('9', 'Workflow', 'WORKFLOW', 'Outlines tasks in a structured workflow format, showing task progression.', 'Workflow', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  ('10', 'Note', 'NOTE', 'Functions as a knowledge base for capturing and organizing notes, documentation, or ideas.', 'NotebookText', '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('11', 'Agile', 'AGILE', 'Supports agile methodologies by managing tasks in an iterative board format.', 'BookText', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
 
 -- Insert time entry data
 INSERT INTO "time_entry" (id, task_id, user_id, start_time, end_time, duration, created_at, updated_at)
@@ -252,11 +164,36 @@ VALUES
   (1, 3, 'https://example.com/files/responsive-design-approach.pdf', '响应式设计方法.pdf', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:10:00Z');
 
 -- Insert subscription plan data
-INSERT INTO "subscription_plan" ("id", "name", "type", "price", "billing_interval", "description", "features", "max_members", "max_projects", "storage_limit", "is_active", "created_at", "updated_at") 
-VALUES 
-('1', 'Free', 'FREE', '0.00', 'MONTHLY', 'Basic plan for small teams', '{"features": ["Up to 3 team members", "2 projects", "Basic task management", "1GB storage", "Community support"]}', '3', '2', '1073741824', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897'), 
-('2', 'Pro', 'PRO', '29.00', 'MONTHLY', 'Perfect for growing teams', '{"features": ["Up to 10 team members", "Unlimited projects", "Advanced task management", "10GB storage", "Priority support", "Custom fields", "Time tracking"]}', '10', '2', '10737418240', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897'), 
-('3', 'Enterprise', 'ENTERPRISE', '99.00', 'MONTHLY', 'For large organizations', '{"features": ["Unlimited team members", "Unlimited projects", "Enterprise security", "100GB storage", "24/7 dedicated support", "Custom branding", "API access"]}', '-1', '2', '107374182400', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897');  
+INSERT INTO "public"."subscription_plan" (
+  "id", "name", "type", "price", "billing_interval", "description", 
+  "features", "max_projects", "max_teams", "max_members", 
+  "max_ai_chat", "max_ai_task", "max_ai_workflow", 
+  "is_active", "created_at", "updated_at"
+) VALUES 
+('1', 'Free', 'FREE', '0.00', 'MONTHLY', 'Basic plan for small teams', 
+ '{"features": ["Basic task management", "1GB storage", "Community support", "4 projects"]}', 
+ '2', '1', '3', '50', '20', '5', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-19 04:49:22.663'),
+('2', 'Pro', 'PRO', '29.00', 'MONTHLY', 'Perfect for growing teams', 
+ '{"features": ["Up to 10 team members", "Advanced task management", "10GB storage", "Priority support", "Custom fields"]}', 
+ '5', '3', '10', '500', '100', '20', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-12 10:33:10.017'),
+('3', 'Enterprise', 'ENTERPRISE', '99.00', 'MONTHLY', 'For large organizations', 
+ '{"features": ["Unlimited team members", "Unlimited projects", "Enterprise security", "100GB storage", "24/7 dedicated support", "Custom branding"]}', 
+ '-1', '-1', '-1', '-1', '-1', '-1', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-12 10:30:03.438'),
+('4', 'Free', 'FREE', '0.00', 'YEARLY', 'Basic plan for small teams', 
+ '{"features": ["Up to 3 team members", "2 projects", "Basic task management", "1GB storage"]}', 
+ '2', '1', '3', '50', '20', '5', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-12 10:30:38.355'),
+('5', 'Pro', 'PRO', '290.00', 'YEARLY', 'Perfect for growing teams with yearly discount', 
+ '{"features": ["Up to 10 team members", "Unlimited projects", "Advanced task management", "15GB storage", "Priority support", "Custom fields", "Time tracking"]}', 
+ '-1', '5', '10', '1000', '200', '50', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-12 10:29:45.189'),
+('6', 'Enterprise', 'ENTERPRISE', '990.00', 'YEARLY', 'For large organizations with yearly discount', 
+ '{"features": ["Unlimited team members", "Unlimited projects", "Enterprise security", "150GB storage", "24/7 dedicated support", "Custom branding", "API access", "SSO integration", "Audit logs"]}', 
+ '-1', '-1', '-1', '-1', '-1', '-1', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897');
 
 -- Insert promo code data
 INSERT INTO "promo_code" (code, description, discount_type, discount_value, max_uses, start_date, end_date) VALUES

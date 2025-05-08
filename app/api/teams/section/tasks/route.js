@@ -1,6 +1,28 @@
 import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { processTaskTagValues } from '@/lib/api';
+
+// 帮助函数：获取标签ID
+async function getTagIdByName(tagName) {
+  try {
+    const { data, error } = await supabase
+      .from('tag')
+      .select('id')
+      .eq('name', tagName)
+      .single();
+      
+    if (error) {
+      console.error(`获取${tagName}标签失败:`, error);
+      return null;
+    }
+    
+    return data?.id || null;
+  } catch (error) {
+    console.error(`获取${tagName}标签时发生错误:`, error);
+    return null;
+  }
+}
 
 // GET /api/tasks
 export async function GET(request) {
@@ -11,6 +33,13 @@ export async function GET(request) {
     const taskId = searchParams.get('taskId')
     const userId = searchParams.get('userId')
     const fetchAll = searchParams.get('fetchAll') === 'true'
+    
+    // 获取Assignee标签ID
+    const assigneeTagId = await getTagIdByName('Assignee');
+    console.log('动态获取的Assignee标签ID:', assigneeTagId);
+    
+    // 如果未能获取到assigneeTagId，使用默认值"2"作为后备
+    const effectiveAssigneeTagId = assigneeTagId || "2";
     
     let data = []
     
@@ -43,9 +72,20 @@ export async function GET(request) {
         }
         
         // 过滤出分配给当前用户的任务
-        const assignedTasks = allTasks.filter(task => 
-          task.tag_values && task.tag_values.assignee_id === user.id
-        );
+        const assignedTasks = allTasks.filter(task => {
+          if (!task.tag_values) return false;
+          
+          // 使用动态获取的assignee标签ID
+          const assigneeValue = task.tag_values[effectiveAssigneeTagId];
+          
+          // 处理assignee为数组的情况
+          if (Array.isArray(assigneeValue)) {
+            return assigneeValue.includes(user.id);
+          }
+          
+          // 处理assignee为单个值的情况
+          return assigneeValue === user.id;
+        });
         
         // 合并两个数组并去重
         const allUserTasks = [...createdTasks];
@@ -115,10 +155,21 @@ export async function GET(request) {
         throw allTasksError;
       }
       
-      // Filter tasks where the user is assigned in tag_values.assignee_id
-      const assignedTasks = allTasks.filter(task => 
-        task.tag_values && task.tag_values.assignee_id === userId
-      );
+      // Filter tasks where the user is assigned in tag_values
+      const assignedTasks = allTasks.filter(task => {
+        if (!task.tag_values) return false;
+        
+        // 使用动态获取的assignee标签ID
+        const assigneeValue = task.tag_values[effectiveAssigneeTagId];
+        
+        // 处理assignee为数组的情况
+        if (Array.isArray(assigneeValue)) {
+          return assigneeValue.includes(userId);
+        }
+        
+        // 处理assignee为单个值的情况
+        return assigneeValue === userId;
+      });
       
       // Combine created and assigned tasks, removing duplicates
       const allUserTasks = [...createdTasks];
@@ -189,6 +240,11 @@ export async function GET(request) {
           data = tasksData || []
         }
       }
+    }
+    
+    // 返回前统一处理所有任务的tag_values格式
+    if (Array.isArray(data)) {
+      data = data.map(task => processTaskTagValues(task, effectiveAssigneeTagId));
     }
     
     return NextResponse.json(data, { status: 200 })

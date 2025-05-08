@@ -8,6 +8,7 @@ import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useSelector } from 'react-redux';
 import { getSectionByTeamId, updateTaskIds } from '@/lib/redux/features/sectionSlice';
 import { getTagByName } from '@/lib/redux/features/tagSlice';
+import { supabase } from '@/lib/supabase';
 
 
 export default function HandleTask({ teamId }) {
@@ -42,7 +43,24 @@ export default function HandleTask({ teamId }) {
             
             // 创建任务
             const result = await dispatch(createTask(newTaskData)).unwrap();
-            console.log('任务创建结果:', result);
+            //it may also create a notion_page, then update the notion_page id into the task table, page_id column
+            const { data: notionPageData, error: notionPageError } = await supabase
+            .from('notion_page')
+            .insert({
+                created_by: user?.id,
+                last_edited_by: user?.id
+            })
+            .select()
+            .single();
+            console.log(notionPageData);
+            //update the notion_page id into the task table, page_id column
+            const { data: taskData, error: taskError } = await supabase
+            .from('task')
+            .update({
+                page_id: notionPageData.id
+            })
+            .eq('id', result.id);
+            console.log(taskData);
             
             // 如果任务创建成功且有分区ID，则将任务添加到分区的 task_ids 中
             if (result && result.id && taskData.sectionId) {
