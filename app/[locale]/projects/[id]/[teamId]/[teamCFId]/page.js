@@ -26,7 +26,9 @@ import TaskTimeline from '@/components/team/timeline/TaskTimeline';
 import TaskNotion from '@/components/team/notion/TaskNotion';
 import TaskCalendar from '@/components/team/calendar/TaskCalendar';
 //agile
+import TaskAgile from '@/components/team/agile/TaskAgile';
 //posts
+import TaskPosts from '@/components/team/posts/TaskPosts';
 
 // 创建记忆化的选择器
 const selectTeams = state => state.teams.teams;
@@ -254,6 +256,12 @@ export default function TeamCustomFieldPage() {
     }
     if (fieldType === 'NOTE') {
       return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+    }
+    if (fieldType === 'AGILE') {
+      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+    }
+    if (fieldType === 'POSTS') {
+      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
     return <div>暂不支持的字段类型: {fieldType}</div>;
   }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey]);

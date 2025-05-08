@@ -89,14 +89,15 @@ export async function createProjectAndTasks(
     const customFieldsToAssociate = aiResponse.recommended_views || [
       { "id": 1, "name": "Overview", "order_index": 0 },
       { "id": 2, "name": "List", "order_index": 1 },
-      { "id": 3, "name": "Files", "order_index": 2 },
-      { "id": 4, "name": "Timeline", "order_index": 3 }, 
-      { "id": 5, "name": "Gantt", "order_index": 4 },
-      { "id": 6, "name": "Kanban Board", "order_index": 5 },
-      { "id": 7, "name": "Workflow", "order_index": 6 },
-      { "id": 8, "name": "Calendar", "order_index": 7 },
-      //{ "id": 9, "name": "Notion", "order_index": 8 },
-      //{ "id": 10, "name": "Agile", "order_index": 9 }
+      { "id": 3, "name": "Timeline", "order_index": 2 },
+      { "id": 4, "name": "Kanban", "order_index": 3 }, 
+      { "id": 5, "name": "Calendar", "order_index": 4 },
+      { "id": 6, "name": "Posts", "order_index": 8 },
+      { "id": 7, "name": "Files", "order_index": 5 },
+      //{ "id": 8, "name": "Gantt", "order_index": 6 },
+      //{ "id": 9, "name": "Workflow", "order_index": 7 },
+      //{ "id": 10, "name": "Note", "order_index": 9 },
+      //{ "id": 11, "name": "Agile", "order_index": 10 }
     ];
     
     console.log("将使用以下自定义字段:", customFieldsToAssociate);

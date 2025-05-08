@@ -131,21 +131,23 @@ export function getDefaultTagIdsForField(fieldId) {
       return [1, 2, 3, 4, 10]; // Name, Assignee, Due Date, Status, Tags
     case 2: // List
       return [1, 2, 3, 4, 10]; // Name, Assignee, Due Date, Status, Tags
-    case 3: // Files
-      return [1, 2, 5]; // Name, Assignee, Description
-    case 4: // Timeline
+    case 3: // Timeline
       return [1, 2, 3, 4, 6, 9]; // Name, Assignee, Due Date, Status, Start Date, Progress
-    case 5: // Gantt
-      return [1, 2, 3, 4, 6, 8, 9]; // Name, Assignee, Due Date, Status, Start Date, Duration, Progress
-    case 6: // Kanban Board
+    case 4: // Kanban
       return [1, 2, 3, 4, 10]; // Name, Assignee, Due Date, Status, Tags
-    case 7: // Workflow
-      return [1, 2, 3, 4, 7]; // Name, Assignee, Due Date, Status, Parent ID
-    case 8: // Calendar
+    case 5: // Calendar
       return [1, 3, 6, 11]; // Name, Due Date, Start Date, Completed On
-    case 9: // Notion
+    case 6: // Posts
+      return [1, 2, 5, 12]; // Name, Assignee, Description, Remarks 
+    case 7: // Files
+      return [1, 2, 5]; // Name, Assignee, Description
+    case 8: // Gantt
+      return [1, 2, 3, 4, 6, 8, 9]; // Name, Assignee, Due Date, Status, Start Date, Duration, Progress
+    case 9: // Workflow
+      return [1, 2, 3, 4, 7]; // Name, Assignee, Due Date, Status, Parent ID
+    case 10: // Note
       return [1, 2, 5, 12]; // Name, Assignee, Description, Remarks
-    case 10: // Agile
+    case 11: // Agile
       return [1, 2, 3, 4, 9, 10]; // Name, Assignee, Due Date, Status, Progress, Tags
     default:
       return []; // Default empty array

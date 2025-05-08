@@ -1974,5 +1974,19 @@
     "openInNewTab": "Open in New Tab",
     "fileNotFound": "File not found",
     "closePreview": "Close Preview"
+  },
+  "PostsView": {
+    "posts": "Posts",
+    "searchPosts": "Search posts...",
+    "newPost": "New Post",
+    "filter": "Filter",
+    "newest": "Newest",
+    "oldest": "Oldest",
+    "alphabetical": "Alphabetical",
+    "popular": "Popular",
+    "allSections": "All Sections",
+    "noPosts": "No Posts Yet",
+    "noPostsDescription": "Start the conversation by creating the first post for your team.",
+    "createFirstPost": "Create First Post"
   }
 }
