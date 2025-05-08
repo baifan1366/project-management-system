@@ -581,6 +581,7 @@
   },
   "CreateTask": {
     "createTask": "Create Task",
+    "unassigned": "Unassigned",
     "taskName": "Task Name",
     "cancel": "Cancel",
     "create": "Create",
@@ -615,6 +616,8 @@
     "calendar": "Calendar",
     "timeline": "Timeline",
     "files": "Files",
+    "posts": "Posts",
+    "agile": "Agile",
     "text": "Text",
     "gantt": "Gantt",
     "day": "Day",

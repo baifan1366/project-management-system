@@ -98,14 +98,15 @@ INSERT INTO "custom_field" (id, name, type, description, icon, created_at, updat
 VALUES 
   ('1', 'Overview', 'OVERVIEW', 'Provides a high-level summary of overall project progress and key metrics.', 'LayoutGrid', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
   ('2', 'List', 'LIST', 'Presents tasks in a straightforward, linear list for easy tracking.', 'List', '2025-03-11 08:33:44.576972', '2025-03-11 08:33:44.576972', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('3', 'Files', 'FILES', 'Allows users to upload, manage, and organize task-related documents.', 'Files', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('4', 'Timeline', 'TIMELINE', 'A simplified version of Gantt that visualizes tasks along a timeline.', 'SquareChartGantt', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('5', 'Gantt', 'GANTT', 'Displays tasks in a Gantt chart with timelines and dependencies for project planning.', 'ChartGantt', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('6', 'Kanban', 'KANBAN', 'Visualizes tasks in a kanban board layout for status-based task tracking.', 'LayoutDashboard', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('7', 'Workflow', 'WORKFLOW', 'Outlines tasks in a structured workflow format, showing task progression.', 'LayoutDashboard', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
-  ('8', 'Calendar', 'CALENDAR', 'Uses a calendar view to plan, schedule, and track tasks by date.', 'CalendarRange', '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('9', 'Note', 'NOTE', 'Functions as a knowledge base for capturing and organizing notes, documentation, or ideas.', 'Text', '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
-  ('10', 'Agile', 'AGILE', 'Supports agile methodologies by managing tasks in an iterative board format.', 'Pen', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
+  ('3', 'Timeline', 'TIMELINE', 'A simplified version of Gantt that visualizes tasks along a timeline.', 'CalendarClock', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('4', 'Kanban', 'KANBAN', 'Visualizes tasks in a kanban board layout for status-based task tracking.', 'SquareKanban', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('5', 'Calendar', 'CALENDAR', 'Uses a calendar view to plan, schedule, and track tasks by date.', 'CalendarRange', '2025-03-11 10:24:37.186868', '2025-03-11 10:24:37.186868', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('6', 'Posts', 'POSTS', 'Used for publishing and managing project-related posts and announcements.', 'Pen', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('7', 'Files', 'FILES', 'Allows users to upload, manage, and organize task-related documents.', 'Files', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('8', 'Gantt', 'GANTT', 'Displays tasks in a Gantt chart with timelines and dependencies for project planning.', 'ChartGantt', '2025-03-11 06:51:17.627043', '2025-03-11 06:51:17.627043', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('9', 'Workflow', 'WORKFLOW', 'Outlines tasks in a structured workflow format, showing task progression.', 'Workflow', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94'),
+  ('10', 'Note', 'NOTE', 'Functions as a knowledge base for capturing and organizing notes, documentation, or ideas.', 'NotebookText', '2025-03-11 10:25:37.878485', '2025-03-11 10:25:37.878485', '75cb09ec-f11e-4b34-a1e5-327e90026b94'), 
+  ('11', 'Agile', 'AGILE', 'Supports agile methodologies by managing tasks in an iterative board format.', 'BookText', '2025-03-11 10:26:13.055402', '2025-03-11 10:26:13.055402', '75cb09ec-f11e-4b34-a1e5-327e90026b94');
 
 -- Insert time entry data
 INSERT INTO "time_entry" (id, task_id, user_id, start_time, end_time, duration, created_at, updated_at)
@@ -163,11 +164,36 @@ VALUES
   (1, 3, 'https://example.com/files/responsive-design-approach.pdf', '响应式设计方法.pdf', '75cb09ec-f11e-4b34-a1e5-327e90026b94', '2023-02-03T11:10:00Z');
 
 -- Insert subscription plan data
-INSERT INTO "subscription_plan" ("id", "name", "type", "price", "billing_interval", "description", "features", "max_members", "max_projects", "storage_limit", "is_active", "created_at", "updated_at") 
-VALUES 
-('1', 'Free', 'FREE', '0.00', 'MONTHLY', 'Basic plan for small teams', '{"features": ["Up to 3 team members", "2 projects", "Basic task management", "1GB storage", "Community support"]}', '3', '2', '1073741824', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897'), 
-('2', 'Pro', 'PRO', '29.00', 'MONTHLY', 'Perfect for growing teams', '{"features": ["Up to 10 team members", "Unlimited projects", "Advanced task management", "10GB storage", "Priority support", "Custom fields", "Time tracking"]}', '10', '2', '10737418240', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897'), 
-('3', 'Enterprise', 'ENTERPRISE', '99.00', 'MONTHLY', 'For large organizations', '{"features": ["Unlimited team members", "Unlimited projects", "Enterprise security", "100GB storage", "24/7 dedicated support", "Custom branding", "API access"]}', '-1', '2', '107374182400', 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897');  
+INSERT INTO "public"."subscription_plan" (
+  "id", "name", "type", "price", "billing_interval", "description", 
+  "features", "max_projects", "max_teams", "max_members", 
+  "max_ai_chat", "max_ai_task", "max_ai_workflow", 
+  "is_active", "created_at", "updated_at"
+) VALUES 
+('1', 'Free', 'FREE', '0.00', 'MONTHLY', 'Basic plan for small teams', 
+ '{"features": ["Basic task management", "1GB storage", "Community support", "4 projects"]}', 
+ '2', '1', '3', '50', '20', '5', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-19 04:49:22.663'),
+('2', 'Pro', 'PRO', '29.00', 'MONTHLY', 'Perfect for growing teams', 
+ '{"features": ["Up to 10 team members", "Advanced task management", "10GB storage", "Priority support", "Custom fields"]}', 
+ '5', '3', '10', '500', '100', '20', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-12 10:33:10.017'),
+('3', 'Enterprise', 'ENTERPRISE', '99.00', 'MONTHLY', 'For large organizations', 
+ '{"features": ["Unlimited team members", "Unlimited projects", "Enterprise security", "100GB storage", "24/7 dedicated support", "Custom branding"]}', 
+ '-1', '-1', '-1', '-1', '-1', '-1', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-12 10:30:03.438'),
+('4', 'Free', 'FREE', '0.00', 'YEARLY', 'Basic plan for small teams', 
+ '{"features": ["Up to 3 team members", "2 projects", "Basic task management", "1GB storage"]}', 
+ '2', '1', '3', '50', '20', '5', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-12 10:30:38.355'),
+('5', 'Pro', 'PRO', '290.00', 'YEARLY', 'Perfect for growing teams with yearly discount', 
+ '{"features": ["Up to 10 team members", "Unlimited projects", "Advanced task management", "15GB storage", "Priority support", "Custom fields", "Time tracking"]}', 
+ '-1', '5', '10', '1000', '200', '50', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-04-12 10:29:45.189'),
+('6', 'Enterprise', 'ENTERPRISE', '990.00', 'YEARLY', 'For large organizations with yearly discount', 
+ '{"features": ["Unlimited team members", "Unlimited projects", "Enterprise security", "150GB storage", "24/7 dedicated support", "Custom branding", "API access", "SSO integration", "Audit logs"]}', 
+ '-1', '-1', '-1', '-1', '-1', '-1', 
+ 'true', '2025-03-26 12:37:28.971897', '2025-03-26 12:37:28.971897');
 
 -- Insert promo code data
 INSERT INTO "promo_code" (code, description, discount_type, discount_value, max_uses, start_date, end_date) VALUES
