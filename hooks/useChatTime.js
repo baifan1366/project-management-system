@@ -30,7 +30,7 @@ export function useChatTime() {
     const diffDay = Math.floor(diffHour / 24);
 
     // 如果是今天的消息，显示时间
-    if (diffDay < 1 && dateInUserTz.getDate() === nowInUserTz.getDate()) {
+    if (diffDay < 1 ) {
       return dateInUserTz.toLocaleTimeString([], {
         hour: '2-digit', 
         minute: '2-digit',

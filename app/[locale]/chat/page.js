@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, createRef } from 'react';
+import { useState, useEffect, useRef, createRef, useCallback, useMemo, memo } from 'react';
 import { Send, Paperclip, Smile, Image as ImageIcon, Gift, ChevronDown, Bot, MessageSquare, Reply, Trash2, Languages, MoreVertical, Search, Link, FileText, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
@@ -32,6 +32,7 @@ import ChatSearch from '@/components/chat/ChatSearch';
 import useGetUser from '@/lib/hooks/useGetUser';
 import MentionSelector from '@/components/chat/MentionSelector';
 import MentionItem from '@/components/chat/MentionItem';
+import { debounce } from 'lodash';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -68,6 +69,359 @@ const HeaderSkeleton = () => (
   </div>
 );
 
+// Process message to display mentions with proper components
+const processMessageWithMentions = (content, msgMentions = null) => {
+  if (!content) return '';
+  
+  // If we have stored mentions data, use it for better display
+  if (msgMentions && Array.isArray(msgMentions) && msgMentions.length > 0) {
+    // Sort mentions by startIndex in reverse order to replace from end to start
+    // This ensures indices remain valid during replacement
+    const sortedMentions = [...msgMentions].sort((a, b) => b.startIndex - a.startIndex);
+    
+    // Create an array of content pieces
+    let contentPieces = [content];
+    
+    // Process each mention
+    sortedMentions.forEach(mention => {
+      const lastPiece = contentPieces.pop();
+      
+      // Split the content at the mention position
+      const before = lastPiece.substring(0, mention.startIndex);
+      const after = lastPiece.substring(mention.endIndex);
+      
+      // Create the appropriate mention component
+      const mentionComponent = (
+        <MentionItem 
+          key={`${mention.type}-${mention.id || mention.name}`}
+          type={mention.type}
+          id={mention.id || mention.name}
+          name={mention.name}
+          projectName={mention.projectName}
+        />
+      );
+      
+      // Push the parts back into the content array
+      contentPieces.push(before, mentionComponent, after);
+    });
+    
+    return contentPieces;
+  }
+  
+  // Fallback to regex-based parsing if no stored mentions data
+  // Parse the message content to identify mentions
+  // Format: @username for users, #project-name for projects, task title (project) for tasks
+  
+  // Pattern for user mentions: @username
+  const userPattern = /@([a-zA-Z0-9_.-]+)/g;
+  
+  // Pattern for project mentions: #project-name
+  const projectPattern = /#([a-zA-Z0-9_.-]+)/g;
+  
+  // Pattern for task mentions with the project in parentheses: TaskTitle (ProjectName)
+  const taskPattern = /(.+) \((.+)\)/g;
+  
+  // Create a temporary div to hold the message with mention components
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  
+  // Process the message text
+  const processedContent = tempDiv.textContent;
+  
+  // We'll use React's createElement to build our component structure
+  const elements = [];
+  let lastIndex = 0;
+  
+  // Helper function to add text segments
+  const addTextSegment = (text, index) => {
+    if (text) {
+      elements.push(text);
+    }
+    lastIndex = index;
+  };
+  
+  // Find user mentions
+  processedContent.replace(userPattern, (match, username, index) => {
+    // Add text before the mention
+    addTextSegment(processedContent.substring(lastIndex, index), index);
+    
+    // Add the mention component
+    elements.push(
+      <MentionItem 
+        key={`user-${index}`}
+        type="user"
+        id={username} // This is just a placeholder, we don't have the actual user ID
+        name={username}
+      />
+    );
+    
+    lastIndex = index + match.length;
+    return match; // This doesn't affect the output, just satisfies the replace function
+  });
+  
+  // Find project mentions
+  processedContent.replace(projectPattern, (match, projectName, index) => {
+    // Check if this index is already processed (part of a user mention)
+    if (index < lastIndex) return match;
+    
+    // Add text before the mention
+    addTextSegment(processedContent.substring(lastIndex, index), index);
+    
+    // Add the mention component
+    elements.push(
+      <MentionItem 
+        key={`project-${index}`}
+        type="project"
+        id={projectName} // This is just a placeholder
+        name={projectName}
+      />
+    );
+    
+    lastIndex = index + match.length;
+    return match;
+  });
+  
+  // Add any remaining text
+  if (lastIndex < processedContent.length) {
+    elements.push(processedContent.substring(lastIndex));
+  }
+  
+  return elements.length > 0 ? elements : processedContent;
+};
+
+// Memoize the expensive message formatting logic
+const useMemoizedMessageFormatter = (messages) => {
+  const formattedMessagesRef = useRef({});
+  
+  return useCallback((msgId, content, msgMentions) => {
+    // Return cached result if available and content hasn't changed
+    if (formattedMessagesRef.current[msgId]?.content === content) {
+      return formattedMessagesRef.current[msgId].formatted;
+    }
+    
+    // Process the message content
+    const processed = processMessageWithMentions(content, msgMentions);
+    
+    // Cache the result
+    formattedMessagesRef.current[msgId] = {
+      content,
+      formatted: processed
+    };
+    
+    return processed;
+  }, []);
+};
+
+// Memoize the message component to prevent unnecessary re-renders
+const MemoizedMessage = memo(function Message({ 
+  msg, 
+  isMe, 
+  currentUser, 
+  formatMessage, 
+  handleReplyMessage, 
+  handleDeleteMessage, 
+  handleTranslateMessage, 
+  translatorRefs, 
+  translatedMessages, 
+  hourFormat, 
+  adjustTimeByOffset,
+  t 
+}) {
+  const isDeleted = msg.is_deleted;
+  
+  return (
+    <div
+      id={`message-${msg.id}`}
+      className={cn(
+        "flex items-start gap-2 max-w-2xl transition-colors duration-300",
+        isMe ? "ml-auto flex-row-reverse" : ""
+      )}
+    >
+      <div className={cn(
+        "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
+        isMe ? "bg-green-600" : "bg-blue-600"
+      )}>
+        {msg.user?.avatar_url && msg.user?.avatar_url !== '' ? (
+          <img 
+            src={msg.user.avatar_url} 
+            alt={msg.user.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <span>{msg.user?.name?.charAt(0) || '?'}</span>
+        )}
+      </div>
+      <div className="min-w-0 max-w-full">
+        <div className={cn(
+          "flex items-baseline gap-2",
+          isMe ? "flex-row-reverse" : ""
+        )}>
+          <span className="font-medium truncate">{msg.user?.name}</span>
+          <span className="text-xs text-muted-foreground flex-shrink-0">
+            {adjustTimeByOffset && new Date(msg.created_at) ? 
+              adjustTimeByOffset(new Date(msg.created_at)).toLocaleTimeString([], {
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: hourFormat === '12h'
+              }) : 
+              new Date(msg.created_at).toLocaleTimeString()
+            }
+          </span>
+        </div>
+        <div className={cn(
+          "mt-1 rounded-lg p-3 text-sm break-words group relative",
+          isDeleted ? "bg-muted text-muted-foreground italic" : (
+            isMe 
+              ? "bg-primary text-primary-foreground" 
+              : "bg-accent"
+          )
+        )}>
+          {/* If it's a reply, show the replied message content */}
+          {msg.replied_message && !isDeleted && (
+            <div className="mb-2 p-2 rounded bg-background/50 text-xs line-clamp-2 border-l-2 border-blue-400">
+              <p className="font-medium text-blue-600 dark:text-blue-400">
+                {t('replyTo')} {msg.replied_message.user?.name}:
+              </p>
+              <p className="text-muted-foreground truncate">
+                {msg.replied_message.content}
+              </p>
+            </div>
+          )}
+          
+          {isDeleted ? (
+            <span className="pr-7">{t('messageWithdrawn')}</span>
+          ) : (
+            <div className="pr-7">
+              <GoogleTranslator 
+                content={msg.content}
+                targetLang="en"
+                showButton={false}
+                ref={ref => {
+                  if (ref) translatorRefs.current[`translator-${msg.id}`] = ref;
+                }}
+              >
+                <div className={`break-words break-all ${msg.content.length > 500 ? 'max-h-60 overflow-y-auto' : ''}`}>
+                  {formatMessage(msg.id, msg.content, msg.mentions)}
+                </div>
+              </GoogleTranslator>
+            </div>
+          )}
+          
+          {/* Message actions menu */}
+          {!isDeleted && (
+            <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-1 rounded-sm hover:bg-background/60 text-muted-foreground hover:text-foreground">
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 bg-popover border border-border text-foreground dark:bg-gray-800">
+                  <DropdownMenuItem 
+                    onClick={() => handleReplyMessage(msg)}
+                    className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
+                  >
+                    <Reply className="h-4 w-4" />
+                    <span>{t('reply')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleTranslateMessage(msg.id)}
+                    className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
+                  >
+                    <Languages className="h-4 w-4" />
+                    <span>{translatedMessages[msg.id] ? t('seeOriginal') : t('translate')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      navigator.clipboard.writeText(msg.content);
+                      toast.success(t('copiedToClipboard'));
+                    }}
+                    className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                    </svg>
+                    <span>{t('copy')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="dark:bg-slate-700" />
+                  {isMe && (
+                    <DropdownMenuItem 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteMessage(msg.id);
+                      }}
+                      className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-destructive dark:hover:bg-gray-900"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>{t('delete')}</span>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+        </div>
+        {!isDeleted && msg.attachments?.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {msg.attachments.map((attachment) => (
+              attachment.is_image ? (
+                <div key={attachment.id} className="mt-2">
+                  <img 
+                    src={attachment.file_url} 
+                    alt={attachment.file_name}
+                    className="max-h-80 rounded-lg object-cover cursor-pointer"
+                    loading="lazy"
+                    onClick={() => window.open(attachment.file_url, '_blank')}
+                  />
+                </div>
+              ) : (
+                <a
+                  key={attachment.id}
+                  href={attachment.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                >
+                  <Paperclip className="h-4 w-4" />
+                  {attachment.file_name}
+                </a>
+              )
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison to prevent unnecessary re-renders
+  return (
+    prevProps.msg.id === nextProps.msg.id &&
+    prevProps.msg.content === nextProps.msg.content &&
+    prevProps.msg.is_deleted === nextProps.msg.is_deleted &&
+    prevProps.isMe === nextProps.isMe &&
+    prevProps.translatedMessages[prevProps.msg.id] === nextProps.translatedMessages[nextProps.msg.id]
+  );
+});
+
+// Improve scrolling performance with a throttled scroll function
+const useThrottledScroll = () => {
+  const scrollTimeoutRef = useRef(null);
+  
+  return useCallback((ref) => {
+    if (scrollTimeoutRef.current) {
+      return; // Don't schedule another scroll while one is pending
+    }
+    
+    scrollTimeoutRef.current = setTimeout(() => {
+      if (ref.current) {
+        ref.current.scrollIntoView({ behavior: 'smooth' });
+      }
+      scrollTimeoutRef.current = null;
+    }, 100); // Throttle to 10 scrolls per second maximum
+  }, []);
+};
+
 export default function ChatPage() {
   const t = useTranslations('Chat');
   const { formatLastSeen } = useLastSeen();
@@ -85,7 +439,7 @@ export default function ChatPage() {
     deleteMessage
   } = useChat();
   
-  // 使用增强的UserStatusContext
+  // Use enhanced UserStatusContext
   const { 
     currentUser, 
     getUserStatus, 
@@ -95,16 +449,84 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const [isPending, setIsPending] = useState(false);
-  // 添加回复消息状态
+  // Add reply message state
   const [replyToMessage, setReplyToMessage] = useState(null);
   
   // Chat search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   
-  // 获取其他参与者ID
+  // @mention state
+  const [isMentionOpen, setIsMentionOpen] = useState(false);
+  const [mentionSearchText, setMentionSearchText] = useState('');
+  const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
+  const textareaRef = useRef(null);
+  const [mentions, setMentions] = useState([]);
+  
+  // Add refs for translator components and track translated messages
+  const translatorRefs = useRef({});
+  const [translatedMessages, setTranslatedMessages] = useState({});
+  
+  // Get other participant ID
   const otherParticipantId = currentSession?.type === 'PRIVATE' ? currentSession?.participants?.[0]?.id : null;
   
-  // 当对话变更时立即获取用户状态
+  // Optimize the extraction of mentions
+  const extractMentionsFromMessage = useCallback((text) => {
+    if (!text) return [];
+    
+    const mentions = [];
+    const userPattern = /@([a-zA-Z0-9_.-]+)/g;
+    const projectPattern = /#([a-zA-Z0-9_.-]+)/g;
+    
+    // Extract user mentions with a single regex execution
+    const userMatches = [...text.matchAll(userPattern)];
+    for (const match of userMatches) {
+      mentions.push({
+        type: 'user',
+        name: match[1],
+        startIndex: match.index,
+        endIndex: match.index + match[0].length
+      });
+    }
+    
+    // Extract project mentions with a single regex execution
+    const projectMatches = [...text.matchAll(projectPattern)];
+    for (const match of projectMatches) {
+      mentions.push({
+        type: 'project',
+        name: match[1],
+        startIndex: match.index,
+        endIndex: match.index + match[0].length
+      });
+    }
+    
+    return mentions;
+  }, []);
+  
+  // Create a memoized formatter
+  const formatMessage = useMemoizedMessageFormatter(messages);
+  
+  // Use the throttled scroll function
+  const throttledScrollToBottom = useThrottledScroll();
+  
+  // Optimize scrolling behavior
+  const scrollToBottom = useCallback(() => {
+    throttledScrollToBottom(messagesEndRef);
+  }, [throttledScrollToBottom]);
+  
+  // Use a more efficient way to monitor new messages
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Only scroll for new messages (not on initial load)
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.user_id) {
+        window.requestAnimationFrame(() => {
+          scrollToBottom();
+        });
+      }
+    }
+  }, [messages.length, scrollToBottom]); // Only depend on messages.length, not the entire messages array
+  
+  // Update user status when conversation changes
   useEffect(() => {
     if (otherParticipantId) {
       getUserStatus(otherParticipantId);
@@ -139,37 +561,35 @@ export default function ChatPage() {
     };
   }, [otherParticipantId, getUserStatus]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  // 监听新消息，自动滚动到底部
-  useEffect(() => {
-    if (messages.length > 0) {
-      scrollToBottom();
-    }
-  }, [messages]);
-
-  const handleSendMessage = async (e) => {
+  // Optimize handleSendMessage to use the memoized mention extractor
+  const handleSendMessage = useCallback(async (e) => {
     e.preventDefault();
-    if (message.trim() && currentSession) {
+    const trimmedMessage = message.trim();
+    
+    // Add message length validation
+    if (trimmedMessage.length > 2000) {
+      toast.error(t('errors.messageTooLong') || 'Message too long (max 2000 characters)');
+      return;
+    }
+    
+    if (trimmedMessage && currentSession) {
       try {
-        // Extract mentions from the message
+        // Extract mentions from the message using memoized function
         const extractedMentions = mentions.length > 0 ? mentions : extractMentionsFromMessage(message);
         
         // Send message with mentions
         await sendMessage(
           currentSession.id, 
-          message, 
+          trimmedMessage, 
           replyToMessage?.id, 
           extractedMentions
         );
         
         setMessage('');
-        setReplyToMessage(null); // 发送后清除回复状态
-        setMentions([]); // Clear mentions after sending
+        setReplyToMessage(null);
+        setMentions([]);
         
-        // 发送消息后立即刷新对方状态
+        // Refresh other participant's status
         if (otherParticipantId) {
           getUserStatus(otherParticipantId);
         }
@@ -177,39 +597,8 @@ export default function ChatPage() {
         console.error(t('errors.sendMessageFailed'), error);
       }
     }
-  };
+  }, [message, currentSession, mentions, replyToMessage, sendMessage, extractMentionsFromMessage, otherParticipantId, getUserStatus, t]);
   
-  // Extract mentions from message text using regex patterns
-  const extractMentionsFromMessage = (text) => {
-    const mentions = [];
-    const userPattern = /@([a-zA-Z0-9_.-]+)/g;
-    const projectPattern = /#([a-zA-Z0-9_.-]+)/g;
-    const taskPattern = /(.+) \((.+)\)/g;
-    
-    // Extract user mentions
-    let match;
-    while ((match = userPattern.exec(text)) !== null) {
-      mentions.push({
-        type: 'user',
-        name: match[1],
-        startIndex: match.index,
-        endIndex: match.index + match[0].length
-      });
-    }
-    
-    // Extract project mentions
-    while ((match = projectPattern.exec(text)) !== null) {
-      mentions.push({
-        type: 'project',
-        name: match[1],
-        startIndex: match.index,
-        endIndex: match.index + match[0].length
-      });
-    }
-    
-    return mentions;
-  };
-
   // 回复消息处理函数
   const handleReplyMessage = (msg) => {
     setReplyToMessage(msg);
@@ -228,18 +617,20 @@ export default function ChatPage() {
     setMessage(prev => prev + emoji);
   };
 
-  // 处理文件上传完成
-  const handleFileUploadComplete = async (uploadResults, messageContent) => {
+  // Optimize handleFileUploadComplete for better performance
+  const handleFileUploadComplete = useCallback(async (uploadResults, messageContent) => {
+    if (isPending) return; // Prevent multiple submissions
+    
     setIsPending(true);
     try {
-      // 确保用户已登录且会话ID存在
+      // Ensure user is logged in and session ID exists
       if (!currentUser?.id || !currentSession?.id) {
         throw new Error(t('errors.userNotLoggedIn'));
       }
 
       toast.info(t('checkingPermission'));
 
-      // 检查用户是否是会话参与者
+      // Check if user is a session participant
       const { data: participant, error: participantError } = await supabase
         .from('chat_participant')
         .select('*')
@@ -252,7 +643,7 @@ export default function ChatPage() {
         throw new Error(t('errors.notParticipant'));
       }
 
-      // 先发送消息以获取message_id
+      // First send message to get message_id
       const { data: messageData, error: messageError } = await supabase
         .from('chat_message')
         .insert({
@@ -268,13 +659,13 @@ export default function ChatPage() {
         throw messageError;
       }
 
-      // 关联附件到消息
+      // Associate attachments to message
       const attachmentsToInsert = uploadResults.map(item => ({
         message_id: messageData.id,
         file_url: item.file_url,
         file_name: item.file_name,
         uploaded_by: currentUser.id,
-        is_image: item.is_image || false // 添加图片标识
+        is_image: item.is_image || false
       }));
 
       if (attachmentsToInsert.length > 0) {
@@ -289,54 +680,17 @@ export default function ChatPage() {
       }
 
       toast.success(t('attachmentAdded'));
-
-      // 清空消息输入
       setMessage('');
       
-      // 发送消息后立即刷新对方状态
+      // Refresh other participant's status
       if (otherParticipantId) {
         getUserStatus(otherParticipantId);
       }
       
-      // 立即获取该消息的完整信息（包括附件）并显示
-      setTimeout(async () => {
-        const { data: completeMessage, error: fetchError } = await supabase
-          .from('chat_message')
-          .select(`
-            *,
-            user:user_id (
-              id,
-              name,
-              avatar_url,
-              email
-            ),
-            attachments:chat_attachment (
-              id,
-              file_url,
-              file_name,
-              is_image
-            ),
-            replied_message:reply_to_message_id (
-              id,
-              content,
-              user:user_id (
-                id,
-                name,
-                avatar_url,
-                email
-              )
-            )
-          `)
-          .eq('id', messageData.id)
-          .single();
-          
-        if (fetchError) {
-          console.error('获取完整消息数据失败:', fetchError);
-        } else if (completeMessage) {
-          // 使用聊天上下文的功能重新获取消息列表
-          fetchMessages(currentSession.id);
-        }
-      }, 300); // 短暂延迟确保附件已处理完成
+      // Get complete message info including attachments
+      requestAnimationFrame(async () => {
+        fetchMessages(currentSession.id);
+      });
       
     } catch (error) {
       console.error(t('errors.uploadFailed'), error);
@@ -344,7 +698,7 @@ export default function ChatPage() {
     } finally {
       setIsPending(false);
     }
-  };
+  }, [currentUser, currentSession, t, supabase, otherParticipantId, getUserStatus, fetchMessages, isPending]);
 
   // 处理删除消息
   const handleDeleteMessage = async (messageId) => {
@@ -370,11 +724,6 @@ export default function ChatPage() {
     });
   };
 
-  // 添加一个ref集合来存储每条消息的GoogleTranslator组件引用
-  const translatorRefs = useRef({});
-  // 跟踪哪些消息已被翻译
-  const [translatedMessages, setTranslatedMessages] = useState({});
-  
   // 添加处理翻译的函数
   const handleTranslateMessage = (msgId) => {
     const translatorRef = translatorRefs.current[`translator-${msgId}`];
@@ -390,79 +739,63 @@ export default function ChatPage() {
     }
   };
 
-  // @mention state
-  const [isMentionOpen, setIsMentionOpen] = useState(false);
-  const [mentionSearchText, setMentionSearchText] = useState('');
-  const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
-  const textareaRef = useRef(null);
-  const [mentions, setMentions] = useState([]);
+  // Optimize handleInputChange with debouncing
+  const debouncedPositionCalculation = useCallback(
+    debounce((text, cursorPosition, textareaElement) => {
+      // Find if we're currently in a mention context (after an @ symbol)
+      const textBeforeCursor = text.substring(0, cursorPosition);
+      const mentionMatch = textBeforeCursor.match(/@(\S*)$/);
+      
+      if (mentionMatch) {
+        // We found an @ symbol followed by some text
+        const mentionText = mentionMatch[1];
+        
+        if (textareaElement) {
+          // Get position of cursor
+          const rect = textareaElement.getBoundingClientRect();
+          const textareaScrollTop = textareaElement.scrollTop;
+          
+          // Calculate line height
+          const lineHeight = parseInt(window.getComputedStyle(textareaElement).lineHeight) || 18;
+          
+          // Find the position of the @ symbol
+          const atSymbolIndex = textBeforeCursor.lastIndexOf('@');
+          const textBeforeAt = textBeforeCursor.substring(0, atSymbolIndex);
+          
+          // Count newlines before the @ symbol to calculate vertical position
+          const newlines = (textBeforeAt.match(/\n/g) || []).length;
+          
+          // Estimate horizontal position (simplified calculation)
+          const charsInLastLine = textBeforeAt.split('\n').pop().length;
+          const averageCharWidth = 8; // Approximate character width in pixels
+          
+          // Set position and open mention selector
+          setMentionPosition({ 
+            top: rect.top + (newlines * lineHeight) - textareaScrollTop + lineHeight, 
+            left: rect.left + (charsInLastLine * averageCharWidth)
+          });
+          setMentionSearchText(mentionText);
+          setIsMentionOpen(true);
+        }
+      } else {
+        // Close the mention selector if no @ symbol is found
+        setIsMentionOpen(false);
+      }
+    }, 100),
+    []
+  );
 
-  // Process the input to check for @ mentions
-  const handleInputChange = (e) => {
+  // Process the input to check for @ mentions - optimized version
+  const handleInputChange = useCallback((e) => {
     const curValue = e.target.value;
     const cursorPosition = e.target.selectionStart;
     
-    // Find if we're currently in a mention context (after an @ symbol)
-    const textBeforeCursor = curValue.substring(0, cursorPosition);
-    const mentionMatch = textBeforeCursor.match(/@(\S*)$/);
+    // Always update the message state immediately for responsiveness
+    setMessage(curValue);
     
-    if (mentionMatch) {
-      // We found an @ symbol followed by some text
-      const mentionText = mentionMatch[1];
-      
-      // Calculate position for the mention selector
-      const textareaElement = textareaRef.current;
-      if (textareaElement) {
-        // Create a hidden div to calculate text position
-        const hiddenDiv = document.createElement('div');
-        hiddenDiv.style.position = 'absolute';
-        hiddenDiv.style.top = '0';
-        hiddenDiv.style.left = '0';
-        hiddenDiv.style.visibility = 'hidden';
-        hiddenDiv.style.whiteSpace = 'pre-wrap';
-        hiddenDiv.style.width = `${textareaElement.clientWidth}px`;
-        hiddenDiv.style.font = window.getComputedStyle(textareaElement).font;
-        hiddenDiv.style.padding = window.getComputedStyle(textareaElement).padding;
-        
-        // Calculate the position of the @ symbol
-        const atSymbolIndex = textBeforeCursor.lastIndexOf('@');
-        const textBeforeAt = textBeforeCursor.substring(0, atSymbolIndex);
-        
-        hiddenDiv.textContent = textBeforeAt;
-        document.body.appendChild(hiddenDiv);
-        
-        // Get position of cursor
-        const rect = textareaElement.getBoundingClientRect();
-        const textareaScrollTop = textareaElement.scrollTop;
-        
-        // Calculate line height
-        const lineHeight = parseInt(window.getComputedStyle(textareaElement).lineHeight) || 18;
-        
-        // Count newlines before the @ symbol
-        const newlines = (textBeforeAt.match(/\n/g) || []).length;
-        
-        // Calculate the position
-        const left = rect.left + (hiddenDiv.clientWidth % textareaElement.clientWidth);
-        
-        // Get the cursor position relative to the viewport
-        const cursorTop = rect.top + Math.floor(hiddenDiv.clientWidth / textareaElement.clientWidth) * lineHeight - textareaScrollTop;
-        
-        // Clean up
-        document.body.removeChild(hiddenDiv);
-        
-        // Set position and open mention selector
-        setMentionPosition({ 
-          top: cursorTop, 
-          left: left 
-        });
-        setMentionSearchText(mentionText);
-        setIsMentionOpen(true);
-      }
-    } else {
-      // Close the mention selector if no @ symbol is found
-      setIsMentionOpen(false);
-    }
-  };
+    // Defer the expensive position calculation
+    debouncedPositionCalculation(curValue, cursorPosition, textareaRef.current);
+  }, [debouncedPositionCalculation]);
 
   // Handle selecting a mention from the dropdown
   const handleMentionSelect = (mention) => {
@@ -505,152 +838,42 @@ export default function ChatPage() {
     }
   };
   
-  // Process message content to render mentions properly
-  const formatMessageContent = (content) => {
-    // Simple regex pattern to detect mentions for display
-    const userPattern = /@([a-zA-Z0-9_.-]+)/g;
-    const projectPattern = /#([a-zA-Z0-9_.-]+)/g;
-    const taskPattern = /\[([^\]]+)\]/g;
+  // Optimize messages display
+  const renderedMessages = useMemo(() => {
+    // Using message ID to create a unique list
+    const uniqueMessages = [];
+    const messageIds = new Set();
     
-    let formattedContent = content;
-    
-    // Replace user mentions
-    formattedContent = formattedContent.replace(userPattern, (match, username) => {
-      return `<span class="mention-user">@${username}</span>`;
-    });
-    
-    // Replace project mentions
-    formattedContent = formattedContent.replace(projectPattern, (match, projectName) => {
-      return `<span class="mention-project">#${projectName}</span>`;
-    });
-    
-    // Replace task mentions
-    formattedContent = formattedContent.replace(taskPattern, (match, taskName) => {
-      return `<span class="mention-task">${taskName}</span>`;
-    });
-    
-    return formattedContent;
-  };
-
-  // Process message to display mentions with proper components
-  const processMessageWithMentions = (content, msgMentions = null) => {
-    if (!content) return '';
-    
-    // If we have stored mentions data, use it for better display
-    if (msgMentions && Array.isArray(msgMentions) && msgMentions.length > 0) {
-      // Sort mentions by startIndex in reverse order to replace from end to start
-      // This ensures indices remain valid during replacement
-      const sortedMentions = [...msgMentions].sort((a, b) => b.startIndex - a.startIndex);
-      
-      // Create an array of content pieces
-      let contentPieces = [content];
-      
-      // Process each mention
-      sortedMentions.forEach(mention => {
-        const lastPiece = contentPieces.pop();
-        
-        // Split the content at the mention position
-        const before = lastPiece.substring(0, mention.startIndex);
-        const after = lastPiece.substring(mention.endIndex);
-        
-        // Create the appropriate mention component
-        const mentionComponent = (
-          <MentionItem 
-            key={`${mention.type}-${mention.id || mention.name}`}
-            type={mention.type}
-            id={mention.id || mention.name}
-            name={mention.name}
-            projectName={mention.projectName}
-          />
-        );
-        
-        // Push the parts back into the content array
-        contentPieces.push(before, mentionComponent, after);
-      });
-      
-      return contentPieces;
-    }
-    
-    // Fallback to regex-based parsing if no stored mentions data
-    // Parse the message content to identify mentions
-    // Format: @username for users, #project-name for projects, task title (project) for tasks
-    
-    // Pattern for user mentions: @username
-    const userPattern = /@([a-zA-Z0-9_.-]+)/g;
-    
-    // Pattern for project mentions: #project-name
-    const projectPattern = /#([a-zA-Z0-9_.-]+)/g;
-    
-    // Pattern for task mentions with the project in parentheses: TaskTitle (ProjectName)
-    const taskPattern = /(.+) \((.+)\)/g;
-    
-    // Create a temporary div to hold the message with mention components
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    
-    // Process the message text
-    const processedContent = tempDiv.textContent;
-    
-    // We'll use React's createElement to build our component structure
-    const elements = [];
-    let lastIndex = 0;
-    
-    // Helper function to add text segments
-    const addTextSegment = (text, index) => {
-      if (text) {
-        elements.push(text);
+    for (const msg of messages) {
+      if (!messageIds.has(msg.id)) {
+        messageIds.add(msg.id);
+        uniqueMessages.push(msg);
       }
-      lastIndex = index;
-    };
-    
-    // Find user mentions
-    processedContent.replace(userPattern, (match, username, index) => {
-      // Add text before the mention
-      addTextSegment(processedContent.substring(lastIndex, index), index);
-      
-      // Add the mention component
-      elements.push(
-        <MentionItem 
-          key={`user-${index}`}
-          type="user"
-          id={username} // This is just a placeholder, we don't have the actual user ID
-          name={username}
-        />
-      );
-      
-      lastIndex = index + match.length;
-      return match; // This doesn't affect the output, just satisfies the replace function
-    });
-    
-    // Find project mentions
-    processedContent.replace(projectPattern, (match, projectName, index) => {
-      // Check if this index is already processed (part of a user mention)
-      if (index < lastIndex) return match;
-      
-      // Add text before the mention
-      addTextSegment(processedContent.substring(lastIndex, index), index);
-      
-      // Add the mention component
-      elements.push(
-        <MentionItem 
-          key={`project-${index}`}
-          type="project"
-          id={projectName} // This is just a placeholder
-          name={projectName}
-        />
-      );
-      
-      lastIndex = index + match.length;
-      return match;
-    });
-    
-    // Add any remaining text
-    if (lastIndex < processedContent.length) {
-      elements.push(processedContent.substring(lastIndex));
     }
     
-    return elements.length > 0 ? elements : processedContent;
-  };
+    return uniqueMessages.map((msg) => {    
+      const isMe = msg.user_id === currentUser?.id;
+      
+      return (
+        <MemoizedMessage
+          key={msg.id}
+          msg={msg}
+          isMe={isMe}
+          currentUser={currentUser}
+          formatMessage={formatMessage}
+          handleReplyMessage={handleReplyMessage}
+          handleDeleteMessage={handleDeleteMessage}
+          handleTranslateMessage={handleTranslateMessage}
+          translatorRefs={translatorRefs}
+          translatedMessages={translatedMessages}
+          hourFormat={hourFormat}
+          adjustTimeByOffset={adjustTimeByOffset}
+          t={t}
+        />
+      );
+    });
+  }, [messages, currentUser, formatMessage, handleReplyMessage, handleDeleteMessage, 
+      handleTranslateMessage, translatorRefs, translatedMessages, hourFormat, adjustTimeByOffset, t]);
 
   if (!currentSession && chatMode === 'normal') {
     return (
@@ -664,15 +887,32 @@ export default function ChatPage() {
   const otherParticipant = currentSession?.participants?.[0];
   // 获取实时状态
   const otherParticipantStatus = otherParticipantId ? usersStatus[otherParticipantId] : null;
-  const sessionName = currentSession?.type === 'PRIVATE'
-    ? otherParticipant?.name
-    : currentSession?.name;
+  
+  // Add better fallback handling for session name
+  let sessionName;
+  if (currentSession?.type === 'PRIVATE') {
+    // For private chats, try to get name from participants or use name from session
+    sessionName = otherParticipant?.name || currentSession?.name || t('privateChat');
+  } else {
+    // For group chats, use the session name or default to "Group Chat"
+    sessionName = currentSession?.name || t('newGroupChat');
+  }
+  
   const sessionAvatar = currentSession?.type === 'PRIVATE'
     ? otherParticipant?.avatar_url
     : null;
-  const sessionEmail = currentSession?.type === 'PRIVATE'
-    ? otherParticipant?.email
-    : `${currentSession?.participantsCount || 0} ${t('members')}`;
+  
+  // Add fallback for email display
+  let sessionEmail;
+  if (currentSession?.type === 'PRIVATE') {
+    sessionEmail = otherParticipant?.email || t('newContact');
+  } else {
+    sessionEmail = `${currentSession?.participantsCount || 0} ${t('members')}`;
+  }
+
+  // In the rendered content, use a virtualized list for large message counts
+  const messageCount = messages.length;
+  const shouldVirtualize = messageCount > 50; // Only virtualize for large message counts
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -707,15 +947,19 @@ export default function ChatPage() {
                     <p className="text-xs">
                       {otherParticipantStatus?.isOnline ? (
                         <span className="text-green-600">{t('online')}</span>
-                      ) : (
+                      ) : otherParticipantStatus?.lastSeen ? (
                         <span className="text-muted-foreground">
-                          {otherParticipantStatus?.lastSeen ? (
-                            formatLastSeen(otherParticipantStatus.lastSeen)
-                          ) : otherParticipant?.last_seen_at ? (
-                            formatLastSeen(otherParticipant.last_seen_at)
-                          ) : (
-                            t('offline')
-                          )}
+                          {formatLastSeen(otherParticipantStatus.lastSeen)}
+                        </span>
+                      ) : otherParticipant?.last_seen_at ? (
+                        <span className="text-muted-foreground">
+                          {formatLastSeen(otherParticipant.last_seen_at)}
+                        </span>
+                      ) : otherParticipant?.is_online ? (
+                        <span className="text-green-600">{t('online')}</span>
+                      ) : (
+                        <span className="text-muted-foreground opacity-0">
+                          {/* Leave empty or invisible for users who have never been online */}
                         </span>
                       )}
                     </p>
@@ -777,199 +1021,29 @@ export default function ChatPage() {
         <>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 relative" ref={chatContainerRef}>
             {messagesLoading ? (
-              // 骨架屏加载状态
-              Array(5).fill().map((_, index) => (
+              // Skeleton loading state with fewer items
+              Array(3).fill().map((_, index) => (
                 <MessageSkeleton 
                   key={`message-skeleton-${index}`}
                   isOwnMessage={index % 2 === 0}
                 />
               ))
+            ) : shouldVirtualize ? (
+              // For large message lists, only render visible messages plus some buffer
+              <>
+                {messageCount > 0 && <div className="text-center text-xs text-muted-foreground py-2">
+                  {t('previousMessages', { count: messageCount - 50 })}
+                </div>}
+                {renderedMessages.slice(-50)}
+                <div ref={messagesEndRef} />
+              </>
             ) : (
-              // 正常消息显示
-              (() => {
-                // 使用消息ID创建一个去重的消息列表
-                const uniqueMessages = [];
-                const messageIds = new Set();
-                
-                for (const msg of messages) {
-                  if (!messageIds.has(msg.id)) {
-                    messageIds.add(msg.id);
-                    uniqueMessages.push(msg);
-                  }
-                }
-                
-                return uniqueMessages.map((msg) => {    
-                  const isMe = msg.user_id === currentUser?.id;
-                  const isDeleted = msg.is_deleted;
-                  
-                  return (
-                    <div
-                      key={msg.id}
-                      id={`message-${msg.id}`}
-                      className={cn(
-                        "flex items-start gap-2 max-w-2xl transition-colors duration-300",
-                        isMe ? "ml-auto flex-row-reverse" : ""
-                      )}
-                    >
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0",
-                        isMe ? "bg-green-600" : "bg-blue-600"
-                      )}>
-                        {msg.user?.avatar_url && msg.user?.avatar_url !== '' ? (
-                          <img 
-                            src={msg.user.avatar_url} 
-                            alt={msg.user.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span>{msg.user?.name?.charAt(0) || '?'}</span>
-                        )}
-                      </div>
-                      <div className="min-w-0 max-w-full">
-                        <div className={cn(
-                          "flex items-baseline gap-2",
-                          isMe ? "flex-row-reverse" : ""
-                        )}>
-                          <span className="font-medium truncate">{msg.user?.name}</span>
-                          <span className="text-xs text-muted-foreground flex-shrink-0">
-                            {adjustTimeByOffset && new Date(msg.created_at) ? 
-                              adjustTimeByOffset(new Date(msg.created_at)).toLocaleTimeString([], {
-                                hour: '2-digit', 
-                                minute: '2-digit',
-                                hour12: hourFormat === '12h'
-                              }) : 
-                              new Date(msg.created_at).toLocaleTimeString()
-                            }
-                          </span>
-                        </div>
-                        <div className={cn(
-                          "mt-1 rounded-lg p-3 text-sm break-words group relative",
-                          isDeleted ? "bg-muted text-muted-foreground italic" : (
-                            isMe 
-                              ? "bg-primary text-primary-foreground" 
-                              : "bg-accent"
-                          )
-                        )}>
-                          {/* 如果是回复的消息，显示被回复的内容 */}
-                          {msg.replied_message && !isDeleted && (
-                            <div className="mb-2 p-2 rounded bg-background/50 text-xs line-clamp-2 border-l-2 border-blue-400">
-                              <p className="font-medium text-blue-600 dark:text-blue-400">
-                                {t('replyTo')} {msg.replied_message.user?.name}:
-                              </p>
-                              <p className="text-muted-foreground truncate">
-                                {msg.replied_message.content}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {isDeleted ? (
-                            <span className="pr-7">{t('messageWithdrawn')}</span>
-                          ) : (
-                            <div className="pr-7">
-                              <GoogleTranslator 
-                                content={msg.content}
-                                targetLang="en"
-                                showButton={false}
-                                ref={ref => {
-                                  // 存储组件引用，以便在下拉菜单中调用
-                                  if (ref) translatorRefs.current[`translator-${msg.id}`] = ref;
-                                }}
-                              >
-                                {processMessageWithMentions(msg.content, msg.mentions)}
-                              </GoogleTranslator>
-                            </div>
-                          )}
-                          
-                          {/* 消息操作菜单 */}
-                          {!isDeleted && (
-                            <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <button className="p-1 rounded-sm hover:bg-background/60 text-muted-foreground hover:text-foreground">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 bg-popover border border-border text-foreground dark:bg-gray-800">
-                                  <DropdownMenuItem 
-                                    onClick={() => handleReplyMessage(msg)}
-                                    className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
-                                  >
-                                    <Reply className="h-4 w-4" />
-                                    <span>{t('reply')}</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleTranslateMessage(msg.id)}
-                                    className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
-                                  >
-                                    <Languages className="h-4 w-4" />
-                                    <span>{translatedMessages[msg.id] ? t('seeOriginal') : t('translate')}</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      // 复制消息内容功能
-                                      navigator.clipboard.writeText(msg.content);
-                                      toast.success(t('copiedToClipboard'));
-                                    }}
-                                    className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                                    </svg>
-                                    <span>{t('copy')}</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator className="dark:bg-slate-700" />
-                                  {isMe && (
-                                    <DropdownMenuItem 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteMessage(msg.id);
-                                      }}
-                                      className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-destructive dark:hover:bg-gray-900"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                      <span>{t('delete')}</span>
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          )}
-                        </div>
-                        {!isDeleted && msg.attachments?.length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            {msg.attachments.map((attachment) => (
-                              attachment.is_image ? (
-                                <div key={attachment.id} className="mt-2">
-                                  <img 
-                                    src={attachment.file_url} 
-                                    alt={attachment.file_name}
-                                    className="max-h-80 rounded-lg object-cover cursor-pointer"
-                                    onClick={() => window.open(attachment.file_url, '_blank')}
-                                  />
-                                </div>
-                              ) : (
-                                <a
-                                  key={attachment.id}
-                                  href={attachment.file_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
-                                >
-                                  <Paperclip className="h-4 w-4" />
-                                  {attachment.file_name}
-                                </a>
-                              )
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                });
-              })()
+              // For smaller lists, render all messages
+              <>
+                {renderedMessages}
+                <div ref={messagesEndRef} />
+              </>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* 输入区域 */}
@@ -1000,26 +1074,19 @@ export default function ChatPage() {
                 <div className="px-3 p-1 relative">
                   <textarea
                     value={message}
-                    onChange={(e) => {
-                      setMessage(e.target.value);
-                      handleInputChange(e);
-                    }}
+                    onChange={handleInputChange}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         handleSendMessage(e);
                       }
-                      // 处理提及建议导航
+                      // Handle mention suggestion navigation
                       if (isMentionOpen) {
-                        if (e.key === 'ArrowDown') {
+                        if (['ArrowDown', 'ArrowUp', 'Escape', 'Tab', 'Enter'].includes(e.key)) {
                           e.preventDefault();
-                          // 处理向下箭头键（让MentionSelector内部处理）
-                        } else if (e.key === 'ArrowUp') {
-                          e.preventDefault();
-                          // 处理向上箭头键（让MentionSelector内部处理）
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault();
-                          setIsMentionOpen(false);
+                          if (e.key === 'Escape') {
+                            setIsMentionOpen(false);
+                          }
                         }
                       }
                     }}
@@ -1028,6 +1095,13 @@ export default function ChatPage() {
                     rows={1}
                     ref={textareaRef}
                   />
+                  
+                  {/* Show character count when approaching limit */}
+                  {message.length > 1500 && (
+                    <div className={`text-xs absolute bottom-1 right-3 ${message.length > 2000 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                      {message.length}/2000
+                    </div>
+                  )}
                   
                   {/* @提及选择器 */}
                   <MentionSelector

@@ -58,7 +58,8 @@ export async function GET(request) {
         user:user_id (
           id,
           email,
-          name
+          name,
+          avatar_url
         )
       `);
 

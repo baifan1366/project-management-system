@@ -31,14 +31,30 @@ export default function AuthCallbackPage() {
           // Get URL parameters
           const urlParams = new URLSearchParams(window.location.search);
           const planId = urlParams.get('plan_id');
-          const redirect = urlParams.get('redirect');
+          const redirect = urlParams.get('redirect') || urlParams.get('redirectTo');
+          const finalRedirect = urlParams.get('final_redirect');
+          
+          console.log('Auth callback parameters:', { planId, redirect, finalRedirect });
+          
+          const locale = window.location.pathname.split('/')[1];
           
           // If URL has plan_id parameter and redirect=payment, redirect to payment page
           if (planId && redirect === 'payment') {
-            router.push(`/${window.location.pathname.split('/')[1]}/payment?plan_id=${planId}`);
+            router.push(`/${locale}/payment?plan_id=${planId}`);
+          } else if (redirect && redirect.includes('teamInvitation')) {
+            // 处理团队邀请重定向
+            const redirectPath = redirect.startsWith('/') ? redirect : `/${redirect}`;
+            console.log('重定向到团队邀请页面:', redirectPath);
+            router.push(`/${locale}${redirectPath}`);
+          } else if (finalRedirect && finalRedirect.includes('teamInvitation')) {
+            // 处理final_redirect参数
+            const finalRedirectPath = finalRedirect.startsWith('/') ? finalRedirect : `/${finalRedirect}`;
+            console.log('使用final_redirect重定向到团队邀请页面:', finalRedirectPath);
+            router.push(`/${locale}${finalRedirectPath}`);
           } else {
             // Otherwise redirect to dashboard
-            router.push(`/${window.location.pathname.split('/')[1]}/projects`);
+            console.log('重定向到项目页面');
+            router.push(`/${locale}/projects`);
           }
         }, 1000); // Small delay to ensure cookie is set
       } catch (error) {

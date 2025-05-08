@@ -39,15 +39,20 @@ export default function NotificationsPage() {
     
     setUser(user);
     
-    // Load notification settings from localStorage
-    try {
-      const storedNotifications = localStorage.getItem(`notifications_${user.id}`);
-      if (storedNotifications) {
-        setNotifications(JSON.parse(storedNotifications));
+    // Load notification settings from user object if available
+    if (user.notifications_settings) {
+      setNotifications(user.notifications_settings);
+    } else {
+      // Fallback to localStorage or default values
+      try {
+        const storedNotifications = localStorage.getItem(`notifications_${user.id}`);
+        if (storedNotifications) {
+          setNotifications(JSON.parse(storedNotifications));
+        }
+      } catch (error) {
+        console.error('Error loading notifications from localStorage:', error);
+        // Use default values if both methods fail
       }
-    } catch (error) {
-      console.error('Error loading notifications from localStorage:', error);
-      // Fallback to default values if localStorage fails
     }
   };
 
@@ -55,23 +60,25 @@ export default function NotificationsPage() {
     if (!user) return;
     setLoading(true);
     try {
-      // Save to localStorage
-      localStorage.setItem(`notifications_${user.id}`, JSON.stringify(notifications));
+      // Update notification settings via API
+      const response = await fetch(`/api/users/${user.id}/notifications`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(notifications),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update notification settings');
+      }
       
       // Update Redux store
       await dispatch(updateUserPreference({ 
         userId: user.id, 
         preferenceData: { 
-          notifications: {
-            emailNotifications: notifications.emailNotifications,
-            pushNotifications: notifications.pushNotifications,
-            weeklyDigest: notifications.weeklyDigest,
-            mentionNotifications: notifications.mentionNotifications,
-            taskAssignments: notifications.taskAssignments,
-            taskComments: notifications.taskComments,
-            dueDates: notifications.dueDates,
-            teamInvitations: notifications.teamInvitations
-          }
+          notifications_settings: notifications,
+          notifications_enabled: notifications.emailNotifications || notifications.pushNotifications
         }
       }));
       

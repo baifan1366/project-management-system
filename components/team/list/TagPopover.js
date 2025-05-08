@@ -2,7 +2,7 @@
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
-import { Plus, Text, Hash, Fingerprint, CircleCheck, SquareCheck, Calendar, User, Sigma, Timer, Clock3, Pen, ClipboardList, Tag } from "lucide-react"
+import { Plus, Text, Hash, Fingerprint, CircleCheck, SquareCheck, Calendar, User, Sigma, Timer, Clock3, Pen, ClipboardList, Tag, File } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { useDispatch } from "react-redux"
 import { getTags, resetTagsStatus, updateTagIds } from '@/lib/redux/features/teamCFSlice'
@@ -88,10 +88,10 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
             })).unwrap();
             
             // 通知成功
-            toast({
-                title: `${t('tagAdded')}`,
-                description: `${t('tagAddedDescription')}`,
-            });
+            // toast({
+            //     title: `${t('tagAdded')}`,
+            //     description: `${t('tagAddedDescription')}`,
+            // });
             
             // 关闭弹窗
             setPopoverOpen(false);
@@ -170,7 +170,8 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
             'COMPLETED-ON': <Clock3 className="w-4 h-4 mr-2 text-gray-500" />,
             'LAST-MODIFIED-ON': <Pen className="w-4 h-4 mr-2 text-gray-500" />,
             'CREATED-AT': <Clock3 className="w-4 h-4 mr-2 text-gray-500" />,
-            'CREATED-BY': <User className="w-4 h-4 mr-2 text-gray-500" />
+            'CREATED-BY': <User className="w-4 h-4 mr-2 text-gray-500" />,
+            'FILE': <File className="w-4 h-4 mr-2 text-gray-500" />
         }
         return iconMap[type] || null
     }
@@ -207,7 +208,7 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
                             tags.map(tag => (
                                 <div 
                                     key={tag.id} 
-                                    className="flex items-center py-1 px-3 hover:bg-gray-100 rounded-md cursor-pointer"
+                                    className="flex items-center py-1 px-3 hover:bg-accent rounded-md cursor-pointer"
                                     onClick={() => handleAddTag(tag)}
                                 >
                                     {getTypeIcon(tag.type)}

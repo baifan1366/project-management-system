@@ -15,16 +15,32 @@ import { Upload, File, X, FileText, Sheet, Film, Music, Eye, ChevronLeft } from 
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
+import { useGetUser } from '@/lib/hooks/useGetUser';
+import { api } from '@/lib/api';
+import { useParams } from "next/navigation";
+import { useSelector } from "react-redux"
 
-export default function FileTools({ isOpen, onClose, taskId, currentPath = '/', onFilesUploaded }) {
-  const t = useTranslations('CreateTask')
+export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath = '/', onFilesUploaded }) {
+  const t = useTranslations('File')
   const { toast } = useToast()
   const [files, setFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
   const [previewFile, setPreviewFile] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef(null)
-
+  const { user } = useGetUser();
+  const userId = user?.id
+  const params = useParams()
+  const { id: projectId } = params
+  const [themeColor, setThemeColor] = useState('#64748b')
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
+  useEffect(() => {
+    if (project?.theme_color) {
+      setThemeColor(project.theme_color);
+    }
+  }, [project]);
   // Handle file selection
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files || [])
@@ -223,86 +239,19 @@ export default function FileTools({ isOpen, onClose, taskId, currentPath = '/', 
     }
   }
 
-  // Confirm upload
+  // 处理文件上传
   const handleConfirmUpload = async () => {
     if (!files.length) return
-    if (!taskId) {
-      toast({
-        title: t('uploadError'),
-        description: t('noTaskIdProvided'),
-        variant: 'destructive'
-      })
-      return
-    }
     
     try {
       setIsUploading(true)
       
-      // Get current task data to access attachment_ids
-      const { data: taskData, error: taskError } = await supabase
-        .from('task')
-        .select('attachment_ids')
-        .eq('id', taskId)
-        .single()
-      
-      if (taskError) throw taskError
-      
-      const attachmentIds = taskData?.attachment_ids || []
-      const newAttachmentIds = []
-      
-      // Upload each file
+      // 处理每个文件的上传
       for (const fileItem of files) {
-        // Generate a unique file path
-        const timestamp = new Date().getTime()
-        const fileExt = fileItem.name.split('.').pop()
-        const fileName = `${timestamp}_${fileItem.name}`
-        const filePath = `tasks/${taskId}/${fileName}`
-        
-        // Upload file to Supabase storage
-        const { data: storageData, error: storageError } = await supabase.storage
-          .from('attachments')
-          .upload(filePath, fileItem.file)
-        
-        if (storageError) throw storageError
-        
-        // Get public URL
-        const { data: publicUrlData } = supabase.storage
-          .from('attachments')
-          .getPublicUrl(filePath)
-          
-        const publicUrl = publicUrlData.publicUrl
-        
-        // Insert record into attachment table
-        const { data: attachmentData, error: attachmentError } = await supabase
-          .from('attachment')
-          .insert({
-            file_name: fileItem.name,
-            file_url: publicUrl,
-            task_id: taskId,
-            uploaded_by: '/* user id from context */', // Replace with authenticated user ID
-            file_path: currentPath,
-            file_type: fileItem.type,
-            size: fileItem.size
-          })
-          .select()
-        
-        if (attachmentError) throw attachmentError
-        
-        newAttachmentIds.push(attachmentData[0].id)
+        await processFileUpload(fileItem)
       }
       
-      // Update task with new attachment IDs
-      const { error: updateError } = await supabase
-        .from('task')
-        .update({ 
-          attachment_ids: [...attachmentIds, ...newAttachmentIds],
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', taskId)
-      
-      if (updateError) throw updateError
-      
-      // Clean up
+      // 清理
       files.forEach(file => {
         if (file.preview) {
           URL.revokeObjectURL(file.preview)
@@ -317,7 +266,7 @@ export default function FileTools({ isOpen, onClose, taskId, currentPath = '/', 
         variant: 'default'
       })
       
-      // Call callback function if provided
+      // 调用回调函数
       if (typeof onFilesUploaded === 'function') {
         onFilesUploaded()
       }
@@ -333,6 +282,148 @@ export default function FileTools({ isOpen, onClose, taskId, currentPath = '/', 
     } finally {
       setIsUploading(false)
     }
+  }
+  
+  // 处理单个文件上传的完整流程
+  const processFileUpload = async (fileItem) => {
+    // 1. 获取文件名
+    const fileName = fileItem.name
+    
+    // 2. 根据名称获取File标签ID
+    let fileTagId
+    const tagName = await api.tags.getByName('Name')
+    const nameTagId = tagName.id
+    const tagResponse = await api.tags.getByName('File')
+    fileTagId = tagResponse.id
+    
+    // 3. 检查当前团队是否有section，如果没有则创建一个
+    let sectionId
+    const sections = await api.teams.teamSection.getSectionByTeamId(teamId)
+      
+    if (sections && sections.length > 0) {
+      // 使用第一个section
+      sectionId = sections[0].id
+    } else {
+      // 创建新section
+      const sectionData = {
+        teamId: teamId,
+        sectionName: 'New Section',
+        createdBy: userId
+      };
+      const newSection = await api.teams.teamSection.create(teamId, sectionData);
+      sectionId = newSection.id
+    }
+    
+    // 4. 创建新任务，只包含必要的标签值
+    let taskId
+    const taskData = {
+      created_by: userId,
+      tag_values: {
+        [nameTagId]: fileName,
+        [fileTagId]: fileName
+      }
+    }
+    
+    const taskResponse = await api.teams.teamSectionTasks.create(taskData)
+    taskId = taskResponse.id
+    //it may also create a notion_page, then update the notion_page id into the task table, page_id column
+    const { data: notionPageData, error: notionPageError } = await supabase
+      .from('notion_page')
+      .insert({
+        created_by: userId,
+        last_edited_by: userId
+      })
+      .select()
+      .single();
+    console.log(notionPageData);
+    //update the notion_page id into the task table, page_id column
+    const { data: newTaskData, error: taskError } = await supabase
+      .from('task')
+      .update({
+        page_id: notionPageData.id
+      })
+      .eq('id', taskId);
+    console.log(newTaskData);
+    
+    // 5. 更新section的task_ids
+    try {
+      const sections = await api.teams.teamSection.getSectionById(teamId, sectionId)
+      const currentTaskIds = sections.task_ids || []
+      await api.teams.teamSection.updateTaskIds(sectionId, teamId, [...currentTaskIds, taskId])
+    } catch (error) {
+      console.error('Error updating section task IDs:', error)
+      throw new Error(t('errorUpdatingSectionTaskIds'))
+    }
+    
+    // 6. 上传文件到storage并创建附件记录
+    try {
+      // 生成唯一的文件路径
+      const timestamp = new Date().getTime()
+      const fileExt = fileName.split('.').pop()
+      const uniqueFileName = `${timestamp}_${fileName}`
+      const filePath = `tasks/${taskId}/${uniqueFileName}`
+      
+      // 上传文件到Supabase存储
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, fileItem.file)
+      
+      if (storageError) throw storageError
+      
+      // 获取公共URL
+      const { data: publicUrlData } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath)
+        
+      const publicUrl = publicUrlData.publicUrl
+      
+      // 创建附件记录
+      const { data: attachmentData, error: attachmentError } = await supabase
+        .from('attachment')
+        .insert({
+          file_name: fileName,
+          file_url: publicUrl,
+          task_id: taskId,
+          uploaded_by: userId, 
+          file_path: currentPath,
+          file_type: fileItem.type,
+          size: fileItem.size
+        })
+        .select()
+      
+      if (attachmentError) throw attachmentError
+      
+      // 7. 不再自动创建文件夹记录
+      // 删除或注释掉以下代码块
+      /*
+      if (currentPath !== '/') {
+        const { data: folderData, error: folderError } = await supabase
+          .from('file_folders')
+          .insert({
+            name: fileName,
+            task_id: taskId,
+            parent_path: currentPath,
+            full_path: `${currentPath}/${fileName}`,
+            created_by: userId
+          })
+          .select()
+        
+        if (folderError) throw folderError
+      }
+      */
+    } catch (error) {
+      // 如果附件上传失败，需要清理已创建的任务
+      try {
+        await api.teams.teamSectionTasks.delete(sectionId, taskId, teamId)
+      } catch (cleanupError) {
+        console.error('Failed to clean up task after attachment error:', cleanupError)
+      }
+      
+      console.error('Error uploading file:', error)
+      throw new Error(t('errorUploadingFile'))
+    }
+    
+    return taskId
   }
 
   // Clean up on dialog close
@@ -392,7 +483,7 @@ export default function FileTools({ isOpen, onClose, taskId, currentPath = '/', 
               <p className="mt-2 text-sm font-medium">{t('dragAndDropFiles')}</p>
               <p className="mt-1 text-xs text-gray-500">{t('or')}</p>
               <Button 
-                variant="outline" 
+                variant={themeColor} 
                 className="mt-2"
                 onClick={handleSelectFilesClick}
               >
@@ -460,10 +551,11 @@ export default function FileTools({ isOpen, onClose, taskId, currentPath = '/', 
             
             <DialogFooter className="mt-5">
               <DialogClose asChild>
-                <Button variant="outline" type="button">{t('cancel')}</Button>
+                <Button variant="outline" type="button" disabled={isUploading}>{t('cancel')}</Button>
               </DialogClose>
               <Button 
                 type="button" 
+                variant={themeColor}
                 onClick={handleConfirmUpload}
                 disabled={files.length === 0 || isUploading}
               >

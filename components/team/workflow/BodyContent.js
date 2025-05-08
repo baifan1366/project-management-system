@@ -50,6 +50,13 @@ export default function BodyContent() {
       sectionsFetched: false
     });
 
+    // 动态标签ID状态
+    const [assigneeTagId, setAssigneeTagId] = useState(null);
+    const [nameTagId, setNameTagId] = useState(null);
+    const [descriptionTagId, setDescriptionTagId] = useState(null);
+    const [statusTagId, setStatusTagId] = useState(null);
+    const [dueDateTagId, setDueDateTagId] = useState(null);
+
     // 获取所有通用标签
     useEffect(() => {
       if (!requestCache.allTags && !localRequestTracker.current.allTagsFetched) {
@@ -124,7 +131,41 @@ export default function BodyContent() {
       };
     }, [teamId, dispatch]);
 
-    // 从任务标签值中提取任务信息
+    // 获取标签IDs
+    useEffect(() => {
+      const fetchTagIds = async () => {
+        try {
+          // 获取常用标签的ID
+          const [nameTag, descriptionTag, statusTag, dueDateTag, assigneeTag] = await Promise.all([
+            dispatch(getTagByName("Name")).unwrap(),
+            dispatch(getTagByName("Description")).unwrap(),
+            dispatch(getTagByName("Status")).unwrap(),
+            dispatch(getTagByName("Due Date")).unwrap(),
+            dispatch(getTagByName("Assignee")).unwrap()
+          ]);
+          
+          setNameTagId(nameTag);
+          setDescriptionTagId(descriptionTag);
+          setStatusTagId(statusTag);
+          setDueDateTagId(dueDateTag);
+          setAssigneeTagId(assigneeTag);
+          
+          console.log('标签IDs已加载:', {
+            nameTag,
+            descriptionTag,
+            statusTag,
+            dueDateTag,
+            assigneeTag
+          });
+        } catch (error) {
+          console.error('获取标签ID失败:', error);
+        }
+      };
+      
+      fetchTagIds();
+    }, [dispatch]);
+
+    // 修改extractTaskInfo函数
     const extractTaskInfo = (task) => {
       const tagValues = task.tag_values || {};
       let taskInfo = {
@@ -137,29 +178,87 @@ export default function BodyContent() {
         originalTask: task
       };
       
-      Object.entries(tagValues).forEach(([tagId, value]) => {
-        const tag = findTagById(tagId, tags);
-        if (tag) {
-          switch (tag.name) {
-            case 'Name':
-              taskInfo.name = String(value || '');
-              break;
-            case 'Description':
-              taskInfo.description = String(value || '');
-              break;
-            case 'Status':
-              taskInfo.status = String(value || t('pending'));
-              break;
-            case 'Assignee':
-              taskInfo.assignee = String(value || '');
-              break;
-            case 'Due Date':
-            case 'DueDate':
-              taskInfo.dueDate = value ? String(value).split('T')[0] : '';
-              break;
-          }
+      // 通过标签ID获取值
+      // Name 标签
+      if (nameTagId && tagValues[nameTagId]) {
+        taskInfo.name = String(tagValues[nameTagId] || '');
+      }
+      
+      // Description 标签
+      if (descriptionTagId && tagValues[descriptionTagId]) {
+        taskInfo.description = String(tagValues[descriptionTagId] || '');
+      }
+      
+      // Status 标签
+      if (statusTagId && tagValues[statusTagId]) {
+        taskInfo.status = String(tagValues[statusTagId] || t('pending'));
+      }
+      
+      // Assignee 标签 - 使用动态获取的ID
+      if (assigneeTagId && tagValues[assigneeTagId]) {
+        const value = tagValues[assigneeTagId];
+        // 处理Assignee可能是数组的情况
+        if (Array.isArray(value)) {
+          // 如果是数组，显示多个指派人的数量
+          taskInfo.assignee = `${value.length} ${t('assignees')}`;
+          // 保存原始数组以便需要时使用
+          taskInfo.assigneeData = value;
+        } else {
+          // 单个指派人情况
+          taskInfo.assignee = String(value || '');
         }
-      });
+      }
+      
+      // Due Date 标签
+      if (dueDateTagId && tagValues[dueDateTagId]) {
+        taskInfo.dueDate = tagValues[dueDateTagId] ? String(tagValues[dueDateTagId]).split('T')[0] : '';
+      }
+      
+      // 保持对老数据的兼容性，使用基于标签名称的处理
+      if (!nameTagId || !descriptionTagId || !statusTagId || !assigneeTagId || !dueDateTagId) {
+        Object.entries(tagValues).forEach(([tagId, value]) => {
+          const tag = findTagById(tagId, tags);
+          if (tag) {
+            switch (tag.name) {
+              case 'Name':
+                if (!taskInfo.name || taskInfo.name === `${t('task')} #${task.id}`) {
+                  taskInfo.name = String(value || '');
+                }
+                break;
+              case 'Description':
+                if (!taskInfo.description) {
+                  taskInfo.description = String(value || '');
+                }
+                break;
+              case 'Status':
+                if (!taskInfo.status || taskInfo.status === t('pending')) {
+                  taskInfo.status = String(value || t('pending'));
+                }
+                break;
+              case 'Assignee':
+                if (!taskInfo.assignee) {
+                  // 处理Assignee可能是数组的情况
+                  if (Array.isArray(value)) {
+                    // 如果是数组，显示多个指派人的数量
+                    taskInfo.assignee = `${value.length} ${t('assignees')}`;
+                    // 保存原始数组以便需要时使用
+                    taskInfo.assigneeData = value;
+                  } else {
+                    // 单个指派人情况
+                    taskInfo.assignee = String(value || '');
+                  }
+                }
+                break;
+              case 'Due Date':
+              case 'DueDate':
+                if (!taskInfo.dueDate) {
+                  taskInfo.dueDate = value ? String(value).split('T')[0] : '';
+                }
+                break;
+            }
+          }
+        });
+      }
       
       return taskInfo;
     };

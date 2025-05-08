@@ -600,7 +600,23 @@ export default function MyTasksPage() {
                                       {getTaskDueDate(task) && (
                                         <div className="flex items-center gap-1">
                                           <Calendar className="w-3 h-3" />
-                                          <span>{format(new Date(getTaskDueDate(task)), 'yyyy-MM-dd')}</span>
+                                          <span>
+                                            {(() => {
+                                              try {
+                                                // Validate date before formatting
+                                                const dueDate = getTaskDueDate(task);
+                                                const dateObj = new Date(dueDate);
+                                                // Check if date is valid before formatting
+                                                if (!isNaN(dateObj.getTime())) {
+                                                  return format(dateObj, 'yyyy-MM-dd');
+                                                }
+                                                return t_tasks('invalidDate');
+                                              } catch (err) {
+                                                console.error('Invalid date format:', err);
+                                                return t_tasks('invalidDate');
+                                              }
+                                            })()}
+                                          </span>
                                         </div>
                                       )}
                                     </div>

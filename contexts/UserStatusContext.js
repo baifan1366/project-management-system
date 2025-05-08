@@ -23,6 +23,27 @@ export function UserStatusProvider({ children }) {
     }
   }, [user]);
 
+  // 发送心跳信号
+  const sendHeartbeat = async () => {
+    if (!currentUser?.id) return;
+    
+    try {
+      const response = await fetch('/api/users/heartbeat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        setIsOnline(true);
+        setLastSeen(new Date().toISOString());
+      }
+    } catch (error) {
+      console.error('Failed to send heartbeat:', error);
+    }
+  };
+
   // 更新当前用户的在线状态
   const updateUserOnlineStatus = async () => {
     if (!currentUser?.id) return;
@@ -106,22 +127,22 @@ export function UserStatusProvider({ children }) {
   useEffect(() => {
     if (!currentUser) return;
     
-    // 首次加载时更新
-    updateUserOnlineStatus();
+    // 首次加载时发送心跳
+    sendHeartbeat();
     
-    // 设置定时器，每分钟更新一次在线状态
-    const intervalId = setInterval(updateUserOnlineStatus, 60000);
+    // 设置定时器，每100秒发送一次心跳
+    const intervalId = setInterval(sendHeartbeat, 100000);
     
     // 页面可见性变化时更新
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        updateUserOnlineStatus();
+        sendHeartbeat();
       }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // 用户离线时更新状态
+    // 用户离线时更新状态 - 保留但不再是主要机制
     const updateOfflineStatus = async () => {
       await setUserOffline();
     };

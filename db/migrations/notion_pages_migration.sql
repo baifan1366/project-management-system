@@ -1,9 +1,6 @@
 -- Create the notion_page table for storing knowledge base pages
 CREATE TABLE IF NOT EXISTS "notion_page" (
   "id" SERIAL PRIMARY KEY,
-  "title" VARCHAR(255) NOT NULL,
-  "content" JSONB DEFAULT '{}', -- Store rich text content as JSON
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
   "parent_id" INT REFERENCES "notion_page"("id") ON DELETE CASCADE, -- For hierarchical structure
   "icon" VARCHAR(255), -- Emoji or URL for page icon
   "cover_image" VARCHAR(255), -- URL for cover image

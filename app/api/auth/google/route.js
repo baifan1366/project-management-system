@@ -6,6 +6,9 @@ export async function GET(request) {
     const redirect = searchParams.get('redirect');
     const planId = searchParams.get('plan_id');
     const redirectTo = searchParams.get('redirectTo');
+    const calendar = searchParams.get('calendar') === 'true';
+    
+    console.log('Google OAuth请求参数:', { redirect, planId, redirectTo, calendar });
     
     // Build Google OAuth URL
     const googleOAuthEndpoint = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -18,6 +21,10 @@ export async function GET(request) {
     if (redirect === 'payment' && planId) {
       callbackParams.append('redirect', 'payment');
       callbackParams.append('plan_id', planId);
+    } 
+    // 处理团队邀请页面的重定向
+    else if (redirect && redirect.includes('teamInvitation')) {
+      callbackParams.append('redirect', redirect);
     }
     
     // If a custom redirect is provided (like for calendar), use that
@@ -28,8 +35,8 @@ export async function GET(request) {
     // Determine needed scopes
     let scopes = 'email profile';
     
-    // If redirecting to calendar, add calendar scopes
-    if (redirectTo && redirectTo.includes('/calendar')) {
+    // If calendar access is requested, add calendar scopes
+    if (calendar || (redirectTo && redirectTo.includes('/calendar'))) {
       scopes += ' https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
     }
     

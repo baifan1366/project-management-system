@@ -19,8 +19,8 @@ export default function PreferencesPage() {
   const { user: currentUser, isLoading: userLoading } = useGetUser();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    language: 'zh',
-    timezone: 'UTC+8',
+    language: 'en',
+    timezone: 'UTC+0',
     hourFormat: '24h'
   });
 
@@ -34,8 +34,8 @@ export default function PreferencesPage() {
     if (!user) return;
     
     setFormData({
-      language: user.language || 'zh',
-      timezone: user.timezone || 'UTC+8',
+      language: user.language || 'en',
+      timezone: user.timezone || 'UTC+0',
       hourFormat: user.hour_format || '24h'
     });
   };
@@ -108,9 +108,9 @@ export default function PreferencesPage() {
                 onChange={handleInputChange}
                 className="w-full p-2 border rounded-md"
               >
-                <option value="zh">中文</option>
-                <option value="en">English</option>
-                <option value="my">Malay</option>
+                <option value="zh">{t('languages.chinese')}</option>
+                <option value="en">{t('languages.english')}</option>
+                <option value="my">{t('languages.malay')}</option>
               </select>
             </div>
             <div className="space-y-2">
@@ -122,16 +122,16 @@ export default function PreferencesPage() {
                 onChange={handleInputChange}
                 className="w-full p-2 border rounded-md"
               >
-                <option value="UTC+8">中国标准时间 (UTC+8)</option>
-                <option value="UTC+0">格林威治标准时间 (UTC+0)</option>
-                <option value="UTC-8">太平洋标准时间 (UTC-8)</option>
-                <option value="UTC-5">东部标准时间 (UTC-5)</option>
-                <option value="UTC+1">中欧标准时间 (UTC+1)</option>
-                <option value="UTC+9">日本标准时间 (UTC+9)</option>
-                <option value="UTC+10">澳大利亚东部标准时间 (UTC+10)</option>
-                <option value="UTC+5.5">印度标准时间 (UTC+5.5)</option>
-                <option value="UTC+7">东南亚标准时间 (UTC+7)</option>
-                <option value="UTC+3">莫斯科标准时间 (UTC+3)</option>
+                <option value="UTC+8">{t('timezones.utc8')}</option>
+                <option value="UTC+0">{t('timezones.utc0')}</option>
+                <option value="UTC-8">{t('timezones.utc-8')}</option>
+                <option value="UTC-5">{t('timezones.utc-5')}</option>
+                <option value="UTC+1">{t('timezones.utc1')}</option>
+                <option value="UTC+9">{t('timezones.utc9')}</option>
+                <option value="UTC+10">{t('timezones.utc10')}</option>
+                <option value="UTC+5.5">{t('timezones.utc55')}</option>
+                <option value="UTC+7">{t('timezones.utc7')}</option>
+                <option value="UTC+3">{t('timezones.utc3')}</option>
               </select>
             </div>
             <div className="space-y-2">
@@ -143,8 +143,8 @@ export default function PreferencesPage() {
                 onChange={handleInputChange}
                 className="w-full p-2 border rounded-md"
               >
-                <option value="24h">24小时制 (14:30)</option>
-                <option value="12h">12小时制 (2:30 PM)</option>
+                <option value="24h">{t('hourFormats.format24h')}</option>
+                <option value="12h">{t('hourFormats.format12h')}</option>
               </select>
             </div>
           </div>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Shield, Phone } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function SecurityPage() {
   const t = useTranslations('profile');
@@ -18,6 +19,9 @@ export default function SecurityPage() {
     newPassword: '',
     confirmPassword: ''
   });
+  
+  // Get current user using the useGetUser hook
+  const { user, isLoading } = useGetUser();
 
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
@@ -32,9 +36,15 @@ export default function SecurityPage() {
       toast.error(t('passwordMismatch'));
       return;
     }
+    
+    if (!user || !user.id) {
+      toast.error(t('common.notAuthenticated'));
+      return;
+    }
+    
     setLoading(true);
     try {
-      await api.users.updatePassword({
+      await api.users.updatePassword(user.id, {
         currentPassword: passwords.currentPassword,
         newPassword: passwords.newPassword
       });
@@ -97,7 +107,7 @@ export default function SecurityPage() {
           </div>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleChangePassword} disabled={loading}>
+          <Button onClick={handleChangePassword} disabled={loading || isLoading}>
             {loading ? t('saving') : t('saveChanges')}
           </Button>
         </CardFooter>
