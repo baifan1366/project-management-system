@@ -526,7 +526,7 @@ const addUser = async (userData) => {
                 name: name,
                 email: email,
                 phone: phone|| null,
-                email_verified: isEmailVerified,
+                email_verified: true,
                 created_at: new Date().toISOString()
               };
               
@@ -581,34 +581,6 @@ const addUser = async (userData) => {
                     placeholder='Enter phone number'
                     onChange={(e) => setPhone(e.target.value)}
                   />
-                </div>
-                
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                    Verification Status
-                  </label>
-                  <div className='flex items-center space-x-4'>
-                    <label className='inline-flex items-center'>
-                      <input
-                        type='radio'
-                        name='email_verified'
-                        value='true'
-                        className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                      />
-                      <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Verified</span>
-                    </label>
-                    
-                    <label className='inline-flex items-center'>
-                      <input
-                        type='radio'
-                        name='email_verified'
-                        value={isEmailVerified}
-                        className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                        defaultChecked='false'
-                      />
-                      <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Unverified</span>
-                    </label>
-                  </div>
                 </div>
               </div>
               

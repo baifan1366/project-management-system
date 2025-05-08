@@ -23,7 +23,6 @@ export default function AdminSubscriptions() {
   const [planPrice, setPrice] = useState('');
   const [planBilling, setPlanBilling] = useState('');
   const [description, setDescription] = useState('');
-  const [planFeatures, setPlanFeatures] = useState('');
   const [planActiveUsers, setPlanActiveUsers] = useState('');
   const [planMaxMembers, setPlanMaxMembers] = useState('');
   const [planMaxProjects, setPlanMaxProjects] = useState('');
@@ -41,7 +40,6 @@ export default function AdminSubscriptions() {
   const [codeValue, setCodeValue] = useState('');
   const [codeDescription, setCodeDescription] = useState('');
   const [codeIsActive, setCodeIsActive] = useState('true');
-  const [modalFor, setModalFor] = useState(null);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]);
   const [maxUses, setMaxUses] = useState('100');
@@ -193,13 +191,6 @@ export default function AdminSubscriptions() {
     setIsPlanSelected(plan);
     setIsCodeSelected(code);
     setCurrentModalPage(1);
-    
-    // Set modalFor based on current activeTab or object type
-    if (type === 'add') {
-      setModalFor(activeTab === "promoCodes" ? "promoCode" : "subscriptionPlan");
-    } else if (type === 'edit') {
-      setModalFor(plan ? "subscriptionPlan" : "promoCode");
-    }
     
     if (type === 'edit' && plan) {
       setPlanName(plan.name || '');
@@ -814,6 +805,7 @@ export default function AdminSubscriptions() {
                 </div>
               </div>
               
+              {/* Promo Codes Table */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -2299,6 +2291,195 @@ export default function AdminSubscriptions() {
         </div>
       )}
 
+      {/* Add Promo Code Modal */}
+      {isModalOpen && modalType === 'add' && activeTab === "promoCodes" && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+                Add New Promo Code
+              </h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const codeData = {
+                code: codeName,
+                discount_type: codeType,
+                discount_value: parseFloat(codeValue),
+                start_date: new Date(startDate).toISOString(),
+                end_date: new Date(endDate).toISOString(),
+                description: codeDescription,
+                is_active: codeIsActive === 'true',
+                max_uses: parseInt(maxUses) || 0
+              };
+              
+              // Add promo code logic
+              addPromoCode(codeData).then(success => {
+                if (success) {
+                  closeModal();
+                }
+              });
+            }}>
+              <div className='space-y-4'>
+                <div>
+                  <label htmlFor='add-code-name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Promo Code
+                  </label>
+                  <input
+                    type='text'
+                    id='add-code-name'
+                    name='code'
+                    required
+                    value={codeName}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter promo code'
+                    onChange={(e) => setCodeName(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-code-type' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Discount Type
+                  </label>
+                  <select
+                    id='add-code-type'
+                    name='discount_type'
+                    required
+                    value={codeType}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    onChange={(e) => setCodeType(e.target.value)}
+                  >
+                    <option value=''>Select discount type</option>
+                    <option value='PERCENTAGE'>Percentage</option>
+                    <option value='FIXED'>Fixed Amount</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor='add-code-value' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Discount Value
+                  </label>
+                  <input
+                    type='number'
+                    id='add-code-value'
+                    name='discount_value'
+                    required
+                    min='0'
+                    step='0.01'
+                    value={codeValue}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder={codeType === 'PERCENTAGE' ? 'Enter discount percentage' : 'Enter discount amount'}
+                    onChange={(e) => setCodeValue(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-code-description' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Description
+                  </label>
+                  <textarea
+                    id='add-code-description'
+                    name='description'
+                    rows='3'
+                    value={codeDescription}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter promo code description'
+                    onChange={(e) => setCodeDescription(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-max-uses' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Max Usage Count
+                  </label>
+                  <input
+                    type='number'
+                    id='add-max-uses'
+                    name='max_uses'
+                    required
+                    min='0'
+                    value={maxUses}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter maximum number of uses'
+                    onChange={(e) => setMaxUses(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Enter 0 for unlimited uses</p>
+                </div>
+                
+                <div>
+                  <label htmlFor='add-start-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Start Date
+                  </label>
+                  <input
+                    type='date'
+                    id='add-start-date'
+                    name='start_date'
+                    required
+                    value={startDate}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-end-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    End Date
+                  </label>
+                  <input
+                    type='date'
+                    id='add-end-date'
+                    name='end_date'
+                    required
+                    value={endDate}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className='mt-6 flex justify-end space-x-3'>
+                <button
+                  type='button'
+                  onClick={closeModal}
+                  className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                    text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                >
+                  Cancel
+                </button>
+                <button
+                  type='submit'
+                  className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500'
+                >
+                  Add Promo Code
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
