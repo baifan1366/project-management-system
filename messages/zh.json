@@ -182,6 +182,16 @@
         "title": "升级选项",
         "compare": "比较计划",
         "contactSales": "联系销售"
+      },
+      "limits": {
+        "back": "返回",
+        "subscriptionLimit": "订阅限制",
+        "currentUsage": "当前使用: {current} / {limit}",
+        "upgradeSubscription": "升级订阅",
+        "operationLimited": "操作受限",
+        "createProjectLimited": "创建项目受限",
+        "inviteMemberLimited": "邀请成员受限",
+        "createTeamLimited": "创建团队受限"
       }
     },
     "connectProviderFailed": "连接{provider}失败",

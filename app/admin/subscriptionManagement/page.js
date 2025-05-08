@@ -23,7 +23,6 @@ export default function AdminSubscriptions() {
   const [planPrice, setPrice] = useState('');
   const [planBilling, setPlanBilling] = useState('');
   const [description, setDescription] = useState('');
-  const [planFeatures, setPlanFeatures] = useState('');
   const [planActiveUsers, setPlanActiveUsers] = useState('');
   const [planMaxMembers, setPlanMaxMembers] = useState('');
   const [planMaxProjects, setPlanMaxProjects] = useState('');
@@ -35,12 +34,12 @@ export default function AdminSubscriptions() {
   const [activeTab, setActiveTab] = useState("subscriptionPlans");
   const [promoCodes, setPromoCodes] = useState([]);
   const [isCodeSelected, setIsCodeSelected] = useState(null);
+  const [isUserSubscriptionPlanSelected, setIsUserSubscriptionPlanSelected] = useState(null);
   const [codeName, setCodeName] = useState('');
   const [codeType, setCodeType] = useState('');
   const [codeValue, setCodeValue] = useState('');
   const [codeDescription, setCodeDescription] = useState('');
   const [codeIsActive, setCodeIsActive] = useState('true');
-  const [modalFor, setModalFor] = useState(null);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]);
   const [maxUses, setMaxUses] = useState('100');
@@ -57,7 +56,7 @@ export default function AdminSubscriptions() {
   const permissions = useSelector((state) => state.admin.permissions);
   const [userSubscriptions, setUserSubscriptions] = useState([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('all');
+  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('ALL');
   const [planTypeFilter, setPlanTypeFilter] = useState('all');
   
   // initialize the page
@@ -136,7 +135,7 @@ export default function AdminSubscriptions() {
         .order('created_at', { ascending: false });
       
       // Apply filters if they are set
-      if (subscriptionStatusFilter !== 'all') {
+      if (subscriptionStatusFilter !== 'ALL') {
         query = query.eq('status', subscriptionStatusFilter);
       }
       
@@ -192,13 +191,6 @@ export default function AdminSubscriptions() {
     setIsPlanSelected(plan);
     setIsCodeSelected(code);
     setCurrentModalPage(1);
-    
-    // Set modalFor based on current activeTab or object type
-    if (type === 'add') {
-      setModalFor(activeTab === "promoCodes" ? "promoCode" : "subscriptionPlan");
-    } else if (type === 'edit') {
-      setModalFor(plan ? "subscriptionPlan" : "promoCode");
-    }
     
     if (type === 'edit' && plan) {
       setPlanName(plan.name || '');
@@ -813,6 +805,7 @@ export default function AdminSubscriptions() {
                 </div>
               </div>
               
+              {/* Promo Codes Table */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -1000,11 +993,11 @@ export default function AdminSubscriptions() {
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {userSubscriptions.map((subscription) => {
                           return (
-                            <tr key={subscription.id} className={subscription.status !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
+                            <tr key={subscription.id} className={subscription.status.toUpperCase() !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
-                                  <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-3">
-                                    {subscription.user?.name?.charAt(0).toUpperCase() || subscription.user?.email?.charAt(0).toUpperCase() || 'U'}
+                                  <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
+                                    {(subscription.user?.name?.charAt(0) || subscription.user?.email?.charAt(0) || '?').toUpperCase()}
                                   </div>
                                   <div>
                                     <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -1139,26 +1132,15 @@ export default function AdminSubscriptions() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
                                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                    ${subscription.status === 'ACTIVE' 
+                                    ${subscription.status.toUpperCase() === 'ACTIVE' 
                                       ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
-                                      : subscription.status === 'CANCELED'
+                                      : subscription.status.toUpperCase() === 'CANCELED'
                                       ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
                                       : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
                                     }`}
                                   >
-                                    {subscription.status}
+                                    {subscription.status.toUpperCase()}
                                   </span>
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  {subscription.auto_renew ? (
-                                    <span className="text-green-600 dark:text-green-400">
-                                      <FaCheck className="inline mr-1" /> Auto-renew
-                                    </span>
-                                  ) : (
-                                    <span className="text-red-600 dark:text-red-400">
-                                      <FaTimes className="inline mr-1" /> No renewal
-                                    </span>
-                                  )}
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1166,22 +1148,73 @@ export default function AdminSubscriptions() {
                                   <button 
                                     className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                                     title="Edit subscription"
+                                    onClick={() => {
+                                      setIsUserSubscriptionPlanSelected(subscription);
+                                      setIsModalOpen(true);
+                                      setModalType('edit');
+                                    }}
                                   >
                                     <FaEdit />
                                   </button>
-                                  {subscription.status === 'ACTIVE' ? (
+                                  {subscription.status.toUpperCase() === 'ACTIVE' ? (
                                     <button 
-                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                      onClick={() => {
+                                        if(confirm('Are you sure you want to cancel this subscription?')) {
+                                          // Update subscription status to CANCELED
+                                          supabase
+                                            .from('user_subscription_plan')
+                                            .update({ 
+                                              status: 'CANCELED',
+                                              updated_at: new Date().toISOString()
+                                            })
+                                            .eq('id', subscription.id)
+                                            .then(({error}) => {
+                                              if(error) {
+                                                console.error('Error canceling subscription:', error);
+                                                alert(`Failed to cancel subscription: ${error.message}`);
+                                              } else {
+                                                fetchUserSubscriptions();
+                                              }
+                                            });
+                                        }
+                                      }}
+                                      className={clsx(
+                                        'text-2xl transition-colors duration-200',
+                                        'text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300'
+                                      )}
                                       title="Cancel subscription"
                                     >
-                                      <FaTimes />
+                                      <FaToggleOn />
                                     </button>
                                   ) : (
                                     <button 
-                                      className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+                                      onClick={() => {
+                                        if(confirm('Are you sure you want to reactivate this subscription?')) {
+                                          // Update subscription status to ACTIVE
+                                          supabase
+                                            .from('user_subscription_plan')
+                                            .update({ 
+                                              status: 'ACTIVE',
+                                              updated_at: new Date().toISOString() 
+                                            })
+                                            .eq('id', subscription.id)
+                                            .then(({error}) => {
+                                              if(error) {
+                                                console.error('Error reactivating subscription:', error);
+                                                alert(`Failed to reactivate subscription: ${error.message}`);
+                                              } else {
+                                                fetchUserSubscriptions();
+                                              }
+                                            });
+                                        }
+                                      }}
+                                      className={clsx(
+                                        'text-2xl transition-colors duration-200',
+                                        'text-gray-400 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-500'
+                                      )}
                                       title="Reactivate subscription"
                                     >
-                                      <FaCheck />
+                                      <FaToggleOff />
                                     </button>
                                   )}
                                 </div>
@@ -2094,6 +2127,359 @@ export default function AdminSubscriptions() {
         </div>
       )}
 
+      {/*userSubscriptionPlan edit modal*/}
+      {isModalOpen && modalType === 'edit' && isUserSubscriptionPlanSelected && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+                Edit User Subscription
+              </h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              
+              try {
+                setLoading(true);
+                
+                // Get form values
+                const formData = new FormData(e.target);
+                const updatedData = {
+                  plan_id: parseInt(formData.get('plan_id')),
+                  status: 'ACTIVE',
+                  start_date: formData.get('start_date'),
+                  end_date: formData.get('end_date'),
+                  updated_at: new Date().toISOString()
+                };
+                
+                // Update the subscription in the database
+                const { data, error } = await supabase
+                  .from('user_subscription_plan')
+                  .update(updatedData)
+                  .eq('id', isUserSubscriptionPlanSelected.id);
+                
+                if (error) {
+                  console.error('Error updating user subscription:', error);
+                  alert(`Failed to update subscription: ${error.message}`);
+                  return;
+                }
+                
+                console.log('User subscription updated successfully:', data);
+                
+                // Refresh the user subscriptions list
+                await fetchUserSubscriptions();
+                
+                // Close the modal
+                closeModal();
+                
+              } catch (error) {
+                console.error('Error in form submission:', error);
+                alert('An unexpected error occurred while updating the subscription');
+              } finally {
+                setLoading(false);
+              }
+            }}>
+              <div className='space-y-4'>
+                {/* User Info (Read-only) */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-md mb-2">
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">User Information</h3>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
+                      {(isUserSubscriptionPlanSelected.user?.name?.charAt(0) || isUserSubscriptionPlanSelected.user?.email?.charAt(0) || '?').toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {isUserSubscriptionPlanSelected.user?.name || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {isUserSubscriptionPlanSelected.user?.email || 'No email'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Subscription Plan Selection */}
+                <div>
+                  <label htmlFor='subscription-plan' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Subscription Plan
+                  </label>
+                  <select
+                    id='subscription-plan'
+                    name='plan_id'
+                    required
+                    defaultValue={isUserSubscriptionPlanSelected.plan_id}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  >
+                    {subscriptionPlans.map(plan => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} ({plan.type}) : {formatCurrency(plan.price)}/{plan.billing_interval.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+         
+                {/* Start Date */}
+                <div>
+                  <label htmlFor='start-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Start Date
+                  </label>
+                  <input
+                    type='date'
+                    id='start-date'
+                    name='start_date'
+                    required
+                    defaultValue={new Date(isUserSubscriptionPlanSelected.start_date).toISOString().split('T')[0]}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  />
+                </div>
+                
+                {/* End Date */}
+                <div>
+                  <label htmlFor='end-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    End Date
+                  </label>
+                  <input
+                    type='date'
+                    id='end-date'
+                    name='end_date'
+                    required
+                    defaultValue={new Date(isUserSubscriptionPlanSelected.end_date).toISOString().split('T')[0]}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  />
+                </div>
+                
+                {/* Subscription Info */}
+                <div className="text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
+                  <p>Subscription ID: {isUserSubscriptionPlanSelected.id}</p>
+                  <p>Created: {formatDate(isUserSubscriptionPlanSelected.created_at)}</p>
+                  <p>Last Updated: {formatDate(isUserSubscriptionPlanSelected.updated_at)}</p>
+                </div>
+              </div>
+              
+              <div className='mt-6 flex justify-end space-x-3'>
+                <button
+                  type='button'
+                  onClick={closeModal}
+                  className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                >
+                  Cancel
+                </button>
+                <button
+                  type='submit'
+                  className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500'
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Promo Code Modal */}
+      {isModalOpen && modalType === 'add' && activeTab === "promoCodes" && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+                Add New Promo Code
+              </h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const codeData = {
+                code: codeName,
+                discount_type: codeType,
+                discount_value: parseFloat(codeValue),
+                start_date: new Date(startDate).toISOString(),
+                end_date: new Date(endDate).toISOString(),
+                description: codeDescription,
+                is_active: codeIsActive === 'true',
+                max_uses: parseInt(maxUses) || 0
+              };
+              
+              // Add promo code logic
+              addPromoCode(codeData).then(success => {
+                if (success) {
+                  closeModal();
+                }
+              });
+            }}>
+              <div className='space-y-4'>
+                <div>
+                  <label htmlFor='add-code-name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Promo Code
+                  </label>
+                  <input
+                    type='text'
+                    id='add-code-name'
+                    name='code'
+                    required
+                    value={codeName}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter promo code'
+                    onChange={(e) => setCodeName(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-code-type' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Discount Type
+                  </label>
+                  <select
+                    id='add-code-type'
+                    name='discount_type'
+                    required
+                    value={codeType}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    onChange={(e) => setCodeType(e.target.value)}
+                  >
+                    <option value=''>Select discount type</option>
+                    <option value='PERCENTAGE'>Percentage</option>
+                    <option value='FIXED'>Fixed Amount</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor='add-code-value' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Discount Value
+                  </label>
+                  <input
+                    type='number'
+                    id='add-code-value'
+                    name='discount_value'
+                    required
+                    min='0'
+                    step='0.01'
+                    value={codeValue}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder={codeType === 'PERCENTAGE' ? 'Enter discount percentage' : 'Enter discount amount'}
+                    onChange={(e) => setCodeValue(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-code-description' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Description
+                  </label>
+                  <textarea
+                    id='add-code-description'
+                    name='description'
+                    rows='3'
+                    value={codeDescription}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter promo code description'
+                    onChange={(e) => setCodeDescription(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-max-uses' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Max Usage Count
+                  </label>
+                  <input
+                    type='number'
+                    id='add-max-uses'
+                    name='max_uses'
+                    required
+                    min='0'
+                    value={maxUses}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter maximum number of uses'
+                    onChange={(e) => setMaxUses(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Enter 0 for unlimited uses</p>
+                </div>
+                
+                <div>
+                  <label htmlFor='add-start-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Start Date
+                  </label>
+                  <input
+                    type='date'
+                    id='add-start-date'
+                    name='start_date'
+                    required
+                    value={startDate}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-end-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    End Date
+                  </label>
+                  <input
+                    type='date'
+                    id='add-end-date'
+                    name='end_date'
+                    required
+                    value={endDate}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className='mt-6 flex justify-end space-x-3'>
+                <button
+                  type='button'
+                  onClick={closeModal}
+                  className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                    text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                >
+                  Cancel
+                </button>
+                <button
+                  type='submit'
+                  className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500'
+                >
+                  Add Promo Code
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

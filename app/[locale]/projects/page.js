@@ -11,6 +11,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarIcon, EyeIcon, CheckCircleIcon, PlusCircleIcon, MessageSquareIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getSubscriptionLimit } from '@/lib/subscriptionService';
+import { useDispatch } from 'react-redux';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function ProjectsPage() {
   const { locale } = useParams();
@@ -18,6 +22,8 @@ export default function ProjectsPage() {
   const { projects, status } = useSelector(( state) => state.projects);
   const t = useTranslations('Projects');
   const [formattedProjects, setFormattedProjects] = useState([]);
+  const dispatch = useDispatch();
+  const { user } = useGetUser();
 
   useEffect(() => {
     if (projects.length > 0) {
@@ -44,6 +50,36 @@ export default function ProjectsPage() {
     window.open(`https://teams.microsoft.com/l/chat/0/0?users=${projectId}`, '_blank');
   };
 
+  // 添加检查订阅限制的函数
+  const checkLimit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      if (!user || !user.id) {
+        console.error('User not authenticated');
+        router.push(`/${locale}/login`);
+        return;
+      }
+      
+      const limitCheck = await getSubscriptionLimit(user.id, 'create_project');
+      
+      if (limitCheck && !limitCheck.allowed) {
+        // 使用 Redux 的 limitExceeded action 显示限制模态框
+        dispatch(limitExceeded({
+          actionType: 'create_project',
+          origin: 'projects/createProject',
+          limitInfo: limitCheck
+        }));
+        return;
+      }
+      
+      // 限制检查通过，跳转到创建项目页面
+      router.push(`/${locale}/createProject`);
+    } catch (error) {
+      console.error('检查订阅限制失败:', error);
+    }
+  };
+
   if (status === 'loading') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -67,13 +103,13 @@ export default function ProjectsPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold tracking-tight">{t('projects')}</h1>
 
-          <Link
-            href={`/${locale}/createProject`}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 shadow-md hover:shadow-lg"
-          >
-            {t('createNewProject')}
-          </Link>
-
+        {/* 修改创建项目按钮，使用onClick处理器而不是Link */}
+        <Button
+          onClick={checkLimit}
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 shadow-md hover:shadow-lg"
+        >
+          {t('createNewProject')}
+        </Button>
       </div>
       <ScrollArea className="h-[calc(100vh-10rem)]">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
