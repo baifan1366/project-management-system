@@ -1733,7 +1733,22 @@
     "copyIDSuccess": "ID copied successfully",
     "identifier": "Identifier",
     "copied": "Copied",
-    "clickToCopy": "Click to copy"
+    "clickToCopy": "Click to copy",
+    "selectOption": "Select Options",
+    "searchOptions": "Search Options",
+    "noMatchingOptions": "No matching options found",
+    "noOptions": "No options found",
+    "newOptionName": "New Option Name",
+    "create": "Create",
+    "addOption": "Add Option",
+    "editOption": "Edit Option",
+    "optionName": "Option Name",
+    "optionColor": "Option Color",
+    "save": "Save",
+    "selectOptions": "Select Options",
+    "selectedOptions": "Selected Options",
+    "typeTagAndEnter": "Type tag and enter",
+    "addTags": "Add Tags"
   },
   "Notion": {
     "knowledgeBase": "Knowledge Base",

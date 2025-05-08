@@ -48,7 +48,20 @@ import {
   renderDateCell,
   isIdType,
   isIdColumn,
-  renderIdCell
+  renderIdCell,
+  isSingleSelectType,
+  isSingleSelectColumn,
+  renderSingleSelectCell,
+  parseSingleSelectValue,
+  isMultiSelectType,
+  isMultiSelectColumn, 
+  renderMultiSelectCell,
+  parseMultiSelectValue,
+  renderMultiSelectTags,
+  isTagsType,
+  isTagsColumn,
+  renderTagsCell,
+  parseTagsValue
 } from './TagConfig';
 
 export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading) {
@@ -322,6 +335,105 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
         dispatch(deleteSection({teamId, sectionId}));
       }
     });
+  };
+
+  // 添加选项管理状态
+  const [taskOptions, setTaskOptions] = useState({});
+  
+  // 处理创建新选项
+  const handleCreateOption = (taskId, tagId, newOption) => {
+    // 确保选项有一个唯一的值
+    const optionWithValue = {
+      ...newOption,
+      value: newOption.value || newOption.label.toLowerCase().replace(/\s+/g, '_')
+    };
+    
+    // 更新本地选项状态
+    setTaskOptions(prev => {
+      const taskKey = `${taskId}-${tagId}`;
+      const currentOptions = prev[taskKey] || [];
+      
+      // 检查选项是否已存在
+      const optionExists = currentOptions.some(opt => 
+        opt.value === optionWithValue.value || opt.label === optionWithValue.label
+      );
+      
+      if (optionExists) {
+        return prev; // 如果选项已存在，不添加
+      }
+      
+      // 添加新选项
+      const updatedOptions = [...currentOptions, optionWithValue];
+      
+      return {
+        ...prev,
+        [taskKey]: updatedOptions
+      };
+    });
+    
+    // 自动选择新创建的选项
+    handleTaskValueChange(taskId, tagId, JSON.stringify(optionWithValue));
+    
+    // 在这里可以添加调用API将选项保存到服务器的逻辑
+    // 例如: saveOptionsToServer(tagId, updatedOptions);
+  };
+  
+  // 处理编辑选项
+  const handleEditOption = (taskId, tagId, editedOption) => {
+    setTaskOptions(prev => {
+      const taskKey = `${taskId}-${tagId}`;
+      const currentOptions = prev[taskKey] || [];
+      
+      // 更新选项
+      const updatedOptions = currentOptions.map(opt => 
+        opt.value === editedOption.value ? editedOption : opt
+      );
+      
+      return {
+        ...prev,
+        [taskKey]: updatedOptions
+      };
+    });
+    
+    // 如果当前选择的是被编辑的选项，更新选择的值
+    const currentValue = JSON.parse(externalEditingTaskValues[tagId] || '{}');
+    if (currentValue && currentValue.value === editedOption.value) {
+      handleTaskValueChange(taskId, tagId, JSON.stringify(editedOption));
+    }
+    
+    // 在这里可以添加调用API将更新后的选项保存到服务器的逻辑
+  };
+  
+  // 处理删除选项
+  const handleDeleteOption = (taskId, tagId, optionToDelete) => {
+    setTaskOptions(prev => {
+      const taskKey = `${taskId}-${tagId}`;
+      const currentOptions = prev[taskKey] || [];
+      
+      // 过滤掉要删除的选项
+      const updatedOptions = currentOptions.filter(opt => 
+        opt.value !== optionToDelete.value
+      );
+      
+      return {
+        ...prev,
+        [taskKey]: updatedOptions
+      };
+    });
+    
+    // 如果当前选择的是被删除的选项，清空选择
+    const currentValue = JSON.parse(externalEditingTaskValues[tagId] || '{}');
+    if (currentValue && currentValue.value === optionToDelete.value) {
+      handleTaskValueChange(taskId, tagId, '');
+    }
+    
+    // 在这里可以添加调用API将删除选项的操作保存到服务器的逻辑
+  };
+  
+  // 获取任务选项
+  const getTaskOptions = (taskId, tagId) => {
+    const taskKey = `${taskId}-${tagId}`;
+    return taskOptions[taskKey] || [];
   };
 
   // 部门标题行
@@ -621,6 +733,57 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                       <div onClick={(e) => e.stopPropagation()}>
                                         {renderIdCell(currentValue)}
                                       </div>
+                                    ) : isSingleSelectColumn(tag) ? (
+                                      // 检查是否为单选列
+                                      <div onClick={(e) => e.stopPropagation()}>
+                                        {renderSingleSelectCell(
+                                          currentValue, 
+                                          getTaskOptions(task.id, tagId), 
+                                          (option) => {
+                                            // 当选择改变时调用
+                                            const newValue = JSON.stringify(option);
+                                            handleTaskValueChange(task.id, tagId, newValue);
+                                          },
+                                          // 创建新选项回调
+                                          (newOption) => handleCreateOption(task.id, tagId, newOption),
+                                          // 编辑选项回调
+                                          (editedOption) => handleEditOption(task.id, tagId, editedOption),
+                                          // 删除选项回调
+                                          (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
+                                        )}
+                                      </div>
+                                    ) : isMultiSelectColumn(tag) ? (
+                                      // 检查是否为多选列
+                                      <div onClick={(e) => e.stopPropagation()}>
+                                        {renderMultiSelectCell(
+                                          currentValue,
+                                          getTaskOptions(task.id, tagId),
+                                          (options) => {
+                                            // 当选择改变时调用，options是选中的选项数组
+                                            const newValue = JSON.stringify(options);
+                                            handleTaskValueChange(task.id, tagId, newValue);
+                                          },
+                                          // 创建新选项回调
+                                          (newOption) => handleCreateOption(task.id, tagId, newOption),
+                                          // 编辑选项回调
+                                          (editedOption) => handleEditOption(task.id, tagId, editedOption),
+                                          // 删除选项回调
+                                          (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
+                                        )}
+                                      </div>
+                                    ) : isTagsColumn(tag) ? (
+                                      // 检查是否为标签列 - 与多选有不同的UI和交互
+                                      <div onClick={(e) => e.stopPropagation()}>
+                                        {renderTagsCell(
+                                          currentValue,
+                                          getTaskOptions(task.id, tagId), // 作为推荐标签使用
+                                          (tags) => {
+                                            // 当标签修改时调用，tags是标签对象数组
+                                            const newValue = JSON.stringify(tags);
+                                            handleTaskValueChange(task.id, tagId, newValue);
+                                          }
+                                        )}
+                                      </div>
                                     ) : (() => {
                                       // 尝试从tagsData中获取标签对象
                                       const tagObj = tagsData?.tags?.find(t => 
@@ -637,6 +800,69 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                               (value) => handleTaskValueChange(task.id, tagId, value + 1),
                                               (value) => handleTaskValueChange(task.id, tagId, value - 1),
                                               (value) => handleTaskValueChange(task.id, tagId, value)
+                                            )}
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // 检查是否为单选类型，如果基于标签对象判断
+                                      if (tagObj && isSingleSelectType(tagObj)) {
+                                        return (
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            {renderSingleSelectCell(
+                                              currentValue, 
+                                              getTaskOptions(task.id, tagId),
+                                              (option) => {
+                                                // 当选择改变时调用
+                                                const newValue = JSON.stringify(option);
+                                                handleTaskValueChange(task.id, tagId, newValue);
+                                              },
+                                              // 创建新选项回调
+                                              (newOption) => handleCreateOption(task.id, tagId, newOption),
+                                              // 编辑选项回调
+                                              (editedOption) => handleEditOption(task.id, tagId, editedOption),
+                                              // 删除选项回调
+                                              (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
+                                            )}
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // 检查是否为多选类型，如果基于标签对象判断
+                                      if (tagObj && isMultiSelectType(tagObj)) {
+                                        return (
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            {renderMultiSelectCell(
+                                              currentValue,
+                                              getTaskOptions(task.id, tagId),
+                                              (options) => {
+                                                // 当选择改变时调用，options是选中的选项数组
+                                                const newValue = JSON.stringify(options);
+                                                handleTaskValueChange(task.id, tagId, newValue);
+                                              },
+                                              // 创建新选项回调
+                                              (newOption) => handleCreateOption(task.id, tagId, newOption),
+                                              // 编辑选项回调
+                                              (editedOption) => handleEditOption(task.id, tagId, editedOption),
+                                              // 删除选项回调
+                                              (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
+                                            )}
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // 检查是否为标签类型，如果基于标签对象判断
+                                      if (tagObj && isTagsType(tagObj)) {
+                                        return (
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            {renderTagsCell(
+                                              currentValue,
+                                              getTaskOptions(task.id, tagId), // 作为推荐标签使用
+                                              (tags) => {
+                                                // 当标签修改时调用，tags是标签对象数组
+                                                const newValue = JSON.stringify(tags);
+                                                handleTaskValueChange(task.id, tagId, newValue);
+                                              }
                                             )}
                                           </div>
                                         );
@@ -811,7 +1037,9 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
     renderBodyContent,
     handleAddTask,
     retryLoadTasks,
-    retryLoadSectionTasks
+    retryLoadSectionTasks,
+    taskOptions,  // 导出选项状态，以便外部组件可以访问
+    setTaskOptions  // 导出设置选项的函数，以便外部组件可以修改
   };
 }
 

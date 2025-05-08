@@ -1,14 +1,9 @@
-//check field type
-//2. single select
-//6. tags
-//7. multi select
-
 //how to check field type
 //with the tag table, there is a column called type
 //the type is used to check the field type
 //the type is TEXT, NUMBER, ID, SINGLE-SELECT, MULTI-SELECT, DATE, PEOPLE, TAGS, FILE
 
-import { FileText, File, Sheet, FileCode, X, User, Calendar, Fingerprint, Copy, CheckCheck } from 'lucide-react';
+import { FileText, File, Sheet, FileCode, X, User, Calendar, Fingerprint, Copy, CheckCheck, Trash, Plus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEffect, useState } from 'react';
@@ -955,6 +950,1387 @@ export function renderIdCell(idValue) {
           <div className="text-xs text-muted-foreground pt-1">
             {copied ? (t('copied') || '已复制到剪贴板') : (t('clickToCopy') || '点击复制完整ID')}
           </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+//check SINGLE-SELECT
+/**
+ * 检查字段是否为单选类型
+ * @param {Object} tag - 标签对象
+ * @returns {boolean} 是否为单选类型
+ */
+export function isSingleSelectType(tag) {
+  // 检查tag对象
+  if (!tag) return false;
+  
+  // 如果有明确的type属性
+  if (tag.type) {
+    return checkFieldType(tag) === 'SINGLE-SELECT';
+  }
+  
+  // 检查名称是否暗示为单选类型
+  if (tag.name) {
+    const selectNames = ['status', 'state', '状态', 'priority', '优先级', 'category', '类别', 'type', '类型'];
+    
+    return selectNames.some(name => 
+      tag.name.toLowerCase().includes(name.toLowerCase())
+    );
+  }
+  
+  return false;
+}
+
+/**
+ * 检查列名是否为单选列
+ * @param {string} tagName - 标签名称
+ * @returns {boolean} 是否为单选列
+ */
+export function isSingleSelectColumn(tagName) {
+  if (!tagName) return false;
+  
+  // 检查标准名称
+  if (typeof tagName === 'string' && (
+    tagName.toLowerCase() === 'status' || 
+    tagName.toLowerCase() === '状态' || 
+    tagName.toLowerCase() === 'priority' || 
+    tagName.toLowerCase() === '优先级'
+  )) {
+    return true;
+  }
+  
+  // 检查标签对象
+  if (typeof tagName === 'object' && tagName !== null) {
+    // 检查对象是否有type属性
+    if (tagName.type && tagName.type.toUpperCase() === 'SINGLE-SELECT') {
+      return true;
+    }
+    
+    // 检查对象是否有name属性
+    if (tagName.name && typeof tagName.name === 'string' && (
+      tagName.name.toLowerCase() === 'status' || 
+      tagName.name.toLowerCase() === '状态' || 
+      tagName.name.toLowerCase() === 'priority' || 
+      tagName.name.toLowerCase() === '优先级'
+    )) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * 解析单选值
+ * @param {string|Object} value - 单选值
+ * @returns {Object} 解析后的单选选项对象
+ */
+export function parseSingleSelectValue(value) {
+  // 如果值是空的，返回null
+  if (!value) return null;
+  
+  // 如果已经是对象形式，直接返回
+  if (typeof value === 'object' && value !== null) {
+    return value;
+  }
+  
+  // 尝试解析JSON字符串
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return parsed;
+      }
+    } catch (e) {
+      // 不是有效的JSON，将作为纯文本选项处理
+    }
+    
+    // 作为普通文本处理
+    return {
+      label: value,
+      value: value,
+      color: generateColorFromLabel(value)
+    };
+  }
+  
+  // 返回默认值
+  return null;
+}
+
+/**
+ * 从标签生成颜色
+ * @param {string} label - 选项标签
+ * @returns {string} 颜色十六进制值
+ */
+function generateColorFromLabel(label) {
+  if (!label) return '#e5e5e5'; // 默认灰色
+  
+  // 简单的哈希算法
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = ((hash << 5) - hash) + label.charCodeAt(i);
+    hash |= 0; // 转换为32位整数
+  }
+  
+  // 预定义的安全颜色列表
+  const colors = [
+    '#ef4444', // 红色
+    '#f97316', // 橙色
+    '#f59e0b', // 琥珀色
+    '#84cc16', // 酸橙色
+    '#10b981', // 绿色
+    '#06b6d4', // 青色
+    '#3b82f6', // 蓝色
+    '#8b5cf6', // 紫色
+    '#d946ef', // 洋红色
+    '#ec4899'  // 粉色
+  ];
+  
+  // 使用哈希值来选择颜色
+  const colorIndex = Math.abs(hash) % colors.length;
+  return colors[colorIndex];
+}
+
+/**
+ * 获取适合背景颜色的文本颜色
+ * @param {string} backgroundColor - 背景颜色
+ * @returns {string} 文本颜色（黑色或白色）
+ */
+function getContrastTextColor(backgroundColor) {
+  // 转换十六进制颜色为RGB
+  const hex = backgroundColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  
+  // 计算亮度
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  
+  // 亮度大于125返回黑色文本，否则返回白色文本
+  return brightness > 125 ? '#000000' : '#ffffff';
+}
+
+/**
+ * 渲染单选单元格内容
+ * @param {string|Object} value - 单选值
+ * @param {Array} options - 可选的选项列表
+ * @param {Function} onChange - 选择修改处理函数
+ * @param {Function} onCreateOption - 创建新选项处理函数
+ * @param {Function} onEditOption - 编辑选项处理函数
+ * @param {Function} onDeleteOption - 删除选项处理函数
+ * @returns {JSX.Element} 渲染的单选单元格组件
+ */
+export function renderSingleSelectCell(value, options = [], onChange, onCreateOption, onEditOption, onDeleteOption) {
+  const t = useTranslations('Team');
+  const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [newOption, setNewOption] = useState({ label: '', color: '#10b981' });
+  const [editingOption, setEditingOption] = useState(null);
+  
+  // 解析当前选择的值
+  const selectedOption = parseSingleSelectValue(value);
+  
+  // 过滤选项
+  const filteredOptions = options.filter(option => 
+    option.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  // 处理选项选择
+  const handleSelect = (option) => {
+    if (onChange) {
+      onChange(option);
+    }
+    setOpen(false);
+    setSearchTerm('');
+  };
+  
+  // 创建新选项
+  const handleCreateOption = () => {
+    if (onCreateOption && newOption.label.trim()) {
+      onCreateOption(newOption);
+      setNewOption({ label: '', color: '#10b981' });
+      setIsCreating(false);
+    }
+  };
+  
+  // 编辑选项
+  const handleEditOption = () => {
+    if (onEditOption && editingOption) {
+      onEditOption(editingOption);
+      setEditingOption(null);
+    }
+  };
+  
+  // 删除选项
+  const handleDeleteOption = (option, e) => {
+    e.stopPropagation();
+    if (onDeleteOption) {
+      onDeleteOption(option);
+    }
+  };
+  
+  // 开始编辑选项
+  const startEditOption = (option, e) => {
+    e.stopPropagation();
+    setEditingOption({...option});
+  };
+  
+  // 生成随机颜色
+  const generateRandomColor = () => {
+    const colors = [
+      '#ef4444', '#f97316', '#f59e0b', '#84cc16', 
+      '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', 
+      '#d946ef', '#ec4899'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+  
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="flex items-center gap-2 hover:bg-accent p-1 rounded-md transition-colors cursor-pointer">
+          {selectedOption ? (
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full flex-shrink-0" 
+                style={{ backgroundColor: selectedOption.color || '#e5e5e5' }}
+              ></div>
+              <span className="text-sm truncate">{selectedOption.label}</span>
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">{t('selectOption')}</span>
+          )}
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-0" align="start">
+        <div className="p-2">
+          {/* 搜索输入框 */}
+          <div className="mb-2">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={t('searchOptions')}
+              className="w-full p-2 border rounded text-sm"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          
+          {/* 选项列表 */}
+          <div className="max-h-40 overflow-y-auto">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option, index) => (
+                <div 
+                  key={index} 
+                  className={`flex items-center justify-between p-2 hover:bg-accent/50 rounded-md cursor-pointer ${
+                    selectedOption && selectedOption.value === option.value ? 'bg-accent' : ''
+                  }`}
+                  onClick={() => handleSelect(option)}
+                >
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: option.color || '#e5e5e5' }}
+                    ></div>
+                    <span className="text-sm">{option.label}</span>
+                  </div>
+                  
+                  {/* 选项编辑按钮 */}
+                  {onEditOption && onDeleteOption && (
+                    <div className="flex items-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => startEditOption(option, e)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        onClick={(e) => handleDeleteOption(option, e)}
+                      >
+                        <Trash size={16} />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-muted-foreground text-center py-2">
+                {searchTerm ? t('noMatchingOptions') : t('noOptions')}
+              </div>
+            )}
+          </div>
+          
+          {/* 添加新选项按钮 */}
+          {onCreateOption && (
+            <div className="mt-2 border-t pt-2">
+              {isCreating ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={newOption.label}
+                    onChange={(e) => setNewOption({...newOption, label: e.target.value})}
+                    placeholder={t('newOptionName')}
+                    className="w-full p-2 border rounded text-sm"
+                  />
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="color"
+                        value={newOption.color}
+                        onChange={(e) => setNewOption({...newOption, color: e.target.value})}
+                        className="w-full h-8"
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setNewOption({...newOption, color: generateRandomColor()})}
+                      className="h-8"
+                    >
+                      🎲
+                    </Button>
+                  </div>
+                  <div className="flex justify-between">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsCreating(false);
+                        setNewOption({ label: '', color: '#10b981' });
+                      }}
+                    >
+                      {t('cancel')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleCreateOption}
+                      disabled={!newOption.label.trim()}
+                    >
+                      {t('create')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setIsCreating(true)}
+                >
+                  <Plus size={16} className="mr-1" />
+                  {t('addOption')}
+                </Button>
+              )}
+            </div>
+          )}
+          
+          {/* 编辑选项界面 */}
+          {editingOption && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingOption(null)}>
+              <div className="bg-background p-4 rounded-lg shadow-lg w-72" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-medium mb-4">{t('editOption')}</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('optionName')}</label>
+                    <input
+                      type="text"
+                      value={editingOption.label}
+                      onChange={(e) => setEditingOption({...editingOption, label: e.target.value})}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('optionColor')}</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingOption.color}
+                        onChange={(e) => setEditingOption({...editingOption, color: e.target.value})}
+                        className="w-full h-8"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingOption({...editingOption, color: generateRandomColor()})}
+                        className="h-8"
+                      >
+                        🎲
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingOption(null)}
+                    >
+                      {t('cancel')}
+                    </Button>
+                    <Button
+                      onClick={handleEditOption}
+                      disabled={!editingOption.label.trim()}
+                    >
+                      {t('save')}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * 创建自定义选项样式
+ * @param {Object} option - 选项对象
+ * @returns {JSX.Element} 样式化的选项组件
+ */
+export function renderCustomSelectOption(option) {
+  // 确保选项有颜色
+  const color = option.color || '#e5e5e5';
+  const textColor = getContrastTextColor(color);
+  
+  return (
+    <div className="flex items-center gap-2 px-2 py-1 rounded transition-colors">
+      <div 
+        className="px-2 py-1 rounded text-xs font-medium"
+        style={{ 
+          backgroundColor: color,
+          color: textColor
+        }}
+      >
+        {option.label}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 渲染状态选项标签
+ * @param {Object} option - 选项对象
+ * @returns {JSX.Element} 状态标签组件
+ */
+export function renderStatusBadge(option) {
+  if (!option) return null;
+  
+  const color = option.color || '#e5e5e5';
+  const textColor = getContrastTextColor(color);
+  
+  return (
+    <div 
+      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+      style={{ 
+        backgroundColor: color,
+        color: textColor
+      }}
+    >
+      {option.label}
+    </div>
+  );
+}
+
+//check MULTI-SELECT
+/**
+ * 检查字段是否为多选类型
+ * @param {Object} tag - 标签对象
+ * @returns {boolean} 是否为多选类型
+ */
+export function isMultiSelectType(tag) {
+  // 检查tag对象
+  if (!tag) return false;
+  
+  // 如果有明确的type属性
+  if (tag.type) {
+    return checkFieldType(tag) === 'MULTI-SELECT';
+  }
+  
+  // 检查名称是否暗示为多选类型
+  if (tag.name) {
+    const multiSelectNames = ['tags', 'tag', '标签', 'multi', '多选', 'labels', '标记', 'options', '选项'];
+    
+    return multiSelectNames.some(name => 
+      tag.name.toLowerCase().includes(name.toLowerCase())
+    );
+  }
+  
+  return false;
+}
+
+/**
+ * 检查列名是否为多选列 - 与标签列有不同的判定逻辑
+ * @param {string} tagName - 标签名称
+ * @returns {boolean} 是否为多选列
+ */
+export function isMultiSelectColumn(tagName) {
+  if (!tagName) return false;
+  
+  // 检查标准名称 - 与标签列使用不同的关键字
+  if (typeof tagName === 'string') {
+    const multiSelectNames = ['tags', 'tag', '标签', 'multi', '多选', 'labels', '标记', 'options', '选项', 'multi-select', '多选项', 'checklist', '检查项'];
+    for (const name of multiSelectNames) {
+      if (tagName.toLowerCase() === name || tagName.toLowerCase().includes(name.toLowerCase())) {
+        return true;
+      }
+    }
+  }
+  
+  // 检查标签对象
+  if (typeof tagName === 'object' && tagName !== null) {
+    // 检查对象是否有type属性
+    if (tagName.type && tagName.type.toUpperCase() === 'MULTI-SELECT') {
+      return true;
+    }
+    
+    // 检查对象是否有name属性
+    if (tagName.name && typeof tagName.name === 'string') {
+      const multiSelectNames = ['tags', 'tag', '标签', 'multi', '多选', 'labels', '标记', 'options', '选项', 'multi-select', '多选项', 'checklist', '检查项'];
+      for (const name of multiSelectNames) {
+        if (tagName.name.toLowerCase() === name || tagName.name.toLowerCase().includes(name.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * 解析多选值
+ * @param {string|Array|Object} value - 多选值
+ * @returns {Array} 解析后的多选选项对象数组
+ */
+export function parseMultiSelectValue(value) {
+  // 如果值是空的，返回空数组
+  if (!value) return [];
+  
+  // 如果已经是数组形式，确保每个元素是对象
+  if (Array.isArray(value)) {
+    return value.map(item => {
+      if (typeof item === 'object' && item !== null) {
+        return item;
+      }
+      return {
+        label: String(item),
+        value: String(item),
+        color: generateColorFromLabel(String(item)) // 使用通用颜色生成函数
+      };
+    });
+  }
+  
+  // 尝试解析JSON字符串
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      
+      // 如果解析结果是数组，处理每个元素
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => {
+          if (typeof item === 'object' && item !== null) {
+            return item;
+          }
+          return {
+            label: String(item),
+            value: String(item),
+            color: generateColorFromLabel(String(item))
+          };
+        });
+      }
+      
+      // 如果解析结果是单个对象，放入数组返回
+      if (typeof parsed === 'object' && parsed !== null) {
+        return [parsed];
+      }
+    } catch (e) {
+      // 不是有效的JSON，仅将作为逗号分隔的文本处理
+      if (value.includes(',')) {
+        return value.split(',').map(item => ({
+          label: item.trim(),
+          value: item.trim(),
+          color: generateColorFromLabel(item.trim())
+        }));
+      }
+      
+      // 单个文本值
+      return [{
+        label: value,
+        value: value,
+        color: generateColorFromLabel(value)
+      }];
+    }
+  }
+  
+  // 返回默认空数组
+  return [];
+}
+
+/**
+ * 渲染多选单元格内容
+ * @param {string|Array|Object} value - 多选值
+ * @param {Array} options - 可选的选项列表
+ * @param {Function} onChange - 选择修改处理函数
+ * @param {Function} onCreateOption - 创建新选项处理函数
+ * @param {Function} onEditOption - 编辑选项处理函数
+ * @param {Function} onDeleteOption - 删除选项处理函数
+ * @returns {JSX.Element} 渲染的多选单元格组件
+ */
+export function renderMultiSelectCell(value, options = [], onChange, onCreateOption, onEditOption, onDeleteOption) {
+  const t = useTranslations('Team');
+  const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [newOption, setNewOption] = useState({ label: '', color: '#10b981' });
+  const [editingOption, setEditingOption] = useState(null);
+  
+  // 解析当前选择的值数组
+  const selectedOptions = parseMultiSelectValue(value);
+  
+  // 过滤选项，排除已选择的选项
+  const availableOptions = options.filter(option => 
+    !selectedOptions.some(selected => selected.value === option.value) &&
+    option.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  // 处理选项选择/取消选择
+  const handleToggleOption = (option) => {
+    let updatedSelection;
+    
+    // 检查选项是否已选中
+    const isSelected = selectedOptions.some(item => item.value === option.value);
+    
+    if (isSelected) {
+      // 如果已选中，则移除
+      updatedSelection = selectedOptions.filter(item => item.value !== option.value);
+    } else {
+      // 如果未选中，则添加
+      updatedSelection = [...selectedOptions, option];
+    }
+    
+    if (onChange) {
+      onChange(updatedSelection);
+    }
+  };
+  
+  // 创建新选项
+  const handleCreateOption = () => {
+    if (onCreateOption && newOption.label.trim()) {
+      const optionToAdd = {
+        ...newOption,
+        value: newOption.value || newOption.label.toLowerCase().replace(/\s+/g, '_')
+      };
+      
+      onCreateOption(optionToAdd);
+      
+      // 自动添加到选中项
+      const updatedSelection = [...selectedOptions, optionToAdd];
+      if (onChange) {
+        onChange(updatedSelection);
+      }
+      
+      setNewOption({ label: '', color: '#10b981' });
+      setIsCreating(false);
+    }
+  };
+  
+  // 编辑选项
+  const handleEditOption = () => {
+    if (onEditOption && editingOption) {
+      onEditOption(editingOption);
+      
+      // 更新已选中的选项
+      const updatedSelection = selectedOptions.map(item => 
+        item.value === editingOption.value ? editingOption : item
+      );
+      
+      if (onChange) {
+        onChange(updatedSelection);
+      }
+      
+      setEditingOption(null);
+    }
+  };
+  
+  // 删除选项
+  const handleDeleteOption = (option, e) => {
+    e.stopPropagation();
+    if (onDeleteOption) {
+      onDeleteOption(option);
+      
+      // 从选中项中移除
+      const updatedSelection = selectedOptions.filter(item => item.value !== option.value);
+      if (onChange) {
+        onChange(updatedSelection);
+      }
+    }
+  };
+  
+  // 移除已选择的选项
+  const removeSelectedOption = (option, e) => {
+    e.stopPropagation();
+    const updatedSelection = selectedOptions.filter(item => item.value !== option.value);
+    if (onChange) {
+      onChange(updatedSelection);
+    }
+  };
+  
+  // 开始编辑选项
+  const startEditOption = (option, e) => {
+    e.stopPropagation();
+    setEditingOption({...option});
+  };
+  
+  // 生成随机颜色
+  const generateRandomColor = () => {
+    const colors = [
+      '#ef4444', '#f97316', '#f59e0b', '#84cc16', 
+      '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', 
+      '#d946ef', '#ec4899'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+  
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="flex items-center flex-wrap gap-1 hover:bg-accent p-1 rounded-md transition-colors cursor-pointer min-h-[28px]">
+          {selectedOptions.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {selectedOptions.map((option, idx) => (
+                <div 
+                  key={`selected-${option.value}-${idx}`}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                  style={{ 
+                    backgroundColor: option.color || '#e5e5e5',
+                    color: getContrastTextColor(option.color || '#e5e5e5')
+                  }}
+                >
+                  <span className="truncate max-w-[80px]">{option.label}</span>
+                  <X 
+                    size={12} 
+                    className="cursor-pointer hover:opacity-80"
+                    onClick={(e) => removeSelectedOption(option, e)}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">{t('selectOptions')}</span>
+          )}
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        <div className="p-2">
+          {/* 搜索输入框 */}
+          <div className="mb-2">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={t('searchOptions')}
+              className="w-full p-2 border rounded text-sm"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          
+          {/* 已选选项列表 */}
+          {selectedOptions.length > 0 && (
+            <div className="mb-2">
+              <div className="text-xs font-medium text-muted-foreground mb-1">{t('selectedOptions')}:</div>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {selectedOptions.map((option, idx) => (
+                  <div 
+                    key={`selected-list-${option.value}-${idx}`}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                    style={{ 
+                      backgroundColor: option.color || '#e5e5e5',
+                      color: getContrastTextColor(option.color || '#e5e5e5')
+                    }}
+                  >
+                    <span className="truncate max-w-[80px]">{option.label}</span>
+                    <X 
+                      size={12} 
+                      className="cursor-pointer hover:opacity-80"
+                      onClick={(e) => removeSelectedOption(option, e)}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="border-t mb-2"></div>
+            </div>
+          )}
+          
+          {/* 可用选项列表 - 强调数据选择而非自由输入 */}
+          <div className="max-h-40 overflow-y-auto">
+            {availableOptions.length > 0 ? (
+              <div>
+                <div className="grid grid-cols-1 gap-1">
+                  {availableOptions.map((option, index) => (
+                    <div 
+                      key={`available-${option.value}-${index}`} 
+                      className="flex items-center justify-between p-2 hover:bg-accent/50 rounded-md cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 flex-1" onClick={() => handleToggleOption(option)}>
+                        <div className="flex-shrink-0 w-4 h-4 border rounded flex items-center justify-center">
+                          {selectedOptions.some(item => item.value === option.value) && (
+                            <div 
+                              className="w-2 h-2 rounded-sm"
+                              style={{ backgroundColor: option.color || '#e5e5e5' }}
+                            ></div>
+                          )}
+                        </div>
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: option.color || '#e5e5e5' }}
+                        ></div>
+                        <span className="text-sm">{option.label}</span>
+                      </div>
+                      
+                      {/* 选项编辑按钮 */}
+                      {onEditOption && onDeleteOption && (
+                        <div className="flex items-center" onClick={e => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => startEditOption(option, e)}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                            onClick={(e) => handleDeleteOption(option, e)}
+                          >
+                            <Trash size={16} />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center py-2">
+                {searchTerm ? t('noMatchingOptions') : t('noOptions')}
+              </div>
+            )}
+          </div>
+          
+          {/* 添加新选项按钮 */}
+          {onCreateOption && (
+            <div className="mt-2 border-t pt-2">
+              {isCreating ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={newOption.label}
+                    onChange={(e) => setNewOption({...newOption, label: e.target.value})}
+                    placeholder={t('newOptionName')}
+                    className="w-full p-2 border rounded text-sm"
+                  />
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="color"
+                        value={newOption.color}
+                        onChange={(e) => setNewOption({...newOption, color: e.target.value})}
+                        className="w-full h-8"
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setNewOption({...newOption, color: generateRandomColor()})}
+                      className="h-8"
+                    >
+                      🎲
+                    </Button>
+                  </div>
+                  <div className="flex justify-between">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsCreating(false);
+                        setNewOption({ label: '', color: '#10b981' });
+                      }}
+                    >
+                      {t('cancel')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleCreateOption}
+                      disabled={!newOption.label.trim()}
+                    >
+                      {t('create')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setIsCreating(true)}
+                >
+                  <Plus size={16} className="mr-1" />
+                  {t('addOption')}
+                </Button>
+              )}
+            </div>
+          )}
+          
+          {/* 编辑选项界面 */}
+          {editingOption && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingOption(null)}>
+              <div className="bg-background p-4 rounded-lg shadow-lg w-72" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-medium mb-4">{t('editOption')}</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('optionName')}</label>
+                    <input
+                      type="text"
+                      value={editingOption.label}
+                      onChange={(e) => setEditingOption({...editingOption, label: e.target.value})}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('optionColor')}</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingOption.color}
+                        onChange={(e) => setEditingOption({...editingOption, color: e.target.value})}
+                        className="w-full h-8"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingOption({...editingOption, color: generateRandomColor()})}
+                        className="h-8"
+                      >
+                        🎲
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingOption(null)}
+                    >
+                      {t('cancel')}
+                    </Button>
+                    <Button
+                      onClick={handleEditOption}
+                      disabled={!editingOption.label.trim()}
+                    >
+                      {t('save')}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * 渲染多选标签组
+ * @param {Array} options - 选项数组
+ * @returns {JSX.Element} 渲染的标签组组件
+ */
+export function renderMultiSelectTags(options) {
+  if (!options || !Array.isArray(options) || options.length === 0) {
+    return null;
+  }
+  
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map((option, idx) => (
+        <div 
+          key={`tag-${option.value}-${idx}`}
+          className="px-2 py-0.5 rounded-full text-xs"
+          style={{ 
+            backgroundColor: option.color || '#e5e5e5',
+            color: getContrastTextColor(option.color || '#e5e5e5')
+          }}
+        >
+          <span>{option.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 检查字段是否为标签类型
+ * @param {Object} tag - 标签对象
+ * @returns {boolean} 是否为标签类型
+ */
+export function isTagsType(tag) {
+  // 检查tag对象
+  if (!tag) return false;
+  
+  // 如果有明确的type属性
+  if (tag.type) {
+    return checkFieldType(tag) === 'TAGS';
+  }
+  
+  // 检查名称是否暗示为标签类型 - 与多选不同的名称组
+  if (tag.name) {
+    const tagsNames = ['tags', '标签', 'keywords', '关键词', 'categories', '分类', 'topic', '主题'];
+    
+    return tagsNames.some(name => 
+      tag.name.toLowerCase() === name.toLowerCase() // 标签类型使用精确匹配
+    );
+  }
+  
+  return false;
+}
+
+/**
+ * 检查列名是否为标签列
+ * @param {string} tagName - 标签名称
+ * @returns {boolean} 是否为标签列
+ */
+export function isTagsColumn(tagName) {
+  if (!tagName) return false;
+  
+  // 检查标准名称 - 比多选更严格的匹配
+  if (typeof tagName === 'string' && (
+    tagName.toLowerCase() === 'tags' || 
+    tagName.toLowerCase() === '标签' || 
+    tagName.toLowerCase() === 'keywords' || 
+    tagName.toLowerCase() === '关键词'
+  )) {
+    return true;
+  }
+  
+  // 检查标签对象
+  if (typeof tagName === 'object' && tagName !== null) {
+    // 检查对象是否有type属性
+    if (tagName.type && tagName.type.toUpperCase() === 'TAGS') {
+      return true;
+    }
+    
+    // 检查对象是否有name属性
+    if (tagName.name && typeof tagName.name === 'string' && (
+      tagName.name.toLowerCase() === 'tags' || 
+      tagName.name.toLowerCase() === '标签' || 
+      tagName.name.toLowerCase() === 'keywords' || 
+      tagName.name.toLowerCase() === '关键词'
+    )) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * 解析标签值 - 特别处理标签特有的格式
+ * @param {string|Array|Object} value - 标签值
+ * @returns {Array} 解析后的标签对象数组
+ */
+export function parseTagsValue(value) {
+  // 如果值是空的，返回空数组
+  if (!value) return [];
+  
+  // 如果已经是数组形式，确保每个元素是对象
+  if (Array.isArray(value)) {
+    return value.map(item => {
+      if (typeof item === 'object' && item !== null) {
+        return item;
+      }
+      return {
+        label: String(item),
+        value: String(item),
+        color: generateTagColor(String(item)) // 使用标签专用的颜色生成
+      };
+    });
+  }
+  
+  // 尝试解析JSON字符串
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      
+      // 如果解析结果是数组，处理每个元素
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => {
+          if (typeof item === 'object' && item !== null) {
+            return item;
+          }
+          return {
+            label: String(item),
+            value: String(item),
+            color: generateTagColor(String(item))
+          };
+        });
+      }
+      
+      // 如果解析结果是单个对象，放入数组返回
+      if (typeof parsed === 'object' && parsed !== null) {
+        return [parsed];
+      }
+    } catch (e) {
+      // 不是有效的JSON，特殊处理为空格或分号分隔的标签格式
+      const separators = [',', ';', ' ']; 
+      for (const separator of separators) {
+        if (value.includes(separator)) {
+          return value.split(separator)
+            .map(item => item.trim())
+            .filter(Boolean) // 过滤空字符串
+            .map(item => ({
+              label: item,
+              value: item,
+              color: generateTagColor(item)
+            }));
+        }
+      }
+      
+      // 单个文本值
+      return [{
+        label: value,
+        value: value,
+        color: generateTagColor(value)
+      }];
+    }
+  }
+  
+  // 返回默认空数组
+  return [];
+}
+
+/**
+ * 为标签生成特定的颜色 - 使用不同于多选的颜色策略
+ * @param {string} tagText - 标签文本
+ * @returns {string} 颜色十六进制值
+ */
+function generateTagColor(tagText) {
+  if (!tagText) return '#e2e8f0'; // 默认淡灰色
+  
+  // 为常见标签类别预定义颜色
+  const commonTags = {
+    'bug': '#ef4444', // 红色
+    'feature': '#3b82f6', // 蓝色
+    'improvement': '#10b981', // 绿色
+    'documentation': '#8b5cf6', // 紫色
+    'urgent': '#f97316', // 橙色
+    'low': '#94a3b8', // 灰色
+    'medium': '#eab308', // 黄色
+    'high': '#f97316', // 橙色
+    'critical': '#ef4444', // 红色
+  };
+  
+  // 检查是否匹配常见标签
+  for (const [key, color] of Object.entries(commonTags)) {
+    if (tagText.toLowerCase().includes(key)) {
+      return color;
+    }
+  }
+  
+  // 对于非常见标签，使用hash颜色但色调更柔和
+  let hash = 0;
+  for (let i = 0; i < tagText.length; i++) {
+    hash = ((hash << 5) - hash) + tagText.charCodeAt(i);
+    hash |= 0; // 转换为32位整数
+  }
+  
+  // 生成柔和的色调 - 高饱和度，高亮度
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 80%)`;
+}
+
+/**
+ * 渲染标签单元格内容 - 与多选有不同的UI和交互
+ * @param {string|Array|Object} value - 标签值
+ * @param {Array} suggestedTags - 推荐的标签列表
+ * @param {Function} onChange - 标签修改处理函数
+ * @returns {JSX.Element} 渲染的标签单元格组件
+ */
+export function renderTagsCell(value, suggestedTags = [], onChange) {
+  const t = useTranslations('Team');
+  const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [selectedTags, setSelectedTags] = useState(parseTagsValue(value));
+  
+  // 同步外部value和内部状态
+  useEffect(() => {
+    setSelectedTags(parseTagsValue(value));
+  }, [value]);
+  
+  // 过滤建议标签，排除已选择的标签
+  const filteredSuggestions = suggestedTags.filter(tag => 
+    !selectedTags.some(selected => selected.value === tag.value) &&
+    tag.label.toLowerCase().includes(inputValue.toLowerCase())
+  );
+  
+  // 添加新标签
+  const addTag = (tagText) => {
+    if (!tagText.trim()) return;
+    
+    // 检查是否已存在该标签
+    if (selectedTags.some(tag => tag.label.toLowerCase() === tagText.toLowerCase())) {
+      return;
+    }
+    
+    // 检查是否在推荐标签中
+    const existingSuggestion = suggestedTags.find(
+      tag => tag.label.toLowerCase() === tagText.toLowerCase()
+    );
+    
+    const newTag = existingSuggestion || {
+      label: tagText.trim(),
+      value: tagText.trim().toLowerCase().replace(/\s+/g, '-'),
+      color: generateTagColor(tagText)
+    };
+    
+    const updatedTags = [...selectedTags, newTag];
+    setSelectedTags(updatedTags);
+    
+    // 调用外部onChange
+    if (onChange) {
+      onChange(updatedTags);
+    }
+    
+    // 清空输入
+    setInputValue('');
+  };
+  
+  // 移除标签
+  const removeTag = (tagToRemove) => {
+    const updatedTags = selectedTags.filter(tag => tag.value !== tagToRemove.value);
+    setSelectedTags(updatedTags);
+    
+    if (onChange) {
+      onChange(updatedTags);
+    }
+  };
+  
+  // 处理键盘事件
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      e.preventDefault();
+      addTag(inputValue);
+    } else if (e.key === 'Backspace' && !inputValue && selectedTags.length > 0) {
+      // 当输入框为空且按下Backspace时，删除最后一个标签
+      removeTag(selectedTags[selectedTags.length - 1]);
+    }
+  };
+  
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="flex items-center flex-wrap gap-1 hover:bg-accent p-1 rounded-md transition-colors cursor-pointer min-h-[28px]">
+          {selectedTags.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {selectedTags.map((tag, idx) => (
+                <div 
+                  key={`tag-${tag.value}-${idx}`}
+                  className="px-2 py-0.5 rounded-md text-xs font-medium"
+                  style={{ 
+                    backgroundColor: tag.color || '#e2e8f0',
+                    color: getContrastTextColor(tag.color || '#e2e8f0')
+                  }}
+                >
+                  {tag.label}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">{t('addTags')}</span>
+          )}
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2" align="start">
+        <div>
+          {/* 当前选中的标签 */}
+          {selectedTags.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1">
+              {selectedTags.map((tag, idx) => (
+                <div 
+                  key={`selected-tag-${tag.value}-${idx}`}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium group"
+                  style={{ 
+                    backgroundColor: tag.color || '#e2e8f0',
+                    color: getContrastTextColor(tag.color || '#e2e8f0')
+                  }}
+                >
+                  <span>{tag.label}</span>
+                  <X 
+                    size={12} 
+                    className="cursor-pointer opacity-70 group-hover:opacity-100"
+                    onClick={() => removeTag(tag)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* 标签输入框 */}
+          <div className="relative mb-2">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={t('typeTagAndEnter')}
+              className="w-full p-2 border rounded text-sm pr-10"
+            />
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="absolute right-1 top-1 h-6 w-6 p-0"
+              onClick={() => addTag(inputValue)}
+              disabled={!inputValue.trim()}
+            >
+              <Plus size={16} />
+            </Button>
+          </div>
+          
+          {/* 推荐标签 */}
+          {filteredSuggestions.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">{t('suggestedTags')}:</div>
+              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                {filteredSuggestions.map((tag, idx) => (
+                  <div 
+                    key={`suggestion-${tag.value}-${idx}`}
+                    className="px-2 py-0.5 rounded-md text-xs font-medium cursor-pointer hover:opacity-80"
+                    style={{ 
+                      backgroundColor: tag.color || '#e2e8f0',
+                      color: getContrastTextColor(tag.color || '#e2e8f0')
+                    }}
+                    onClick={() => addTag(tag.label)}
+                  >
+                    {tag.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
