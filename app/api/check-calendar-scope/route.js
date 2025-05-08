@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
 
-// 检查用户是否拥有谷歌日历权限
+// Check if user has Google Calendar permissions
 async function checkCalendarScope(accessToken) {
   try {
-    // 尝试调用一个需要日历权限的简单API请求
+    // Try a simple API request that requires calendar permissions
     const response = await fetch(
       'https://www.googleapis.com/calendar/v3/users/me/calendarList', 
       {
@@ -14,33 +15,33 @@ async function checkCalendarScope(accessToken) {
       }
     );
     
-    // 如果请求成功，用户具有日历权限
+    // If request is successful, user has calendar permissions
     if (response.ok) {
       return true;
     }
     
-    // 检查特定错误
+    // Check specific errors
     const error = await response.json();
     if (error?.error?.status === 'PERMISSION_DENIED' || 
         error?.error?.code === 403 || 
         error?.error?.message?.includes('insufficient authentication scopes')) {
-      // 用户没有日历权限
+      // User doesn't have calendar permission
       return false;
     }
     
-    // 其他错误，可能是认证问题
+    // Other errors, might be authentication issues
     return false;
   } catch (error) {
-    console.error('检查日历权限错误:', error);
+    console.error('Error checking calendar permissions:', error);
     return false;
   }
 }
 
-// 刷新访问令牌
+// Refresh access token
 async function refreshAccessToken(refreshToken) {
   try {
-    // 添加日志以便调试
-    console.log('正在尝试刷新Google令牌...');
+    // Add logging for debugging
+    console.log('Attempting to refresh Google token...');
     
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -48,8 +49,8 @@ async function refreshAccessToken(refreshToken) {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-        client_secret: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
       }),
@@ -57,31 +58,65 @@ async function refreshAccessToken(refreshToken) {
     
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('刷新令牌失败:', errorData);
+      console.error('Token refresh failed:', errorData);
       throw new Error('Failed to refresh access token');
     }
     
     const data = await response.json();
-    console.log('令牌刷新成功');
+    console.log('Token refresh successful');
     return data.access_token;
   } catch (error) {
-    console.error('刷新访问令牌时出错:', error);
+    console.error('Error refreshing access token:', error);
     throw error;
+  }
+}
+
+// Update user's Google tokens in the custom user table
+async function updateUserTokens(userId, accessToken, refreshToken) {
+  try {
+    // Calculate the expiration timestamp (usually 1 hour from now)
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+    
+    // Update the user table directly
+    const { error } = await supabase
+      .from('user')
+      .update({
+        google_access_token: accessToken,
+        google_refresh_token: refreshToken,
+        google_token_expires_at: expiresAt,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Failed to update user tokens:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating user tokens:', error);
+    return false;
   }
 }
 
 export async function POST(request) {
   try {
-    // 获取请求数据
+    // Get request data
     const requestData = await request.json();
-    const { access_token, refresh_token } = requestData;
+    const { access_token, refresh_token, user_id } = requestData;
     
-    // 使用前端传递的token
+    // Use token from frontend
     let token = access_token;
     
-    // 如果没有访问令牌，但有刷新令牌，尝试刷新
+    // If no access token but we have a refresh token, try to refresh
     if (!token && refresh_token) {
       token = await refreshAccessToken(refresh_token);
+      
+      // If refresh was successful and we have a user ID, update the tokens in database
+      if (token && user_id) {
+        await updateUserTokens(user_id, token, refresh_token);
+      }
     }
     
     if (!token) {
@@ -91,10 +126,13 @@ export async function POST(request) {
       );
     }
     
-    // 检查是否有日历权限
+    // Check if user has calendar permissions
     const hasCalendarScope = await checkCalendarScope(token);
     
-    return NextResponse.json({ hasCalendarScope });
+    return NextResponse.json({ 
+      hasCalendarScope,
+      access_token: token  // Return the new token if it was refreshed
+    });
   } catch (error) {
     console.error('API Error:', error);
     

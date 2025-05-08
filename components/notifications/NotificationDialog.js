@@ -23,7 +23,8 @@ import {
   selectUnreadCount,
   selectNotificationsLoading,
   selectIsSubscribed,
-  unsubscribeFromNotifications
+  unsubscribeFromNotifications,
+  subscribeToNotifications
 } from '@/lib/redux/features/notificationSlice';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN, enUS } from 'date-fns/locale';
@@ -39,31 +40,27 @@ export function NotificationDialog({ open, onOpenChange }) {
   const loading = useSelector(selectNotificationsLoading);
   const isSubscribed = useSelector(selectIsSubscribed);
   const [activeTab, setActiveTab] = useState('all');
-  const [user, setUser] = useState(null);
-  const [locale, setLocale] = useState('zh');
+  const { user } = useGetUser();
+  const [locale, setLocale] = useState('en');
 
   useEffect(() => {
     if (open) {
-      const getUser = async () => {
-        const { user } = useGetUser();
-        if (user) {
-          setUser(user);
-          setLocale(user.language || 'zh');
-          
-          // 只在没有数据或订阅时获取通知
-          if (notifications.length === 0 || !isSubscribed) {
-            dispatch(fetchNotifications(user.id));
-          }
-        }
-      };
+      // Only fetch and subscribe when dialog opens
+      if(!user) return;
       
-      getUser();
+      // Fetch initial notifications
+      dispatch(fetchNotifications(user.id));
+      
+      // Subscribe to realtime updates
+      console.log('NotificationDialog: Starting realtime subscription');
+      dispatch(subscribeToNotifications(user.id));
     } else if (!open && isSubscribed) {
-      // 对话框关闭后取消订阅，但不清除通知数据
-      // 这样通知图标上的数字仍然会显示正确的未读数量
+      // Unsubscribe when dialog closes but keep notification data
+      // so the notification badge still shows correct unread count
+      console.log('NotificationDialog: Cleaning up subscription');
       dispatch(unsubscribeFromNotifications());
     }
-  }, [dispatch, open, notifications.length, isSubscribed]);
+  }, [dispatch, open, user]);
 
   const handleMarkAsRead = (notificationId) => {
     if (user) {

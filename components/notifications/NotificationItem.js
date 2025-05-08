@@ -13,12 +13,12 @@ export default function NotificationItem({ notification, onAction }) {
   const tCalendar = useTranslations('Calendar');
   const tNotif = useTranslations('notificationCenter');
   
-  // 添加状态来跟踪会议邀请的状态
+  // Add state to track meeting invitation status
   const [localMeetingData, setLocalMeetingData] = useState(null);
   const [localIsDeclined, setLocalIsDeclined] = useState(false);
   const [localIsAccepted, setLocalIsAccepted] = useState(false);
   
-  // 初始化本地状态
+  // Initialize local state
   useEffect(() => {
     const data = getMeetingData();
     setLocalMeetingData(data);
@@ -40,14 +40,14 @@ export default function NotificationItem({ notification, onAction }) {
       
       if (error) throw error;
       
-      // 通知父组件更新状态
+      // Notify parent component to update state
       if (onAction) onAction('read', id);
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }
   };
 
-  // 根据通知类型获取图标
+  // Get icon based on notification type
   const getIcon = (type) => {
     switch (type) {
       case 'TASK_ASSIGNED':
@@ -57,7 +57,7 @@ export default function NotificationItem({ notification, onAction }) {
       case 'MENTION':
         return <User className="h-4 w-4" />;
       case 'SYSTEM':
-        // 检查是否是会议邀请
+        // Check if this is a meeting invitation
         try {
           if (notification.data) {
             const data = typeof notification.data === 'string' 
@@ -77,11 +77,11 @@ export default function NotificationItem({ notification, onAction }) {
     }
   };
 
-  // 处理notification.data字段
+  // Process notification.data field
   const getMeetingData = () => {
     try {
       if (notification.data) {
-        // 判断data是对象还是字符串
+        // Determine if data is an object or string
         if (typeof notification.data === 'object' && notification.data !== null) {
           return notification.data;
         } else if (typeof notification.data === 'string') {
@@ -95,36 +95,36 @@ export default function NotificationItem({ notification, onAction }) {
     }
   };
 
-  // 检查是否是会议邀请
+  // Check if this is a meeting invitation
   const isMeetingInvitation = () => {
     const data = getMeetingData();
     return data && data.isMeetingInvitation;
   };
 
-  // 检查会议是否已被拒绝
+  // Check if meeting has been declined
   const isMeetingDeclined = () => {
     const data = getMeetingData();
     return data && data.declined;
   };
 
-  // 向邀请人发送通知
+  // Send notification to the inviter
   const sendResponseNotification = async (meetData, isAccepted) => {
     if (!meetData || !meetData.inviterId) return;
     
     try {
-      // 获取当前用户信息
+      // Get current user information
       const { user } = useGetUser();
-      if (!user) throw new Error('未获取到用户信息');
+      if (!user) throw new Error('Failed to get user information');
       
-      // 准备通知数据
+      // Prepare notification data
       const notificationData = {
-        user_id: meetData.inviterId,  // 通知发送给邀请人
+        user_id: meetData.inviterId,  // Send notification to the inviter
         title: isAccepted 
           ? tNotif('meetingAccepted') 
           : tNotif('meetingDeclined'),
         content: `${user.name || user.email} ${isAccepted 
           ? tNotif('acceptedYourMeeting') 
-          : tNotif('declinedYourMeeting')} "${meetData.meetingTitle || '会议'}"`,
+          : tNotif('declinedYourMeeting')} "${meetData.meetingTitle || 'meeting'}"`,
         type: 'SYSTEM',
         is_read: false,
         data: {
@@ -138,44 +138,44 @@ export default function NotificationItem({ notification, onAction }) {
         }
       };
       
-      // 发送通知
+      // Send notification
       const { error } = await supabase
         .from('notification')
         .insert(notificationData);
       
       if (error) throw error;
       
-      console.log(`已向邀请人 ${meetData.inviterId} 发送${isAccepted ? '接受' : '拒绝'}会议通知`);
+      console.log(`Sent ${isAccepted ? 'acceptance' : 'decline'} notification to inviter ${meetData.inviterId}`);
     } catch (error) {
-      console.error('发送会议响应通知失败:', error);
+      console.error('Failed to send meeting response notification:', error);
     }
   };
 
-  // 接受会议邀请
+  // Accept meeting invitation
   const handleAcceptMeeting = async (id, meetData) => {
     try {
       await handleMarkAsRead(id);
       
-      // 更新通知状态为已接受
+      // Update notification status to accepted
       const updatedData = { ...meetData, accepted: true };
       
       const { error } = await supabase
         .from('notification')
         .update({ 
-          data: updatedData  // Supabase将自动处理JSON序列化
+          data: updatedData  // Supabase will handle JSON serialization automatically
         })
         .eq('id', id);
       
       if (error) throw error;
       
-      // 更新本地状态
+      // Update local state
       setLocalMeetingData(updatedData);
       setLocalIsAccepted(true);
       
-      // 向邀请人发送接受通知
+      // Send acceptance notification to the inviter
       await sendResponseNotification(meetData, true);
       
-      // 打开Google Meet链接
+      // Open Google Meet link
       if (meetData && meetData.meetLink) {
         window.open(meetData.meetLink, '_blank');
       }
@@ -183,12 +183,12 @@ export default function NotificationItem({ notification, onAction }) {
       if (onAction) onAction('accept', id);
       toast.success(tNotif('meetingAccepted'));
     } catch (error) {
-      console.error('接受会议邀请失败:', error);
+      console.error('Failed to accept meeting invitation:', error);
       toast.error(t('actionFailed'));
     }
   };
 
-  // 拒绝会议邀请
+  // Decline meeting invitation
   const handleDeclineMeeting = async (id) => {
     try {
       const data = getMeetingData();
@@ -196,25 +196,25 @@ export default function NotificationItem({ notification, onAction }) {
 
       const updatedData = { ...data, declined: true };
       
-      // 直接更新data字段
+      // Update data field directly
       const { error } = await supabase
         .from('notification')
         .update({ 
           is_read: true, 
-          data: updatedData  // Supabase将自动处理JSON序列化
+          data: updatedData  // Supabase will handle JSON serialization automatically
         })
         .eq('id', id);
       
       if (error) throw error;
       
-      // 更新本地状态
+      // Update local state
       setLocalMeetingData(updatedData);
       setLocalIsDeclined(true);
       
-      // 向邀请人发送拒绝通知
+      // Send decline notification to the inviter
       await sendResponseNotification(data, false);
       
-      // 通知父组件更新状态
+      // Notify parent component to update state
       if (onAction) onAction('decline', id);
       toast.success(tCalendar('meetingDeclined'));
     } catch (error) {
@@ -223,7 +223,7 @@ export default function NotificationItem({ notification, onAction }) {
     }
   };
 
-  // 解析会议数据
+  // Parse meeting data
   const meetingData = localMeetingData || getMeetingData();
   const isMeeting = isMeetingInvitation();
   const isDeclined = localIsDeclined || isMeetingDeclined();
@@ -258,7 +258,7 @@ export default function NotificationItem({ notification, onAction }) {
           {notification.content}
         </p>
         
-        {/* 针对会议邀请显示接受/拒绝按钮 */}
+        {/* For meeting invitation display accept/decline buttons */}
         {isMeeting && meetingData && !isDeclined && !isAccepted && (
           <div className="mt-2 flex space-x-2">
             <Button 
@@ -289,7 +289,7 @@ export default function NotificationItem({ notification, onAction }) {
           </div>
         )}
         
-        {/* 如果会议已被接受 */}
+        {/* If meeting has been accepted */}
         {isMeeting && meetingData && isAccepted && (
           <div className="mt-2">
             <span className="text-xs text-green-600 font-medium">
@@ -312,7 +312,7 @@ export default function NotificationItem({ notification, onAction }) {
           </div>
         )}
         
-        {/* 如果会议已被拒绝 */}
+        {/* If meeting has been declined */}
         {isMeeting && meetingData && isDeclined && (
           <div className="mt-2">
             <span className="text-xs text-muted-foreground">

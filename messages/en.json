@@ -938,7 +938,8 @@
       "minutesAgo": "{minutes} minutes ago",
       "hoursAgo": "{hours} hours ago",
       "daysAgo": "{days} days ago"
-    }
+    },
+    "groupChat":"Group Chat"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
