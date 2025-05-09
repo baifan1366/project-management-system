@@ -494,34 +494,38 @@ export default function TeamCustomFieldPage() {
           <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex">
-                <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
-                  <Plus className="h-4 w-4 mr-1" />
-                  {t(addButtonText)}
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="rounded-l-none rounded-r-md px-1">
-                      <ChevronDown className="h-4 w-4" />
+                {currentItem?.custom_field?.type !== 'FILES' && (
+                  <>
+                    <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
+                      <Plus className="h-4 w-4 mr-1" />
+                      {t(addButtonText)}
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => setAddButtonText('addTask')} className="flex">
-                      <CircleCheck className="h-4 w-4 mr-1" />
-                      <span className="text-sm">{t('task')}</span>
-                      {addButtonText === 'addTask' && <Check className="h-4 w-4 ml-auto" />}                      
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setAddButtonText('addSection')} className="flex">
-                      <TextQuote className="h-4 w-4 mr-1" />
-                      <span className="text-sm">{t('section')}</span>
-                      {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
-                    </DropdownMenuItem>
-                    {/* <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
-                      <FileUp className="h-4 w-4 mr-1" />
-                      <span className="text-sm">{t('attachment')}</span>
-                      {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
-                    </DropdownMenuItem> */}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="rounded-l-none rounded-r-md px-1">
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => setAddButtonText('addTask')} className="flex">
+                          <CircleCheck className="h-4 w-4 mr-1" />
+                          <span className="text-sm">{t('task')}</span>
+                          {addButtonText === 'addTask' && <Check className="h-4 w-4 ml-auto" />}                      
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAddButtonText('addSection')} className="flex">
+                          <TextQuote className="h-4 w-4 mr-1" />
+                          <span className="text-sm">{t('section')}</span>
+                          {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
+                        </DropdownMenuItem>
+                        {/* <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
+                          <FileUp className="h-4 w-4 mr-1" />
+                          <span className="text-sm">{t('attachment')}</span>
+                          {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
+                        </DropdownMenuItem> */}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">

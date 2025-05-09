@@ -587,7 +587,15 @@
     "createError": "Error creating project.",
     "pleaseTryAgain": "Something went wrong. Please try again.",
     "error": "Error",
-    "themeColorLoadError": "Theme color load error"
+    "loading": "Loading...",
+    "subscriptionLimit": "Subscription limit",
+    "subscriptionLimitDescription": "You have reached the maximum number of projects for your subscription plan. Please upgrade to a higher plan to create more projects.",
+    "upgrade": "Upgrade",
+    "themeColorLoadError": "Theme color load error",
+    "subscriptionLimitReached": "Subscription limit reached",
+    "subscriptionLimitWarning": "You are approaching the maximum number of projects for your subscription plan. Consider upgrading to a higher plan.",
+    "projectUsage": "Project usage",
+    "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
   },
   "CreateTask": {
     "createTask": "Create Task",
