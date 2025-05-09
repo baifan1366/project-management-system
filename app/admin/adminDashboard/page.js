@@ -162,79 +162,87 @@ export default function AdminDashboard() {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {hasPermission('view_users') && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.totalUsers}</p>
+            <Link href={`/admin/userManagement`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.totalUsers}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-500 dark:text-blue-300">
+                    <FaUsers />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-500 dark:text-blue-300">
-                  <FaUsers />
+                <div className="mt-4">
+                  <span className="text-sm text-blue-500 dark:text-blue-400">
+                    View all users →
+                  </span>
                 </div>
               </div>
-              <div className="mt-4">
-                <Link href={`/admin/userManagement`} className="text-sm text-blue-500 dark:text-blue-400 hover:underline">
-                  View all users →
-                </Link>
-              </div>
-            </div>
+            </Link>
             )}
             
             {hasPermission('view_subscription_plans') && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Subscriptions</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.activeSubscriptions}</p>
+            <Link href={`/admin/subscriptionManagement`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Subscriptions</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.activeSubscriptions}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-500 dark:text-green-300">
+                    <FaMoneyBillWave />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-500 dark:text-green-300">
-                  <FaMoneyBillWave />
+                <div className="mt-4">
+                  <span className="text-sm text-green-500 dark:text-green-400">
+                    Manage subscriptions →
+                  </span>
                 </div>
               </div>
-              <div className="mt-4">
-                <Link href={`/admin/subscriptionManagement`} className="text-sm text-green-500 dark:text-green-400 hover:underline">
-                  Manage subscriptions →
-                </Link>
-              </div>
-            </div>
+            </Link>
             )}
 
             {hasPermission('view_support_tickets') && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Support</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.pendingSupport}</p>
+            <Link href={`/admin/supportManagement`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Support</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.pendingSupport}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center text-yellow-500 dark:text-yellow-300">
+                    <FaTicketAlt />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center text-yellow-500 dark:text-yellow-300">
-                  <FaTicketAlt />
+                <div className="mt-4">
+                  <span className="text-sm text-yellow-500 dark:text-yellow-400">
+                    View support tickets →
+                  </span>
                 </div>
               </div>
-              <div className="mt-4">
-                <Link href={`/admin/supportManagement`} className="text-sm text-yellow-500 dark:text-yellow-400 hover:underline">
-                  View support tickets →
-                </Link>
-              </div>
-            </div>
+            </Link>
             )}
 
             {hasPermission('view_analytics') && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revenue (This Month)</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(stats.revenueThisMonth)}</p>
+            <Link href={`/admin/analytics`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revenue (This Month)</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(stats.revenueThisMonth)}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
+                    <FaChartLine />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
-                  <FaChartLine />
+                <div className="mt-4">
+                  <span className="text-sm text-purple-500 dark:text-purple-400">
+                    View analytics →
+                  </span>
                 </div>
               </div>
-              <div className="mt-4">
-                <Link href={`/admin/adminAnalytics`} className="text-sm text-purple-500 dark:text-purple-400 hover:underline">
-                  View analytics →
-                </Link>
-              </div>
-            </div>
+            </Link>
             )}
             
             {!hasPermission('view_users') && 
