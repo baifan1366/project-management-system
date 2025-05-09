@@ -183,7 +183,7 @@ export default function TeamInvitation() {
       })).unwrap();
 
       // 6. 重定向到项目页面
-      router.push(`/${params.locale}/projects/${teamData.project_id}/${params.teamId}`);
+      router.push(`/${params.locale}/projects/${teamData.project_id}`);
     } catch (error) {
       // console.error('Failed to accept invitation:', error);
       setError(error.message);

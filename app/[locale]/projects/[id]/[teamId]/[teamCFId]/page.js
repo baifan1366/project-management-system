@@ -42,7 +42,7 @@ const selectTeamById = createSelector(
   }
 );
 
-export default function TeamCustomFieldPage() {
+const TeamCustomFieldPage = () => {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const params = useParams();
@@ -58,6 +58,7 @@ export default function TeamCustomFieldPage() {
   const { user } = useGetUser();
   const { confirm } = useConfirm();
   const { currentItem, status: cfStatus, error: cfError } = useSelector((state) => state.teamCF);
+  const teamUsers = useSelector(state => state.teamUsers.teamUsers[teamId] || []);
   const [isLoading, setIsLoading] = useState(false);
   const [currentView, setCurrentView] = useState('list');
   const [open, setOpen] = useState(false);
@@ -68,6 +69,13 @@ export default function TeamCustomFieldPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
   const isStarred = selectedTeam?.star || false;  
+  
+  // 检查当前用户是否为团队所有者
+  const isCurrentUserOwner = () => {
+    if (!teamUsers || !user?.id) return false;
+    const currentUserTeamMember = teamUsers.find(tu => String(tu.user.id) === String(user.id));
+    return currentUserTeamMember?.role === 'OWNER';
+  };
   
   // 当视图切换时，触发refreshKey更新
   const handleViewChange = (newView) => {
@@ -354,14 +362,19 @@ export default function TeamCustomFieldPage() {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="max-w-none border-0 bg-background text-foreground flex flex-col flex-grow">
+      <div className="max-w-full border-0 bg-background text-foreground flex flex-col flex-grow">
         <div>
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-1">
-              <h2 className="text-xl font-semibold">{selectedTeam?.name}</h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 gap-2">
+            <div className="flex flex-wrap items-center gap-1 max-w-full">
+              <div 
+                className="group relative"
+                title={selectedTeam?.name}
+              >
+                <h2 className="text-xl font-semibold truncate sm:truncate md:text-clip md:overflow-visible md:whitespace-normal max-w-[180px] sm:max-w-[220px] md:max-w-none mr-1">{selectedTeam?.name}</h2>
+              </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -397,81 +410,116 @@ export default function TeamCustomFieldPage() {
                     {t('editTeamAccess')}
                   </DropdownMenuItem>
                   <hr className="my-1" />
-                  <DropdownMenuItem 
-                    className="text-red-500 flex items-center px-3 py-2 text-sm focus:text-red-500"
-                    onClick={handleArchiveTeam}
-                    onClose={() => onClose(false)}
-                  >
-                    <Archive className="h-4 w-4 mr-2" />
-                    {t('archiveTeam')}
-                  </DropdownMenuItem>
+                  {/* if owner, can archive, else cursor-not-allow */}
+                  {isCurrentUserOwner() ? (
+                    <DropdownMenuItem 
+                      className="text-red-500 flex items-center px-3 py-2 text-sm focus:text-red-500"
+                      onClick={handleArchiveTeam}
+                      onClose={() => onClose(false)}
+                    >
+                      <Archive className="h-4 w-4 mr-2" />
+                      {t('archiveTeam')}
+                    </DropdownMenuItem>
+                  ) : (
+                    <div className="text-red-500 flex items-center px-3 py-2 text-sm cursor-not-allowed">
+                      <Archive className="h-4 w-4 mr-2" />
+                      {t('archiveTeam')}
+                    </div>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button variant="ghost" size="icon" onClick={handleStarClick}>
-                {isStarred ? <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /> : <Star className="h-4 w-4" />}
-              </Button>
+              {isCurrentUserOwner() ? (
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleStarClick}>
+                  {isStarred ? <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /> : <Star className="h-4 w-4" />}
+                </Button>
+              ) : (
+                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-not-allowed">
+                  {isStarred ? <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /> : <Star className="h-4 w-4" />}
+                </Button>
+              )}
               
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <div className="flex-shrink-0">
+                {isCurrentUserOwner() ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        size="sm"
+                        className={selectedTeam?.status ? `border-transparent shadow-none flex items-center px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200` : ""}
+                      >
+                        <Circle 
+                          className="h-3 w-3 sm:h-4 sm:w-4" 
+                          style={selectedTeam?.status ? {fill: 'currentColor'} : {}} 
+                        />
+                        <span className="ml-1 truncate max-w-[80px] sm:max-w-full">
+                          {selectedTeam?.status ? t(selectedTeam.status) : t('setStatus')}
+                        </span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-55 p-1">
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.PENDING} ${statusHoverColors.PENDING} transition-colors duration-200 ${statusFocusColors.PENDING}`}
+                        onClick={() => handleStatusChange('PENDING')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('PENDING')}
+                        {selectedTeam?.status === 'PENDING' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.IN_PROGRESS} ${statusHoverColors.IN_PROGRESS} transition-colors duration-200 ${statusFocusColors.IN_PROGRESS}`}
+                        onClick={() => handleStatusChange('IN_PROGRESS')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('IN_PROGRESS')}
+                        {selectedTeam?.status === 'IN_PROGRESS' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.COMPLETED} ${statusHoverColors.COMPLETED} transition-colors duration-200 ${statusFocusColors.COMPLETED}`}
+                        onClick={() => handleStatusChange('COMPLETED')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('COMPLETED')}
+                        {selectedTeam?.status === 'COMPLETED' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.CANCELLED} ${statusHoverColors.CANCELLED} transition-colors duration-200 ${statusFocusColors.CANCELLED}`}
+                        onClick={() => handleStatusChange('CANCELLED')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('CANCELLED')}
+                        {selectedTeam?.status === 'CANCELLED' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.ON_HOLD} ${statusHoverColors.ON_HOLD} transition-colors duration-200 ${statusFocusColors.ON_HOLD}`}
+                        onClick={() => handleStatusChange('ON_HOLD')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('ON_HOLD')}
+                        {selectedTeam?.status === 'ON_HOLD' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
                   <Button 
                     size="sm"
-                    className={selectedTeam?.status ? `border-transparent shadow-none flex items-center px-3 py-2 text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200` : ""}
+                    className={selectedTeam?.status ? `border-transparent shadow-none flex items-center px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200 cursor-not-allowed` : "cursor-not-allowed"}
                   >
                     <Circle 
-                      className="h-4 w-4" 
+                      className="h-3 w-3 sm:h-4 sm:w-4" 
                       style={selectedTeam?.status ? {fill: 'currentColor'} : {}} 
                     />
-                    {selectedTeam?.status ? t(selectedTeam.status) : t('setStatus')}
+                    <span className="ml-1 truncate max-w-[80px] sm:max-w-full">
+                      {selectedTeam?.status ? t(selectedTeam.status) : t('setStatus')}
+                    </span>
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-55 p-1">
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.PENDING} ${statusHoverColors.PENDING} transition-colors duration-200 ${statusFocusColors.PENDING}`}
-                    onClick={() => handleStatusChange('PENDING')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('PENDING')}
-                    {selectedTeam?.status === 'PENDING' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.IN_PROGRESS} ${statusHoverColors.IN_PROGRESS} transition-colors duration-200 ${statusFocusColors.IN_PROGRESS}`}
-                    onClick={() => handleStatusChange('IN_PROGRESS')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('IN_PROGRESS')}
-                    {selectedTeam?.status === 'IN_PROGRESS' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.COMPLETED} ${statusHoverColors.COMPLETED} transition-colors duration-200 ${statusFocusColors.COMPLETED}`}
-                    onClick={() => handleStatusChange('COMPLETED')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('COMPLETED')}
-                    {selectedTeam?.status === 'COMPLETED' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.CANCELLED} ${statusHoverColors.CANCELLED} transition-colors duration-200 ${statusFocusColors.CANCELLED}`}
-                    onClick={() => handleStatusChange('CANCELLED')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('CANCELLED')}
-                    {selectedTeam?.status === 'CANCELLED' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.ON_HOLD} ${statusHoverColors.ON_HOLD} transition-colors duration-200 ${statusFocusColors.ON_HOLD}`}
-                    onClick={() => handleStatusChange('ON_HOLD')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('ON_HOLD')}
-                    {selectedTeam?.status === 'ON_HOLD' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
-                <Share2 className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center self-end sm:self-auto gap-2 mt-1 sm:mt-0">
+              {isCurrentUserOwner() && (
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(true)}>
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              )}
               <InvitationDialog
                 open={open}
                 onClose={() => setOpen(false)}
@@ -531,15 +579,15 @@ export default function TeamCustomFieldPage() {
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm">
                 <Filter className="h-4 w-4 mr-1" />
-                {t('filter')}
+                <span className="hidden md:inline">{t('filter')}</span>
               </Button>
               <Button variant="ghost" size="sm">
                 <SortAsc className="h-4 w-4 mr-1" />
-                {t('sort')}
+                <span className="hidden md:inline">{t('sort')}</span>
               </Button>
               <Button variant="ghost" size="sm">
                 <Grid className="h-4 w-4 mr-1" />
-                {t('group')}
+                <span className="hidden md:inline">{t('group')}</span>
               </Button>
             </div>
           </div>
@@ -559,3 +607,5 @@ export default function TeamCustomFieldPage() {
     </div>
   );
 }
+
+export default TeamCustomFieldPage;

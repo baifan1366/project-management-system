@@ -1220,5 +1220,11 @@
     "openInNewTab": "在新标签页中打开",
     "fileNotFound": "未找到文件",
     "closePreview": "关闭预览"
+  },
+  "Team": {
+    "transferOwner": "转移所有权",
+    "pendingRemoval": "待移除",
+    "undoRemoval": "撤销移除",
+    "undoRoleChange": "撤销角色变更"
   }
 }
