@@ -7,6 +7,8 @@ import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUse
 import { useSelector, useDispatch } from 'react-redux';
 import { checkAdminSession } from '@/lib/redux/features/adminSlice';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
+
 
 export default function AdminUserManagement() {
 
@@ -201,6 +203,7 @@ export default function AdminUserManagement() {
     try {
       // Verify permission
       if (!hasPermission('edit_admins')) {
+        toast.error('Permission denied: You do not have permission to edit admin users');
         throw new Error('You do not have permission to edit admin users');
       }
       
@@ -232,7 +235,10 @@ export default function AdminUserManagement() {
         .update(filteredAdminData)
         .eq('id', selectedAdmin.id);
       
-      if (error) throw error;
+      if (error) {
+        toast.error(`Failed to update admin: ${error.message}`);
+        throw error;
+      }
       
       // Update local data
       setAdmins(admins.map(admin => 
@@ -252,21 +258,99 @@ export default function AdminUserManagement() {
         }]);
       }
       
+      toast.success(`Admin user "${selectedAdmin.username}" updated successfully`);
       closeModal();
       
       // Refresh admin data to ensure permissions are correctly displayed
       fetchAdminUsers();
       
     } catch (error) {
-      console.error('Error updating admin user:', error);
+      toast.error(`Error updating admin user: ${error.message}`);
     }
   };
   
+  // Initialize permissions for a new admin user
+  const initializeAdminPermissions = async (adminId) => {
+    try {
+      // Fetch all available permissions
+      const { data: allPermissions, error: permissionsError } = await supabase
+        .from('admin_permission')
+        .select('id, name')
+        .order('id', { ascending: true });
+      
+      if (permissionsError) {
+        toast.error(`Failed to fetch permissions: ${permissionsError.message}`);
+        throw permissionsError;
+      }
+      
+      // Default permissions to give to new admins
+      // For basic admin access but not super admin access
+      const defaultPermissionNames = ['view_users', 'edit_users', 'add_users', 'delete_users']; //default permissions
+      
+      // Prepare batch insert data
+      const permissionsToInsert = allPermissions.map(permission => ({
+        admin_id: adminId,
+        permission_id: permission.id,
+        is_active: defaultPermissionNames.includes(permission.name)
+      }));
+      
+      // Insert permissions in a single batch operation
+      if (permissionsToInsert.length > 0) {
+        const { error: batchInsertError } = await supabase
+          .from('admin_role_permission')
+          .insert(permissionsToInsert);
+        
+        if (batchInsertError) {
+          console.error('Failed to insert permissions batch:', batchInsertError);
+          
+          // If batch insert fails, try one by one as fallback
+          let someSucceeded = false;
+          for (const permData of permissionsToInsert) {
+            try {
+              // Check if this specific permission already exists for this admin
+              const { data: existingPerm } = await supabase
+                .from('admin_role_permission')
+                .select('id')
+                .eq('admin_id', adminId)
+                .eq('permission_id', permData.permission_id)
+                .maybeSingle();
+              
+              if (existingPerm) {
+                // Update existing permission
+                await supabase
+                  .from('admin_role_permission')
+                  .update({ is_active: permData.is_active })
+                  .eq('id', existingPerm.id);
+              } else {
+                // Insert new permission
+                await supabase
+                  .from('admin_role_permission')
+                  .insert(permData);
+              }
+              
+              someSucceeded = true;
+            } catch (error) {
+              console.error(`Failed to insert/update permission ${permData.permission_id}:`, error);
+            }
+          }
+          
+          return someSucceeded;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error initializing admin permissions:', error);
+      return false;
+    }
+  };
+
   // Create new admin
   const createAdmin = async (adminUserData) => {
     try {
       // Verify permission
-      if (!hasPermission('manage_admins')) {
+      if (!hasPermission('add_admins')) {
+        toast.error('Permission denied: You do not have permission to create admin users');
         throw new Error('You do not have permission to create admin users');
       }
       
@@ -286,7 +370,16 @@ export default function AdminUserManagement() {
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        toast.error(`Failed to create admin: ${error.message}`);
+        throw error;
+      }
+      
+      // Initialize permissions for the new admin
+      const permissionsInitialized = await initializeAdminPermissions(data.id);
+      if (!permissionsInitialized) {
+        toast.warning('Admin created but permissions initialization failed. Please assign permissions manually.');
+      }
       
       // Update local data
       setAdmins([data, ...admins]);
@@ -298,18 +391,20 @@ export default function AdminUserManagement() {
           action: 'create_admin_user',
           entity_type: 'admin_user',
           entity_id: String(data.id),
+          details: { updated_fields: Object.keys(adminUserData) },
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
         }]);
       }
       
+      toast.success(`Admin user "${data.username}" created successfully`);
       closeModal();
       
       // Refresh admin data to ensure permissions are correctly displayed
       fetchAdminUsers();
       
     } catch (error) {
-      console.error('Error creating admin user:', error);
+      toast.error(`Error creating admin user: ${error.message}`);
     }
   };
   
@@ -317,12 +412,14 @@ export default function AdminUserManagement() {
   const deleteAdmin = async () => {
     try {
       // Verify permission
-      if (!hasPermission('manage_admins')) {
+      if (!hasPermission('delete_admins')) {
+        toast.error('Permission denied: You do not have permission to delete admin users');
         throw new Error('You do not have permission to delete admin users');
       }
       
       // Prevent deleting your own account
       if (adminData && selectedAdmin.id === adminData.id) {
+        toast.error('You cannot delete your own account');
         throw new Error('You cannot delete your own account');
       }
       
@@ -331,7 +428,10 @@ export default function AdminUserManagement() {
         .delete()
         .eq('id', selectedAdmin.id);
       
-      if (error) throw error;
+      if (error) {
+        toast.error(`Failed to delete admin: ${error.message}`);
+        throw error;
+      }
       
       // Update local data
       setAdmins(admins.filter(admin => admin.id !== selectedAdmin.id));
@@ -348,13 +448,14 @@ export default function AdminUserManagement() {
         }]);
       }
       
+      toast.success(`Admin user deleted successfully`);
       closeModal();
       
       // Refresh admin data to ensure permissions are correctly displayed
       fetchAdminUsers();
       
     } catch (error) {
-      console.error('Error deleting admin user:', error);
+      toast.error(`Error deleting admin user: ${error.message}`);
     }
   };
   
@@ -526,6 +627,7 @@ export default function AdminUserManagement() {
     try {
       // Verify permission
       if (!hasPermission('edit_admins')) {
+        toast.error('Permission denied: You do not have permission to manage admin permissions');
         throw new Error('You do not have permission to manage admin permissions');
       }
       
@@ -538,7 +640,10 @@ export default function AdminUserManagement() {
         .select('*')
         .eq('admin_id', selectedAdmin.id);
       
-      if (currentError) throw currentError;
+      if (currentError) {
+        toast.error(`Failed to fetch current permissions: ${currentError.message}`);
+        throw currentError;
+      }
       
       // Process each permission
       for (const permission of allPermissions) {
@@ -553,19 +658,51 @@ export default function AdminUserManagement() {
               .update({ is_active: isActive })
               .eq('id', existingPerm.id);
             
-            if (updateError) throw updateError;
+            if (updateError) {
+              toast.error(`Failed to update permission: ${updateError.message}`);
+              throw updateError;
+            }
           }
         } else if (isActive) {
-          // Insert new permission if it should be active
-          const { error: insertError } = await supabase
+          // First check if this permission already exists for this admin
+          const { data: existingData, error: checkError } = await supabase
             .from('admin_role_permission')
-            .insert({
-              admin_id: selectedAdmin.id,
-              permission_id: permission.id,
-              is_active: true
-            });
+            .select('id')
+            .eq('admin_id', selectedAdmin.id)
+            .eq('permission_id', permission.id)
+            .single();
+            
+          if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows returned
+            toast.error(`Failed to check existing permission: ${checkError.message}`);
+            throw checkError;
+          }
           
-          if (insertError) throw insertError;
+          // If the permission already exists, update it instead of inserting
+          if (existingData) {
+            const { error: updateError } = await supabase
+              .from('admin_role_permission')
+              .update({ is_active: true })
+              .eq('id', existingData.id);
+              
+            if (updateError) {
+              toast.error(`Failed to update permission: ${updateError.message}`);
+              throw updateError;
+            }
+          } else {
+            // Insert new permission if it should be active and doesn't exist
+            const { error: insertError } = await supabase
+              .from('admin_role_permission')
+              .insert({
+                admin_id: selectedAdmin.id,
+                permission_id: permission.id,
+                is_active: true
+              });
+            
+            if (insertError) {
+              toast.error(`Failed to add permission: ${insertError.message}`);
+              throw insertError;
+            }
+          }
         }
       }
       
@@ -582,6 +719,7 @@ export default function AdminUserManagement() {
         }]);
       }
       
+      toast.success(`Permissions for "${selectedAdmin.username}" updated successfully`);
       // Show success notification in a real app
       // For now, just close the modal
       closeModal();
@@ -592,6 +730,7 @@ export default function AdminUserManagement() {
     } catch (error) {
       console.error('Error saving admin permissions:', error);
       setPermissionError(error.message || 'Failed to save permissions. Please try again.');
+      toast.error(`Error saving permissions: ${error.message}`);
     } finally {
       setSavingPermissions(false);
     }
@@ -621,10 +760,10 @@ export default function AdminUserManagement() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+    <div className="w-full">
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="w-full">
 
         {/* Content Area */}
         {hasPermission('view_admins') ? (
@@ -662,7 +801,7 @@ export default function AdminUserManagement() {
               </div>
               
               {/* Add Admin Button */}
-              {hasPermission('manage_admins') && (
+              {hasPermission('add_admins') && (
               <button
                 onClick={() => openModal('add')}
                 className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"

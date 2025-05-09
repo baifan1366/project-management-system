@@ -9,7 +9,7 @@ import SubscriptionLimitModal from './SubscriptionLimitModal';
 
 export function RootLayoutClient({ children, locale, messages }) {
   const pathname = usePathname();
-  const isPricingPage = pathname.includes('/pricing') || pathname.includes('/payment') || pathname.includes('/landing');
+  const isPricingPage = pathname.includes('/pricing') || pathname.includes('/payment') || pathname.includes('/landing') || pathname.includes('/contactUs');
   const isAuthPage = pathname.includes('/auth') || pathname.includes('/login') || pathname.includes('/signup') || pathname.includes('/reset-password') || pathname.includes('/forgot-password');
   const isProjectPage = pathname.includes('/projects/');
 

@@ -58,11 +58,21 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
-    position: relative;
-    background-color: #121212;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-    background-size: 30px 30px;
+    min-height: 100vh;
   }
+  html {
+    height: 100%;
+  }
+}
+
+/* Admin layout specific styles */
+.admin-content {
+  background-color: #f9fafb;
+  min-height: 100vh;
+}
+
+.dark .admin-content {
+  background-color: #111827;
 }
 
 .dotted-bg {

@@ -14,6 +14,9 @@ export default function PricingPage() {
   const router = useRouter()
   const params = useParams()  
   const { plans, status, error, selectedInterval } = useSelector((state) => state.plans)
+  
+  // Move the hook call to component level
+  const { user, error: userError } = useGetUser()
 
   //cta 按钮更新状态
   const [currentUserPlan, setCurrentUserPlan] = useState(null)
@@ -34,11 +37,9 @@ export default function PricingPage() {
     console.log('选择了计划:', plan);
 
     try {
-      // 获取会话
-      const { user , error } = useGetUser();
-      
-      if (error) {
-        console.error('获取会话错误:', error);
+      // Use the user from the hook called at component level
+      if (userError) {
+        console.error('获取会话错误:', userError);
         // 创建登录重定向参数
         const loginParams = new URLSearchParams({
           plan_id: plan.id.toString(),

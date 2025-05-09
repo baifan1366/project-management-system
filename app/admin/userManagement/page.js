@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
 
 export default function UserManagement() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function UserManagement() {
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminData, setAdminData] = useState(null);
+  const [processing, setProcessing] = useState(false);
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
 
@@ -119,6 +121,7 @@ export default function UserManagement() {
   // Edit user
   const editUser = async (userData) => {
     try {
+      setProcessing(true);
       // Store original user data for activity logging
       const originalUserData = { ...selectedUser };
       
@@ -137,7 +140,10 @@ export default function UserManagement() {
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        toast.error(`Failed to update user: ${error.message}`);
+        throw error;
+      }
       
       // Update local data
       setUsers(users.map(user => 
@@ -173,23 +179,28 @@ export default function UserManagement() {
         });
       }
       
+      toast.success(`User "${data.name || data.email}" updated successfully`);
       closeModal();
       
     } catch (error) {
       console.error('Error updating user:', error);
-      alert(`Failed to update user: ${error.message}`);
+      toast.error(`Failed to update user: ${error.message}`);
+    } finally {
+      setProcessing(false);
     }
   };
   
   // Delete user
   const deleteUser = async () => {
     try {
+      setProcessing(true);
       const confirmationInput = document.getElementById('delete-confirmation');
       const confirmationValue = confirmationInput.value.trim();
       const expectedValue = selectedUser.name || selectedUser.email;
       
       if (confirmationValue !== expectedValue) {
-        alert('Confirmation text does not match. Please try again.');
+        toast.error('Confirmation text does not match. Please try again.');
+        setProcessing(false);
         return;
       }
       
@@ -198,7 +209,10 @@ export default function UserManagement() {
         .delete()
         .eq('id', selectedUser.id);
       
-      if (error) throw error;
+      if (error) {
+        toast.error(`Failed to delete user: ${error.message}`);
+        throw error;
+      }
       
       // Update local data
       setUsers(users.filter(user => user.id !== selectedUser.id));
@@ -215,11 +229,14 @@ export default function UserManagement() {
         });
       }
       
+      toast.success(`User deleted successfully`);
       closeModal();
       
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert(`Failed to delete user: ${error.message}`);
+      toast.error(`Failed to delete user: ${error.message}`);
+    } finally {
+      setProcessing(false);
     }
   };
   
@@ -252,8 +269,9 @@ export default function UserManagement() {
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
   
   // Add user
-const addUser = async (userData) => {
+  const addUser = async (userData) => {
     try {
+      setProcessing(true);
       // Generate a proper UUID (follows RFC4122 format)
       const id = crypto.randomUUID ? crypto.randomUUID() : 
         'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -266,7 +284,6 @@ const addUser = async (userData) => {
       const userDataWithId = {
         ...userData,
         id,
-        provider: 'local', // From your signup code
         theme: 'system', // Default from your schema
         language: 'en', // Default from your schema
         notifications_enabled: true // Default from your schema
@@ -283,6 +300,7 @@ const addUser = async (userData) => {
       
       if (error) {
         console.error('Supabase error:', error);
+        toast.error(`Failed to add user: ${error.message}`);
         throw error;
       }
       
@@ -302,11 +320,14 @@ const addUser = async (userData) => {
         });
       }
       
+      toast.success(`User "${data.name || data.email}" created successfully`);
       closeModal();
       
     } catch (error) {
       console.error('Error adding user:', error);
-      alert(`Failed to add user: ${error.message}`);
+      toast.error(`Failed to add user: ${error.message}`);
+    } finally {
+      setProcessing(false);
     }
   };
   
@@ -590,17 +611,24 @@ const addUser = async (userData) => {
                   onClick={closeModal}
                   className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
                     text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                  disabled={processing}
                 >
                   Cancel
                 </button>
                 
                 <button
                   type='submit'
+                  disabled={processing}
                   className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                     text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                    focus:ring-offset-2 focus:ring-indigo-500'
+                    focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed'
                 >
-                  Add User
+                  {processing ? (
+                    <>
+                      <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                      Adding...
+                    </>
+                  ) : 'Add User'}
                 </button>
               </div>
             </form>
@@ -748,6 +776,7 @@ const addUser = async (userData) => {
                 <button
                   type='button'
                   onClick={closeModal}
+                  disabled={processing}
                   className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
                     text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
                 >
@@ -756,11 +785,17 @@ const addUser = async (userData) => {
                 
                 <button
                   type='submit'
+                  disabled={processing}
                   className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                     text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                    focus:ring-offset-2 focus:ring-indigo-500'
+                    focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed'
                 >
-                  Save Changes
+                  {processing ? (
+                    <>
+                      <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                      Saving...
+                    </>
+                  ) : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -832,6 +867,7 @@ const addUser = async (userData) => {
               <button
                 type='button'
                 onClick={closeModal}
+                disabled={processing}
                 className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
                   text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
               >
@@ -841,11 +877,17 @@ const addUser = async (userData) => {
               <button
                 type='button'
                 onClick={deleteUser}
+                disabled={processing}
                 className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                   text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2
-                  focus:ring-offset-2 focus:ring-red-500'
+                  focus:ring-offset-2 focus:ring-red-500 disabled:bg-red-400 disabled:cursor-not-allowed'
               >
-                Delete User
+                {processing ? (
+                  <>
+                    <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                    Deleting...
+                  </>
+                ) : 'Delete User'}
               </button>
             </div>
           </div>

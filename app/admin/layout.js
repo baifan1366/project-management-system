@@ -12,6 +12,7 @@ import { store } from '@/lib/redux/store';
 import { ThemeProvider } from 'next-themes';
 import { useDispatch } from 'react-redux';
 import { checkAdminSession, logoutAdmin, checkAdminPermissions } from '@/lib/redux/features/adminSlice';
+import { Toaster } from 'sonner';
 
 // Redux wrapper for accessing dispatch
 function AdminLayoutInner({ children }) {
@@ -145,19 +146,20 @@ function AdminLayoutInner({ children }) {
   }
   
   return (
-    <div className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50 dark:bg-gray-900 flex`}>
+    <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
       <AdminSidebar 
         activePage={getActivePage()} 
         adminData={adminData} 
         onLogout={handleLogout} 
       />
-      <div className="flex-1 overflow-auto">
+      <div className="ml-64 flex flex-col min-h-screen admin-content">
         <AdminHeader 
           title={getPageTitle()}
           adminData={adminData}
         />
-        {children}
+        <main className="flex-1 overflow-y-auto p-4">{children}</main>
       </div>
+      <Toaster position="top-right" richColors />
     </div>
   );
 }
