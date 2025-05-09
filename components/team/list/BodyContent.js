@@ -16,7 +16,8 @@ import {
   Sheet,
   FileCode,
   Calendar,
-  Fingerprint
+  Fingerprint,
+  X
 } from 'lucide-react';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
@@ -61,10 +62,14 @@ import {
   isTagsType,
   isTagsColumn,
   renderTagsCell,
-  parseTagsValue
+  parseTagsValue,
+  isTextType,
+  isTextColumn,
+  renderTextCell,
+  validateTextInput
 } from './TagConfig';
 
-export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading) {
+export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading, validationErrors) {
   const t = useTranslations('CreateTask');
   const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
@@ -677,7 +682,34 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                         tId = String(tagsData.tags[rIndex].id);
                                       }
                                       
-                                      allTagValues[tId] = task.tag_values?.[tId] || '';
+                                      const rawValue = task.tag_values?.[tId];
+                                      
+                                      // 根据不同类型处理值，确保初始值格式正确
+                                      let processedValue = rawValue;
+                                      
+                                      // 安全地获取tagObj
+                                      const tagObj = tagsData?.tags?.find(t => 
+                                        t.id.toString() === tId || 
+                                        t.name === tag
+                                      );
+                                      
+                                      // 对特定类型进行预处理
+                                      if (rawValue !== undefined && rawValue !== null) {
+                                        if (isSingleSelectColumn(tag) || (tagObj && isSingleSelectType(tagObj))) {
+                                          // 单选值可能需要JSON字符串格式
+                                          if (typeof rawValue === 'object') {
+                                            processedValue = JSON.stringify(rawValue);
+                                          }
+                                        } else if (isMultiSelectColumn(tag) || isTagsColumn(tag) || 
+                                                 (tagObj && (isMultiSelectType(tagObj) || isTagsType(tagObj)))) {
+                                          // 多选或标签值应该是JSON字符串格式
+                                          if (typeof rawValue === 'object') {
+                                            processedValue = JSON.stringify(rawValue);
+                                          }
+                                        }
+                                      }
+                                      
+                                      allTagValues[tId] = processedValue;
                                     });
                                     
                                     setEditingTaskValues(allTagValues);
@@ -685,214 +717,513 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                 }}
                               >
                                 {(isEditing || isCurrentTaskBeingAdded) ? (
-                                  <input
-                                    type="text"
-                                    ref={tagIndex === 0 ? taskInputRef : null}
-                                    value={currentValue}
-                                    onChange={(e) => {
-                                      const newValue = e.target.value;
-                                      handleTaskValueChange(task.id, tagId, newValue);
-                                    }}
-                                    onKeyDown={(e) => handleKeyDown(e, task.id, sectionId)}
-                                    autoFocus={tagIndex === 0}
-                                    className="w-full bg-transparent border-none focus:outline-none h-10"
-                                    placeholder={`${t('input')} ${tag}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    disabled={isTaskLoading}
-                                    spellCheck="false"
-                                    autoComplete="off"
-                                    autoCorrect="off"
-                                    autoCapitalize="off"
-                                  />
-                                ) : (
-                                  <div className="w-full overflow-hidden truncate">
-                                    {/* 检查是否为文件列 */}
-                                    {isFileColumn(tag) && currentValue ? (
-                                      renderFileCell(currentValue, (e) => {
-                                        e.stopPropagation();
-                                        // 如果需要，这里可以添加文件点击处理
-                                      })
-                                    ) : isPeopleColumn(tag) ? (
-                                      // 检查是否为人员列
-                                      <div onClick={(e) => e.stopPropagation()}>
-                                        {/* 如果值是字符串形式，直接传递；如果已经是数组形式，转换为字符串格式 */}
-                                        {typeof currentValue === 'string' 
-                                          ? renderPeopleCell(currentValue)
-                                          : Array.isArray(currentValue)
-                                            ? renderPeopleCell(currentValue) // 已修改parseUserIds支持数组
-                                            : renderPeopleCell('')
-                                        }
-                                      </div>
-                                    ) : isDateColumn(tag) ? (
-                                      // 检查是否为日期列
-                                      <div onClick={(e) => e.stopPropagation()}>
-                                        {renderDateCell(currentValue, (value) => handleTaskValueChange(task.id, tagId, value))}
-                                      </div>
-                                    ) : isIdColumn(tag) ? (
-                                      // 检查是否为ID列
-                                      <div onClick={(e) => e.stopPropagation()}>
-                                        {renderIdCell(currentValue)}
-                                      </div>
-                                    ) : isSingleSelectColumn(tag) ? (
-                                      // 检查是否为单选列
-                                      <div onClick={(e) => e.stopPropagation()}>
-                                        {renderSingleSelectCell(
-                                          currentValue, 
-                                          getTaskOptions(task.id, tagId), 
-                                          (option) => {
-                                            // 当选择改变时调用
-                                            const newValue = JSON.stringify(option);
-                                            handleTaskValueChange(task.id, tagId, newValue);
-                                          },
-                                          // 创建新选项回调
-                                          (newOption) => handleCreateOption(task.id, tagId, newOption),
-                                          // 编辑选项回调
-                                          (editedOption) => handleEditOption(task.id, tagId, editedOption),
-                                          // 删除选项回调
-                                          (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
-                                        )}
-                                      </div>
-                                    ) : isMultiSelectColumn(tag) ? (
-                                      // 检查是否为多选列
-                                      <div onClick={(e) => e.stopPropagation()}>
-                                        {renderMultiSelectCell(
-                                          currentValue,
-                                          getTaskOptions(task.id, tagId),
-                                          (options) => {
-                                            // 当选择改变时调用，options是选中的选项数组
-                                            const newValue = JSON.stringify(options);
-                                            handleTaskValueChange(task.id, tagId, newValue);
-                                          },
-                                          // 创建新选项回调
-                                          (newOption) => handleCreateOption(task.id, tagId, newOption),
-                                          // 编辑选项回调
-                                          (editedOption) => handleEditOption(task.id, tagId, editedOption),
-                                          // 删除选项回调
-                                          (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
-                                        )}
-                                      </div>
-                                    ) : isTagsColumn(tag) ? (
-                                      // 检查是否为标签列 - 与多选有不同的UI和交互
-                                      <div onClick={(e) => e.stopPropagation()}>
-                                        {renderTagsCell(
-                                          currentValue,
-                                          getTaskOptions(task.id, tagId), // 作为推荐标签使用
-                                          (tags) => {
-                                            // 当标签修改时调用，tags是标签对象数组
-                                            const newValue = JSON.stringify(tags);
-                                            handleTaskValueChange(task.id, tagId, newValue);
-                                          }
-                                        )}
-                                      </div>
-                                    ) : (() => {
-                                      // 尝试从tagsData中获取标签对象
+                                  <div className="w-full">
+                                    {/* 首先获取tagObj以确保它存在 */}
+                                    {(() => {
+                                      // 在这里安全地获取tagObj
                                       const tagObj = tagsData?.tags?.find(t => 
                                         t.id.toString() === tagId || 
                                         t.name === tag
                                       );
                                       
-                                      // 检查是否为数字类型
-                                      if ((tagObj && isNumberType(tagObj)) || isNumberColumn(tag)) {
-                                        return (
-                                          <div onClick={(e) => e.stopPropagation()}>
-                                            {renderNumberCell(
-                                              currentValue,
-                                              (value) => handleTaskValueChange(task.id, tagId, value + 1),
-                                              (value) => handleTaskValueChange(task.id, tagId, value - 1),
-                                              (value) => handleTaskValueChange(task.id, tagId, value)
-                                            )}
-                                          </div>
+                                      // 检查不同类型并渲染相应编辑组件
+                                      if (isFileColumn(tag)) {
+                                        return renderFileCell(currentValue, (e) => {
+                                          e.stopPropagation();
+                                        });
+                                      } else if (isPeopleColumn(tag)) {
+                                        return renderPeopleCell(currentValue);
+                                      } else if (isDateColumn(tag) || (tagObj && isDateType(tagObj))) {
+                                        return renderDateCell(currentValue, (value) => {
+                                          // 直接更新日期值
+                                          handleTaskValueChange(task.id, tagId, value);
+                                        });
+                                      } else if (isIdColumn(tag) || (tagObj && isIdType(tagObj))) {
+                                        return renderIdCell(currentValue);
+                                      } else if (isSingleSelectColumn(tag) || (tagObj && isSingleSelectType(tagObj))) {
+                                        return renderSingleSelectCell(
+                                          currentValue, 
+                                          getTaskOptions(task.id, tagId), 
+                                          (option) => {
+                                            const newValue = JSON.stringify(option);
+                                            handleTaskValueChange(task.id, tagId, newValue);
+                                          },
+                                          (newOption) => handleCreateOption(task.id, tagId, newOption),
+                                          (editedOption) => handleEditOption(task.id, tagId, editedOption),
+                                          (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
+                                        );
+                                      } else if (isMultiSelectColumn(tag) || (tagObj && isMultiSelectType(tagObj))) {
+                                        return renderMultiSelectCell(
+                                          currentValue,
+                                          getTaskOptions(task.id, tagId),
+                                          (options) => {
+                                            const newValue = JSON.stringify(options);
+                                            handleTaskValueChange(task.id, tagId, newValue);
+                                          },
+                                          (newOption) => handleCreateOption(task.id, tagId, newOption),
+                                          (editedOption) => handleEditOption(task.id, tagId, editedOption),
+                                          (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
+                                        );
+                                      } else if (isTagsColumn(tag) || (tagObj && isTagsType(tagObj))) {
+                                        return renderTagsCell(
+                                          currentValue,
+                                          getTaskOptions(task.id, tagId),
+                                          (tags) => {
+                                            const newValue = JSON.stringify(tags);
+                                            handleTaskValueChange(task.id, tagId, newValue);
+                                          }
+                                        );
+                                      } else if (isNumberColumn(tag) || (tagObj && isNumberType(tagObj))) {
+                                        return renderNumberCell(
+                                          currentValue,
+                                          // 增加数值
+                                          (value) => {
+                                            handleTaskValueChange(task.id, tagId, value + 1);
+                                          },
+                                          // 减少数值
+                                          (value) => {
+                                            handleTaskValueChange(task.id, tagId, value - 1);
+                                          },
+                                          // 直接设置数值
+                                          (value) => {
+                                            handleTaskValueChange(task.id, tagId, value);
+                                          }
+                                        );
+                                      } else {
+                                        // 默认作为文本类型处理 - TEXT类型或未识别类型
+                                        return renderTextCell(
+                                          currentValue,
+                                          (value) => {
+                                            // 更新文本值
+                                            handleTaskValueChange(task.id, tagId, value);
+                                          },
+                                          { 
+                                            placeholder: `${t('input')} ${tag}`,
+                                            // Name字段默认为必填
+                                            required: tag === 'Name' || (tagObj && tagObj.name === 'Name'),
+                                            // 添加按键事件处理
+                                            onKeyDown: (e) => {
+                                              if (e.key === 'Enter' && !e.shiftKey) {
+                                                // 当按下Enter且不按住Shift时提交
+                                                e.preventDefault(); // 防止换行
+                                                // 在表单的最后一个字段时提交整个表单
+                                                if (tagIndex === sortedTagInfo.length - 1) {
+                                                  handleTaskEditComplete(task.id, sectionId);
+                                                } else {
+                                                  // 在其他字段时，焦点移到下一个字段
+                                                  const nextField = document.querySelector(`[data-rfd-draggable-id="task-${task.id}"] input:nth-child(${tagIndex + 2})`);
+                                                  if (nextField) {
+                                                    nextField.focus();
+                                                  }
+                                                }
+                                              } else if (e.key === 'Escape') {
+                                                // 按ESC键取消编辑
+                                                handleKeyDown(e, task.id, sectionId);
+                                              }
+                                            }
+                                          }
                                         );
                                       }
+                                    })()}
+                                    
+                                    {validationErrors && validationErrors[tagId] && (
+                                      <div className="text-red-500 text-xs">
+                                        {validationErrors[tagId]}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="w-full overflow-hidden truncate">
+                                    {/* 非编辑状态下，使用相同的类型检查逻辑渲染只读组件 */}
+                                    {(() => {
+                                      // 安全地获取tagObj
+                                      const tagObj = tagsData?.tags?.find(t => 
+                                        t.id.toString() === tagId || 
+                                        t.name === tag
+                                      );
                                       
-                                      // 检查是否为单选类型，如果基于标签对象判断
-                                      if (tagObj && isSingleSelectType(tagObj)) {
+                                      // 检查不同类型并渲染相应查看组件
+                                      if (isFileColumn(tag) && currentValue) {
+                                        return renderFileCell(currentValue, (e) => {
+                                          e.stopPropagation();
+                                        });
+                                      } else if (isPeopleColumn(tag)) {
+                                        return (
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            {typeof currentValue === 'string' 
+                                              ? renderPeopleCell(currentValue)
+                                              : Array.isArray(currentValue)
+                                                ? renderPeopleCell(currentValue)
+                                                : renderPeopleCell('')
+                                            }
+                                          </div>
+                                        );
+                                      } else if (isDateColumn(tag) || (tagObj && isDateType(tagObj))) {
+                                        return (
+                                          <div onClick={(e) => {
+                                            e.stopPropagation();
+                                            // 单击日期时启用编辑模式
+                                            if (!isEditing && !isTaskLoading) {
+                                              setEditingTask(task.id);
+                                              
+                                              // 初始化整行的所有标签值
+                                              const allTagValues = {};
+                                              sortedTagInfo.forEach((tag, idx) => {
+                                                const rIndex = tagOrder[idx];
+                                                let tId = String(rIndex + 1);
+                                                
+                                                if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                  tId = String(tagsData.tags[rIndex].id);
+                                                }
+                                                
+                                                allTagValues[tId] = task.tag_values?.[tId] || '';
+                                              });
+                                              
+                                              setEditingTaskValues(allTagValues);
+                                            }
+                                          }}>
+                                            {renderDateCell(currentValue, (value) => {
+                                              // 直接激活编辑模式并设置日期值
+                                              if (!isEditing) {
+                                                setEditingTask(task.id);
+                                                
+                                                // 初始化所有字段值
+                                                const allTagValues = {};
+                                                sortedTagInfo.forEach((tag, idx) => {
+                                                  const rIndex = tagOrder[idx];
+                                                  let tId = String(rIndex + 1);
+                                                  
+                                                  if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                    tId = String(tagsData.tags[rIndex].id);
+                                                  }
+                                                  
+                                                  allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                });
+                                                
+                                                // 更新当前日期字段值
+                                                allTagValues[tagId] = value;
+                                                
+                                                setEditingTaskValues(allTagValues);
+                                                
+                                                // 直接提交更改
+                                                setTimeout(() => {
+                                                  handleTaskEditComplete(task.id, sectionId);
+                                                }, 0);
+                                              } else {
+                                                // 如果已经在编辑模式，直接更新值
+                                                handleTaskValueChange(task.id, tagId, value);
+                                                
+                                                // 自动保存更改
+                                                setTimeout(() => {
+                                                  handleTaskEditComplete(task.id, sectionId);
+                                                }, 0);
+                                              }
+                                            })}
+                                          </div>
+                                        );
+                                      } else if (isIdColumn(tag) || (tagObj && isIdType(tagObj))) {
+                                        return (
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            {renderIdCell(currentValue)}
+                                          </div>
+                                        );
+                                      } else if (isSingleSelectColumn(tag) || (tagObj && isSingleSelectType(tagObj))) {
                                         return (
                                           <div onClick={(e) => e.stopPropagation()}>
                                             {renderSingleSelectCell(
                                               currentValue, 
-                                              getTaskOptions(task.id, tagId),
+                                              getTaskOptions(task.id, tagId), 
                                               (option) => {
-                                                // 当选择改变时调用
-                                                const newValue = JSON.stringify(option);
-                                                handleTaskValueChange(task.id, tagId, newValue);
+                                                // 激活编辑模式并设置新值
+                                                if (!isEditing) {
+                                                  setEditingTask(task.id);
+                                                  
+                                                  // 初始化所有字段值
+                                                  const allTagValues = {};
+                                                  sortedTagInfo.forEach((tag, idx) => {
+                                                    const rIndex = tagOrder[idx];
+                                                    let tId = String(rIndex + 1);
+                                                    
+                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                      tId = String(tagsData.tags[rIndex].id);
+                                                    }
+                                                    
+                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                  });
+                                                  
+                                                  // 更新当前字段值
+                                                  allTagValues[tagId] = JSON.stringify(option);
+                                                  
+                                                  setEditingTaskValues(allTagValues);
+                                                  
+                                                  // 直接提交更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                } else {
+                                                  const newValue = JSON.stringify(option);
+                                                  handleTaskValueChange(task.id, tagId, newValue);
+                                                }
                                               },
-                                              // 创建新选项回调
                                               (newOption) => handleCreateOption(task.id, tagId, newOption),
-                                              // 编辑选项回调
                                               (editedOption) => handleEditOption(task.id, tagId, editedOption),
-                                              // 删除选项回调
                                               (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
                                             )}
                                           </div>
                                         );
-                                      }
-                                      
-                                      // 检查是否为多选类型，如果基于标签对象判断
-                                      if (tagObj && isMultiSelectType(tagObj)) {
+                                      } else if (isMultiSelectColumn(tag) || (tagObj && isMultiSelectType(tagObj))) {
                                         return (
                                           <div onClick={(e) => e.stopPropagation()}>
                                             {renderMultiSelectCell(
                                               currentValue,
                                               getTaskOptions(task.id, tagId),
                                               (options) => {
-                                                // 当选择改变时调用，options是选中的选项数组
-                                                const newValue = JSON.stringify(options);
-                                                handleTaskValueChange(task.id, tagId, newValue);
+                                                // 激活编辑模式并设置新值
+                                                if (!isEditing) {
+                                                  setEditingTask(task.id);
+                                                  
+                                                  // 初始化所有字段值
+                                                  const allTagValues = {};
+                                                  sortedTagInfo.forEach((tag, idx) => {
+                                                    const rIndex = tagOrder[idx];
+                                                    let tId = String(rIndex + 1);
+                                                    
+                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                      tId = String(tagsData.tags[rIndex].id);
+                                                    }
+                                                    
+                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                  });
+                                                  
+                                                  // 更新当前字段值
+                                                  allTagValues[tagId] = JSON.stringify(options);
+                                                  
+                                                  setEditingTaskValues(allTagValues);
+                                                  
+                                                  // 直接提交更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                } else {
+                                                  const newValue = JSON.stringify(options);
+                                                  handleTaskValueChange(task.id, tagId, newValue);
+                                                }
                                               },
-                                              // 创建新选项回调
                                               (newOption) => handleCreateOption(task.id, tagId, newOption),
-                                              // 编辑选项回调
                                               (editedOption) => handleEditOption(task.id, tagId, editedOption),
-                                              // 删除选项回调
                                               (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
                                             )}
                                           </div>
                                         );
-                                      }
-                                      
-                                      // 检查是否为标签类型，如果基于标签对象判断
-                                      if (tagObj && isTagsType(tagObj)) {
+                                      } else if (isTagsColumn(tag) || (tagObj && isTagsType(tagObj))) {
                                         return (
                                           <div onClick={(e) => e.stopPropagation()}>
                                             {renderTagsCell(
                                               currentValue,
-                                              getTaskOptions(task.id, tagId), // 作为推荐标签使用
+                                              getTaskOptions(task.id, tagId),
                                               (tags) => {
-                                                // 当标签修改时调用，tags是标签对象数组
-                                                const newValue = JSON.stringify(tags);
-                                                handleTaskValueChange(task.id, tagId, newValue);
+                                                // 激活编辑模式并设置新值
+                                                if (!isEditing) {
+                                                  setEditingTask(task.id);
+                                                  
+                                                  // 初始化所有字段值
+                                                  const allTagValues = {};
+                                                  sortedTagInfo.forEach((tag, idx) => {
+                                                    const rIndex = tagOrder[idx];
+                                                    let tId = String(rIndex + 1);
+                                                    
+                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                      tId = String(tagsData.tags[rIndex].id);
+                                                    }
+                                                    
+                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                  });
+                                                  
+                                                  // 更新当前字段值
+                                                  allTagValues[tagId] = JSON.stringify(tags);
+                                                  
+                                                  setEditingTaskValues(allTagValues);
+                                                  
+                                                  // 直接提交更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                } else {
+                                                  const newValue = JSON.stringify(tags);
+                                                  handleTaskValueChange(task.id, tagId, newValue);
+                                                }
                                               }
                                             )}
                                           </div>
                                         );
-                                      }
-                                      
-                                      // 检查是否为日期类型，如果基于标签对象判断
-                                      if (tagObj && isDateType(tagObj)) {
+                                      } else if (isNumberColumn(tag) || (tagObj && isNumberType(tagObj))) {
                                         return (
                                           <div onClick={(e) => e.stopPropagation()}>
-                                            {renderDateCell(currentValue, (value) => handleTaskValueChange(task.id, tagId, value))}
+                                            {renderNumberCell(
+                                              currentValue,
+                                              // 增加数值
+                                              (value) => {
+                                                // 激活编辑模式并增加数值
+                                                if (!isEditing) {
+                                                  setEditingTask(task.id);
+                                                  
+                                                  // 初始化所有字段值
+                                                  const allTagValues = {};
+                                                  sortedTagInfo.forEach((tag, idx) => {
+                                                    const rIndex = tagOrder[idx];
+                                                    let tId = String(rIndex + 1);
+                                                    
+                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                      tId = String(tagsData.tags[rIndex].id);
+                                                    }
+                                                    
+                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                  });
+                                                  
+                                                  // 更新当前数字字段值
+                                                  allTagValues[tagId] = value + 1;
+                                                  
+                                                  setEditingTaskValues(allTagValues);
+                                                  
+                                                  // 直接提交更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                } else {
+                                                  handleTaskValueChange(task.id, tagId, value + 1);
+                                                  
+                                                  // 自动保存更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                }
+                                              },
+                                              // 减少数值
+                                              (value) => {
+                                                // 激活编辑模式并减少数值
+                                                if (!isEditing) {
+                                                  setEditingTask(task.id);
+                                                  
+                                                  // 初始化所有字段值
+                                                  const allTagValues = {};
+                                                  sortedTagInfo.forEach((tag, idx) => {
+                                                    const rIndex = tagOrder[idx];
+                                                    let tId = String(rIndex + 1);
+                                                    
+                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                      tId = String(tagsData.tags[rIndex].id);
+                                                    }
+                                                    
+                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                  });
+                                                  
+                                                  // 更新当前数字字段值
+                                                  allTagValues[tagId] = value - 1;
+                                                  
+                                                  setEditingTaskValues(allTagValues);
+                                                  
+                                                  // 直接提交更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                } else {
+                                                  handleTaskValueChange(task.id, tagId, value - 1);
+                                                  
+                                                  // 自动保存更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                }
+                                              },
+                                              // 直接设置数值
+                                              (value) => {
+                                                // 激活编辑模式并设置数值
+                                                if (!isEditing) {
+                                                  setEditingTask(task.id);
+                                                  
+                                                  // 初始化所有字段值
+                                                  const allTagValues = {};
+                                                  sortedTagInfo.forEach((tag, idx) => {
+                                                    const rIndex = tagOrder[idx];
+                                                    let tId = String(rIndex + 1);
+                                                    
+                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                      tId = String(tagsData.tags[rIndex].id);
+                                                    }
+                                                    
+                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                  });
+                                                  
+                                                  // 更新当前数字字段值
+                                                  allTagValues[tagId] = value;
+                                                  
+                                                  setEditingTaskValues(allTagValues);
+                                                  
+                                                  // 直接提交更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                } else {
+                                                  handleTaskValueChange(task.id, tagId, value);
+                                                }
+                                              }
+                                            )}
                                           </div>
                                         );
+                                      } else {
+                                        // 默认作为文本类型处理 - TEXT类型或未识别类型
+                                        return currentValue;
                                       }
-                                      
-                                      // 检查是否为ID类型，如果基于标签对象判断
-                                      if (tagObj && isIdType(tagObj)) {
-                                        return (
-                                          <div onClick={(e) => e.stopPropagation()}>
-                                            {renderIdCell(currentValue)}
-                                          </div>
-                                        );
-                                      }
-                                      
-                                      return currentValue;
                                     })()}
                                   </div>
                                 )}
                               </div>
                             );
                           })}
+                          
+                          {/* 添加操作按钮 - 只在编辑状态显示 */}
+                          {(isEditing || isCurrentTaskBeingAdded) && (
+                            <div className="flex items-center px-2 gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => {
+                                  // 取消编辑
+                                  if (isCurrentTaskBeingAdded) {
+                                    // 如果是新任务，从列表中移除
+                                    setLocalTasks(prevTasks => ({
+                                      ...prevTasks,
+                                      [sectionId]: prevTasks[sectionId].filter(t => t.id !== task.id)
+                                    }));
+                                  }
+                                  // 清除编辑状态
+                                  setEditingTask(null);
+                                  setEditingTaskValues({});
+                                  setIsAddingTask(false);
+                                }}
+                                title={t('cancel')}
+                              >
+                                <X size={16} />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                                onClick={() => handleTaskEditComplete(task.id, sectionId)}
+                                disabled={isTaskLoading}
+                                title={t('save')}
+                              >
+                                {isTaskLoading ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                  </svg>
+                                )}
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1073,7 +1404,8 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
 //     handleKeyDown,
 //     editingTask,
 //     editingTaskValues,
-//     isLoading
+//     isLoading,
+//     validationErrors
 //   );
 //   
 //   // 在组件加载时加载数据

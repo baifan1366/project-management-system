@@ -63,7 +63,8 @@ function TaskListContent() {
     handleTaskEditComplete,
     handleKeyDown,
     handleClickOutside,
-    setEditingTask
+    setEditingTask,
+    validationErrors
   } = HandleTask({ 
     teamId, 
     localTasks, 
@@ -83,7 +84,8 @@ function TaskListContent() {
     handleKeyDown,
     editingTask,
     editingTaskValues,
-    isTaskLoading
+    isTaskLoading,
+    validationErrors
   );
   
   // 拖拽相关功能
@@ -193,7 +195,7 @@ function TaskListContent() {
           <TableBody>
             <TableRow>
               <TableCell colSpan={totalColumns+1} className="p-0">
-                {renderBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, editingTask, editingTaskValues)}
+                {renderBodyContent()}
               </TableCell>
             </TableRow>
             <TableRow>
