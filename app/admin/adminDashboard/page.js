@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell } from 'react-icons/fa';
 import { useDispatch, useSelector } from 'react-redux';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -144,10 +145,48 @@ export default function AdminDashboard() {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Skeleton cards for stats */}
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+                <Skeleton className="h-12 w-12 rounded-full" />
+              </div>
+              <div className="mt-4">
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Skeleton for recent activity */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
+          <Skeleton className="h-6 w-48 mb-6" />
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-32 ml-auto" />
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Skeleton for quick actions */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <Skeleton className="h-6 w-32 mb-6" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-12" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -163,7 +202,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {hasPermission('view_users') && (
             <Link href={`/admin/userManagement`}>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
@@ -184,7 +223,7 @@ export default function AdminDashboard() {
             
             {hasPermission('view_subscription_plans') && (
             <Link href={`/admin/subscriptionManagement`}>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Subscriptions</p>
@@ -205,7 +244,7 @@ export default function AdminDashboard() {
 
             {hasPermission('view_support_tickets') && (
             <Link href={`/admin/supportManagement`}>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Support</p>
@@ -226,7 +265,7 @@ export default function AdminDashboard() {
 
             {hasPermission('view_analytics') && (
             <Link href={`/admin/analytics`}>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revenue (This Month)</p>

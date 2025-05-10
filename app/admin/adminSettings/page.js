@@ -48,10 +48,51 @@ export default function AdminSettings() {
 
     if (loading) {
       return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading user data...</p>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+          {/* Main Content */}
+          <div className="flex-1 overflow-auto p-6">
+            {/* Skeleton Tabs */}
+            <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+              <ul className="flex flex-wrap -mb-px">
+                {['Website Settings', 'Language & Region', 'Theme & Appearance', 'Landing Page Media'].map((tab, index) => (
+                  <li key={index} className="mr-2">
+                    <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                      <div className="flex items-center">
+                        <div className="h-4 w-4 mr-2 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        {tab}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Card Skeleton */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+              {/* Card Header Skeleton */}
+              <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                <div className="h-4 w-96 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+              
+              {/* Card Content Skeleton */}
+              <div className="p-4 md:p-6">
+                <div className="space-y-6">
+                  {/* Form Field Skeletons */}
+                  {[1, 2, 3, 4].map((field) => (
+                    <div key={field} className="space-y-2">
+                      <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                  
+                  {/* Button Skeleton */}
+                  <div className="flex justify-end mt-6">
+                    <div className="h-10 w-32 bg-indigo-500 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       );

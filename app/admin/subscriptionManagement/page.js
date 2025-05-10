@@ -605,10 +605,105 @@ export default function AdminSubscriptions() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading subscription management...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {/* Skeleton Tabs */}
+          <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+            <ul className="flex flex-wrap -mb-px">
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  Subscription Plans
+                </div>
+              </li>
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  Promo Codes
+                </div>
+              </li>
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  User Subscriptions
+                </div>
+              </li>
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  Payment History
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          {/* Subscription Plans Skeleton */}
+          <div>
+            <div className="mb-6 flex justify-between items-center">
+              <div className="h-7 w-56 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-8">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((item) => (
+                        <th key={item} scope="col" className="px-6 py-3 text-left">
+                          <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {[1, 2, 3, 4, 5].map((row) => (
+                      <tr key={row}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                          <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((feat) => (
+                              <div key={feat} className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((limit) => (
+                              <div key={limit} className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex justify-end space-x-3">
+                            {[1, 2].map((action) => (
+                              <div key={action} className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          
         </div>
       </div>
     );
