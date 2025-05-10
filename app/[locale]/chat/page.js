@@ -33,6 +33,7 @@ import useGetUser from '@/lib/hooks/useGetUser';
 import MentionSelector from '@/components/chat/MentionSelector';
 import MentionItem from '@/components/chat/MentionItem';
 import { debounce } from 'lodash';
+import { useSearchParams } from 'next/navigation';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -436,7 +437,9 @@ export default function ChatPage() {
     fetchChatSessions,
     loading: messagesLoading,
     fetchMessages,
-    deleteMessage
+    deleteMessage,
+    setCurrentSession,
+    sessions
   } = useChat();
   
   // Use enhanced UserStatusContext
@@ -874,6 +877,26 @@ export default function ChatPage() {
     });
   }, [messages, currentUser, formatMessage, handleReplyMessage, handleDeleteMessage, 
       handleTranslateMessage, translatorRefs, translatedMessages, hourFormat, adjustTimeByOffset, t]);
+
+  // Add useSearchParams and useEffect to check for session parameter in URL
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get('session');
+  
+  useEffect(() => {
+    if (sessionId && !currentSession && sessions.length > 0 && !messagesLoading) {
+      // Find the session in our loaded sessions
+      const sessionToOpen = sessions.find(s => s.id === sessionId);
+      if (sessionToOpen) {
+        // Set the current session
+        setCurrentSession(sessionToOpen);
+        
+        // Scroll to bottom once messages are loaded
+        setTimeout(() => {
+          scrollToBottom();
+        }, 500);
+      }
+    }
+  }, [sessions, currentSession, messagesLoading, setCurrentSession, scrollToBottom]);
 
   if (!currentSession && chatMode === 'normal') {
     return (

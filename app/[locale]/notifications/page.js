@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,24 +44,59 @@ export default function NotificationsPage() {
   const isSubscribed = useSelector(selectIsSubscribed);
   const [activeTab, setActiveTab] = useState('all');
   const [filterType, setFilterType] = useState('all');
-  const { user , error} = useGetUser();
+  const { user, error } = useGetUser();
+  const pageSubscriptionCreatedRef = useRef(false);
+  const hasInitiatedFetchRef = useRef(false);
 
+  // useEffect(() => {
+  //   if(!user) return;
+    
+  //   // On mount, first check if already subscribed (likely by Header)
+  //   if (isSubscribed) {
+  //     console.log('NotificationsPage: Found existing subscription, refreshing data');
+      
+  //     // Only fetch if we don't already have notifications data
+  //     if (notifications.length === 0 && !loading && !hasInitiatedFetchRef.current) {
+  //       console.log('NotificationsPage: Initial fetch for subscribed state');
+  //       dispatch(fetchNotifications(user.id));
+  //       hasInitiatedFetchRef.current = true;
+  //     }
+  //     return;
+  //   }
+    
+  //   // Otherwise start own subscription (the Header component might have created one previously)
+  //   console.log('NotificationsPage: Starting realtime subscription');
+  //   dispatch(subscribeToNotifications(user.id));
+    
+  //   // Also perform initial fetch when starting our own subscription
+  //   if (!hasInitiatedFetchRef.current) {
+  //     console.log('NotificationsPage: Initial fetch with new subscription');
+  //     dispatch(fetchNotifications(user.id));
+  //     hasInitiatedFetchRef.current = true;
+  //   }
+    
+  //   pageSubscriptionCreatedRef.current = true;
+
+  //   // Cleanup subscription on unmount, but only if this page created it
+  //   return () => {
+  //     if (pageSubscriptionCreatedRef.current) {
+  //       console.log('NotificationsPage: Cleaning up subscription created by this page');
+  //       dispatch(unsubscribeFromNotifications());
+  //       pageSubscriptionCreatedRef.current = false;
+  //     } else {
+  //       console.log('NotificationsPage: Unmounted, but not cleaning up subscription created elsewhere');
+  //     }
+  //   };
+  // }, [dispatch, user, isSubscribed, notifications.length, loading]);
+
+  // Reset fetch flag on component mount
   useEffect(() => {
-    if(!user) return;
-    
-    // Fetch initial notifications
-    dispatch(fetchNotifications(user.id));
-    
-    // Subscribe to realtime notifications
-    console.log('Starting realtime subscription for notifications');
-    dispatch(subscribeToNotifications(user.id));
-
-    // Cleanup subscription on unmount
+    hasInitiatedFetchRef.current = false;
     return () => {
-      console.log('Notification page unmounted, cleaning up subscription');
-      dispatch(unsubscribeFromNotifications());
+      // Ensure flag is reset when component unmounts
+      hasInitiatedFetchRef.current = false;
     };
-  }, [dispatch, user]);
+  }, []);
 
   const handleMarkAllAsRead = () => {
     if (user) {

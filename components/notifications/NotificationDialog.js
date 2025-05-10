@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslations } from 'next-intl';
 import { 
@@ -32,7 +32,7 @@ import { Check, Trash, Bell, BellOff, Calendar, User, MessageSquare, Video } fro
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import NotificationItem from '@/components/notifications/NotificationItem';
 
-export function NotificationDialog({ open, onOpenChange }) {
+export function NotificationDialog({ open, onOpenChange, headerHandlesSubscription = false }) {
   const t = useTranslations();
   const dispatch = useDispatch();
   const notifications = useSelector(selectNotifications);
@@ -42,25 +42,42 @@ export function NotificationDialog({ open, onOpenChange }) {
   const [activeTab, setActiveTab] = useState('all');
   const { user } = useGetUser();
   const [locale, setLocale] = useState('en');
+  const dialogSubscriptionCreatedRef = useRef(false);
 
   useEffect(() => {
-    if (open) {
-      // Only fetch and subscribe when dialog opens
-      if(!user) return;
-      
-      // Fetch initial notifications
+    // Only take action when dialog opens and we have a user
+    if (!open || !user) return;
+    
+    // If Header handles subscriptions, we only refresh data but don't manage subscriptions
+    if (headerHandlesSubscription) {
+      // Only refresh data, don't handle subscriptions
+      console.log('NotificationDialog: Header handles subscriptions, only refreshing data');
       dispatch(fetchNotifications(user.id));
-      
-      // Subscribe to realtime updates
-      console.log('NotificationDialog: Starting realtime subscription');
-      dispatch(subscribeToNotifications(user.id));
-    } else if (!open && isSubscribed) {
-      // Unsubscribe when dialog closes but keep notification data
-      // so the notification badge still shows correct unread count
-      console.log('NotificationDialog: Cleaning up subscription');
-      dispatch(unsubscribeFromNotifications());
+      return;
     }
-  }, [dispatch, open, user]);
+    
+    // If we get here, the dialog is managing its own subscriptions
+    
+    // Don't re-subscribe if already subscribed
+    if (!isSubscribed) {
+      console.log('NotificationDialog: Starting realtime subscription (dialog-managed)');
+      dispatch(subscribeToNotifications(user.id));
+      dialogSubscriptionCreatedRef.current = true;
+    } else {
+      // Just refresh the data if already subscribed
+      console.log('NotificationDialog: Already subscribed, refreshing data');
+      dispatch(fetchNotifications(user.id));
+    }
+    
+    // Clean up when dialog closes, but only if we created the subscription
+    return () => {
+      if (!headerHandlesSubscription && dialogSubscriptionCreatedRef.current && isSubscribed) {
+        console.log('NotificationDialog: Cleaning up dialog-managed subscription');
+        dispatch(unsubscribeFromNotifications());
+        dialogSubscriptionCreatedRef.current = false;
+      }
+    };
+  }, [dispatch, open, user, headerHandlesSubscription, isSubscribed, dialogSubscriptionCreatedRef]);
 
   const handleMarkAsRead = (notificationId) => {
     if (user) {
