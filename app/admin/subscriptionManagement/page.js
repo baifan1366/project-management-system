@@ -58,6 +58,8 @@ export default function AdminSubscriptions() {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('ALL');
   const [planTypeFilter, setPlanTypeFilter] = useState('all');
+  const [isUserSubscriptionDetailsModalOpen, setIsUserSubscriptionDetailsModalOpen] = useState(false);
+  const [selectedSubscriptionDetails, setSelectedSubscriptionDetails] = useState(null);
   
   // initialize the page
   useEffect(() => {
@@ -589,6 +591,18 @@ export default function AdminSubscriptions() {
     }
   }, [activeTab, userSearchQuery, subscriptionStatusFilter, planTypeFilter]);
 
+  // Open subscription details modal function (add after parseFeatures function)
+  const openSubscriptionDetailsModal = (subscription) => {
+    setSelectedSubscriptionDetails(subscription);
+    setIsUserSubscriptionDetailsModalOpen(true);
+  };
+
+  // Close subscription details modal
+  const closeSubscriptionDetailsModal = () => {
+    setIsUserSubscriptionDetailsModalOpen(false);
+    setSelectedSubscriptionDetails(null);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -993,7 +1007,11 @@ export default function AdminSubscriptions() {
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {userSubscriptions.map((subscription) => {
                           return (
-                            <tr key={subscription.id} className={subscription.status.toUpperCase() !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
+                            <tr 
+                              key={subscription.id} 
+                              className={`${subscription.status.toUpperCase() !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''} cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700`}
+                              onClick={() => openSubscriptionDetailsModal(subscription)}
+                            >
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
                                   <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
@@ -2477,6 +2495,349 @@ export default function AdminSubscriptions() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Subscription Details Modal */}
+      {isUserSubscriptionDetailsModalOpen && selectedSubscriptionDetails && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+                Subscription Details
+              </h2>
+              <button
+                onClick={closeSubscriptionDetailsModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* User Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">User Information</h3>
+                <div className="flex items-center space-x-4 mb-3">
+                  <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-xl">
+                    {(selectedSubscriptionDetails.user?.name?.charAt(0) || selectedSubscriptionDetails.user?.email?.charAt(0) || '?').toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-800 dark:text-white">
+                      {selectedSubscriptionDetails.user?.name || 'Unknown User'}
+                    </h4>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {selectedSubscriptionDetails.user?.email || 'No email available'}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">User ID</p>
+                    <p className="text-gray-700 dark:text-gray-300">{selectedSubscriptionDetails.user_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Joined</p>
+                    <p className="text-gray-700 dark:text-gray-300">{formatDate(selectedSubscriptionDetails.user?.created_at || new Date())}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Subscription Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Subscription Information</h3>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Plan</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${selectedSubscriptionDetails.plan?.type === 'FREE' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : 
+                          selectedSubscriptionDetails.plan?.type === 'PRO' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
+                          'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}
+                      >
+                        {selectedSubscriptionDetails.plan?.name || selectedSubscriptionDetails.plan?.type || 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${selectedSubscriptionDetails.status.toUpperCase() === 'ACTIVE' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
+                          : selectedSubscriptionDetails.status.toUpperCase() === 'CANCELED'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                        }`}
+                      >
+                        {selectedSubscriptionDetails.status.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Start Date</p>
+                    <p className="text-gray-700 dark:text-gray-300">{formatDate(selectedSubscriptionDetails.start_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">End Date</p>
+                    <p className="text-gray-700 dark:text-gray-300">{formatDate(selectedSubscriptionDetails.end_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Price</p>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      {formatCurrency(selectedSubscriptionDetails.plan?.price || 0)}
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                        /{selectedSubscriptionDetails.plan?.billing_interval?.toLowerCase() || 'month'}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Subscription ID</p>
+                    <p className="text-gray-700 dark:text-gray-300 text-xs truncate">{selectedSubscriptionDetails.id}</p>
+                  </div>
+                </div>
+                <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Timeline</p>
+                  <div className="space-y-2">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 h-4 w-4 rounded-full bg-green-400 mt-1"></div>
+                      <div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">Subscription created</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(selectedSubscriptionDetails.created_at)}</p>
+                      </div>
+                    </div>
+                    {selectedSubscriptionDetails.updated_at !== selectedSubscriptionDetails.created_at && (
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 h-4 w-4 rounded-full bg-blue-400 mt-1"></div>
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">Last updated</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(selectedSubscriptionDetails.updated_at)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedSubscriptionDetails.status.toUpperCase() === 'CANCELED' && (
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 h-4 w-4 rounded-full bg-red-400 mt-1"></div>
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">Subscription canceled</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(selectedSubscriptionDetails.updated_at)}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Usage Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Usage & Limits</h3>
+                <div className="space-y-4">
+                  {/* Projects Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_projects} / {selectedSubscriptionDetails.plan?.max_projects === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_projects}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_projects !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.8 
+                              ? 'bg-red-500' 
+                              : selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, (selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Members Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Team Members</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_members} / {selectedSubscriptionDetails.plan?.max_members === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_members}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_members !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.8 
+                              ? 'bg-red-500' 
+                              : selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, (selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* AI Chat Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Chat</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_ai_chat || 0} / {selectedSubscriptionDetails.plan?.max_ai_chat === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_chat}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_ai_chat !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.8 
+                              ? 'bg-red-500' 
+                              : (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* AI Task Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Tasks</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_ai_task || 0} / {selectedSubscriptionDetails.plan?.max_ai_task === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_task}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_ai_task !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.8 
+                              ? 'bg-red-500' 
+                              : (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* AI Workflow Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Workflows</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_ai_workflow || 0} / {selectedSubscriptionDetails.plan?.max_ai_workflow === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_workflow}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_ai_workflow !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.8 
+                              ? 'bg-red-500' 
+                              : (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-between">
+              <div>
+                {selectedSubscriptionDetails.status.toUpperCase() === 'ACTIVE' ? (
+                  <button 
+                    onClick={() => {
+                      if(confirm('Are you sure you want to cancel this subscription?')) {
+                        // Update subscription status to CANCELED
+                        supabase
+                          .from('user_subscription_plan')
+                          .update({ 
+                            status: 'CANCELED',
+                            updated_at: new Date().toISOString()
+                          })
+                          .eq('id', selectedSubscriptionDetails.id)
+                          .then(({error}) => {
+                            if(error) {
+                              console.error('Error canceling subscription:', error);
+                              alert(`Failed to cancel subscription: ${error.message}`);
+                            } else {
+                              fetchUserSubscriptions();
+                              closeSubscriptionDetailsModal();
+                            }
+                          });
+                      }
+                    }}
+                    className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    Cancel Subscription
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      if(confirm('Are you sure you want to reactivate this subscription?')) {
+                        // Update subscription status to ACTIVE
+                        supabase
+                          .from('user_subscription_plan')
+                          .update({ 
+                            status: 'ACTIVE',
+                            updated_at: new Date().toISOString() 
+                          })
+                          .eq('id', selectedSubscriptionDetails.id)
+                          .then(({error}) => {
+                            if(error) {
+                              console.error('Error reactivating subscription:', error);
+                              alert(`Failed to reactivate subscription: ${error.message}`);
+                            } else {
+                              fetchUserSubscriptions();
+                              closeSubscriptionDetailsModal();
+                            }
+                          });
+                      }
+                    }}
+                    className="px-4 py-2 border border-green-500 text-green-500 rounded-md text-sm hover:bg-green-50 dark:hover:bg-green-900/20"
+                  >
+                    Reactivate Subscription
+                  </button>
+                )}
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={closeSubscriptionDetailsModal}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUserSubscriptionPlanSelected(selectedSubscriptionDetails);
+                    setIsModalOpen(true);
+                    setModalType('edit');
+                    closeSubscriptionDetailsModal();
+                  }}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Edit Subscription
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
