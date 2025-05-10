@@ -42,6 +42,13 @@ const selectTeamById = createSelector(
   }
 );
 
+// 新增：记忆化选择器，避免 useSelector 返回新数组
+const selectTeamUsers = createSelector(
+  state => state.teamUsers.teamUsers,
+  (_, teamId) => teamId,
+  (teamUsers, teamId) => teamUsers[teamId] || []
+);
+
 const TeamCustomFieldPage = () => {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
@@ -58,7 +65,8 @@ const TeamCustomFieldPage = () => {
   const { user } = useGetUser();
   const { confirm } = useConfirm();
   const { currentItem, status: cfStatus, error: cfError } = useSelector((state) => state.teamCF);
-  const teamUsers = useSelector(state => state.teamUsers.teamUsers[teamId] || []);
+  // 替换为记忆化选择器
+  const teamUsers = useSelector(state => selectTeamUsers(state, teamId));
   const [isLoading, setIsLoading] = useState(false);
   const [currentView, setCurrentView] = useState('list');
   const [open, setOpen] = useState(false);

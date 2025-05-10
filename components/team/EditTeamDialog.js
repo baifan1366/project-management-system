@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -21,7 +21,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { createSelector } from '@reduxjs/toolkit';
 import InvitationDialog from './InvitationDialog';
 
-// 创建记忆化的选择器
+// 组件外部：创建记忆化的 selector 工厂函数
 const selectTeamUsers = createSelector(
   [(state) => state.teamUsers.teamUsers, (_, teamId) => teamId],
   (teamUsers, teamId) => teamUsers[teamId] || []
@@ -52,8 +52,16 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
   const [pendingRoleChanges, setPendingRoleChanges] = useState({});
   const [pendingRemovals, setPendingRemovals] = useState([]);
   
-  // 使用记忆化的选择器获取团队成员
-  const teamUsers = useSelector(state => selectTeamUsers(state, team?.id));
+  // 组件内部：用 useMemo 记忆化 selector，避免每次渲染都创建新函数
+  // 只有 team?.id 变化时才会重新创建 selector
+  const selectTeamUsersWithId = useMemo(
+    () => (state) => selectTeamUsers(state, team?.id),
+    [team?.id]
+  );
+  // 获取团队成员原始数组
+  const rawTeamUsers = useSelector(selectTeamUsersWithId);
+  // 再用 useMemo 保证 teamUsers 的引用稳定，避免 useSelector 警告
+  const teamUsers = useMemo(() => rawTeamUsers, [JSON.stringify(rawTeamUsers)]);
   const { status } = useSelector(state => state.teamUsers);
 
   const formReset = () => {
@@ -254,7 +262,6 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
   const isCurrentUserOwner = () => {
     if (!teamUsers || !userId) return false;
     const currentUserTeamMember = teamUsers.find(tu => String(tu.user.id) === String(userId));
-    console.log('currentUserTeamMember', currentUserTeamMember);
     return currentUserTeamMember?.role === 'OWNER';
   };
   
