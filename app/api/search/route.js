@@ -56,7 +56,7 @@ async function searchProjects(query, limit = 10) {
     .from('project')
     .select('*')
     .textSearch('tsv_searchable', query, {
-      type: 'plain',
+      type: 'websearch',
       config: 'english'
     })
     .order('updated_at', { ascending: false })
@@ -98,7 +98,7 @@ async function searchTasks(query, limit = 10) {
       .from('task')
       .select('*')
       .textSearch('tsv_searchable', query, {
-        type: 'plain',
+        type: 'websearch',
         config: 'english'
       })
       .order('updated_at', { ascending: false })
@@ -107,11 +107,11 @@ async function searchTasks(query, limit = 10) {
     if (tsError) {
       console.error('任务全文搜索失败:', { message: tsError.message, details: tsError.details, hint: tsError.hint, code: tsError.code });
       
-      // 失败后回退到模糊搜索
+      // 失败后回退到模糊搜索 - 注意：tag_values是JSONB字段，包含name属性作为标题
       const { data, error } = await supabase
         .from('task')
         .select('*')
-        .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+        .or(`tag_values->name.ilike.%${query}%`)
         .order('updated_at', { ascending: false })
         .limit(limit);
       
@@ -122,13 +122,19 @@ async function searchTasks(query, limit = 10) {
       
       return data.map(task => ({
         ...task,
-        type: 'task'
+        type: 'task',
+        // 从tag_values提取常用字段，方便前端展示
+        title: task.tag_values.name || '',
+        description: task.tag_values.description || ''
       }));
     }
     
     return (tsData || []).map(task => ({
       ...task,
-      type: 'task'
+      type: 'task',
+      // 从tag_values提取常用字段，方便前端展示
+      title: task.tag_values.name || '',
+      description: task.tag_values.description || ''
     }));
   } catch (error) {
     console.error('搜索任务时发生异常:', error);
@@ -183,7 +189,7 @@ async function searchUsers(query, limit = 10, sessionId = null) {
     .from('user')
     .select('*')
     .textSearch('tsv_searchable', query, {
-      type: 'plain',
+      type: 'websearch',
       config: 'english'
     })
     .order('updated_at', { ascending: false })
@@ -229,7 +235,7 @@ async function searchTeams(query) {
         created_by_user:created_by (name)
       `)
       .textSearch('tsv_searchable', query, {
-        type: 'plain',
+        type: 'websearch',
         config: 'english'
       })
       .order('updated_at', { ascending: false })
@@ -285,7 +291,7 @@ async function searchMessages(query) {
       chat:session_id (name)
     `)
     .textSearch('tsv_content', query, {
-      type: 'plain',
+      type: 'websearch',
       config: 'english'
     })
     .order('created_at', { ascending: false })
@@ -312,13 +318,15 @@ export async function GET(request) {
     const type = searchParams.get('type'); // Get the search type (mention, etc.)
     const sessionId = searchParams.get('sessionId'); // Get the chat session ID
     
-    // 如果查询过短，返回空结果
-    if (query.length < 2) {
-      return NextResponse.json({
-        results: [],
-        message: '查询词太短'
-      });
-    }
+    console.log('Search API called with:', { query, userId, type, sessionId });
+    
+    // // 如果查询过短，返回空结果
+    // if (query.length < 2) {
+    //   return NextResponse.json({
+    //     results: [],
+    //     message: '查询词太短'
+    //   });
+    // }
     
     // For mentions, we need to limit results and prioritize recent items
     if (type === 'mention') {
@@ -369,6 +377,15 @@ export async function GET(request) {
       ...teams,
       ...messages
     ];
+    
+    console.log(`Search results for "${query}":`, { 
+      totalResults: results.length,
+      projectCount: projects.length,
+      taskCount: tasks.length,
+      userCount: users.length,
+      teamCount: teams.length,
+      messageCount: messages.length
+    });
     
     return NextResponse.json({
       results

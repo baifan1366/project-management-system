@@ -151,7 +151,7 @@ CREATE TABLE "time_entry" (
 CREATE TABLE "custom_field" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'WORKFLOW', 'KANBAN', 'AGILE', 'FILES')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'WORKFLOW', 'KANBAN', 'AGILE', 'FILES', 'POSTS')),
   "description" TEXT,
   "icon" VARCHAR(255),
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -184,6 +184,29 @@ CREATE TABLE "team_custom_field_value" (
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
 );
 
+-- Create team posts table
+CREATE TABLE "team_post" (
+  "id" SERIAL PRIMARY KEY,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "section_id" INT REFERENCES "section"("id") ON DELETE SET NULL,
+  "is_pinned" BOOLEAN DEFAULT FALSE,
+  "reactions" JSONB DEFAULT '{}', -- Store reactions as {emoji: [user_ids]} format
+  "tags" TEXT[] DEFAULT '{}', -- Array of tags associated with the post
+  "comments" JSONB DEFAULT '[]', -- Store comments directly in the post
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for better performance
+CREATE INDEX idx_team_post_team_id ON "team_post"("team_id");
+CREATE INDEX idx_team_post_section_id ON "team_post"("section_id");
+CREATE INDEX idx_team_post_created_by ON "team_post"("created_by");
+CREATE INDEX idx_team_post_created_at ON "team_post"("created_at");
+CREATE INDEX idx_team_post_is_pinned ON "team_post"("is_pinned");
+CREATE INDEX idx_team_post_reactions ON "team_post" USING GIN("reactions");
 
 -- 任务模板表（用于创建任务模板）
 CREATE TABLE "task_template" (

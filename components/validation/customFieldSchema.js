@@ -15,7 +15,7 @@ export function createCustomFieldSchema(tValidation) {
     .addRule('type', [
       validators.required(tValidation('typeRequired')),
       validators.custom((value) => {
-        const validTypes = ['LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'AGILE', 'WORKFLOW', 'KANBAN', 'FILES'];
+        const validTypes = ['LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'AGILE', 'WORKFLOW', 'KANBAN', 'FILES', 'POSTS'];
         return validTypes.includes(value);
       }, 'type_invalid', tValidation('typeInvalid'))
     ])

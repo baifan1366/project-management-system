@@ -1,25 +1,37 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// 刷新访问令牌
+// Refresh access token from Google
 async function refreshAccessToken(refreshToken) {
   try {
+    console.log("Attempting to refresh token:");
+    console.log("Client ID available:", !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
+    console.log("Client Secret available:", !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET);
+    console.log("Refresh Token:", refreshToken);
+    
+    // Check if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are defined
+    if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || !process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET) {
+      console.error("Missing Google OAuth credentials in environment variables");
+      return null;
+    }
+    
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        client_secret: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
       }),
     });
     
     if (!response.ok) {
-      const error = await response.json();
-      console.error('Failed to refresh access token:', error);
+      const errorData = await response.json();
+      console.error('Failed to refresh access token. Status:', response.status);
+      console.error('Error details:', JSON.stringify(errorData));
       return null;
     }
     
@@ -35,68 +47,76 @@ async function refreshAccessToken(refreshToken) {
   }
 }
 
-async function updateUserMetadata(userId, accessToken, refreshToken) {
+// Update user's Google tokens in the custom user table
+async function updateUserTokens(userId, accessToken, refreshToken) {
   try {
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        google_tokens: {
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          updated_at: new Date().toISOString()
-        }
-      }
-    });
+    // Calculate the expiration timestamp (usually 1 hour from now)
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+    
+    // Update the user table directly
+    const { error } = await supabase
+      .from('user')
+      .update({
+        google_access_token: accessToken,
+        google_refresh_token: refreshToken,
+        google_token_expires_at: expiresAt,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
 
     if (error) {
-      console.error('Failed to update user metadata:', error);
+      console.error('Failed to update user tokens:', error);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error('Error updating user metadata:', error);
+    console.error('Error updating user tokens:', error);
     return false;
   }
 }
 
 export async function POST(request) {
   try {
-    const { refreshToken } = await request.json();
+    const body = await request.json();
+    console.log("Received request body:", JSON.stringify(body, null, 2));
+    
+    const { refresh_token: refreshToken, userId } = body;
 
     if (!refreshToken) {
+      console.error("Missing refresh token in request");
       return NextResponse.json(
         { error: 'Refresh token is required' },
         { status: 400 }
       );
     }
 
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
     const tokenData = await refreshAccessToken(refreshToken);
     if (!tokenData) {
+      console.error("Failed to refresh token from Google");
       return NextResponse.json(
         { error: 'Failed to refresh access token' },
         { status: 401 }
       );
     }
 
-    // Get the current session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'No active session found' },
-        { status: 401 }
-      );
-    }
-
-    // Update user metadata with new tokens
-    const success = await updateUserMetadata(
-      session.user.id,
+    // Update user's tokens in the database
+    const success = await updateUserTokens(
+      userId,
       tokenData.access_token,
       refreshToken
     );
 
     if (!success) {
       return NextResponse.json(
-        { error: 'Failed to update user metadata' },
+        { error: 'Failed to update user tokens' },
         { status: 500 }
       );
     }

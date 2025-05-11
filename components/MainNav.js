@@ -12,11 +12,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUserProjects, clearProjects } from '@/lib/redux/features/projectSlice';
 import { supabase } from '@/lib/supabase';
 import useGetUser from '@/lib/hooks/useGetUser';
+import CreateProjectDialog from '@/components/CreateProject';
 
 export function MainNav() {
   const pathname = usePathname();
@@ -25,6 +26,7 @@ export function MainNav() {
   const dispatch = useDispatch();
   const { projects, status } = useSelector((state) => state.projects);
   const { user , error } = useGetUser();
+  const [openCreateDialog, setOpenCreateDialog] = useState(false);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -86,6 +88,44 @@ export function MainNav() {
            color?.toLowerCase().startsWith('#f') || color?.toLowerCase().startsWith('#e');
   };
 
+  // 根据颜色值获取对应的Tailwind类
+  const getColorClass = (color) => {
+    if (!color) return "bg-gray-500 text-white"; // 默认颜色
+
+    // 颜色名称到Tailwind类的映射
+    const colorClassMap = {
+      "black": "bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90",
+      "red": "bg-[#c72c41] text-white hover:bg-[#c72c41]/90 dark:bg-[#c72c41] dark:text-white dark:hover:bg-[#c72c41]/90",
+      "orange": "bg-[#d76d2b] text-white hover:bg-[#d76d2b]/90 dark:bg-[#d76d2b] dark:text-white dark:hover:bg-[#d76d2b]/90",
+      "green": "bg-[#008000] text-white hover:bg-[#008000]/90 dark:bg-[#008000] dark:text-white dark:hover:bg-[#008000]/90",
+      "blue": "bg-[#3b6dbf] text-white hover:bg-[#3b6dbf]/90 dark:bg-[#3b6dbf] dark:text-white dark:hover:bg-[#3b6dbf]/90",
+      "purple": "bg-[#5c4b8a] text-white hover:bg-[#5c4b8a]/90 dark:bg-[#5c4b8a] dark:text-white dark:hover:bg-[#5c4b8a]/90",
+      "pink": "bg-[#d83c5e] text-white hover:bg-[#d83c5e]/90 dark:bg-[#d83c5e] dark:text-white dark:hover:bg-[#d83c5e]/90",
+      "white": "bg-white text-black border border-gray-200 hover:bg-gray-50",
+      "lightGreen": "bg-[#bbf7d0] text-black hover:bg-[#bbf7d0]/90",
+      "lightYellow": "bg-[#fefcbf] text-black hover:bg-[#fefcbf]/90",
+      "lightCoral": "bg-[#f08080] text-white hover:bg-[#f08080]/90",
+      "lightOrange": "bg-[#ffedd5] text-black hover:bg-[#ffedd5]/90",
+      "peach": "bg-[#ffcccb] text-black hover:bg-[#ffcccb]/90",
+      "lightCyan": "bg-[#e0ffff] text-black hover:bg-[#e0ffff]/90",
+    };
+
+    // 尝试直接匹配颜色名称（不区分大小写）
+    const normalizedColor = color.toLowerCase();
+    
+    // 先检查是否是已知的颜色名
+    for (const [colorName, className] of Object.entries(colorClassMap)) {
+      if (colorName.toLowerCase() === normalizedColor) {
+        return className;
+      }
+    }
+    
+    // 如果没有找到匹配的颜色名，使用默认的深色/浅色判断
+    return shouldUseDarkText(color) 
+      ? "bg-white text-black border border-gray-200 hover:bg-gray-50" 
+      : "bg-black text-white hover:bg-black/90";
+  };
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full">
@@ -141,13 +181,12 @@ export function MainNav() {
                         <div 
                           className={cn(
                             "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-all",
-                            shouldUseDarkText(project.theme_color) ? "text-gray-900" : "text-white",
+                            getColorClass(project.theme_color),
                             "ring-offset-background",
                             pathname === `/${locale}/projects/${project.id}`
                               ? "ring-2 ring-white ring-offset-2"
                               : "hover:ring-2 hover:ring-white/50 hover:ring-offset-2"
                           )}
-                          style={{ backgroundColor: project.theme_color }}
                         >
                           {getProjectInitial(project.project_name)}
                         </div>
@@ -160,8 +199,8 @@ export function MainNav() {
                 ))}
                 <Tooltip key="create-project-button">
                   <TooltipTrigger asChild>
-                    <Link
-                      href={`/${locale}/createProject`}
+                    <button
+                      onClick={() => setOpenCreateDialog(true)}
                       className="flex items-center space-x-2 px-2 py-2 mt-2 rounded-lg transition-colors text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground group w-full"
                     >
                       <div 
@@ -173,7 +212,7 @@ export function MainNav() {
                       >
                         <Plus size={20} className="transition-transform group-hover:scale-110" />
                       </div>
-                    </Link>
+                    </button>
                   </TooltipTrigger>
                   <TooltipContent side="right">
                     {t('Projects.createNewProject')}
@@ -184,6 +223,7 @@ export function MainNav() {
           </div>
         </div>
       </div>
+      <CreateProjectDialog open={openCreateDialog} onOpenChange={setOpenCreateDialog} />
     </TooltipProvider>
   );
 }

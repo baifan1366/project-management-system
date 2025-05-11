@@ -1,21 +1,35 @@
 'use client'
 
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { createTask, updateTask } from '@/lib/redux/features/taskSlice';
 import { updateTaskIds } from '@/lib/redux/features/sectionSlice';
 import { useTranslations } from 'next-intl';
 import { useTableContext } from './TableProvider';
 import { useState, useEffect } from 'react';
 import { useGetUser } from '@/lib/hooks/useGetUser';
-import { Plus } from 'lucide-react';
+import { Plus, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
+import { validateTextInput } from './TagConfig';
+
+// 错误提示组件
+function ValidationError({ message }) {
+  if (!message) return null;
+  
+  return (
+    <div className="flex items-center text-red-500 text-xs mt-1">
+      <AlertCircle size={12} className="mr-1" />
+      <span>{message}</span>
+    </div>
+  );
+}
 
 export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInputRef }) {
   const dispatch = useDispatch();
   const t = useTranslations('CreateTask');
   const { user } = useGetUser();
   const [isLoading, setIsLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
   
   // 获取表格上下文
   const {
@@ -26,6 +40,10 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
     isAddingTask,
     setIsAddingTask
   } = useTableContext();
+
+  // 将useSelector移到组件顶层 - 修复Hook错误
+  const tagsData = useSelector((state) => state.teamCF.tags);
+  const tags = Array.isArray(tagsData) ? tagsData : (tagsData?.tags || []);
 
   // ===== 添加任务相关功能 =====
   
@@ -72,15 +90,39 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
    * 处理任务值更新
    * @param {string} taskId - 任务ID
    * @param {string} tagId - 标签ID
-   * @param {string} value - 新值
+   * @param {string|object} value - 新值
    */
   const handleTaskValueChange = (taskId, tagId, value) => {
     if (editingTask === taskId) {
       // 同步更新编辑值
       setEditingTaskValues(prev => {
+        // 根据不同类型的数据进行处理
+        let processedValue = value;
+        
+        // 处理对象类型的数据 - 例如JSON字符串
+        if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
+          try {
+            processedValue = JSON.parse(value);
+          } catch (e) {
+            // 如果解析失败，保持原样
+            processedValue = value;
+          }
+        }
+        
+        // 处理数字类型
+        if (typeof value === 'string' && !isNaN(value) && value !== '') {
+          const num = Number(value);
+          if (!isNaN(num) && Number.isFinite(num)) {
+            // 确保不是像 '123abc' 这样的非纯数字字符串
+            if (/^-?\d+(\.\d+)?$/.test(value)) {
+              processedValue = num;
+            }
+          }
+        }
+        
         const newValues = {
           ...prev,
-          [tagId]: value
+          [tagId]: processedValue
         };
         return newValues;
       });
@@ -93,11 +135,32 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
             const taskIndex = updatedTasks[sectionId].findIndex(task => task.id === taskId);
             if (taskIndex !== -1) {
               updatedTasks[sectionId] = [...updatedTasks[sectionId]];
+              
+              // 处理对象类型的数据 - 与上面相同逻辑
+              let processedValue = value;
+              if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
+                try {
+                  processedValue = JSON.parse(value);
+                } catch (e) {
+                  processedValue = value;
+                }
+              }
+              
+              // 处理数字类型
+              if (typeof value === 'string' && !isNaN(value) && value !== '') {
+                const num = Number(value);
+                if (!isNaN(num) && Number.isFinite(num)) {
+                  if (/^-?\d+(\.\d+)?$/.test(value)) {
+                    processedValue = num;
+                  }
+                }
+              }
+              
               updatedTasks[sectionId][taskIndex] = {
                 ...updatedTasks[sectionId][taskIndex],
                 tag_values: {
                   ...updatedTasks[sectionId][taskIndex].tag_values,
-                  [tagId]: value
+                  [tagId]: processedValue
                 }
               };
               break;
@@ -117,8 +180,98 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
    */
   const saveNewTask = async (taskId, sectionId) => {
     try {
-      // 验证必填字段 (标题字段，ID为1)
-      if (!editingTaskValues['1'] || editingTaskValues['1'].trim() === '') {
+      // 使用组件顶层已声明的tagsData和tags变量，而不是在函数内部调用useSelector
+      
+      // 重置所有验证错误
+      setValidationErrors({});
+      
+      // 检查必填字段是否已填写
+      let validationFailed = false;
+      let firstInvalidField = null;
+      const errors = {};
+      
+      // 处理和转换编辑值，确保格式正确
+      const processedValues = {};
+      
+      // 遍历所有字段进行验证和处理
+      for (const [tagId, value] of Object.entries(editingTaskValues)) {
+        // 找到对应的标签定义
+        const tagDefinition = tags.find(t => t.id.toString() === tagId);
+        
+        // 如果是名称字段，或者标记为必填的字段
+        const isNameField = tagDefinition?.name === 'Name' || tagId === '1';
+        const isRequired = isNameField || tagDefinition?.required;
+        
+        if (isRequired) {
+          const validation = validateTextInput(value, { required: true });
+          if (!validation.isValid) {
+            validationFailed = true;
+            errors[tagId] = validation.message;
+            if (!firstInvalidField) {
+              firstInvalidField = tagId;
+            }
+          }
+        }
+        
+        // 处理不同类型的字段值
+        if (value !== undefined && value !== null) {
+          // 特殊类型处理
+          if (tagDefinition) {
+            // 根据标签类型处理
+            const tagType = tagDefinition.type ? tagDefinition.type.toUpperCase() : 'TEXT';
+            
+            switch (tagType) {
+              case 'SINGLE-SELECT':
+                // 单选字段可能是字符串或对象
+                if (typeof value === 'string' && (value.startsWith('{') && value.endsWith('}'))) {
+                  try {
+                    processedValues[tagId] = JSON.parse(value);
+                  } catch (e) {
+                    processedValues[tagId] = value;
+                  }
+                } else {
+                  processedValues[tagId] = value;
+                }
+                break;
+                
+              case 'MULTI-SELECT':
+              case 'TAGS':
+                // 多选或标签字段可能是字符串或数组
+                if (typeof value === 'string' && (value.startsWith('[') && value.endsWith(']'))) {
+                  try {
+                    processedValues[tagId] = JSON.parse(value);
+                  } catch (e) {
+                    processedValues[tagId] = value;
+                  }
+                } else {
+                  processedValues[tagId] = value;
+                }
+                break;
+                
+              case 'NUMBER':
+                // 数字字段
+                if (typeof value === 'string' && !isNaN(value)) {
+                  processedValues[tagId] = Number(value);
+                } else {
+                  processedValues[tagId] = value;
+                }
+                break;
+                
+              default:
+                // 默认不处理
+                processedValues[tagId] = value;
+            }
+          } else {
+            // 没有标签定义，直接使用值
+            processedValues[tagId] = value;
+          }
+        }
+      }
+      
+      // 如果验证失败，显示错误并返回失败
+      if (validationFailed) {
+        setValidationErrors(errors);
+        console.error('验证失败: 有必填字段未填写', errors);
         return false;
       }
       
@@ -126,12 +279,13 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
       
       // 准备任务数据
       const taskData = {
-        tag_values: editingTaskValues,
+        tag_values: processedValues,
         created_by: userId
       };
       
       // 创建任务
       const result = await dispatch(createTask(taskData)).unwrap();
+      
       //it may also create a notion_page, then update the notion_page id into the task table, page_id column
       const { data: notionPageData, error: notionPageError } = await supabase
         .from('notion_page')
@@ -141,15 +295,25 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
         })
         .select()
         .single();
+      
       console.log(notionPageData);
+      
       //update the notion_page id into the task table, page_id column
-      const { data: newTaskData, error: taskError } = await supabase
-        .from('task')
-        .update({
-          page_id: notionPageData.id
-        })
-        .eq('id', result.id);
-      console.log(newTaskData);
+      if (notionPageData && notionPageData.id) {
+        const { data: newTaskData, error: taskError } = await supabase
+          .from('task')
+          .update({
+            page_id: notionPageData.id
+          })
+          .eq('id', result.id);
+          
+        if (taskError) {
+          console.error('更新任务页面ID失败:', taskError);
+        } else {
+          console.log('任务页面ID已更新:', newTaskData);
+        }
+      }
+      
       // 更新本地任务列表
       setLocalTasks(prevTasks => ({
         ...prevTasks,
@@ -192,11 +356,54 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
       const currentTask = localTasks[sectionId].find(task => task.id === taskId);
       if (!currentTask) return false;
 
+      // 使用组件顶层已声明的tagsData和tags变量，而不是在函数内部调用useSelector
+      
+      // 重置所有验证错误
+      setValidationErrors({});
+      
       // 准备本地更新的任务数据（对象格式的tag_values）
       const updatedTagValues = {
-        ...currentTask.tag_values,
-        ...editingTaskValues
+        ...currentTask.tag_values
       };
+      
+      // 只更新已编辑的字段
+      for (const [tagId, value] of Object.entries(editingTaskValues)) {
+        // 只有当值改变时才更新
+        if (value !== undefined && value !== null && 
+            JSON.stringify(updatedTagValues[tagId]) !== JSON.stringify(value)) {
+          updatedTagValues[tagId] = value;
+        }
+      }
+      
+      // 验证必填字段
+      let validationFailed = false;
+      const errors = {};
+      
+      // 遍历所有字段进行验证
+      for (const [tagId, value] of Object.entries(updatedTagValues)) {
+        // 找到对应的标签定义
+        const tagDefinition = tags.find(t => t.id.toString() === tagId);
+        
+        // 如果是名称字段，或者标记为必填的字段
+        const isNameField = tagDefinition?.name === 'Name' || tagId === '1';
+        const isRequired = isNameField || tagDefinition?.required;
+        
+        if (isRequired) {
+          const validation = validateTextInput(value, { required: true });
+          if (!validation.isValid) {
+            validationFailed = true;
+            errors[tagId] = validation.message;
+            break;
+          }
+        }
+      }
+      
+      // 如果验证失败，显示错误并返回失败
+      if (validationFailed) {
+        setValidationErrors(errors);
+        console.error('验证失败: 有必填字段未填写', errors);
+        return false;
+      }
       
       // 更新本地任务列表
       setLocalTasks(prevTasks => ({
@@ -238,6 +445,34 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
     try {
       setIsLoading(true);
       
+      // 清除所有验证错误
+      setValidationErrors({});
+      
+      // 使用组件顶层已声明的tagsData和tags变量，而不是在函数内部调用useSelector
+      
+      // 检查必填字段 (预验证)
+      let preValidationFailed = false;
+      const errors = {};
+      
+      // 确认必填字段都有值
+      for (const tag of tags) {
+        if (tag.required || tag.name === 'Name') {
+          const tagId = tag.id.toString();
+          const value = editingTaskValues[tagId];
+          
+          if (!value || (typeof value === 'string' && value.trim() === '')) {
+            preValidationFailed = true;
+            errors[tagId] = '此字段不能为空';
+          }
+        }
+      }
+      
+      if (preValidationFailed) {
+        setValidationErrors(errors);
+        setIsLoading(false);
+        return false;
+      }
+      
       let success = false;
       
       if (isAddingTask) {
@@ -257,13 +492,21 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
       }
       
       // 清除编辑状态
-      setEditingTask(null);
-      setEditingTaskValues({});
-      setIsAddingTask(false);
+      if (success) {
+        setEditingTask(null);
+        setEditingTaskValues({});
+        setIsAddingTask(false);
+      }
       
       return success;
     } catch (error) {
       console.error('任务操作失败:', error);
+      
+      // 提供更具体的错误信息
+      if (error.message) {
+        console.error('错误详情:', error.message);
+      }
+      
       return false;
     } finally {
       setIsLoading(false);
@@ -378,11 +621,13 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
     editingTaskValues,
     isAddingTask,
     isLoading,
+    validationErrors,
     
     // 设置函数
     setEditingTask,
     setEditingTaskValues,
     setIsAddingTask,
+    setValidationErrors,
     
     // 操作函数
     handleAddTask,
@@ -392,6 +637,7 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
     handleClickOutside,
     
     // UI组件
-    renderAddTaskButton
+    renderAddTaskButton,
+    ValidationError
   };
 }

@@ -37,6 +37,19 @@ export default function CalendarPage() {
   const [isLoadingPersonal, setIsLoadingPersonal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isViewLoading, setIsViewLoading] = useState(false);
+  const [userLoadTimeout, setUserLoadTimeout] = useState(false);
+
+  // Add a safety timeout to prevent waiting forever for user data
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (userLoading) {
+        console.log('User loading taking too long, proceeding anyway');
+        setUserLoadTimeout(true);
+      }
+    }); // 3 seconds timeout
+    
+    return () => clearTimeout(timeoutId);
+  }, [userLoading]);
 
   // Google日历颜色对应表
   const googleCalendarColors = {
@@ -57,9 +70,11 @@ export default function CalendarPage() {
   useEffect(() => {
     async function checkGoogleConnection() {
       try {
+        console.log('Checking Google connection, userLoading:', userLoading, 'currentUser:', !!currentUser, 'timeout:', userLoadTimeout);
+        
         // 使用自定义hook获取用户信息
         if (!currentUser) {
-          console.log('用户未登录');
+          console.log('用户未登录 - skipping connection check');
           setIsGoogleConnected(false);
           setIsLoading(false); // 如果未登录，立即结束加载状态
           return;
@@ -67,7 +82,7 @@ export default function CalendarPage() {
         
         // 使用google_provider_id检查是否连接了Google，而不是provider字段
         if (currentUser?.google_provider_id) {
-          console.log('检测到Google提供商ID，正在检查令牌...');
+          console.log('Detected Google provider ID, checking tokens...');
           // 从用户元数据中获取 tokens，而不是从 supabase session 中获取
           const response = await fetch('/api/users/tokens?provider=google');
           if (!response.ok) {
@@ -85,6 +100,7 @@ export default function CalendarPage() {
             
             // 尝试调用API验证令牌有效性
             try {
+              console.log('Validating token with calendar scope API...');
               const testResponse = await fetch(`/api/check-calendar-scope`, {
                 method: 'POST',
                 headers: {
@@ -93,10 +109,17 @@ export default function CalendarPage() {
                 body: JSON.stringify({
                   access_token: accessToken,
                   refresh_token: refreshToken,
+                  user_id: currentUser.id
                 }),
               });
               
               const testData = await testResponse.json();
+              console.log('Calendar scope API response:', testData);
+              
+              // If token was refreshed, use the new one
+              if (testData.access_token && testData.access_token !== accessToken) {
+                console.log('Token was refreshed, using new token');
+              }
               
               // 更新连接状态
               if (testData.hasCalendarScope) {
@@ -121,7 +144,7 @@ export default function CalendarPage() {
             setIsGoogleConnected(false);
           }
         } else {
-          console.log('未使用Google连接');
+          console.log('未使用Google连接，provider_id:', currentUser?.google_provider_id);
           setIsGoogleConnected(false);
         }
       } catch (error) {
@@ -137,10 +160,18 @@ export default function CalendarPage() {
       }
     }
     
-    if (!userLoading) {
+    // Only run the check when user loading completes OR timeout occurs AND we have a user
+    if ((!userLoading || userLoadTimeout) && currentUser) {
+      console.log('User available, running Google connection check');
       checkGoogleConnection();
+    } else if ((!userLoading || userLoadTimeout) && !currentUser) {
+      console.log('User loading completed or timed out but no user found');
+      setIsGoogleConnected(false);
+      setIsLoading(false);
+    } else {
+      console.log('User still loading, deferring Google connection check');
     }
-  }, [currentUser, userLoading, t]);
+  }, [currentUser, userLoading, t, userLoadTimeout]);
 
   // 加载任务数据
   // useEffect(() => {
@@ -191,84 +222,80 @@ export default function CalendarPage() {
       }
     }
     
-    if (currentUser && !userLoading) {
+    if (currentUser && (!userLoading || userLoadTimeout)) {
       fetchPersonalEvents();
     }
-  }, [currentDate, t, isViewLoading, isLoading, isGoogleConnected, isLoadingGoogle, currentUser, userLoading]);
+  }, [currentDate, t, isViewLoading, isLoading, isGoogleConnected, isLoadingGoogle, currentUser, userLoading, userLoadTimeout]);
 
   // 获取Google日历事件
   useEffect(() => {
+    console.log('Google events fetch effect triggered - isGoogleConnected:', isGoogleConnected);
+    
     if (!isGoogleConnected) {
+      console.log('Google not connected, skipping calendar events fetch');
       if (isViewLoading) {
         setIsViewLoading(false);
       }
       return;
     }
     
+    if (!currentUser && !userLoadTimeout) {
+      console.log('User not loaded yet, deferring Google calendar fetch');
+      return;
+    }
+    
     async function fetchGoogleEvents() {
+      console.log('Starting Google events fetch');
       setIsLoadingGoogle(true);
       try {
         const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
         const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
         
-        // 使用我们的自定义API端点获取Google令牌
+        // 使用我们的自定义API端点获取Google令牌，而不是Supabase session
+        console.log('Fetching Google tokens');
         const tokensResponse = await fetch('/api/users/tokens?provider=google');
         if (!tokensResponse.ok) {
-          console.error(t('noGoogleToken'));
-          toast.error(t('noGoogleToken'), {
-            action: {
-              label: t('goToSettings'),
-              onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
-            }
-          });
+          console.error('获取Google令牌失败:', tokensResponse.status);
           return;
         }
         
         const tokens = await tokensResponse.json();
+        console.log('Received tokens:', { hasAccess: !!tokens.access_token, hasRefresh: !!tokens.refresh_token });
         const accessToken = tokens.access_token;
         const refreshToken = tokens.refresh_token;
         
         if (!accessToken && !refreshToken) {
-          console.error(t('noGoogleToken'));
-          // 显示一个通知而不是立即设置未连接
-          toast.error(t('noGoogleToken'), {
-            action: {
-              label: t('goToSettings'),
-              onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
-            }
-          });
+          console.error('没有Google令牌');
           return;
         }
         
-        console.log('正在获取Google日历事件...');
-        const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}`);
+        // Add user_id for token refreshing
+        console.log('Fetching Google calendar events with user ID:', currentUser?.id);
+        const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}&user_id=${currentUser?.id || ''}`);
         
         if (response.status === 401) {
-          console.error(t('googleAuthExpired'));
+          console.error('Google授权过期:', response.status);
           toast.error(t('googleAuthExpired'), {
             action: {
               label: t('goToSettings'),
               onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
             }
           });
-          // 不要立即设置未连接，给用户机会刷新权限
+          setIsGoogleConnected(false);
           return;
         }
         
         if (!response.ok) {
           const errorData = await response.json();
-          console.error(t('getGoogleEventsFailed'), errorData);
+          console.error('获取Google日历事件失败:', errorData);
           throw new Error(errorData.error || t('getGoogleEventsFailed'));
         }
         
         const data = await response.json();
-        console.log('收到Google日历数据:', data);
-        console.log('事件列表:', data.items);
+        console.log('Received Google calendar data, event count:', data.items?.length);
         setGoogleEvents(data.items || []);
-        console.log('设置到状态后的googleEvents:', data.items?.length);
       } catch (error) {
-        console.error(t('getGoogleEventsFailed'), error);
-        // 使用更好的错误处理，只显示一次toast
+        console.error('获取Google日历事件异常:', error);
         if (!window.calendarErrorToastShown) {
           window.calendarErrorToastShown = true;
           toast.error(t('getGoogleEventsFailed'), {
@@ -277,26 +304,19 @@ export default function CalendarPage() {
               onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
             }
           });
-          // 5秒后重置toast状态，允许未来的错误显示
-          setTimeout(() => {
-            window.calendarErrorToastShown = false;
-          }, 5000);
         }
       } finally {
         setIsLoadingGoogle(false);
-        // 更新加载状态
-        if (isViewLoading) {
+        // 检查个人事件是否已完成加载，如果是，则关闭视图加载状态
+        if (!isLoadingPersonal) {
           setIsViewLoading(false);
         }
-        // 如果初始加载尚未完成，并且个人事件也已加载完成，则完成初始加载
-        if (isLoading && !isLoadingPersonal) {
-          setIsLoading(false);
-        }
       }
-    }
+    };
     
+    // 只调用Google事件获取，个人事件通过自己的useEffect获取
     fetchGoogleEvents();
-  }, [currentDate, isGoogleConnected, t, isViewLoading, isLoading, isLoadingPersonal]);
+  }, [currentDate, isGoogleConnected, t, isViewLoading, isLoading, isLoadingPersonal, currentUser, userLoading, userLoadTimeout]);
 
   const handlePrevMonth = () => {
     setIsViewLoading(true);
@@ -431,7 +451,8 @@ export default function CalendarPage() {
           return;
         }
         
-        const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}`);
+        // Add user_id for token refreshing
+        const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}&user_id=${currentUser.id}`);
         
         if (response.status === 401) {
           console.error(t('googleAuthExpired'));

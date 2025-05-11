@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,9 +16,7 @@ import {
   Info, 
   Calendar
 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { supabase } from '@/lib/supabase';
+import useGetUser from '@/lib/hooks/useGetUser';
 import { useDispatch, useSelector } from 'react-redux';
 import Link from 'next/link';
 import {
@@ -31,11 +28,11 @@ import {
   selectUnreadCount,
   selectNotificationsLoading,
   selectIsSubscribed,
-  unsubscribeFromNotifications
+  unsubscribeFromNotifications,
+  subscribeToNotifications
 } from '@/lib/redux/features/notificationSlice';
 import NotificationItem from '@/components/notifications/NotificationItem';
 import { useRouter } from 'next/navigation';
-import { useGetUser } from '@/lib/hooks/useGetUser';
 
 export default function NotificationsPage() {
   const t = useTranslations();
@@ -47,17 +44,59 @@ export default function NotificationsPage() {
   const isSubscribed = useSelector(selectIsSubscribed);
   const [activeTab, setActiveTab] = useState('all');
   const [filterType, setFilterType] = useState('all');
-  const { user , error} = useGetUser();
+  const { user, error } = useGetUser();
+  const pageSubscriptionCreatedRef = useRef(false);
+  const hasInitiatedFetchRef = useRef(false);
 
+  // useEffect(() => {
+  //   if(!user) return;
+    
+  //   // On mount, first check if already subscribed (likely by Header)
+  //   if (isSubscribed) {
+  //     console.log('NotificationsPage: Found existing subscription, refreshing data');
+      
+  //     // Only fetch if we don't already have notifications data
+  //     if (notifications.length === 0 && !loading && !hasInitiatedFetchRef.current) {
+  //       console.log('NotificationsPage: Initial fetch for subscribed state');
+  //       dispatch(fetchNotifications(user.id));
+  //       hasInitiatedFetchRef.current = true;
+  //     }
+  //     return;
+  //   }
+    
+  //   // Otherwise start own subscription (the Header component might have created one previously)
+  //   console.log('NotificationsPage: Starting realtime subscription');
+  //   dispatch(subscribeToNotifications(user.id));
+    
+  //   // Also perform initial fetch when starting our own subscription
+  //   if (!hasInitiatedFetchRef.current) {
+  //     console.log('NotificationsPage: Initial fetch with new subscription');
+  //     dispatch(fetchNotifications(user.id));
+  //     hasInitiatedFetchRef.current = true;
+  //   }
+    
+  //   pageSubscriptionCreatedRef.current = true;
+
+  //   // Cleanup subscription on unmount, but only if this page created it
+  //   return () => {
+  //     if (pageSubscriptionCreatedRef.current) {
+  //       console.log('NotificationsPage: Cleaning up subscription created by this page');
+  //       dispatch(unsubscribeFromNotifications());
+  //       pageSubscriptionCreatedRef.current = false;
+  //     } else {
+  //       console.log('NotificationsPage: Unmounted, but not cleaning up subscription created elsewhere');
+  //     }
+  //   };
+  // }, [dispatch, user, isSubscribed, notifications.length, loading]);
+
+  // Reset fetch flag on component mount
   useEffect(() => {
-      dispatch(fetchNotifications(user.id));
-
-    // 组件卸载时清理订阅
+    hasInitiatedFetchRef.current = false;
     return () => {
-      console.log('通知页面卸载，清理订阅');
-      dispatch(unsubscribeFromNotifications());
+      // Ensure flag is reset when component unmounts
+      hasInitiatedFetchRef.current = false;
     };
-  }, [dispatch]);
+  }, []);
 
   const handleMarkAllAsRead = () => {
     if (user) {
@@ -76,32 +115,32 @@ export default function NotificationsPage() {
         dispatch(deleteNotification({ notificationId, userId: user.id }));
         break;
       case 'accept':
-        // 会议邀请接受后已在NotificationItem中处理
+        // Meeting invite acceptance handled in NotificationItem
         break;
       case 'decline':
-        // 会议邀请拒绝后已在NotificationItem中处理
+        // Meeting invite rejection handled in NotificationItem
         break;
       default:
         break;
     }
   };
 
-  // 首先按未读/全部筛选
+  // First filter by read status
   let filteredByReadStatus = activeTab === 'unread'
     ? notifications.filter(notification => !notification.is_read)
     : notifications;
 
-  // 然后按类型筛选
+  // Then filter by type
   const filteredNotifications = filterType === 'all' 
     ? filteredByReadStatus 
     : filteredByReadStatus.filter(notification => notification.type === filterType);
 
-  // 获取可用的通知类型
+  // Get available notification types
   const notificationTypes = Array.from(
     new Set(notifications.map(notification => notification.type))
   );
 
-  // 显示错误信息
+  // Display error message
   if (error) {
     return (
       <div className="container py-4 md:py-8">
@@ -117,7 +156,7 @@ export default function NotificationsPage() {
     );
   }
 
-  // 获取通知类型对应的图标
+  // Get icon for notification type
   const getTypeIcon = (type) => {
     switch(type) {
       case 'task': return <CheckCircle className="h-4 w-4" />;
@@ -142,7 +181,7 @@ export default function NotificationsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
-        {/* 侧边过滤器 */}
+        {/* Side filters */}
         <div className="md:col-span-3">
           <Card className="border shadow-sm">
             <CardHeader className="pb-3">
@@ -221,7 +260,7 @@ export default function NotificationsPage() {
           </Card>
         </div>
 
-        {/* 主要内容区 */}
+        {/* Main content area */}
         <div className="md:col-span-9">
           <Card className="border shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">

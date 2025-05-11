@@ -93,7 +93,7 @@ export const WorkflowTools = () => {
   }
 
   return (
-    <div style={{ width: '100%', height: '500px' }}>
+    <div style={{ width: '100%', height: '600px' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

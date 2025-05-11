@@ -6,32 +6,68 @@ import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
 import { fetchAllTags } from '@/lib/redux/features/tagSlice';
 import { getTags } from '@/lib/redux/features/teamCFSlice';
+import { fetchTaskLink } from '@/lib/redux/features/taskLinksSlice';
 
 // 使用唯一键记录全局请求状态，避免重复请求
 const requestCache = {
   allTags: false,
   teamTags: {},
-  sections: {}
+  sections: {},
+  taskLinks: false // 添加任务链接的缓存标志
 };
 
-export const useGanttData = (teamId, teamCFId, gantt) => {
+// 添加一个新函数用于重置指定团队的缓存
+export const resetTeamCache = (teamId) => {
+  if (teamId) {
+    requestCache.sections[teamId] = false;
+    // 重置其他相关缓存
+    requestCache.taskLinks = false;
+    
+    // 如果有teamTags缓存，也重置相关的
+    Object.keys(requestCache.teamTags).forEach(key => {
+      if (key.startsWith(`${teamId}_`)) {
+        requestCache.teamTags[key] = false;
+      }
+    });
+  }
+};
+
+export const useGanttData = (teamId, teamCFId, gantt, refreshFlag = 0, refreshKey) => {
   const dispatch = useDispatch();
   const allTags = useSelector(state => state.tags.tags);
   const teamCFTags = useSelector(state => state.teamCF.tags);
   const tagsStatus = useSelector(state => state.teamCF.tagsStatus);
+  const taskLinks = useSelector(state => state.taskLinks.links); // 从Redux获取任务链接
   
   const [sections, setSections] = useState([]);
   const [allTasks, setAllTasks] = useState([]);
   const [ganttTasks, setGanttTasks] = useState([]);
   const [tags, setTags] = useState([]);
+  const [links, setLinks] = useState([]); // 添加links状态存储任务链接
   
   // 本地跟踪当前组件实例的已请求状态
   const localRequestTracker = useRef({
     allTagsFetched: false,
     teamTagsFetched: false,
-    sectionsFetched: false
+    sectionsFetched: false,
+    taskLinksFetched: false // 添加任务链接的本地跟踪标志
   });
 
+  // 当refreshKey或refreshFlag变化时重置本地请求跟踪器
+  useEffect(() => {
+    localRequestTracker.current = {
+      allTagsFetched: false,
+      teamTagsFetched: false,
+      sectionsFetched: false,
+      taskLinksFetched: false
+    };
+    
+    // 重置特定团队的缓存
+    if (teamId) {
+      resetTeamCache(teamId);
+    }
+  }, [refreshKey, teamId]); // 添加teamId以确保在团队ID变化时也重置缓存
+  
   // 获取所有通用标签 - 全局只请求一次
   useEffect(() => {
     if (!requestCache.allTags && !localRequestTracker.current.allTagsFetched) {
@@ -64,12 +100,80 @@ export const useGanttData = (teamId, teamCFId, gantt) => {
     }
   }, [allTags, teamCFTags]);
 
-  // 获取部分和任务数据 - 每个teamId只请求一次
+  // 获取任务链接数据
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function fetchLinks() {
+      try {
+        // 当收到刷新标志时重置缓存状态
+        if (refreshFlag > 0) {
+          requestCache.taskLinks = false;
+          localRequestTracker.current.taskLinksFetched = false;
+        }
+        
+        if (!requestCache.taskLinks && !localRequestTracker.current.taskLinksFetched) {
+          await dispatch(fetchTaskLink());
+          
+          if (!isMounted) return;
+          
+          requestCache.taskLinks = true;
+          localRequestTracker.current.taskLinksFetched = true;
+        }
+      } catch (error) {
+        console.error("获取任务链接失败:", error);
+      }
+    }
+    
+    fetchLinks();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch, refreshFlag]);
+
+  // 当Redux中的taskLinks更新时，更新本地links状态
+  useEffect(() => {
+    if (taskLinks && taskLinks.length > 0) {
+      // 处理链接数据，转换为gantt需要的格式
+      const formattedLinks = taskLinks.map(link => {
+        // 确保链接类型是有效的值（0-3）并转换为字符串
+        let linkType = link.link_type;
+        if (linkType === null || linkType === undefined) {
+          linkType = 0; // 默认使用 finish_to_start
+        }
+        
+        // 确保链接类型在有效范围内
+        if (linkType < 0 || linkType > 3) {
+          linkType = 0;
+        }
+        
+        return {
+          id: link.id,
+          source: link.source_task_id,
+          target: link.target_task_id,
+          type: linkType.toString() // gantt需要字符串类型
+        };
+      });
+      
+      setLinks(formattedLinks);
+    } else {
+      setLinks([]);
+    }
+  }, [taskLinks]);
+
+  // 获取部分和任务数据 - 当添加新任务时重新加载
   useEffect(() => {
     let isMounted = true;
     
     async function fetchData() {
       try {
+        // 当收到刷新标志或初始加载时重置缓存状态
+        if (refreshFlag > 0) {
+          requestCache.sections[teamId] = false;
+          localRequestTracker.current.sectionsFetched = false;
+        }
+        
         if (!requestCache.sections[teamId] && !localRequestTracker.current.sectionsFetched) {
           // 获取部分数据
           const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
@@ -102,18 +206,24 @@ export const useGanttData = (teamId, teamCFId, gantt) => {
     return () => {
       isMounted = false;
     };
-  }, [teamId, dispatch]);
+  }, [teamId, dispatch, refreshFlag]);
 
   // 当任务或标签数据更新时，重新映射并更新Gantt
   useEffect(() => {
-    // 只有当gantt已初始化且有任务和标签数据时
-    if (gantt && allTasks.length > 0 && tags.length > 0) {
-      const updatedGanttTasks = mapTasksToGantt(allTasks, tags, gantt);
-      setGanttTasks(updatedGanttTasks);
+    // 当gantt已初始化且有标签数据时进行处理(不管是否有任务)
+    if (gantt && tags.length > 0) {
+      if (allTasks.length > 0) {
+        // 有任务时，正常映射任务
+        const updatedGanttTasks = mapTasksToGantt(allTasks, tags, gantt);
+        setGanttTasks(updatedGanttTasks);
+      } else {
+        // 当没有任务时，设置空数组以清空甘特图
+        setGanttTasks([]);
+      }
     }
   }, [allTasks, tags, gantt]);
 
-  return { sections, allTasks, ganttTasks, tags };
+  return { sections, allTasks, ganttTasks, links, tags, refreshKey };
 };
 
 // 将任务映射到Gantt格式
@@ -137,18 +247,16 @@ export const mapTasksToGantt = (tasks, tags, gantt) => {
           case 'Name':
             taskName = String(value || '');
             break;
-          case 'Created At':
+          case 'Start Date':
             if (value) {
               startDate = value;
             }
             break;
           case 'Duration':
-          case 'duration':
             const duration = parseInt(value);
             taskDuration = !isNaN(duration) && duration > 0 ? duration : 1;
             break;
           case 'Progress':
-          case 'progress':
             const progress = parseFloat(value);
             if (!isNaN(progress)) {
               taskProgress = progress > 1 ? progress / 100 : progress;

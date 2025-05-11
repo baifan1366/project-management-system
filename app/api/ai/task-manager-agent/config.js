@@ -31,7 +31,7 @@ You must extract the following information from the user's message:
    - Assignees (if mentioned)
 
 3. Recommended project views based on project type:
-   - Select from available views: Overview(1), List(2), Files(3), Timeline(4), Gantt(5), Kanban Board(6), Workflow(7), Calendar(8), Notion(9), Agile(10)
+   - Select from available views: Overview(1), List(2), Timeline(3), Kanban(4), Calendar(5), Posts(6), Files(7), Gantt(8), Workflow(9), Note(10), Agile(11)
    - Choose 4-6 most suitable views for this project type
    - Order them by importance for this project type
 
@@ -66,12 +66,11 @@ Respond ONLY with the JSON object matching this format:
   "recommended_views": [
     {"id": 1, "name": "Overview", "order_index": 0},
     {"id": 2, "name": "List", "order_index": 1},
-    {"id": 3, "name": "Files", "order_index": 2},
-    {"id": 4, "name": "Timeline", "order_index": 3},
-    {"id": 5, "name": "Gantt", "order_index": 4},
-    {"id": 6, "name": "Kanban Board", "order_index": 5},
-    {"id": 7, "name": "Workflow", "order_index": 6},
-    {"id": 8, "name": "Calendar", "order_index": 7}
+    {"id": 3, "name": "Timeline", "order_index": 2},
+    {"id": 4, "name": "Kanban", "order_index": 3},
+    {"id": 5, "name": "Calendar", "order_index": 4},
+    {"id": 6, "name": "Posts", "order_index": 5},
+    {"id": 7, "name": "Files", "order_index": 6}
   ]
 }
 `;

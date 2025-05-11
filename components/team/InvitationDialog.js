@@ -238,8 +238,8 @@ export default function InvitationDialog({ open, onClose }) {
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader className="text-left">
-          <DialogTitle className="text-xl font-semibold">
-            {t('inviteToTeam')} {team?.name}
+          <DialogTitle className="text-xl font-semibold break-words">
+            {t('inviteToTeam')} <span className="break-all">{team?.name}</span>
           </DialogTitle>
           <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
             {t('invitationDescription')}

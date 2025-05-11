@@ -129,16 +129,16 @@ export default function Home({ params }) {
   const displayTasks = tasks.map(transformTaskForDisplay);
 
   return (
-    <div className="container px-4 py-6">
+    <div className="container px-4 py-6 max-h-screen overflow-y-auto">
       {/* 页面头部 */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">{t('overview')}</h1>
         <div className="flex space-x-2">
           <Dialog open={openAgentDialog} onOpenChange={setOpenAgentDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Bot size={16} />
-                {t_pengy('title')}
+              <Button variant="outline" className="gap-2 px-2">
+                <Bot size={20} />
+                <span className="hidden md:inline">{t_pengy('title')}</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden p-0">
@@ -146,32 +146,34 @@ export default function Home({ params }) {
               <TaskManagerAgent userId={userId} projectId={projectId} />
             </DialogContent>
           </Dialog>
-          <Button variant={themeColor}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('createTask')}
+          <Button 
+            variant={themeColor}
+            size="icon"
+          >
+            <Plus size={20} />
           </Button>
         </div>
       </div>
 
       {/* 统计卡片部分 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
         <StatsCard 
-          icon={<ListTodo className="h-5 w-5 text-blue-500" />} 
-          title={t('pendingTasks')} 
+          icon={<ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />} 
+          title={t('pendingTasks')}
           value={loading ? "..." : taskCount.pending.toString()} 
         />
         <StatsCard 
-          icon={<Clock className="h-5 w-5 text-yellow-500" />} 
+          icon={<Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />} 
           title={t('inProgressTasks')} 
           value={loading ? "..." : taskCount.inProgress.toString()} 
         />
         <StatsCard 
-          icon={<Calendar className="h-5 w-5 text-green-500" />} 
+          icon={<Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />} 
           title={t('completedTasks')} 
           value={loading ? "..." : taskCount.completed.toString()} 
         />
         <StatsCard 
-          icon={<BarChart2 className="h-5 w-5 text-purple-500" />} 
+          icon={<BarChart2 className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />} 
           title={t('completionRate')} 
           value={loading ? "..." : `${taskCount.total > 0 ? Math.round((taskCount.completed / taskCount.total) * 100) : 0}%`} 
         />
@@ -220,14 +222,14 @@ export default function Home({ params }) {
 // 统计卡片组件
 function StatsCard({ icon, title, value }) {
   return (
-    <Card>
-      <CardContent className="pt-6">
+    <Card className="overflow-hidden">
+      <CardContent className="p-3 sm:p-4 sm:pt-6">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold">{value}</p>
+          <div className="mr-2">
+            <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
+            <p className="text-lg sm:text-2xl font-bold">{value}</p>
           </div>
-          <div className="p-2 bg-background rounded-full">{icon}</div>
+          <div className="p-1.5 sm:p-2 bg-background rounded-full flex-shrink-0">{icon}</div>
         </div>
       </CardContent>
     </Card>
@@ -250,10 +252,10 @@ function TasksOverview({ tasks, loading }) {
 
   return (
     <Card className="h-full">
-      <CardHeader>
-        <CardTitle>{t('upcomingTasks')}</CardTitle>
+      <CardHeader className="px-3 py-3 sm:p-6">
+        <CardTitle className="text-base sm:text-lg">{t('upcomingTasks')}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-3 pt-0 sm:px-6">
         {loading ? (
           <div className="flex justify-center items-center h-40">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -263,18 +265,18 @@ function TasksOverview({ tasks, loading }) {
             {t('noTasks')}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2 sm:space-y-4">
             {recentTasks.map((task) => (
-              <div key={task.id} className="flex items-center p-3 bg-accent/20 rounded-lg">
-                <div className={`w-2 h-2 rounded-full mr-3 ${
+              <div key={task.id} className="flex items-center p-2 sm:p-3 bg-accent/20 rounded-lg">
+                <div className={`w-2 h-2 rounded-full mr-2 sm:mr-3 ${
                   task.status === 'in_progress' ? 'bg-yellow-500' : 
                   task.status === 'done' ? 'bg-green-500' : 'bg-blue-500'
                 }`}></div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-medium">{task.title}</h4>
-                  <p className="text-xs text-muted-foreground">截止日期: {task.dueDate || '无'}</p>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs sm:text-sm font-medium truncate">{task.title}</h4>
+                  <p className="text-xs text-muted-foreground truncate">截止日期: {task.dueDate || '无'}</p>
                 </div>
-                <span className={`px-2 py-1 text-xs rounded-full ${
+                <span className={`ml-2 px-1.5 py-0.5 sm:px-2 sm:py-1 text-xs rounded-full flex-shrink-0 ${
                   task.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' : 
                   task.status === 'done' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
                 }`}>
@@ -295,16 +297,16 @@ function TasksList({ tasks, loading }) {
   const t = useTranslations('Projects');
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="px-3 py-3 sm:p-6">
         <div className="flex items-center justify-between">
-          <CardTitle>{t('allTasks')}</CardTitle>
-          <Button variant="outline" size="sm">
-            <Plus className="mr-2 h-4 w-4" />
+          <CardTitle className="text-base sm:text-lg">{t('allTasks')}</CardTitle>
+          <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm">
+            <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
             {t('addTask')}
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-3 pt-0 sm:px-6">
         {loading ? (
           <div className="flex justify-center items-center h-40">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -314,7 +316,7 @@ function TasksList({ tasks, loading }) {
             {t('noTasks')}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {tasks.map((task) => (
               <TaskItem key={task.id} task={task} />
             ))}
