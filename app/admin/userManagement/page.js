@@ -615,7 +615,6 @@ export default function UserManagement() {
       </div>
       )}
       
-      {/* Modals would go here in a real implementation */}
       {/* Add User Modal */}
       {isModalOpen && modalType === 'add' && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>

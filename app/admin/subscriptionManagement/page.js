@@ -2597,7 +2597,7 @@ export default function AdminSubscriptions() {
       {/* User Subscription Details Modal */}
       {isUserSubscriptionDetailsModalOpen && selectedSubscriptionDetails && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
-          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] flex flex-col p-6 overflow-hidden'>
             <div className='flex justify-between items-center mb-4'>
               <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
                 Subscription Details
@@ -2610,7 +2610,7 @@ export default function AdminSubscriptions() {
               </button>
             </div>
             
-            <div className="space-y-6">
+            <div className="space-y-6 overflow-y-auto pr-2">
               {/* User Information */}
               <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                 <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">User Information</h3>
@@ -2851,7 +2851,7 @@ export default function AdminSubscriptions() {
               </div>
             </div>
             
-            <div className="mt-6 flex justify-between">
+            <div className="mt-6 flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
               <div>
                 {selectedSubscriptionDetails.status.toUpperCase() === 'ACTIVE' ? (
                   <button 
