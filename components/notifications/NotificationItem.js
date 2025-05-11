@@ -1,22 +1,28 @@
 import { Button } from "@/components/ui/button";
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { formatDistanceToNow } from 'date-fns';
-import { Check, X, Bell, Calendar, User, MessageSquare, Video } from 'lucide-react';
+import { Check, X, Bell, Calendar, User, MessageSquare, Video, ExternalLink, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function NotificationItem({ notification, onAction }) {
   const t = useTranslations('notifications');
   const tCalendar = useTranslations('Calendar');
   const tNotif = useTranslations('notificationCenter');
+  const { user } = useGetUser();
+  const router = useRouter();
   
   // Add state to track meeting invitation status
   const [localMeetingData, setLocalMeetingData] = useState(null);
   const [localIsDeclined, setLocalIsDeclined] = useState(false);
   const [localIsAccepted, setLocalIsAccepted] = useState(false);
+  const [isActioning, setIsActioning] = useState(false);
   
   // Initialize local state
   useEffect(() => {
@@ -31,19 +37,23 @@ export default function NotificationItem({ notification, onAction }) {
     return formatDistanceToNow(d, { addSuffix: true });
   };
 
-  const handleMarkAsRead = async (id) => {
+  const handleMarkAsRead = async (e) => {
+    e.stopPropagation();
+    setIsActioning(true);
     try {
       const { error } = await supabase
         .from('notification')
         .update({ is_read: true })
-        .eq('id', id);
+        .eq('id', notification.id);
       
       if (error) throw error;
       
       // Notify parent component to update state
-      if (onAction) onAction('read', id);
+      if (onAction) onAction('read', notification.id);
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
+    } finally {
+      setTimeout(() => setIsActioning(false), 500);
     }
   };
 
@@ -51,11 +61,11 @@ export default function NotificationItem({ notification, onAction }) {
   const getIcon = (type) => {
     switch (type) {
       case 'TASK_ASSIGNED':
-        return <Calendar className="h-4 w-4" />;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Task icon */}</div>;
       case 'COMMENT_ADDED':
-        return <MessageSquare className="h-4 w-4" />;  
+        return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full">{/* Comment icon */}</div>;
       case 'MENTION':
-        return <User className="h-4 w-4" />;
+        return <div className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 p-2 rounded-full">{/* Mention icon */}</div>;
       case 'SYSTEM':
         // Check if this is a meeting invitation
         try {
@@ -65,15 +75,15 @@ export default function NotificationItem({ notification, onAction }) {
               : notification.data;
             
             if (data.isMeetingInvitation) {
-              return <Video className="h-4 w-4" />;
+              return <div className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 p-2 rounded-full">{/* System icon */}</div>;
             }
           }
         } catch (e) {
           console.error('Error parsing notification data', e);
         }
-        return <Bell className="h-4 w-4" />;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Default icon */}</div>;
       default:
-        return <Bell className="h-4 w-4" />;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Default icon */}</div>;
     }
   };
 
@@ -107,13 +117,14 @@ export default function NotificationItem({ notification, onAction }) {
     return data && data.declined;
   };
 
-  // Send notification to the inviter
+  // Send notification to the inviter when a user accepts or declines a meeting invitation
+  // This creates a new notification in the database for the person who sent the original invitation
+  // letting them know whether their invitation was accepted or declined
   const sendResponseNotification = async (meetData, isAccepted) => {
     if (!meetData || !meetData.inviterId) return;
     
     try {
-      // Get current user information
-      const { user } = useGetUser();
+      // Check if we have user information
       if (!user) throw new Error('Failed to get user information');
       
       // Prepare notification data
@@ -124,13 +135,13 @@ export default function NotificationItem({ notification, onAction }) {
           : tNotif('meetingDeclined'),
         content: `${user.name || user.email} ${isAccepted 
           ? tNotif('acceptedYourMeeting') 
-          : tNotif('declinedYourMeeting')} "${meetData.meetingTitle || 'meeting'}"`,
+          : tNotif('declinedYourMeeting')} "${meetData.eventTitle || 'meeting'}"`,
         type: 'SYSTEM',
         is_read: false,
         data: {
           responseToMeeting: true,
-          meetingId: meetData.meetingId,
-          meetingTitle: meetData.meetingTitle,
+          meetingId: meetData.eventId,
+          meetingTitle: meetData.eventTitle,
           responderName: user.name || user.email,
           responderEmail: user.email,
           accepted: isAccepted,
@@ -154,7 +165,7 @@ export default function NotificationItem({ notification, onAction }) {
   // Accept meeting invitation
   const handleAcceptMeeting = async (id, meetData) => {
     try {
-      await handleMarkAsRead(id);
+      await handleMarkAsRead(e);
       
       // Update notification status to accepted
       const updatedData = { ...meetData, accepted: true };
@@ -229,112 +240,164 @@ export default function NotificationItem({ notification, onAction }) {
   const isDeclined = localIsDeclined || isMeetingDeclined();
   const isAccepted = localIsAccepted || (meetingData && meetingData.accepted);
 
-  return (
-    <div className={cn(
-      "p-3 flex items-start space-x-3 border-b hover:bg-accent/5 transition-colors cursor-pointer",
-      !notification.is_read && "bg-primary/5"
-    )}>
-      <div className={cn(
-        "p-2 rounded-full",
-        !notification.is_read ? "bg-primary text-primary-foreground" : "bg-muted"
-      )}>
-        {getIcon(notification.type)}
-      </div>
+  // Handle notification click - for direct navigation
+  const handleNotificationClick = () => {
+    // For MENTION notifications, navigate directly to the chat
+    if (notification.type === 'MENTION' && notification.data?.session_id) {
+      router.push(`/chat?session=${notification.data.session_id}`);
       
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <p className={cn(
-            "text-sm font-medium truncate",
-            !notification.is_read && "font-semibold"
-          )}>
-            {notification.title}
-          </p>
-          <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-            {formatDate(notification.created_at)}
+      // Mark as read after click
+      if (!notification.is_read) {
+        onAction('read', notification.id);
+      }
+    }
+  };
+
+  // Handle meeting invite actions directly in this component
+  const renderMeetingActions = () => {
+    if (notification.type !== 'MEETING_INVITE' && !isMeeting) return null;
+    
+    if (isDeclined) {
+      return (
+        <div className="mt-2">
+          <span className="text-xs text-muted-foreground">
+            {tCalendar('meetingDeclined')}
           </span>
         </div>
-        
-        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-          {notification.content}
-        </p>
-        
-        {/* For meeting invitation display accept/decline buttons */}
-        {isMeeting && meetingData && !isDeclined && !isAccepted && (
-          <div className="mt-2 flex space-x-2">
-            <Button 
-              size="sm" 
-              variant="default" 
-              className="h-8"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAcceptMeeting(notification.id, meetingData);
-              }}
-            >
-              <Check className="h-4 w-4 mr-1" />
-              {tCalendar('accept')}
-            </Button>
-            
+      );
+    }
+
+    if (isAccepted) {
+      return (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-xs text-green-600 font-medium">
+            {tNotif('meetingAccepted')}
+          </span>
+          {meetingData && meetingData.meetLink && (
             <Button 
               size="sm" 
               variant="outline" 
-              className="h-8"
+              className="h-7 text-xs"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDeclineMeeting(notification.id);
+                window.open(meetingData.meetLink, '_blank');
               }}
             >
-              <X className="h-4 w-4 mr-1" />
-              {tCalendar('decline')}
+              <Video className="h-3 w-3 mr-1" />
+              {tCalendar('joinMeeting')}
             </Button>
-          </div>
-        )}
-        
-        {/* If meeting has been accepted */}
-        {isMeeting && meetingData && isAccepted && (
-          <div className="mt-2">
-            <span className="text-xs text-green-600 font-medium">
-              {tNotif('meetingAccepted')}
-            </span>
-            {meetingData.meetLink && (
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="h-8 ml-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(meetingData.meetLink, '_blank');
-                }}
-              >
-                <Video className="h-4 w-4 mr-1" />
-                {tNotif('joinMeeting')}
-              </Button>
-            )}
-          </div>
-        )}
-        
-        {/* If meeting has been declined */}
-        {isMeeting && meetingData && isDeclined && (
-          <div className="mt-2">
-            <span className="text-xs text-muted-foreground">
-              {tCalendar('meetingDeclined')}
-            </span>
-          </div>
-        )}
-      </div>
-      
-      {!notification.is_read && (
+          )}
+        </div>
+      );
+    }
+
+    // If not accepted or declined yet, show both options
+    return (
+      <div className="mt-2 flex space-x-2">
         <Button 
-          size="icon" 
-          variant="ghost" 
-          className="h-6 w-6 rounded-full"
+          size="sm" 
+          variant="default" 
+          className="h-7 text-xs"
           onClick={(e) => {
             e.stopPropagation();
-            handleMarkAsRead(notification.id);
+            handleAcceptMeeting(notification.id, meetingData);
           }}
+          disabled={isActioning}
         >
-          <Check className="h-4 w-4" />
+          <Check className="h-3 w-3 mr-1" />
+          {tCalendar('accept')}
         </Button>
-      )}
-    </div>
+        
+        <Button 
+          size="sm" 
+          variant="outline" 
+          className="h-7 text-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDeclineMeeting(notification.id);
+          }}
+          disabled={isActioning}
+        >
+          <X className="h-3 w-3 mr-1" />
+          {tCalendar('decline')}
+        </Button>
+      </div>
+    );
+  };
+
+  return (
+    <Card 
+      className={`border ${notification.is_read ? 'bg-card' : 'bg-accent'} shadow-sm transition-all hover:shadow-md`}
+      onClick={handleNotificationClick}
+    >
+      <CardContent className="p-4 cursor-pointer">
+        <div className="flex gap-3">
+          {getIcon(notification.type)}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h4 className="font-medium text-sm">{notification.title}</h4>
+                <p className="text-sm text-muted-foreground line-clamp-2">{notification.content}</p>
+              </div>
+              <div className="flex flex-shrink-0 gap-1">
+                {!notification.is_read && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-7 w-7" 
+                    onClick={handleMarkAsRead}
+                    disabled={isActioning}
+                  >
+                    <Check className="h-4 w-4" />
+                    <span className="sr-only">{t('markAsRead')}</span>
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsActioning(true);
+                    onAction('delete', notification.id);
+                    setTimeout(() => setIsActioning(false), 500);
+                  }}
+                  disabled={isActioning}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">{t('delete')}</span>
+                </Button>
+              </div>
+            </div>
+            
+            {/* Handle meeting invitations directly in this component */}
+            {renderMeetingActions()}
+            
+            {/* For other notifications with links */}
+            {notification.link && notification.type !== 'MENTION' && (
+              <div className="mt-2">
+                <Link
+                  href={notification.link}
+                  className="text-xs inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!notification.is_read) {
+                      onAction('read', notification.id);
+                    }
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  {t('common.viewDetails')}
+                </Link>
+              </div>
+            )}
+            
+            <div className="text-xs text-muted-foreground mt-2">
+              {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 } 

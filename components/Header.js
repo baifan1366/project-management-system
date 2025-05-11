@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ProfilePopover } from './ui/ProfilePopover';
 import { Popover, PopoverTrigger } from '@/components/ui/popover';
 import { NotificationDialog } from './notifications/NotificationDialog';
@@ -19,12 +19,18 @@ import {
   selectUnreadCount, 
   fetchNotifications,
   subscribeToNotifications,
-  unsubscribeFromNotifications
+  unsubscribeFromNotifications,
+  selectIsSubscribed,
 } from '@/lib/redux/features/notificationSlice';
 import { Badge } from './ui/badge';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
+
+// Singleton flag to track if Header has mounted - prevents multiple instances from competing
+let headerHasMounted = false;
+// Keep track of the last user ID to avoid redundant subscription changes
+let lastSubscribedUserId = null;
 
 export function Header() {
   const t = useTranslations();
@@ -34,24 +40,108 @@ export function Header() {
   const [isProfileOpen, setProfileOpen] = useState(false);
   const [isNotificationOpen, setNotificationOpen] = useState(false);
   const unreadCount = useSelector(selectUnreadCount);
+  const isSubscribed = useSelector(selectIsSubscribed);
   const { user } = useGetUser();
+  const headerSubscriptionRef = useRef(false);
+  const initialFetchDoneRef = useRef(false);
+  const isMountedRef = useRef(false);
+  const previousUnreadCountRef = useRef(unreadCount);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+  const setupAttemptedRef = useRef(false);
 
+  // Handle subscriptions to notifications
   useEffect(() => {
-    if (!user) return;
+    // Set mounted flag on component mount
+    isMountedRef.current = true;
     
-    // Initial fetch of notifications
-    dispatch(fetchNotifications(user.id));
+    // Skip if no user available
+    if (!user || !user.id) {
+      return;
+    }
     
-    // Subscribe to realtime notifications
-    console.log('Header: Starting realtime subscription for notifications');
-    dispatch(subscribeToNotifications(user.id));
+    // Prevent duplicate setup attempts in the same render cycle
+    if (setupAttemptedRef.current) {
+      return;
+    }
     
-    // Cleanup subscription on unmount
-    return () => {
-      console.log('Header: Cleaning up notification subscription');
-      dispatch(unsubscribeFromNotifications());
+    setupAttemptedRef.current = true;
+    
+    // Only one Header component should handle notifications
+    if (headerHasMounted && !headerSubscriptionRef.current) {
+      console.log('Another Header component is already managing notifications');
+      return;
+    }
+    
+    // Claim header management responsibility
+    headerHasMounted = true;
+    
+    const setupNotifications = async () => {
+      try {
+        // Avoid redundant subscription setup for the same user
+        if (lastSubscribedUserId === user.id && isSubscribed) {
+          console.log('Header: Already subscribed for this user, skipping setup');
+          headerSubscriptionRef.current = true;
+          return;
+        }
+        
+        // Only fetch notifications once on initial mount or when user changes
+        if (!initialFetchDoneRef.current || lastSubscribedUserId !== user.id) {
+          console.log('Header: Performing initial notification fetch');
+          await dispatch(fetchNotifications(user.id));
+          initialFetchDoneRef.current = true;
+        }
+        
+        // Subscribe to realtime notifications if not already subscribed
+        if (!isSubscribed && isMountedRef.current) {
+          console.log('Header: Starting realtime subscription for notifications');
+          await dispatch(subscribeToNotifications(user.id));
+          headerSubscriptionRef.current = true;
+          lastSubscribedUserId = user.id;
+        }
+      } catch (error) {
+        console.error('Error setting up notifications:', error);
+      }
     };
-  }, [dispatch, user]); // Added user dependency
+    
+    setupNotifications();
+    
+    // Cleanup on unmount
+    return () => {
+      if (isMountedRef.current) {
+        isMountedRef.current = false;
+        
+        // Only unsubscribe if this component created the subscription
+        if (headerSubscriptionRef.current) {
+          console.log('Header: Cleaning up notification subscription on unmount');
+          dispatch(unsubscribeFromNotifications());
+          headerSubscriptionRef.current = false;
+          initialFetchDoneRef.current = false;
+          headerHasMounted = false;
+          lastSubscribedUserId = null;
+        }
+        
+        setupAttemptedRef.current = false;
+      }
+    };
+  }, [user, isSubscribed, dispatch]);
+
+  // Effect to detect new notifications and trigger animation
+  useEffect(() => {
+    // If unreadCount increased, trigger animation
+    if (unreadCount > previousUnreadCountRef.current && initialFetchDoneRef.current) {
+      setShouldAnimate(true);
+      
+      // Reset animation after 1.5 seconds
+      const timer = setTimeout(() => {
+        setShouldAnimate(false);
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+    
+    // Update previous count reference
+    previousUnreadCountRef.current = unreadCount;
+  }, [unreadCount]);
 
   const handleNotificationClick = (event) => {
     // Hold Shift key to open dialog instead of navigation
@@ -87,7 +177,8 @@ export function Header() {
                     {unreadCount > 0 && (
                       <Badge 
                         variant="destructive" 
-                        className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center p-0 text-xs"
+                        className={`absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center p-0 text-xs
+                          ${shouldAnimate ? 'animate-notification-pulse' : ''}`}
                       >
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </Badge>
@@ -95,7 +186,7 @@ export function Header() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  {t('common.notifications')} <span className="text-xs opacity-70">(Shift+点击查看快速预览)</span>
+                  {t('common.notifications')} <span className="text-xs opacity-70">(Shift+Click to preview)</span>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -121,7 +212,20 @@ export function Header() {
       <NotificationDialog 
         open={isNotificationOpen} 
         onOpenChange={setNotificationOpen} 
+        headerHandlesSubscription={true}
       />
+      
+      <style jsx global>{`
+        @keyframes notificationPulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.5); }
+          100% { transform: scale(1); }
+        }
+        
+        .animate-notification-pulse {
+          animation: notificationPulse 1.5s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 }
