@@ -508,7 +508,10 @@
     "field_description_description": "字段的描述",
     "field_options_description": "字段的选项",
     "taskDeleted": "任务已成功删除",
-    "deleteError": "删除任务时出错"
+    "deleteError": "删除任务时出错",
+    "deleteTaskTitle": "确认删除任务",
+    "deleteTaskDescription": "您确定要删除此任务吗？此操作无法撤销。",
+    "deleteTaskFailed": "删除任务失败"
   },
   "ChatDialog": {
     "privateMessages": "私人消息",

@@ -3,7 +3,7 @@
 import { useContext, useEffect, useState, useRef } from 'react';
 import { WorkflowContext } from './TaskWorkflow';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchTasksBySectionId, updateTask, fetchTaskById, createTask } from '@/lib/redux/features/taskSlice';
+import { fetchTasksBySectionId, updateTask, fetchTaskById, createTask, deleteTask } from '@/lib/redux/features/taskSlice';
 import { getSectionByTeamId, createSection, updateTaskIds } from '@/lib/redux/features/sectionSlice';
 import { fetchAllTags, getTagByName } from '@/lib/redux/features/tagSlice';
 import { getTags } from '@/lib/redux/features/teamCFSlice';
@@ -11,6 +11,7 @@ import { Plus, Edit, Check, X, CheckCircle2, Circle, Trash } from 'lucide-react'
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useConfirm } from '@/hooks/use-confirm';
 import { 
   Popover, 
   PopoverContent, 
@@ -327,6 +328,7 @@ export default function BodyContent() {
     const teamCFTags = useSelector(state => state.teamCF.tags);
     const { user } = useGetUser()
     const userId = user?.id;
+    const { confirm } = useConfirm();
     const { 
         selectedTaskId, 
         setSelectedTaskId,
@@ -903,11 +905,31 @@ export default function BodyContent() {
 
     // 处理本地编辑任务
     const handleEditTask = (task) => {
+        // 检查任务对象是否有效
+        if (!task || !task.id) {
+            console.error('无法编辑任务: 缺少任务对象或任务ID');
+            toast.error(t('editTaskFailed'));
+            return;
+        }
+        
+        // 如果正在创建任务，先关闭创建表单
+        if (isCreating) {
+            setIsCreating(false);
+            setNewTaskValues({
+                name: '',
+                description: '',
+                status: null,
+                assignee: '',
+                dueDate: ''
+            });
+        }
+        
         setIsEditing(true);
-        setEditingTask(task);
+        setEditingTask({...task}); // 确保完整复制任务对象
         
         // 初始化编辑值
         const initialValues = {
+            id: task.id, // 确保ID也包含在编辑值中
             name: task.name,
             description: task.description,
             status: task.status,
@@ -927,37 +949,32 @@ export default function BodyContent() {
         
         return (
             <div className="mb-6 p-4 border rounded-lg">
-                <div className="flex justify-between items-center border-b pb-2 mb-3">
-                    <div className="w-full">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-lg font-medium text-gray-700">{t('editTask')}</h3>
+                    <button 
+                        className="p-1 rounded-full hover:bg-gray-100"
+                        onClick={handleCancelEdit}
+                    >
+                        <X className="w-4 h-4 text-gray-500 hover:text-black" />
+                    </button>
+                </div>
+                
+                <div className="space-y-3">
+                    <div className="flex flex-col">
+                        <label className="font-medium mb-1">{t('name')}:</label>
                         <input
                             type="text"
                             value={editingValues.name || ''}
                             onChange={(e) => handleInputChange('name', e.target.value)}
                             onBlur={(e) => handleFieldBlur('name', false)}
-                            className="text-lg font-semibold w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="p-2 border rounded text-sm w-full focus:ring-1 focus:ring-primary focus:outline-none"
                             maxLength={100}
                         />
                         <div className="text-xs text-gray-500 mt-1 text-right">
                             {(editingValues.name || '').length}/100
                         </div>
                     </div>
-                    <div className="flex ml-2">
-                        <button 
-                            className="p-1 rounded hover:bg-accent"
-                            onClick={handleSaveTask}
-                            disabled={!isNameValid}
-                        >
-                            <Check className={`w-4 h-4 ${!isNameValid ? 'text-gray-300' : 'text-gray-500 hover:text-green-500'}`} />
-                        </button>
-                        <button 
-                            className="p-1 rounded hover:bg-accent"
-                            onClick={handleCancelEdit}
-                        >
-                            <X className="w-4 h-4 text-gray-500 hover:text-red-500" />
-                        </button>
-                    </div>
-                </div>
-                <div className="space-y-3">
+                    
                     <div className="flex flex-col">
                         <label className="font-medium mb-1">{t('status')}:</label>
                         <StatusSelector 
@@ -972,7 +989,7 @@ export default function BodyContent() {
                             value={editingValues.description || ''}
                             onChange={(e) => handleInputChange('description', e.target.value.slice(0, 100))}
                             onBlur={(e) => handleFieldBlur('description', false)}
-                            className="p-1 border rounded text-sm min-h-[80px]"
+                            className="p-2 border rounded text-sm min-h-[80px] focus:ring-1 focus:ring-primary focus:outline-none"
                             maxLength={100}
                         />
                         <div className="text-xs text-gray-500 mt-1 text-right">
@@ -986,7 +1003,7 @@ export default function BodyContent() {
                                 type="text"
                                 value={editingValues.assignee || ''}
                                 onChange={(e) => handleInputChange('assignee', e.target.value)}
-                                className="p-1 border rounded text-sm"
+                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                             />
                         </div>
                         <div className="flex flex-col">
@@ -995,10 +1012,41 @@ export default function BodyContent() {
                                 type="date"
                                 value={editingValues.dueDate || ''}
                                 onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                                className="p-1 border rounded text-sm"
+                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                                 min={today}
                             />
                         </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-4 mt-3 border-t">
+                        <button 
+                            className="flex items-center text-sm text-red-500 hover:text-red-600 py-2 px-3 rounded hover:bg-gray-50 transition-colors"
+                            onClick={() => {
+                                // 直接使用selectedTask，它是完整的任务对象
+                                if (selectedTask && selectedTask.id) {
+                                    console.log('删除任务ID:', selectedTask.id);
+                                    handleCancelEdit(); // 先关闭编辑表单
+                                    handleDeleteTask(selectedTask); 
+                                } else {
+                                    toast.error(t('deleteTaskFailed'));
+                                    console.error('无法删除任务: 缺少任务ID', {selectedTask});
+                                }
+                            }}
+                            type="button"
+                        >
+                            <Trash className="w-4 h-4 mr-1" />
+                            {t('delete')}
+                        </button>
+                        
+                        <button 
+                            className="flex items-center text-sm text-green-500 hover:text-green-600 py-2 px-3 rounded hover:bg-gray-50 transition-colors"
+                            onClick={handleSaveTask}
+                            disabled={!isNameValid}
+                            type="button"
+                        >
+                            <Check className={`w-4 h-4 mr-1 ${!isNameValid ? 'text-gray-300' : ''}`} />
+                            {t('save')}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1239,15 +1287,26 @@ export default function BodyContent() {
         
         return (
             <div className="mb-6 p-4 border rounded-lg">
-                <div className="flex justify-between items-center border-b pb-2 mb-3">
-                    <div className="w-full">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-lg font-medium text-gray-700">{t('createTask')}</h3>
+                    <button 
+                        className="p-1 rounded-full hover:bg-gray-100"
+                        onClick={handleCancelCreate}
+                    >
+                        <X className="w-4 h-4 text-gray-500 hover:text-black" />
+                    </button>
+                </div>
+                
+                <div className="space-y-3">
+                    <div className="flex flex-col">
+                        <label className="font-medium mb-1">{t('name')}:</label>
                         <input
                             type="text"
                             value={newTaskValues.name}
                             onChange={(e) => handleNewTaskInputChange('name', e.target.value)}
                             onBlur={(e) => handleFieldBlur('name', true)}
                             placeholder={t('taskName')}
-                            className="text-lg font-semibold w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="p-2 border rounded text-sm w-full focus:ring-1 focus:ring-primary focus:outline-none"
                             autoFocus
                             maxLength={100}
                         />
@@ -1255,23 +1314,7 @@ export default function BodyContent() {
                             {newTaskValues.name.length}/100
                         </div>
                     </div>
-                    <div className="flex ml-2">
-                        <button 
-                            className="p-1 rounded hover:bg-accent"
-                            onClick={handleCreateTask}
-                            disabled={!isNameValid}
-                        >
-                            <Check className={`w-4 h-4 ${!isNameValid ? 'text-gray-300' : 'text-gray-500 hover:text-green-500'}`} />
-                        </button>
-                        <button 
-                            className="p-1 rounded hover:bg-accent"
-                            onClick={handleCancelCreate}
-                        >
-                            <X className="w-4 h-4 text-gray-500 hover:text-red-500" />
-                        </button>
-                    </div>
-                </div>
-                <div className="space-y-3">
+                    
                     <div className="flex flex-col">
                         <label className="font-medium mb-1">{t('status')}:</label>
                         <StatusSelector 
@@ -1287,7 +1330,7 @@ export default function BodyContent() {
                             onChange={(e) => handleNewTaskInputChange('description', e.target.value.slice(0, 100))}
                             onBlur={(e) => handleFieldBlur('description', true)}
                             placeholder={t('taskDescription')}
-                            className="p-1 border rounded text-sm min-h-[80px]"
+                            className="p-2 border rounded text-sm min-h-[80px] focus:ring-1 focus:ring-primary focus:outline-none"
                             maxLength={100}
                         />
                         <div className="text-xs text-gray-500 mt-1 text-right">
@@ -1302,7 +1345,7 @@ export default function BodyContent() {
                                 value={newTaskValues.assignee}
                                 onChange={(e) => handleNewTaskInputChange('assignee', e.target.value)}
                                 placeholder={t('assigneePlaceholder')}
-                                className="p-1 border rounded text-sm"
+                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                             />
                         </div>
                         <div className="flex flex-col">
@@ -1311,14 +1354,145 @@ export default function BodyContent() {
                                 type="date"
                                 value={newTaskValues.dueDate}
                                 onChange={(e) => handleNewTaskInputChange('dueDate', e.target.value)}
-                                className="p-1 border rounded text-sm"
+                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                                 min={today}
                             />
                         </div>
                     </div>
+                    
+                    <div className="flex justify-end items-center pt-4 mt-3 border-t">
+                        <button 
+                            className="flex items-center text-sm text-green-500 hover:text-green-600 py-2 px-3 rounded hover:bg-gray-50 transition-colors"
+                            onClick={handleCreateTask}
+                            disabled={!isNameValid}
+                            type="button"
+                        >
+                            <Check className={`w-4 h-4 mr-1 ${!isNameValid ? 'text-gray-300' : ''}`} />
+                            <span className={`${!isNameValid ? 'text-gray-300' : ''}`}>{t('create')}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         );
+    };
+
+    // 打开创建任务表单
+    const handleOpenCreateTask = () => {
+        // 如果正在编辑任务，先关闭编辑表单
+        if (isEditing) {
+            setIsEditing(false);
+            setEditingTask(null);
+            setEditingValues({});
+        }
+        
+        setIsCreating(true);
+    };
+
+    // 处理删除任务
+    const handleDeleteTask = (task) => {
+        console.log('handleDeleteTask被调用，传入的任务对象:', task);
+        
+        // 检查任务对象是否有效
+        if (!task) {
+            console.error('删除任务失败: 任务对象为空');
+            toast.error(t('deleteTaskFailed'));
+            return;
+        }
+        
+        // 检查任务ID是否有效
+        if (!task.id) {
+            console.error('删除任务失败: 任务ID为空');
+            toast.error(t('deleteTaskFailed'));
+            return;
+        }
+        
+        const taskId = task.id; // 保存任务ID以确保一致性
+        console.log('任务ID有效，将显示确认对话框，任务ID:', taskId);
+        
+        confirm({
+            title: t('deleteTaskTitle'),
+            description: t('deleteTaskDescription'),
+            variant: "error",
+            onConfirm: async () => {
+                try {
+                    setLoading(true);
+                    console.log('用户确认删除，开始删除任务，任务ID:', taskId);
+                    
+                    // 获取任务所在的部分
+                    const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
+                    const sectionWithTask = sectionsData.find(section => 
+                        section.task_ids && section.task_ids.includes(taskId)
+                    );
+                    
+                    if (sectionWithTask) {
+                        // 从部分的任务ID列表中移除该任务
+                        const updatedTaskIds = sectionWithTask.task_ids.filter(id => id !== taskId);
+                        
+                        // 准备删除任务的参数
+                        const deleteParams = {
+                            taskId,
+                            teamId,
+                            sectionId: sectionWithTask.id,
+                            userId // 添加用户ID到参数中
+                        };
+                        console.log('调用deleteTask，参数:', deleteParams);
+                        
+                        // 删除任务
+                        await dispatch(deleteTask(deleteParams)).unwrap();
+                        
+                        // 更新部分的任务ID列表
+                        await dispatch(updateTaskIds({
+                            sectionId: sectionWithTask.id,
+                            teamId: teamId,
+                            newTaskIds: updatedTaskIds
+                        })).unwrap();
+                        
+                        // 更新本地任务列表
+                        setAllTasks(prev => prev.filter(t => t.id !== taskId));
+                        setProcessedTasks(prev => prev.filter(t => t.id !== taskId));
+                        
+                        // 如果删除的是当前选中的任务，选择其他任务
+                        if (selectedTaskId === taskId) {
+                            const otherTask = processedTasks.find(t => t.id !== taskId);
+                            setSelectedTaskId(otherTask ? otherTask.id : null);
+                        }
+                        
+                        // 更新工作流数据
+                        const updatedTasks = processedTasks.filter(t => t.id !== taskId);
+                        updateWorkflowData(updatedTasks);
+                        
+                        // 刷新工作流图
+                        if (refreshWorkflow) {
+                            refreshWorkflow(updatedTasks);
+                        }
+                        
+                        toast.success(t('taskDeleted'));
+                    } else {
+                        // 即使找不到部分，也尝试删除任务
+                        const deleteParams = {
+                            taskId,
+                            teamId,
+                            userId // 添加用户ID到参数中
+                        };
+                        console.log('找不到部分，仍调用deleteTask，参数:', deleteParams);
+                        
+                        // 删除任务
+                        await dispatch(deleteTask(deleteParams)).unwrap();
+                        
+                        // 更新本地任务列表
+                        setAllTasks(prev => prev.filter(t => t.id !== taskId));
+                        setProcessedTasks(prev => prev.filter(t => t.id !== taskId));
+                        
+                        toast.success(t('taskDeleted'));
+                    }
+                } catch (error) {
+                    console.error('删除任务失败:', error);
+                    toast.error(t('deleteTaskFailed'));
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
     };
 
     if (loading) {
@@ -1330,13 +1504,15 @@ export default function BodyContent() {
             {selectedTask && !isEditing && (
                 <div className="mb-6 p-4 border rounded-lg">
                     <div className="flex justify-between items-center border-b pb-2 mb-3">
-                        <h3 className="text-lg max-w-[70%] break-words font-semibold">{selectedTask.name}</h3>
-                        <button 
-                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                            onClick={() => handleEditTask(selectedTask)}
-                        >
-                            <Edit className="w-4 h-4 text-gray-500" />
-                        </button>
+                        <h3 className="text-lg max-w-[80%] break-words font-semibold">{selectedTask.name}</h3>
+                        <div className="flex items-center space-x-2">
+                            <button 
+                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                                onClick={() => handleEditTask(selectedTask)}
+                            >
+                                <Edit className="w-4 h-4 text-gray-500" />
+                            </button>
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
@@ -1362,7 +1538,6 @@ export default function BodyContent() {
             )}
 
             {renderEditForm()}
-            {renderCreateForm()}
 
             <div className="grid grid-cols-1 gap-4">
                 {processedTasks.length > 0 ? processedTasks.map((item) => (
@@ -1377,7 +1552,7 @@ export default function BodyContent() {
                         onClick={() => setSelectedTaskId(item.id)}
                     >
                         <div className="flex justify-between items-center">
-                            <h3 className="font-semibold break-words max-w-[70%]">{item.name}</h3>
+                            <h3 className="font-semibold break-words max-w-[80%]">{item.name}</h3>
                             {item.status ? renderStatusBadge(item.status) : renderStatusBadge(null)}
                         </div>
                         <p className="text-gray-600 text-sm mt-1">{item.description || '-'}</p>
@@ -1392,12 +1567,13 @@ export default function BodyContent() {
                     </div>
                 )}
             </div>
+            {renderCreateForm()}
 
             {/* add task button */}
             <div className="mt-4">
               <div 
                 className="p-4 border rounded-md cursor-pointer hover:bg-accent flex items-center justify-center"
-                onClick={() => setIsCreating(true)}
+                onClick={handleOpenCreateTask}
               >
                 <Plus className="w-4 h-4 mr-2 text-gray-500"/>
                 <span className="text-sm text-gray-600">{t('addTask')}</span>
