@@ -143,6 +143,9 @@ export default function AdminSupport() {
         });
       }
       
+      // Refresh tickets to update the list with the new status
+      fetchSupportTickets();
+      
     } catch (error) {
       console.error('Error updating ticket status:', error);
     }
@@ -219,6 +222,9 @@ export default function AdminSupport() {
       // Show success message (in a real app, you'd use a toast notification)
       alert('Reply sent successfully!');
       // toast.success('Reply sent successfully!');
+      
+      // Refresh tickets to update the list
+      fetchSupportTickets();
       
     } catch (error) {
       console.error('Error sending reply:', error);
