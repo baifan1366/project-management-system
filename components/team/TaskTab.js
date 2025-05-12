@@ -41,7 +41,7 @@ const selectTeamCustomFieldValues = createSelector(
   }
 );
 
-export default function TaskTab({ onViewChange, teamId, projectId, refreshContent }) {
+export default function TaskTab({ onViewChange, teamId, projectId, handleRefreshContent }) {
   const t = useTranslations('CreateTask');
   const router = useRouter();
   const params = useParams();
@@ -175,28 +175,52 @@ export default function TaskTab({ onViewChange, teamId, projectId, refreshConten
         const newOrderedFields = orderedFields.filter(field => field.id !== fieldId);
         setOrderedFields(newOrderedFields);
         
-        // 如果删除的是当前激活的标签页，则切换到第一个标签页
-        if (activeTab === `${fieldId}` && newOrderedFields.length > 0) {
-          const firstTabValue = `${newOrderedFields[0].id}`;
-          setActiveTab(firstTabValue);
-          onViewChange?.(firstTabValue);
-          router.replace(`/projects/${projectId}/${teamId}/${firstTabValue}`);
-        }
-        
-        // 从useGetUser获取当前用户ID
+        // 获取用户ID
         const userId = user?.id;
         
+        // 获取当前locale
+        const locale = params?.locale || 'en';
+        
+        // 记录目标URL
+        let targetUrl;
+        
+        // 如果删除的是当前激活的标签页
+        if (activeTab === `${fieldId}`) {
+          if (newOrderedFields.length > 0) {
+            // 如果还有其他标签页，目标URL为第一个标签页
+            const firstTabValue = `${newOrderedFields[0].id}`;
+            targetUrl = `/${locale}/projects/${projectId}/${teamId}/${firstTabValue}`;
+          } else {
+            // 如果没有剩余标签页了，目标URL为项目页面
+            targetUrl = `/${locale}/projects/${projectId}`;
+          }
+        } else {
+          // 如果删除的不是当前激活的标签页，保持当前URL
+          targetUrl = window.location.pathname;
+        }
+        
+        console.log(`删除标签页: ${fieldId}, 由用户: ${userId}, 完成后将导航至: ${targetUrl}`);
+        
+        // 无论如何，先执行删除操作
         if (userId && teamId) {
-          // 调用API删除数据库中的记录
           dispatch(deleteTeamCustomField({ 
             teamId, 
             teamCustomFieldId: fieldId,
-            userId // 传递userId用于日志记录
-          }));
-          
-          console.log(`删除标签页: ${fieldId}, 由用户: ${userId}`);
+            userId
+          })).then(() => {
+            // 删除成功后强制刷新页面
+            console.log('删除成功，正在刷新页面...');
+            window.location.href = targetUrl;
+          }).catch(error => {
+            console.error('删除标签页失败:', error);
+            // 即使出错也强制刷新
+            console.log('删除失败，仍然刷新页面...');
+            window.location.href = targetUrl;
+          });
         } else {
           console.error('删除标签页失败: 缺少用户ID或团队ID');
+          // 即使出错也强制刷新
+          window.location.href = targetUrl;
         }
       }
     });
@@ -230,13 +254,13 @@ export default function TaskTab({ onViewChange, teamId, projectId, refreshConten
       console.log('标签页顺序更新成功，正在刷新组件...');
       
       // 使用父组件提供的 refreshContent 函数刷新组件
-      if (typeof refreshContent === 'function') {
+      if (typeof handleRefreshContent === 'function') {
         console.log('调用 refreshContent 函数刷新 TaskTab 和 customFieldContent...');
         
         // 正确处理异步函数调用
         Promise.resolve().then(async () => {
           try {
-            await refreshContent();
+            await handleRefreshContent();
             console.log('refreshContent 调用成功');
           } catch (error) {
             console.error('调用 refreshContent 函数时出错:', error);
@@ -325,10 +349,10 @@ export default function TaskTab({ onViewChange, teamId, projectId, refreshConten
                           {isCurrentUserOwner() ? (
                             <>
                               <ContextMenuItem>
-                                <Icons.Pen className="mr-2 h-4 w-4 text-gray-800 hover:text-black" />
-                                <span className="text-gray-800 hover:text-black">{t('edit')}</span>
+                                <Icons.Pen className="mr-2 h-4 w-4 text-sm text-foreground" />
+                                <span className="text-sm text-foreground">{t('edit')}</span>
                               </ContextMenuItem>
-                              <ContextMenuItem onClick={() => handleDeleteTab(field.id)} className="text-red-500 hover:text-red-600">
+                              <ContextMenuItem onClick={() => handleDeleteTab(field.id)}>
                                 <Icons.Trash className="mr-2 h-4 w-4 text-red-500 hover:text-red-600" />
                                 <span className="text-red-500 hover:text-red-600">{t('delete')}</span>
                               </ContextMenuItem>

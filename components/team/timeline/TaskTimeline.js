@@ -111,7 +111,32 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
     duration: 1,
     progress: 0
   });
+  
+  // 颜色名称到颜色代码的映射，与button.jsx中的颜色一致
+  const colorMap = {
+    red: '#c72c41',
+    orange: '#d76d2b',
+    green: '#008000',
+    blue: '#3b6dbf',
+    purple: '#5c4b8a',
+    pink: '#d83c5e',
+    black: '#000000',
+    white: '#ffffff',
+    lightGreen: '#bbf7d0',
+    lightYellow: '#fefcbf',
+    lightCoral: '#f08080',
+    lightOrange: '#ffedd5',
+    peach: '#ffcccb',
+    lightCyan: '#e0ffff',
+  };
+  
+  // 获取颜色代码，如果是已知的颜色名称则使用映射，否则直接返回原值
+  const getColorCode = (colorName) => {
+    return colorMap[colorName] || colorName;
+  };
+  
   const taskColor = project?.theme_color;
+  const taskColorCode = getColorCode(taskColor);
   
   // 初始化gantt对象，避免循环依赖
   const [ganttObj, setGanttObj] = useState(null);
@@ -370,6 +395,18 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
     gantt.config.xml_date = "%Y-%m-%d %H:%i";
     gantt.config.show_grid = false;
     
+    // 配置甘特图主题适配
+    gantt.config.scale_height = 60; // 适当调整高度，使周和日期显示更清晰
+    
+    // 自定义周和日期的背景和前景色
+    gantt.templates.scale_cell_class = function(date) {
+      return "custom-scale-cell";
+    };
+    
+    gantt.templates.timeline_cell_class = function(item, date) {
+      return "timeline-cell";
+    };
+    
     // 配置链接类型 - 链接类型配置
     gantt.config.links = {
       "finish_to_start": "0", // 类型 0
@@ -395,8 +432,13 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
     // Customize task color
     gantt.templates.task_class = () => `custom-task-color`;
     
-    // Set task color CSS variable
-    document.documentElement.style.setProperty('--task-color', taskColor);
+    // 使用颜色代码而非颜色名称
+    gantt.templates.task_color = () => taskColorCode;
+    gantt.templates.progress_color = () => taskColorCode;
+    
+    // 设置链接颜色
+    gantt.templates.link_color = () => taskColorCode;
+    gantt.templates.link_arrow_color = () => taskColorCode;
     
     // Disable default lightbox
     gantt.config.lightbox.sections = [];
@@ -567,6 +609,12 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
   useEffect(() => {
     if (!ganttObj) return;
     
+    // 确保设置正确的任务颜色
+    ganttObj.templates.task_color = () => taskColorCode;
+    ganttObj.templates.progress_color = () => taskColorCode;
+    ganttObj.templates.link_color = () => taskColorCode;
+    ganttObj.templates.link_arrow_color = () => taskColorCode;
+    
     // 当任务数据或缩放级别更新时，更新Gantt图表
     if (ganttTasks.length > 0) {
       ganttObj.clearAll();
@@ -584,7 +632,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
       });
       setZoom(currentZoom);
     }
-  }, [ganttObj, ganttTasks, links, currentZoom, refreshKey]); 
+  }, [ganttObj, ganttTasks, links, currentZoom, refreshKey, taskColorCode]); 
 
   // 添加一个新函数用于更新数据库
   const updateTaskInDatabase = async (taskData) => {
@@ -631,11 +679,42 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
 
   return (
     <div className={`w-full h-full overflow-hidden`}>
-      <style jsx>{`
-        :root {
-          --task-color: ${taskColor};
-        }
-      `}</style>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .gantt_task_line {
+            background-color: ${taskColorCode} !important;
+            border-color: ${taskColorCode} !important;
+          }
+          .gantt_task_progress {
+            background-color: ${taskColorCode} !important;
+          }
+          .gantt_link_arrow {
+            border-color: ${taskColorCode} !important;
+          }
+          .gantt_task_link .gantt_line_wrapper div {
+            background-color: ${taskColorCode} !important;
+          }
+          
+          /* 确保周和日期区域背景色与主题一致 */
+          .gantt_task_scale, 
+          .gantt_task_scale .gantt_scale_cell,
+          .gantt_scale_line {
+            background-color: hsl(var(--background)) !important;
+            color: hsl(var(--foreground)) !important;
+            border-color: hsl(var(--border)) !important;
+          }
+          
+          /* 确保日期单元格边框是透明的以避免出现白线 */
+          .gantt_scale_cell {
+            border-right: none !important;
+          }
+          
+          /* 周号单元格样式 */
+          .gantt_scale_cell:first-child {
+            font-weight: 600;
+          }
+        `
+      }} />
       <Toolbar />
       <AddTaskDialog
         teamId={teamId}

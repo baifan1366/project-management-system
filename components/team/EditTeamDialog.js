@@ -328,7 +328,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
       }
       
       return (
-        <div key={teamUser.user.id} className={`flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md ${pendingRoleChanges[teamUser.user.id] ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+        <div key={teamUser.user.id} className={`flex items-center justify-between p-2 hover:bg-accent rounded-md ${pendingRoleChanges[teamUser.user.id] ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
           <div className="flex items-center space-x-3">
             <Avatar>
               <AvatarImage src={teamUser.user.avatar_url || "/placeholder-avatar.jpg"} />

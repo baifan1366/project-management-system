@@ -110,6 +110,14 @@ const TeamCustomFieldPage = () => {
     // 增加refreshKey强制重新加载数据
     setRefreshKey(prev => prev + 1);
   };
+
+  // 添加刷新内容的函数，传递给TaskTab组件
+  const handleRefreshContent = () => {
+    // 增加refreshKey强制重新加载数据
+    setRefreshKey(prev => prev + 1);
+    // 可以在这里添加其他需要刷新的逻辑
+    return Promise.resolve(); // 返回一个成功的Promise
+  };
   
   // 定义团队状态及对应颜色
   const statusColors = {
@@ -620,7 +628,7 @@ const TeamCustomFieldPage = () => {
                 display: none;
               }
             `}</style>
-            <TaskTab projectId={projectId} teamId={teamId} onViewChange={handleViewChange} />
+            <TaskTab projectId={projectId} teamId={teamId} onViewChange={handleViewChange} handleRefreshContent={handleRefreshContent} />
           </div>
         </div>
         <div className="w-full p-0">

@@ -19,53 +19,35 @@ html, body, #root,#root div:only-child, .gantt-container {
     border: none;
   }
   
-  /* Task styling */
-  .gantt_task_line, .gantt_task_link_control {
-    background-color: var(--task-color);
-    border-color: var(--task-color);
-    transition: opacity 0.2s ease-out;
+  /* 修改周和日期区域的背景颜色 */
+  .gantt_task_scale, 
+  .gantt_task_scale .gantt_scale_cell,
+  .gantt_scale_line {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border) / 1) !important;
   }
   
-  .gantt_task_line:hover {
-    opacity: 0.8;
+  /* 自定义样式类 */
+  .custom-scale-cell {
+    background-color: hsl(var(--background)) !important;
+    border-color: transparent !important;
+    color: hsl(var(--foreground)) !important;
   }
   
-  .gantt_link_arrow {
-    border-color: var(--task-color);
+  .timeline-cell {
+    background-color: inherit !important;
   }
   
-  .gantt_task_progress {
-    background-color: var(--task-color);
-    opacity: 0.8;
+  /* 确保时间轴与背景一致 */
+  .gantt_task_scale .gantt_scale_line {
+    border-top: 1px solid hsl(var(--border) / 1);
   }
   
-  /* Grid and scales */
-  /* .gantt_grid_scale,
-  .gantt_task_scale { */
-    /* background-color: hsl(var(--background)); */
-    /* color: hsl(var(--foreground)); */
-    /* border-color: hsl(var(--border)); */
-  /* } */
-  
-  /* .gantt_grid_data,
-  .gantt_task_bg {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-  } */
-  
-  /* Grid elements */
-  /* .gantt_grid {
-    border-color: hsl(var(--border));
-  } */
-  
-  /* .gantt_row { */
-    /* border-color: hsl(var(--border)); */
-    /* background-color: transparent;
-  } */
-  
-  /* .gantt_row.odd {
-    background-color: transparent;
-  } */
+  /* 周号单元格 */
+  .gantt_scale_cell[data-column-index="0"] {
+    font-weight: 600;
+  }
   
   /* 修改行悬停效果 */
   .gantt_grid_data .gantt_row:hover {
@@ -83,7 +65,7 @@ html, body, #root,#root div:only-child, .gantt-container {
     color: hsl(var(--muted-foreground));
     border: none;
     font-weight: 500;
-    background-color: hsl(var(--muted-background));
+    background-color: hsl(var(--background)) !important;
   }
   
   /* Task cells */
