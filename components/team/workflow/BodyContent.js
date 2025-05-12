@@ -338,7 +338,8 @@ export default function BodyContent() {
         setWorkflowData,
         editableTask,
         setEditableTask,
-        refreshWorkflow
+        refreshWorkflow,
+        workflowData
     } = useContext(WorkflowContext);
     
     const [sections, setSections] = useState([]);
@@ -417,7 +418,18 @@ export default function BodyContent() {
       
       async function fetchData() {
         try {
-          if (!requestCache.sections[teamId] && !localRequestTracker.current.sectionsFetched) {
+          // 检查 workflowData 是否为空，如果为空则强制重新获取数据
+          const shouldRefetch = 
+            !requestCache.sections[teamId] || 
+            !localRequestTracker.current.sectionsFetched ||
+            (workflowData && workflowData.nodes && workflowData.nodes.length === 0);
+          
+          if (shouldRefetch) {
+            console.log('BodyContent - 强制重新获取任务数据');
+            // 重置请求缓存状态
+            requestCache.sections[teamId] = false;
+            localRequestTracker.current.sectionsFetched = false;
+            
             const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
             if (!isMounted) return;
             
@@ -451,7 +463,7 @@ export default function BodyContent() {
       return () => {
         isMounted = false;
       };
-    }, [teamId, dispatch]);
+    }, [teamId, dispatch, workflowData]);
 
     // 获取标签IDs
     useEffect(() => {

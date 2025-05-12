@@ -14,11 +14,14 @@ import { fetchAllTasks } from '@/lib/redux/features/taskSlice';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import TaskManagerAgent from '@/components/ui/TaskManagerAgent';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
+import { useRouter } from 'next/navigation';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
 
 export default function Home({ params }) {
   // 使用React.use解包params对象
   const projectParams = use(params);
   const projectId = projectParams.id;
+  const { locale } = projectParams;
   const [themeColor, setThemeColor] = useState('#64748b')
   const project = useSelector(state => 
     state.projects.projects.find(p => String(p.id) === String(projectId))
@@ -35,6 +38,10 @@ export default function Home({ params }) {
   const [loading, setLoading] = useState(true);
   const [openAgentDialog, setOpenAgentDialog] = useState(false);
   const { user } = useGetUser();
+  const router = useRouter();
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
+  const [permissionChecked, setPermissionChecked] = useState(false);
 
   // 使用Redux获取任务数据
   const dispatch = useDispatch();
@@ -49,6 +56,7 @@ export default function Home({ params }) {
       setThemeColor(project.theme_color);
     }
   }, [project]);
+  
   useEffect(() => {
     async function getCurrentUser() {
       try {
@@ -63,12 +71,54 @@ export default function Home({ params }) {
     getCurrentUser();
   }, [user]);
 
+  // 检查用户是否有权限访问此项目
+  useEffect(() => {
+    async function checkProjectPermission() {
+      try {
+        if (!userId || !projectId) return;
+
+        // 检查用户是否是项目创建者
+        if (project && project.created_by === userId) {
+          setHasPermission(true);
+          setPermissionChecked(true);
+          return;
+        }
+
+        // 检查用户是否是项目团队成员
+        const response = await fetch(`/api/projects/${projectId}/team?userId=${userId}`);
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+          setHasPermission(true);
+        } else {
+          setHasPermission(false);
+          setShowPermissionDialog(true);
+        }
+        
+        setPermissionChecked(true);
+      } catch (err) {
+        console.error('Error checking project permission:', err);
+        setHasPermission(false);
+        setShowPermissionDialog(true);
+        setPermissionChecked(true);
+      }
+    }
+    
+    checkProjectPermission();
+  }, [userId, projectId, project]);
+
+  // 处理权限对话框关闭
+  const handlePermissionDialogClose = () => {
+    setShowPermissionDialog(false);
+    router.push(`/${locale}/projects`);
+  };
+
   // 获取任务数据
   useEffect(() => {
-    if (userId) {
+    if (userId && hasPermission) {
       dispatch(fetchAllTasks());
     }
-  }, [dispatch, userId]);
+  }, [dispatch, userId, hasPermission]);
 
   // 计算任务统计数据
   useEffect(() => {
@@ -127,6 +177,37 @@ export default function Home({ params }) {
 
   // 转换所有任务
   const displayTasks = tasks.map(transformTaskForDisplay);
+
+  // 如果权限检查未完成，显示加载状态
+  if (!permissionChecked) {
+    return (
+      <div className="container px-4 py-6 flex justify-center items-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>{t('loading')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 如果没有权限，显示权限对话框
+  if (!hasPermission) {
+    return (
+      <AlertDialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('projectNotFound')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('noAccessToProject')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handlePermissionDialogClose}>{t('close')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
 
   return (
     <div className="container px-4 py-6 max-h-screen overflow-y-auto">

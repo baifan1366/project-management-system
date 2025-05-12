@@ -7,13 +7,28 @@ import BodyContent from './BodyContent';
 // 创建工作流上下文
 export const WorkflowContext = createContext(null);
 
-export default function TaskWorkflow({projectId, teamId, teamCFId}) {
+export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey}) {
     const [selectedTaskId, setSelectedTaskId] = useState(null);
     const [workflowData, setWorkflowData] = useState({
         nodes: [],
         edges: []
     });
     const [editableTask, setEditableTask] = useState(null);
+
+    // 添加一个新的 useEffect 来响应 refreshKey 变化
+    useEffect(() => {
+        console.log('TaskWorkflow - refreshKey 变化，重新加载数据:', refreshKey);
+        
+        // 重置工作流数据，以便 BodyContent 组件重新获取任务数据
+        setWorkflowData({
+            nodes: [],
+            edges: []
+        });
+        
+        // 重置选中的任务 ID
+        setSelectedTaskId(null);
+        setEditableTask(null);
+    }, [refreshKey]);
 
     // 监听selectedTaskId的变化并记录日志
     useEffect(() => {

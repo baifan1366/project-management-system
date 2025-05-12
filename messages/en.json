@@ -272,6 +272,10 @@
     "dueDate": "Due Date",
     "priority": "Priority",
     "members": "Members",
+    "projectNotFound": "Project Not Found",
+    "noAccessToProject": "You do not have access to this project. You might not be a team member or project owner.",
+    "close": "Close",
+    "loading": "Loading...",
     "filters": {
       "all": "All",
       "recent": "Recent",
@@ -817,7 +821,13 @@
     "deleteTaskTitle": "Confirm Delete Task",
     "deleteTaskDescription": "Are you sure you want to delete this task? This action cannot be undone.",
     "taskDeleted": "Task has been successfully deleted",
-    "deleteTaskFailed": "Failed to delete task"
+    "close": "Close",
+    "deleteTaskFailed": "Failed to delete task",
+    "teamNotFound": "TEAM NOT FOUND",
+    "noAccessToTeam": "You do not have access to this team. You may not be a team member or team owner.",
+    "deleteTabTitle": "Delete View",
+    "edit": "Edit",
+    "deleteTabConfirm": "Are you sure you want to delete this view? This action cannot be undone."
   },
   "ChatDialog": {
     "privateMessages": "Private Messages",
@@ -1721,8 +1731,8 @@
     "permanentlyDelete": "Delete",
     "task": "Task",
     "deleteConfirm": "Confirm Delete",
-    "selectedItemsDeleteConfirmDesc": "It will be permanently delete the selected file(s). ",
-    "deleteFileConfirmDesc": "It will be permanently delete the selected file(s).",
+    "selectedItemsDeleteConfirmDesc": "It will be permanently delete the selected file(s). This action cannot be undone.",
+    "deleteFileConfirmDesc": "It will be permanently delete the selected file(s). This action cannot be undone.",
     "delete": "Delete",
     "assignTo": "Assign To",
     "noAssignees": "No assignees",
