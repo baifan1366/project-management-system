@@ -16,6 +16,8 @@ import { fetchTeamUsers } from "@/lib/redux/features/teamUserSlice";
 import { createTeamUserInv } from "@/lib/redux/features/teamUserInvSlice";
 import { createSelector } from '@reduxjs/toolkit';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { getSubscriptionLimit } from '@/lib/subscriptionService';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
 // 创建记忆化的选择器
 const selectTeam = createSelector(
@@ -107,6 +109,27 @@ export default function InvitationDialog({ open, onClose }) {
     const inviteLink = `${window.location.origin}/invite/${teamId}`;
     try {
       setIsLinkLoading(true);
+      
+      // Check subscription limit before allowing to copy link
+      if (user?.id) {
+        const limitCheck = await getSubscriptionLimit(user.id, 'invite_member');
+        
+        if (limitCheck && !limitCheck.allowed) {
+          // Use Redux to show limit exceeded modal
+          dispatch(limitExceeded({
+            actionType: 'invite_member',
+            origin: 'team/inviteLinkCopy',
+            limitInfo: limitCheck
+          }));
+          setIsLinkLoading(false);
+          return;
+        }
+      } else {
+        setError('User authentication required');
+        setIsLinkLoading(false);
+        return;
+      }
+      
       await navigator.clipboard.writeText(inviteLink);
       // 可以添加成功提示
     } catch (err) {
@@ -115,7 +138,7 @@ export default function InvitationDialog({ open, onClose }) {
     } finally {
       setIsLinkLoading(false);
     }
-  }, [teamId]);
+  }, [teamId, user, dispatch]);
 
   const handleSendInvite = useCallback(async (e) => {
     e.preventDefault();
@@ -131,7 +154,21 @@ export default function InvitationDialog({ open, onClose }) {
         throw new Error('未授权的操作，请先登录');
       }
 
-      // 发送邀请邮件
+      // 2. 检查订阅限制
+      const limitCheck = await getSubscriptionLimit(user.id, 'invite_member');
+      
+      if (limitCheck && !limitCheck.allowed) {
+        // 使用 Redux 的 limitExceeded action 显示限制模态框
+        dispatch(limitExceeded({
+          actionType: 'invite_member',
+          origin: 'team/inviteMember',
+          limitInfo: limitCheck
+        }));
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. 发送邀请邮件
       const response = await fetch('/api/send-team-invitation', {
         method: 'POST',
         headers: {
@@ -153,7 +190,7 @@ export default function InvitationDialog({ open, onClose }) {
         throw new Error(errorData.error || '邀请发送失败');
       }
       
-      // 2. 邮件发送成功后，创建本地邀请记录
+      // 4. 邮件发送成功后，创建本地邀请记录
       await dispatch(createTeamUserInv({
         teamId: Number(teamId),
         userEmail: email,
@@ -169,7 +206,7 @@ export default function InvitationDialog({ open, onClose }) {
     } finally {
       setIsLoading(false);
     }
-  }, [email, teamId, permission, dispatch, team]);
+  }, [email, teamId, permission, dispatch, team, user]);
 
   if (!project) {
     return null;

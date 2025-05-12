@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaFilter, FaSearch, FaEnvelope, FaBuilding, FaUser, FaClock, FaCheck, FaTimes, FaSpinner, FaReply } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
+
 export default function AdminSupport() {
   const router = useRouter();
   const params = useParams();
@@ -21,12 +23,18 @@ export default function AdminSupport() {
   const [searchQuery, setSearchQuery] = useState('');
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
+  const adminState = useSelector((state) => state.admin);
 
   // initialize the page
   useEffect(() => {
     const initAdminSupport = async () => {
       try {
         setLoading(true);
+        
+        // Set admin data from redux store
+        if (adminState.admin) {
+          setAdminData(adminState.admin);
+        }
         
         // Fetch support tickets
         await fetchSupportTickets();
@@ -41,7 +49,7 @@ export default function AdminSupport() {
     };
     
     initAdminSupport();
-  }, [dispatch, router]);
+  }, [dispatch, router, adminState.admin]);
   
   // Add useEffect to fetch tickets when filter changes
   useEffect(() => {
@@ -130,6 +138,17 @@ export default function AdminSupport() {
         updated_at: new Date().toISOString()
       });
       
+      // Show toast notification based on status
+      if (newStatus === 'IN_PROGRESS') {
+        toast.success(`Ticket #${selectedTicket.id} marked as Active`);
+      } else if (newStatus === 'COMPLETED') {
+        toast.success(`Ticket #${selectedTicket.id} marked as Closed`);
+      } else if (newStatus === 'SPAM') {
+        toast.warning(`Ticket #${selectedTicket.id} marked as Spam`);
+      } else {
+        toast.success(`Ticket #${selectedTicket.id} status updated to ${newStatus}`);
+      }
+      
       // Log activity
       if (adminData) {
         supabase.from('admin_activity_log').insert({
@@ -148,6 +167,7 @@ export default function AdminSupport() {
       
     } catch (error) {
       console.error('Error updating ticket status:', error);
+      toast.error(`Failed to update ticket status: ${error.message}`);
     }
   };
   
@@ -190,21 +210,22 @@ export default function AdminSupport() {
       }
       
       // Store the reply in the database (optional)
-      const { error: replyError } = await supabase
-        .from('support_replies')
-        .insert({
-          contact_id: selectedTicket.id,
-          admin_id: adminData.id,
-          message: replyText,
-          sent_at: new Date().toISOString()
-        });
-        
-      if (replyError) {
-        console.error('Error saving reply to database:', replyError);
-      }
-      
-      // Log the reply activity
       if (adminData) {
+        const { error: replyError } = await supabase
+          .from('support_replies')
+          .insert({
+            contact_id: selectedTicket.id,
+            admin_id: adminData.id,
+            message: replyText,
+            sent_at: new Date().toISOString()
+          });
+          
+        if (replyError) {
+          console.error('Error saving reply to database:', replyError);
+          toast.error(`Error saving reply to database: ${replyError.message}`);
+        }
+        
+        // Log the reply activity
         await supabase.from('admin_activity_log').insert({
           admin_id: adminData.id,
           action: 'reply_to_ticket',
@@ -214,22 +235,23 @@ export default function AdminSupport() {
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
         });
+      } else {
+        // If adminData is not available, just log the issue
+        console.warn('Admin data not available for logging reply activity');
       }
       
       // Clear reply text
       setReplyText('');
       
-      // Show success message (in a real app, you'd use a toast notification)
-      alert('Reply sent successfully!');
-      // toast.success('Reply sent successfully!');
+      // Show success toast notification
+      toast.success(`Reply sent to ${selectedTicket.email} successfully!`);
       
       // Refresh tickets to update the list
       fetchSupportTickets();
       
     } catch (error) {
       console.error('Error sending reply:', error);
-      alert(`Error sending reply: ${error.message}`);
-      // toast.error('Error sending reply:', error);
+      toast.error(`Error sending reply: ${error.message}`);
     }
   };
   

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { clsx } from 'clsx';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
 
 export default function AdminSubscriptions() {
   const router = useRouter();
@@ -240,123 +241,75 @@ export default function AdminSubscriptions() {
     setIsCodeSelected(null);
   };
 
-  // Fix the addPromoCode function
-  const addPromoCode = async (codeData) =>{
-    try{
-      setLoading(true);
-
-      const { data, error } = await supabase
-        .from('promo_code')
-        .insert({
-          code: codeData.code,
-          discount_type: codeData.discount_type,
-          discount_value: codeData.discount_value,
-          description: codeData.description,
-          is_active: codeData.is_active,
-          start_date: codeData.start_date,
-          end_date: codeData.end_date,
-          current_uses: 0,
-          max_uses: codeData.max_uses || 0
-        });
-        
-      if(error){
-        console.error('Error in addPromoCode:', error);
-        alert(`Failed to add promo code: ${error.message}`);
-        return false;
-      }
-
-      console.log('Promo code added successfully:', data);
-      
-      await fetchPromoCodes();
-      return true;
-
-    } catch (error) {
-      console.error('Error in addPromoCode:', error);
-      alert('An unexpected error occurred while adding the promo code');
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Update subscription plan
-  const updateSubscriptionPlan = async (planId, planData) => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('subscription_plan')
-        .update(planData)
-        .eq('id', planId);
-        
-      if (error) {
-        console.error('Error updating subscription plan:', error);
-        return;
-      }
-      
-      console.log('Subscription plan updated successfully:', data);
-      
-      // Now fetchSubscriptionPlans is accessible here
-      await fetchSubscriptionPlans();
-      
-    } catch (error) {
-      console.error('Error in updateSubscriptionPlan:', error);
-    } finally {
-      setLoading(false);
-    } 
-  };
-
-  const updatePromoCode = async (codeId, codeData) => {
-    try {
-        setLoading(true);
-        
-        const { data, error } = await supabase
-          .from('promo_code')
-          .update(codeData)
-          .eq('id', codeId);
-          
-        if (error) {
-          console.error('Error updating promo code:', error);
-          return;
-        }
-        
-        console.log('Promo code updated successfully:', data);
-        
-        // Now fetchPromoCodes is accessible here
-        await fetchPromoCodes();
-        
-      } catch (error) {
-        console.error('Error in updatePromoCode:', error);
-      } finally {
-        setLoading(false);
-      } 
-  }
   // deactivate or activate subscription plan and promo code
   const toggleActive = async (id, isActive, type) => {
     try {
       setLoading(true);
       
       if(type === 'subscription_plan'){
+        // First get the plan name
+        const { data: planData, error: planError } = await supabase
+          .from('subscription_plan')
+          .select('name')
+          .eq('id', id)
+          .single();
+          
+        if (planError) {
+          console.error('Error getting plan details:', planError);
+        }
+        
+        const planName = planData?.name || 'Plan';
+        
         const { data, error } = await supabase
           .from('subscription_plan')
           .update({ is_active: isActive })
           .eq('id', id);
 
-      if (error) {
-        console.error('Error in toggleActive:', error);
-      }
+        if (error) {
+          console.error('Error in toggleActive:', error);
+          toast.error(`Failed to update ${planName} status`, {
+            description: error.message
+          });
+          return;
+        }
+        
+        toast.success(`${planName} plan ${isActive ? 'activated' : 'deactivated'} successfully`);
 
       } else if(type === 'promo_code'){
+        // First get the code name
+        const { data: codeData, error: codeError } = await supabase
+          .from('promo_code')
+          .select('code')
+          .eq('id', id)
+          .single();
+          
+        if (codeError) {
+          console.error('Error getting promo code details:', codeError);
+        }
+        
+        const codeName = codeData?.code || 'Promo code';
+        
         const { data, error } = await supabase
           .from('promo_code')
           .update({ is_active: isActive })
           .eq('id', id);
+          
+        if (error) {
+          console.error('Error in toggleActive:', error);
+          toast.error(`Failed to update ${codeName} status`, {
+            description: error.message
+          });
+          return;
+        }
+        
+        toast.success(`Promo code "${codeName}" ${isActive ? 'activated' : 'deactivated'} successfully`);
       }
 
       await fetchSubscriptionPlans();
       await fetchPromoCodes();
     } catch (error) {
       console.error('Error in toggleActive:', error);
+      toast.error('An error occurred while updating status');
     } finally {
       setLoading(false);
     }
@@ -413,8 +366,21 @@ export default function AdminSubscriptions() {
 
   const deletePromoCode = async (codeId) => {
     try {
+      // Get the code name first
+      const { data: codeData, error: codeError } = await supabase
+        .from('promo_code')
+        .select('code')
+        .eq('id', codeId)
+        .single();
+        
+      if (codeError) {
+        console.error('Error getting promo code details:', codeError);
+      }
+      
+      const codeName = codeData?.code || 'Promo code';
+      
       // Confirm deletion
-      if (!confirm('Are you sure you want to delete this promo code?')) {
+      if (!confirm(`Are you sure you want to delete this promo code: ${codeName}?`)) {
         return;
       }
       
@@ -427,18 +393,21 @@ export default function AdminSubscriptions() {
         
       if (error) {
         console.error('Error deleting promo code:', error);
-        alert(`Failed to delete promo code: ${error.message}`);
+        toast.error(`Failed to delete ${codeName}`, {
+          description: error.message
+        });
         return;
       }
       
       console.log('Promo code deleted successfully');
+      toast.success(`Promo code "${codeName}" deleted successfully`);
       
       // Refresh the promo codes list
       await fetchPromoCodes();
       
     } catch (error) {
       console.error('Error in deletePromoCode:', error);
-      alert('An unexpected error occurred while deleting the promo code');
+      toast.error('An unexpected error occurred while deleting the promo code');
     } finally {
       setLoading(false);
     }
@@ -515,13 +484,14 @@ export default function AdminSubscriptions() {
     }
   }, [activeTab, paymentStatusFilter, paymentSearchQuery, currentPaymentPage]);
 
-  // 添加一个导出CSV功能
+  // Add toast for exporting csv
   const exportPaymentsToCSV = async () => {
     try {
-      // 显示加载状态
+      // Show loading toast
+      const loadingToast = toast.loading('Preparing payment history export...');
       setIsPaymentLoading(true);
       
-      // 获取所有支付记录，不分页
+      // Get all payment records, not paginated
       const { data, error } = await supabase
         .from('payment')
         .select(`
@@ -534,7 +504,7 @@ export default function AdminSubscriptions() {
         throw error;
       }
       
-      // 格式化数据
+      // Format data
       const formattedData = data.map(payment => ({
         'User Name': payment.user?.name || 'Unknown',
         'User Email': payment.user?.email || 'No email',
@@ -548,7 +518,7 @@ export default function AdminSubscriptions() {
         'Promo Code': payment.applied_promo_code || 'None'
       }));
       
-      // 创建CSV内容
+      // Create CSV content
       const headers = Object.keys(formattedData[0]).join(',');
       const csvRows = formattedData.map(row => 
         Object.values(row).map(value => 
@@ -557,20 +527,30 @@ export default function AdminSubscriptions() {
       );
       
       const csvContent = [headers, ...csvRows].join('\n');
+      const fileName = `payment_history_${new Date().toISOString().split('T')[0]}.csv`;
       
-      // 创建Blob和下载链接
+      // Create Blob and download link
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `payment_history_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', fileName);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
+      // Dismiss loading toast and show success toast
+      toast.dismiss(loadingToast);
+      toast.success(`Payment history exported to ${fileName}`, {
+        description: `${data.length} records exported successfully`
+      });
+      
     } catch (error) {
       console.error('Error exporting payments:', error);
+      toast.error('Error exporting payment data', {
+        description: error.message
+      });
       setPaymentError('An error occurred while exporting payment history.');
     } finally {
       setIsPaymentLoading(false);
@@ -601,6 +581,111 @@ export default function AdminSubscriptions() {
   const closeSubscriptionDetailsModal = () => {
     setIsUserSubscriptionDetailsModalOpen(false);
     setSelectedSubscriptionDetails(null);
+  };
+
+  // Update subscription plan
+  const updateSubscriptionPlan = async (planId, planData) => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('subscription_plan')
+        .update(planData)
+        .eq('id', planId);
+        
+      if (error) {
+        console.error('Error updating subscription plan:', error);
+        toast.error(`Failed to update ${planData.name}`, {
+          description: error.message
+        });
+        return;
+      }
+      
+      console.log('Subscription plan updated successfully:', data);
+      toast.success(`${planData.name} updated successfully`);
+      
+      // Now fetchSubscriptionPlans is accessible here
+      await fetchSubscriptionPlans();
+      
+    } catch (error) {
+      console.error('Error in updateSubscriptionPlan:', error);
+      toast.error('An error occurred while updating the subscription plan');
+    } finally {
+      setLoading(false);
+    } 
+  };
+
+  const updatePromoCode = async (codeId, codeData) => {
+    try {
+        setLoading(true);
+        
+        const { data, error } = await supabase
+          .from('promo_code')
+          .update(codeData)
+          .eq('id', codeId);
+          
+        if (error) {
+          console.error('Error updating promo code:', error);
+          toast.error(`Failed to update promo code "${codeData.code}"`, {
+            description: error.message
+          });
+          return;
+        }
+        
+        console.log('Promo code updated successfully:', data);
+        toast.success(`Promo code "${codeData.code}" updated successfully`);
+        
+        // Now fetchPromoCodes is accessible here
+        await fetchPromoCodes();
+        
+      } catch (error) {
+        console.error('Error in updatePromoCode:', error);
+        toast.error('An error occurred while updating the promo code');
+      } finally {
+        setLoading(false);
+      } 
+  }
+
+  // Fix the addPromoCode function
+  const addPromoCode = async (codeData) =>{
+    try{
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('promo_code')
+        .insert({
+          code: codeData.code,
+          discount_type: codeData.discount_type,
+          discount_value: codeData.discount_value,
+          description: codeData.description,
+          is_active: codeData.is_active,
+          start_date: codeData.start_date,
+          end_date: codeData.end_date,
+          current_uses: 0,
+          max_uses: codeData.max_uses || 0
+        });
+        
+      if(error){
+        console.error('Error in addPromoCode:', error);
+        toast.error(`Failed to add promo code "${codeData.code}"`, {
+          description: error.message
+        });
+        return false;
+      }
+
+      console.log('Promo code added successfully:', data);
+      toast.success(`Promo code "${codeData.code}" added successfully`);
+      
+      await fetchPromoCodes();
+      return true;
+
+    } catch (error) {
+      console.error('Error in addPromoCode:', error);
+      toast.error('An unexpected error occurred while adding the promo code');
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -1272,7 +1357,6 @@ export default function AdminSubscriptions() {
                                   {subscription.status.toUpperCase() === 'ACTIVE' ? (
                                     <button 
                                       onClick={() => {
-                                        if(confirm('Are you sure you want to cancel this subscription?')) {
                                           // Update subscription status to CANCELED
                                           supabase
                                             .from('user_subscription_plan')
@@ -1284,12 +1368,14 @@ export default function AdminSubscriptions() {
                                             .then(({error}) => {
                                               if(error) {
                                                 console.error('Error canceling subscription:', error);
-                                                alert(`Failed to cancel subscription: ${error.message}`);
+                                                toast.error(`Failed to cancel subscription for "${subscription.user?.name || 'user'}"`, {
+                                                  description: error.message
+                                                });
                                               } else {
+                                                toast.success(`Subscription for "${subscription.user?.name || 'user'}" canceled successfully`);
                                                 fetchUserSubscriptions();
                                               }
                                             });
-                                        }
                                       }}
                                       className={clsx(
                                         'text-2xl transition-colors duration-200',
@@ -1302,7 +1388,6 @@ export default function AdminSubscriptions() {
                                   ) : (
                                     <button 
                                       onClick={() => {
-                                        if(confirm('Are you sure you want to reactivate this subscription?')) {
                                           // Update subscription status to ACTIVE
                                           supabase
                                             .from('user_subscription_plan')
@@ -1314,12 +1399,14 @@ export default function AdminSubscriptions() {
                                             .then(({error}) => {
                                               if(error) {
                                                 console.error('Error reactivating subscription:', error);
-                                                alert(`Failed to reactivate subscription: ${error.message}`);
+                                                toast.error(`Failed to reactivate subscription for "${subscription.user?.name || 'user'}"`, {
+                                                  description: error.message
+                                                });
                                               } else {
+                                                toast.success(`Subscription for "${subscription.user?.name || 'user'}" reactivated successfully`);
                                                 fetchUserSubscriptions();
                                               }
                                             });
-                                        }
                                       }}
                                       className={clsx(
                                         'text-2xl transition-colors duration-200',
@@ -2272,6 +2359,10 @@ export default function AdminSubscriptions() {
                   updated_at: new Date().toISOString()
                 };
                 
+                // Get the plan name for the toast
+                const planName = subscriptionPlans.find(p => p.id === updatedData.plan_id)?.name || 'plan';
+                const userName = isUserSubscriptionPlanSelected.user?.name || 'user';
+                
                 // Update the subscription in the database
                 const { data, error } = await supabase
                   .from('user_subscription_plan')
@@ -2280,11 +2371,14 @@ export default function AdminSubscriptions() {
                 
                 if (error) {
                   console.error('Error updating user subscription:', error);
-                  alert(`Failed to update subscription: ${error.message}`);
+                  toast.error(`Failed to update subscription for "${userName}"`, {
+                    description: error.message
+                  });
                   return;
                 }
                 
                 console.log('User subscription updated successfully:', data);
+                toast.success(`Subscription for "${userName}" updated to ${planName} successfully`);
                 
                 // Refresh the user subscriptions list
                 await fetchUserSubscriptions();
@@ -2294,7 +2388,7 @@ export default function AdminSubscriptions() {
                 
               } catch (error) {
                 console.error('Error in form submission:', error);
-                alert('An unexpected error occurred while updating the subscription');
+                toast.error('An unexpected error occurred while updating the subscription');
               } finally {
                 setLoading(false);
               }
@@ -2856,7 +2950,6 @@ export default function AdminSubscriptions() {
                 {selectedSubscriptionDetails.status.toUpperCase() === 'ACTIVE' ? (
                   <button 
                     onClick={() => {
-                      if(confirm('Are you sure you want to cancel this subscription?')) {
                         // Update subscription status to CANCELED
                         supabase
                           .from('user_subscription_plan')
@@ -2868,13 +2961,15 @@ export default function AdminSubscriptions() {
                           .then(({error}) => {
                             if(error) {
                               console.error('Error canceling subscription:', error);
-                              alert(`Failed to cancel subscription: ${error.message}`);
+                              toast.error(`Failed to cancel subscription for "${selectedSubscriptionDetails.user?.name || 'user'}"`, {
+                                description: error.message
+                              });
                             } else {
+                              toast.success(`Subscription for "${selectedSubscriptionDetails.user?.name || 'user'}" canceled successfully`);
                               fetchUserSubscriptions();
                               closeSubscriptionDetailsModal();
                             }
                           });
-                      }
                     }}
                     className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm hover:bg-red-50 dark:hover:bg-red-900/20"
                   >
@@ -2883,7 +2978,6 @@ export default function AdminSubscriptions() {
                 ) : (
                   <button 
                     onClick={() => {
-                      if(confirm('Are you sure you want to reactivate this subscription?')) {
                         // Update subscription status to ACTIVE
                         supabase
                           .from('user_subscription_plan')
@@ -2895,13 +2989,15 @@ export default function AdminSubscriptions() {
                           .then(({error}) => {
                             if(error) {
                               console.error('Error reactivating subscription:', error);
-                              alert(`Failed to reactivate subscription: ${error.message}`);
+                              toast.error(`Failed to reactivate subscription for "${selectedSubscriptionDetails.user?.name || 'user'}"`, {
+                                description: error.message
+                              });
                             } else {
+                              toast.success(`Subscription for "${selectedSubscriptionDetails.user?.name || 'user'}" reactivated successfully`);
                               fetchUserSubscriptions();
                               closeSubscriptionDetailsModal();
                             }
                           });
-                      }
                     }}
                     className="px-4 py-2 border border-green-500 text-green-500 rounded-md text-sm hover:bg-green-50 dark:hover:bg-green-900/20"
                   >
