@@ -2,9 +2,10 @@ import React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useTranslations } from 'next-intl'
-import { format } from 'date-fns'
+import { format, isBefore, startOfDay } from 'date-fns'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Lock } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 
 export default function DayTasksDialog({ isOpen, setIsOpen, date, tasks, teamMembers, onTaskClick }) {
   const t = useTranslations('Calendar')
@@ -23,6 +24,9 @@ export default function DayTasksDialog({ isOpen, setIsOpen, date, tasks, teamMem
         <ScrollArea className="max-h-[60vh] mt-4">
           <div className="space-y-2">
             {tasks.map((task) => {
+              // 检查任务是否在过去
+              const isPastTask = task.dueDate && isBefore(new Date(task.dueDate), startOfDay(new Date()))
+              
               return (
                 <div
                   key={task.id}
@@ -31,7 +35,15 @@ export default function DayTasksDialog({ isOpen, setIsOpen, date, tasks, teamMem
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <h4 className="font-medium">{task.name}</h4>
+                      <div className="flex items-center">
+                        <h4 className="font-medium">{task.name}</h4>
+                        {isPastTask && (
+                          <Badge variant="outline" className="ml-2 bg-gray-100 text-gray-500 flex items-center">
+                            <Lock className="h-3 w-3 mr-1" />
+                            {t('pastTask')}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="flex items-center">

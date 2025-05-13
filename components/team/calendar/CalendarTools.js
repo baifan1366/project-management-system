@@ -23,8 +23,8 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select'
-import { format } from 'date-fns'
-import { CalendarIcon, UserPlus } from 'lucide-react'
+import { format, isBefore, startOfDay } from 'date-fns'
+import { CalendarIcon, UserPlus, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -61,9 +61,23 @@ export default function CalendarTools({
   // Form state
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [startDate, setStartDate] = useState(selectedDate || new Date())
   const [dueDate, setDueDate] = useState(selectedDate || new Date())
   const [selectedAssignees, setSelectedAssignees] = useState([])
   const [selectedSection, setSelectedSection] = useState(null)
+  
+  // 验证状态
+  const [errors, setErrors] = useState({
+    title: false,
+    description: false,
+    dates: false
+  })
+  const [errorMessages, setErrorMessages] = useState({
+    title: '',
+    description: '',
+    dates: ''
+  })
+  
   useEffect(() => {
     if (project?.theme_color) {
       setThemeColor(project.theme_color);
@@ -79,6 +93,7 @@ export default function CalendarTools({
   // Set selected date when it changes
   useEffect(() => {
     if (selectedDate) {
+      setStartDate(selectedDate)
       setDueDate(selectedDate)
     }
   }, [selectedDate])
@@ -88,25 +103,79 @@ export default function CalendarTools({
     if (isOpen) {
       setTitle('')
       setDescription('')
+      setStartDate(selectedDate || new Date())
       setDueDate(selectedDate || new Date())
       setSelectedAssignees([])
+      setErrors({
+        title: false,
+        description: false,
+        dates: false
+      })
+      setErrorMessages({
+        title: '',
+        description: '',
+        dates: ''
+      })
       if (sections.length > 0) {
         setSelectedSection(sections[0].id)
       }
     }
   }, [isOpen, selectedDate, sections])
+  
+  // 表单验证
+  useEffect(() => {
+    // 验证标题
+    const trimmedTitle = title.trim()
+    if (trimmedTitle.length < 2 && trimmedTitle.length > 0) {
+      setErrors(prev => ({ ...prev, title: true }))
+      setErrorMessages(prev => ({ ...prev, title: t('titleTooShort') }))
+    } else if (trimmedTitle.length > 100) {
+      setErrors(prev => ({ ...prev, title: true }))
+      setErrorMessages(prev => ({ ...prev, title: t('titleTooLong') }))
+    } else {
+      setErrors(prev => ({ ...prev, title: false }))
+      setErrorMessages(prev => ({ ...prev, title: '' }))
+    }
+    
+    // 验证描述
+    if (description.trim().length > 0 && description.trim().length < 10) {
+      setErrors(prev => ({ ...prev, description: true }))
+      setErrorMessages(prev => ({ ...prev, description: t('descriptionTooShort') }))
+    } else if (description.trim().length > 1000) {
+      setErrors(prev => ({ ...prev, description: true }))
+      setErrorMessages(prev => ({ ...prev, description: t('descriptionTooLong') }))
+    } else {
+      setErrors(prev => ({ ...prev, description: false }))
+      setErrorMessages(prev => ({ ...prev, description: '' }))
+    }
+    
+    // 验证日期 - 只检查dueDate是否早于startDate
+    // 不再检查dueDate是否早于当前日期，因为日历选择器已经禁用了这个选项
+    if (isBefore(dueDate, startDate)) {
+      setErrors(prev => ({ ...prev, dates: true }))
+      setErrorMessages(prev => ({ ...prev, dates: t('dueDateBeforeStartDate') }))
+    } else {
+      setErrors(prev => ({ ...prev, dates: false }))
+      setErrorMessages(prev => ({ ...prev, dates: '' }))
+    }
+  }, [title, description, startDate, dueDate, t])
+
+  // 检查表单是否有效
+  const isFormValid = () => {
+    const isTitleValid = title.trim().length >= 2 && title.trim().length <= 100
+    const isDescriptionValid = description.trim().length === 0 || (description.trim().length >= 10 && description.trim().length <= 1000)
+    const isDatesValid = !isBefore(dueDate, startDate) // 只检查dueDate是否早于startDate
+    const isSectionSelected = !!selectedSection
+    
+    return isTitleValid && isDescriptionValid && isDatesValid && isSectionSelected
+  }
 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    if (!title.trim()) {
-      toast.error(t('titleRequired'))
-      return
-    }
-    
-    if (!selectedSection) {
-      toast.error(t('sectionRequired'))
+    if (!isFormValid()) {
+      toast.error(t('formHasErrors'))
       return
     }
     
@@ -121,16 +190,19 @@ export default function CalendarTools({
       const descriptionTagId = await dispatch(getTagByName("Description")).unwrap()
       const dueDateTagId = await dispatch(getTagByName("Due Date")).unwrap()
       const assigneesTagId = await dispatch(getTagByName("Assignee")).unwrap()
+      const startDateTagId = await dispatch(getTagByName("Start Date")).unwrap()
       
       console.log('获取到的标签IDs:', {
         titleTagId, descriptionTagId, dueDateTagId, 
-        assigneesTagId
+        assigneesTagId, startDateTagId
       })
       
       // 准备任务数据
       const taskData = {
         tag_values: {
           [titleTagId]: title.trim(),
+          [dueDateTagId]: format(dueDate, 'yyyy-MM-dd'),
+          [startDateTagId]: format(startDate, 'yyyy-MM-dd')
         },
         created_by: currentUser.id
       }
@@ -139,8 +211,6 @@ export default function CalendarTools({
       if (description.trim()) {
         taskData.tag_values[descriptionTagId] = description.trim()
       }
-      
-      taskData.tag_values[dueDateTagId] = format(dueDate, 'yyyy-MM-dd')
       
       if (selectedAssignees.length > 0) {
         taskData.tag_values[assigneesTagId] = selectedAssignees
@@ -236,22 +306,37 @@ export default function CalendarTools({
         
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="title" className="text-right pt-2">
                 {t('title')} *
               </Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={t('taskTitlePlaceholder')}
-                className="col-span-3"
-                required
-              />
+              <div className="col-span-3 space-y-1">
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={t('taskTitlePlaceholder')}
+                  className={cn(errors.title && "border-red-500")}
+                  required
+                />
+                <div className="flex justify-between items-center">
+                  {errors.title ? (
+                    <p className="text-xs text-red-500 flex items-center">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      {errorMessages.title}
+                    </p>
+                  ) : (
+                    <span className="text-xs text-muted-foreground opacity-0">占位</span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {title.trim().length}/100
+                  </span>
+                </div>
+              </div>
             </div>
             
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="section" className="text-right">
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="section" className="text-right pt-2">
                 {t('section')} *
               </Label>
               <Select 
@@ -275,41 +360,67 @@ export default function CalendarTools({
               <Label htmlFor="description" className="text-right pt-2">
                 {t('description')}
               </Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder={t('taskDescriptionPlaceholder')}
-                className="col-span-3 min-h-24"
-              />
+              <div className="col-span-3 space-y-1">
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={t('taskDescriptionPlaceholder')}
+                  className={cn("min-h-24", errors.description && "border-red-500")}
+                />
+                <div className="flex justify-between items-center">
+                  {errors.description ? (
+                    <p className="text-xs text-red-500 flex items-center">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      {errorMessages.description}
+                    </p>
+                  ) : (
+                    <span className="text-xs text-muted-foreground opacity-0">占位</span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {description.trim().length}/1000
+                  </span>
+                </div>
+              </div>
             </div>
             
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="dueDate" className="text-right">
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="dueDate" className="text-right pt-2">
                 {t('dueDate')}
               </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "col-span-3 justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate ? format(dueDate, 'PPP') : <span>{t('selectDate')}</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={dueDate}
-                    onSelect={(date) => setDueDate(date || new Date())}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="col-span-3 space-y-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="dueDate"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dueDate && "text-muted-foreground",
+                        errors.dates && "border-red-500"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dueDate ? format(dueDate, 'PPP') : <span>{t('selectDate')}</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dueDate}
+                      onSelect={(date) => setDueDate(date || new Date())}
+                      initialFocus
+                      disabled={(date) => isBefore(date, startOfDay(new Date()))}
+                    />
+                  </PopoverContent>
+                </Popover>
+                {errors.dates && (
+                  <p className="text-xs text-red-500 flex items-center">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    {errorMessages.dates}
+                  </p>
+                )}
+              </div>
             </div>            
             
             <div className="grid grid-cols-4 items-start gap-4">
@@ -389,7 +500,7 @@ export default function CalendarTools({
             <Button 
               type="submit"
               variant={themeColor}
-              disabled={taskStatus === 'loading'}
+              disabled={taskStatus === 'loading' || !isFormValid()}
             >
               {taskStatus === 'loading' ? t('creating') : t('create')}
             </Button>
