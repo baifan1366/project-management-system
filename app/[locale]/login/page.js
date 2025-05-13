@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaGoogle, FaGithub, FaEye, FaEyeSlash, FaQuestionCircle } from 'react-icons/fa';
+import { FaGoogle, FaGithub, FaEye, FaEyeSlash, FaQuestionCircle, FaCheck, FaTimes } from 'react-icons/fa';
 import LogoImage from '../../../public/logo.png';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -30,12 +30,64 @@ export default function LoginPage() {
   });
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
   const { user, isLoading: userLoading } = useGetUser();
   // Use our custom auth hook
   const { login, error: authError } = useAuth();
+  const [passwordRequirements, setPasswordRequirements] = useState({
+    minLength: false,
+    uppercase: false,
+    lowercase: false,
+    number: false,
+    special: false,
+  });
+
+  // Check requirements whenever password changes
+  useEffect(() => {
+    if (formData.password) {
+      setPasswordRequirements({
+        minLength: formData.password.length >= 8,
+        uppercase: /[A-Z]/.test(formData.password),
+        lowercase: /[a-z]/.test(formData.password),
+        number: /[0-9]/.test(formData.password),
+        special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(formData.password),
+      });
+    } else {
+      setPasswordRequirements({
+        minLength: false,
+        uppercase: false,
+        lowercase: false,
+        number: false,
+        special: false,
+      });
+    }
+  }, [formData.password]);
+
+  // Password validation function
+  const validatePassword = (password) => {
+    // Check if all requirements are met
+    const allRequirementsMet = Object.values(passwordRequirements).every(req => req === true);
+    
+    if (!allRequirementsMet) {
+      // Find the first requirement that's not met
+      if (!passwordRequirements.minLength) {
+        return { valid: false, message: t('password.minLength') };
+      } else if (!passwordRequirements.uppercase) {
+        return { valid: false, message: t('password.uppercase') };
+      } else if (!passwordRequirements.lowercase) {
+        return { valid: false, message: t('password.lowercase') };
+      } else if (!passwordRequirements.number) {
+        return { valid: false, message: t('password.number') };
+      } else if (!passwordRequirements.special) {
+        return { valid: false, message: t('password.special') };
+      }
+    }
+    
+    return { valid: true, message: '' };
+  };
 
   // 添加自动重定向检查
   useEffect(() => {
@@ -104,6 +156,11 @@ export default function LoginPage() {
       ...formData,
       [e.target.name]: e.target.value,
     });
+    
+    // Clear password error when user types
+    if (e.target.name === 'password') {
+      setPasswordError('');
+    }
   };
 
   const handleRememberMeChange = (e) => {
@@ -113,6 +170,15 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setPasswordError('');
+    
+    // Validate password format
+    const { valid, message } = validatePassword(formData.password);
+    if (!valid) {
+      setPasswordError(message);
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -235,6 +301,18 @@ export default function LoginPage() {
     setShowPasswordTooltip(!showPasswordTooltip);
   };
 
+  // Validate password on blur
+  const handlePasswordBlur = () => {
+    if (formData.password) {
+      const { valid, message } = validatePassword(formData.password);
+      if (!valid) {
+        setPasswordError(message);
+      } else {
+        setPasswordError('');
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen min-w-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 dotted-bg">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -307,7 +385,8 @@ export default function LoginPage() {
                 placeholder="Password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 pr-20"
+                onBlur={handlePasswordBlur}
+                className={`w-full px-4 py-3 rounded-lg border ${passwordError ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 pr-20`}
                 required
                 autoComplete={rememberMe ? 'current-password' : 'off'}
               />
@@ -333,21 +412,74 @@ export default function LoginPage() {
                   >
                     <FaQuestionCircle className="h-4 w-4" />
                   </button>
-                  {showPasswordTooltip && (
-                    <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-white dark:bg-gray-700 rounded-lg shadow-lg text-xs text-gray-600 dark:text-gray-200 z-10">
-                      <p className="font-semibold mb-1">{t('password.requirementsTitle')}</p>
-                      <ul className="space-y-1 list-disc pl-4">
-                        <li>{t('password.minLength')}</li>
-                        <li>{t('password.uppercase')}</li>
-                        <li>{t('password.lowercase')}</li>
-                        <li>{t('password.number')}</li>
-                        <li>{t('password.special')}</li>
-                      </ul>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
+            
+            {/* Password requirements visualization - conditionally shown */}
+            {formData.password.length > 0 && (
+              <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 space-y-1">
+                <p className="font-semibold">{t('password.requirementsTitle')}</p>
+                <ul className="space-y-1">
+                  <li className="flex items-center">
+                    {passwordRequirements.minLength ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.minLength ? "text-green-500" : "text-red-500"}>
+                      {t('password.minLength')}
+                    </span>
+                  </li>
+                  <li className="flex items-center">
+                    {passwordRequirements.uppercase ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.uppercase ? "text-green-500" : "text-red-500"}>
+                      {t('password.uppercase')}
+                    </span>
+                  </li>
+                  <li className="flex items-center">
+                    {passwordRequirements.lowercase ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.lowercase ? "text-green-500" : "text-red-500"}>
+                      {t('password.lowercase')}
+                    </span>
+                  </li>
+                  <li className="flex items-center">
+                    {passwordRequirements.number ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.number ? "text-green-500" : "text-red-500"}>
+                      {t('password.number')}
+                    </span>
+                  </li>
+                  <li className="flex items-center">
+                    {passwordRequirements.special ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.special ? "text-green-500" : "text-red-500"}>
+                      {t('password.special')}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            )}
+
+            {passwordError && (
+              <div className="text-red-500 dark:text-red-400 text-sm">
+                {passwordError}
+              </div>
+            )}
 
             <div className="flex items-center justify-between">
               <div className="flex items-center">

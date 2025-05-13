@@ -24,6 +24,7 @@ export default function ProfilePage() {
     phone: '',
     email: ''
   });
+  const [phoneError, setPhoneError] = useState('');
   const [providerData, setProviderData] = useState({
     googleConnected: false,
     githubConnected: false,
@@ -60,6 +61,27 @@ export default function ProfilePage() {
     if (googleConnected) {
       checkCalendarScope();
     }
+  };
+
+  // Phone validation function
+  const validatePhone = (phone) => {
+    // Allow empty phone numbers (optional field)
+    if (!phone) return { valid: true, message: '' };
+    
+    // Basic phone validation: minimum 7 digits, can contain +, -, (), and spaces
+    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/;
+    
+    if (!phoneRegex.test(phone)) {
+      return { valid: false, message: t('phoneInvalid') || 'Please enter a valid phone number' };
+    }
+    
+    // Check minimum digits (excluding non-numeric characters)
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (digitsOnly.length < 7) {
+      return { valid: false, message: t('phoneMinDigits') || 'Phone number must have at least 7 digits' };
+    }
+    
+    return { valid: true, message: '' };
   };
 
   // Move the checkCalendarScope function to useCallback to prevent dependency loops
@@ -132,10 +154,35 @@ export default function ProfilePage() {
       ...prev,
       [name]: value
     }));
+    
+    // Clear phone error when typing
+    if (name === 'phone') {
+      setPhoneError('');
+    }
+  };
+
+  // Validate phone on blur
+  const handlePhoneBlur = () => {
+    if (formData.phone) {
+      const { valid, message } = validatePhone(formData.phone);
+      if (!valid) {
+        setPhoneError(message);
+      } else {
+        setPhoneError('');
+      }
+    }
   };
 
   const handleSaveProfile = async () => {
     if (!user) return;
+    
+    // Validate phone before saving
+    const { valid, message } = validatePhone(formData.phone);
+    if (!valid) {
+      setPhoneError(message);
+      return;
+    }
+    
     setLoading(true);
     
     const profileData = {
@@ -414,15 +461,20 @@ export default function ProfilePage() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    placeholder={t('phone')}
+                    onBlur={handlePhoneBlur}
+                    placeholder="+1 (123) 456-7890"
+                    className={phoneError ? 'border-red-500 focus:ring-red-500' : ''}
                   />
+                  {phoneError && (
+                    <p className="text-sm text-red-500 mt-1">{phoneError}</p>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSaveProfile} disabled={loading}>
+          <Button onClick={handleSaveProfile} disabled={loading || !!phoneError}>
             {loading ? t('saving') : t('saveChanges')}
           </Button>
         </CardFooter>

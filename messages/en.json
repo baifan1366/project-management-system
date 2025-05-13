@@ -102,6 +102,19 @@
     "passwordChanged": "Password has been changed successfully",
     "timezone": "Timezone",
     "timeFormat": "Time Format",
+    "password": {
+      "requirementsTitle": "Password Requirements:",
+      "minLength": "At least 8 characters",
+      "uppercase": "At least 1 uppercase letter",
+      "lowercase": "At least 1 lowercase letter",
+      "number": "At least 1 number",
+      "special": "At least 1 special character (e.g. @#$%)",
+      "match": "Passwords do not match",
+      "rememberMe": "Remember me",
+      "show": "Show password",
+      "hide": "Hide password",
+      "requirements": "Password requirements"
+    },
     "languages": {
       "chinese": "Chinese",
       "english": "English",
