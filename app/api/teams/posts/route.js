@@ -43,6 +43,22 @@ export async function POST(request) {
   try {
     const post = await request.json();
     
+    // 确保使用正确的字段
+    if (!post.comment_id && post.comments) {
+      post.comment_id = [];
+      delete post.comments;
+    }
+    
+    if (!post.attachment_id && post.attachments) {
+      post.attachment_id = [];
+      delete post.attachments;
+    }
+    
+    // 移除tags字段如果存在
+    if (post.tags) {
+      delete post.tags;
+    }
+    
     const { data, error } = await supabase
       .from('team_post')
       .insert(post)
@@ -65,6 +81,22 @@ export async function PUT(request) {
     
     if (!id) {
       return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
+    }
+    
+    // 确保使用正确的字段
+    if (updateData.comments) {
+      updateData.comment_id = updateData.comment_id || [];
+      delete updateData.comments;
+    }
+    
+    if (updateData.attachments) {
+      updateData.attachment_id = updateData.attachment_id || [];
+      delete updateData.attachments;
+    }
+    
+    // 移除tags字段如果存在
+    if (updateData.tags) {
+      delete updateData.tags;
     }
 
     const { data, error } = await supabase
@@ -196,31 +228,102 @@ export async function PATCH(request) {
           return NextResponse.json({ error: 'userId, userName, and content are required' }, { status: 400 });
         }
         
-        // First get the current post to access its comments
+        // 首先在comments表中插入新评论
+        const { data: newComment, error: commentError } = await supabase
+          .from('comment')
+          .insert({
+            user_id: userId,
+            content: content,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+          
+        if (commentError) throw commentError;
+        
+        // 然后获取当前帖子以更新comment_id数组
         const { data: post, error: fetchError } = await supabase
           .from('team_post')
-          .select('comments')
+          .select('comment_id')
           .eq('id', postId)
           .single();
 
         if (fetchError) throw fetchError;
 
-        // Create new comment
-        const newComment = {
-          id: Date.now().toString(),
-          user_id: userId,
-          user_name: userName,
-          content,
-          created_at: new Date().toISOString()
-        };
+        // 更新评论ID数组
+        const updatedCommentIds = [...(post.comment_id || []), newComment.id];
 
-        // Add comment to existing comments
-        const updatedComments = [...(post.comments || []), newComment];
-
-        // Update post with new comments
+        // 更新帖子的comment_id字段
         const { data: updatedPost, error: updateError } = await supabase
           .from('team_post')
-          .update({ comments: updatedComments })
+          .update({ comment_id: updatedCommentIds })
+          .eq('id', postId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        
+        // 返回更新后的帖子和新评论信息
+        return NextResponse.json({
+          ...updatedPost,
+          newComment
+        });
+      }
+      
+      case 'addAttachment': {
+        const { attachmentId } = data;
+        
+        if (!attachmentId) {
+          return NextResponse.json({ error: 'attachmentId is required' }, { status: 400 });
+        }
+        
+        // 获取当前帖子以更新attachment_id数组
+        const { data: post, error: fetchError } = await supabase
+          .from('team_post')
+          .select('attachment_id')
+          .eq('id', postId)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // 更新附件ID数组
+        const updatedAttachmentIds = [...(post.attachment_id || []), attachmentId];
+
+        // 更新帖子的attachment_id字段
+        const { data: updatedPost, error: updateError } = await supabase
+          .from('team_post')
+          .update({ attachment_id: updatedAttachmentIds })
+          .eq('id', postId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        return NextResponse.json(updatedPost);
+      }
+      
+      case 'removeAttachment': {
+        const { attachmentId } = data;
+        
+        if (!attachmentId) {
+          return NextResponse.json({ error: 'attachmentId is required' }, { status: 400 });
+        }
+        
+        // 获取当前帖子以更新attachment_id数组
+        const { data: post, error: fetchError } = await supabase
+          .from('team_post')
+          .select('attachment_id')
+          .eq('id', postId)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // 从数组中移除指定的附件ID
+        const updatedAttachmentIds = (post.attachment_id || []).filter(id => id !== attachmentId);
+
+        // 更新帖子的attachment_id字段
+        const { data: updatedPost, error: updateError } = await supabase
+          .from('team_post')
+          .update({ attachment_id: updatedAttachmentIds })
           .eq('id', postId)
           .select()
           .single();

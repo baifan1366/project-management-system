@@ -635,7 +635,8 @@ const TeamCustomFieldPage = () => {
           <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex">
-                {currentItem?.custom_field?.type !== 'FILES' && (
+                {/* if currentItem?.custom_field?.type !== 'FILES' and POSTS */}
+                {currentItem?.custom_field?.type !== 'FILES' && currentItem?.custom_field?.type !== 'POSTS' && (
                   <>
                     <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
                       <Plus className="h-4 w-4 mr-1" />
