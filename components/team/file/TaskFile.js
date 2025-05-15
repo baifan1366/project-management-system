@@ -1199,7 +1199,7 @@ export default function TaskFile({ taskId, teamId }) {
           {currentPath !== '/' && (
             <Button 
               variant="ghost" 
-              className="gap-1 text-gray-800 hover:text-black hover:font-medium transition-colors"
+              className="gap-1 text-muted-foreground transition-colors"
               onClick={navigateBack}
             >
               <ChevronDown className="h-4 w-4 mr-1 rotate-90" />
@@ -1423,8 +1423,10 @@ export default function TaskFile({ taskId, teamId }) {
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               className="col-span-3"
+              minLength={2}
               maxLength={100}
             />
+            <span className="text-xs text-gray-500 text-right">{newFolderName.trim().length}/100</span>
           </div>
           <DialogFooter>
             <Button 
@@ -1438,7 +1440,12 @@ export default function TaskFile({ taskId, teamId }) {
             >
               {t('cancel')}
             </Button>
-            <Button type="button" variant={themeColor} onClick={createNewFolder} disabled={isCreatingFolder || !newFolderName.trim()}>
+            <Button 
+              type="button" 
+              variant={themeColor} 
+              onClick={createNewFolder} 
+              disabled={isCreatingFolder || !newFolderName.trim() || newFolderName.trim().length < 2}
+            >
               {isCreatingFolder ? t('creating') : t('create')}
             </Button>
           </DialogFooter>

@@ -189,12 +189,12 @@ CREATE TABLE "team_post" (
   "id" SERIAL PRIMARY KEY,
   "title" VARCHAR(255) NOT NULL,
   "description" TEXT,
+  "type" TEXT NOT NULL CHECK ("type" IN ('post', 'announcement')),
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "section_id" INT REFERENCES "section"("id") ON DELETE SET NULL,
+  "attachment_id" INT[] DEFAULT '{}', -- Array of attachments associated with the post
   "is_pinned" BOOLEAN DEFAULT FALSE,
   "reactions" JSONB DEFAULT '{}', -- Store reactions as {emoji: [user_ids]} format
-  "tags" TEXT[] DEFAULT '{}', -- Array of tags associated with the post
-  "comments" JSONB DEFAULT '[]', -- Store comments directly in the post
+  "comment_id" INT[] DEFAULT '{}', -- Array of comments associated with the post
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -202,7 +202,7 @@ CREATE TABLE "team_post" (
 
 -- Create indexes for better performance
 CREATE INDEX idx_team_post_team_id ON "team_post"("team_id");
-CREATE INDEX idx_team_post_section_id ON "team_post"("section_id");
+CREATE INDEX idx_team_post_attachment_id ON "team_post"("attachment_id");
 CREATE INDEX idx_team_post_created_by ON "team_post"("created_by");
 CREATE INDEX idx_team_post_created_at ON "team_post"("created_at");
 CREATE INDEX idx_team_post_is_pinned ON "team_post"("is_pinned");
