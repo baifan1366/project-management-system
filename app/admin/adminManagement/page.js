@@ -198,77 +198,6 @@ export default function AdminUserManagement() {
     setSelectedAdmin(null);
   };
   
-  // Edit admin
-  const editAdmin = async (newAdminData) => {
-    try {
-      // Verify permission
-      if (!hasPermission('edit_admins')) {
-        toast.error('Permission denied: You do not have permission to edit admin users');
-        throw new Error('You do not have permission to edit admin users');
-      }
-      
-      // Create a filtered version of newAdminData that only includes non-empty values
-      const filteredAdminData = {};
-      
-      // Only include fields that have values
-      if (newAdminData.username && newAdminData.username.trim() !== '') {
-        filteredAdminData.username = newAdminData.username;
-      }
-      
-      if (newAdminData.full_name) {
-        filteredAdminData.full_name = newAdminData.full_name;
-      }
-      
-      if (newAdminData.email && newAdminData.email.trim() !== '') {
-        filteredAdminData.email = newAdminData.email;
-      }
-      
-      if (newAdminData.password_hash && newAdminData.password_hash.trim() !== '') {
-        filteredAdminData.password_hash = newAdminData.password_hash;
-      }
-      
-      // Always update the updated_at timestamp
-      filteredAdminData.updated_at = new Date().toISOString();
-      
-      const { error } = await supabase
-        .from('admin_user')
-        .update(filteredAdminData)
-        .eq('id', selectedAdmin.id);
-      
-      if (error) {
-        toast.error(`Failed to update admin: ${error.message}`);
-        throw error;
-      }
-      
-      // Update local data
-      setAdmins(admins.map(admin => 
-        admin.id === selectedAdmin.id ? { ...admin, ...filteredAdminData } : admin
-      ));
-      
-      // Log activity
-      if (adminData) {
-        await supabase.from('admin_activity_log').insert([{
-          admin_id: adminData.id,
-          action: 'update_admin_user',
-          entity_type: 'admin_user',
-          entity_id: String(selectedAdmin.id),
-          details: { updated_fields: Object.keys(filteredAdminData) },
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        }]);
-      }
-      
-      toast.success(`Admin user "${selectedAdmin.username}" updated successfully`);
-      closeModal();
-      
-      // Refresh admin data to ensure permissions are correctly displayed
-      fetchAdminUsers();
-      
-    } catch (error) {
-      toast.error(`Error updating admin user: ${error.message}`);
-    }
-  };
-  
   // Initialize permissions for a new admin user
   const initializeAdminPermissions = async (adminId) => {
     try {
@@ -345,6 +274,137 @@ export default function AdminUserManagement() {
     }
   };
 
+  // Edit admin
+  const editAdmin = async (newAdminData) => {
+    try {
+      // Verify permission
+      if (!hasPermission('edit_admins')) {
+        toast.error('Permission denied: You do not have permission to edit admin users');
+        throw new Error('You do not have permission to edit admin users');
+      }
+      
+      // Create a filtered version of newAdminData that only includes non-empty values
+      const filteredAdminData = {};
+      
+      // Check for duplicate username if username is being updated
+      if (newAdminData.username && newAdminData.username.trim() !== '') {
+        // Only check for duplicates if the username is different from the current one
+        if (newAdminData.username !== selectedAdmin.username) {
+          // Check if username already exists for another admin
+          const { data: existingUserByUsername, error: usernameCheckError } = await supabase
+            .from('admin_user')
+            .select('id')
+            .eq('username', newAdminData.username)
+            .not('id', 'eq', selectedAdmin.id) // Exclude the current admin from the check
+            .single();
+          
+          if (existingUserByUsername) {
+            toast.error('Another admin with this username already exists');
+            return;
+          }
+          
+          if (usernameCheckError && usernameCheckError.code !== 'PGRST116') {
+            toast.error(`Error checking existing username: ${usernameCheckError.message}`);
+            throw usernameCheckError;
+          }
+        }
+        
+        filteredAdminData.username = newAdminData.username;
+      }
+      
+      if (newAdminData.full_name) {
+        filteredAdminData.full_name = newAdminData.full_name;
+      }
+      
+      // Check for duplicate email if email is being updated
+      if (newAdminData.email && newAdminData.email.trim() !== '') {
+        // Only check for duplicates if the email is different from the current one
+        if (newAdminData.email !== selectedAdmin.email) {
+          // Check if email already exists for another admin
+          const { data: existingUserByEmail, error: emailCheckError } = await supabase
+            .from('admin_user')
+            .select('id')
+            .eq('email', newAdminData.email)
+            .not('id', 'eq', selectedAdmin.id) // Exclude the current admin from the check
+            .single();
+          
+          if (existingUserByEmail) {
+            toast.error('Another admin with this email address already exists');
+            return;
+          }
+          
+          if (emailCheckError && emailCheckError.code !== 'PGRST116') {
+            toast.error(`Error checking existing email: ${emailCheckError.message}`);
+            throw emailCheckError;
+          }
+        }
+        
+        filteredAdminData.email = newAdminData.email;
+      }
+      
+      if (newAdminData.password_hash && newAdminData.password_hash.trim() !== '') {
+        filteredAdminData.password_hash = newAdminData.password_hash;
+      }
+      
+      // Always update the updated_at timestamp
+      filteredAdminData.updated_at = new Date().toISOString();
+      
+      // Only proceed with update if there are fields to update
+      if (Object.keys(filteredAdminData).length === 1 && filteredAdminData.updated_at) {
+        toast.info('No changes to update');
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('admin_user')
+        .update(filteredAdminData)
+        .eq('id', selectedAdmin.id);
+      
+      if (error) {
+        // Handle specific database errors
+        if (error.code === '23505') {
+          if (error.message.includes('email')) {
+            toast.error('Another admin with this email already exists');
+          } else if (error.message.includes('username')) {
+            toast.error('Another admin with this username already exists');
+          } else {
+            toast.error(`Database constraint violation: ${error.message}`);
+          }
+        } else {
+          toast.error(`Failed to update admin: ${error.message}`);
+        }
+        throw error;
+      }
+      
+      // Update local data
+      setAdmins(admins.map(admin => 
+        admin.id === selectedAdmin.id ? { ...admin, ...filteredAdminData } : admin
+      ));
+      
+      // Log activity
+      if (adminData) {
+        await supabase.from('admin_activity_log').insert([{
+          admin_id: adminData.id,
+          action: 'update_admin_user',
+          entity_type: 'admin_user',
+          entity_id: String(selectedAdmin.id),
+          details: { updated_fields: Object.keys(filteredAdminData) },
+          ip_address: '127.0.0.1',
+          user_agent: navigator.userAgent
+        }]);
+      }
+      
+      toast.success(`Admin user "${filteredAdminData.username || selectedAdmin.username}" updated successfully`);
+      closeModal();
+      
+      // Refresh admin data to ensure permissions are correctly displayed
+      fetchAdminUsers();
+      
+    } catch (error) {
+      console.error('Error updating admin user:', error);
+    }
+  };
+
   // Create new admin
   const createAdmin = async (adminUserData) => {
     try {
@@ -354,8 +414,32 @@ export default function AdminUserManagement() {
         throw new Error('You do not have permission to create admin users');
       }
       
-      // For simplicity, in a real app you would hash the password properly
-      // and handle authentication through your auth provider
+      // Check for both duplicate email and username in a single query
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('admin_user')
+        .select('id, email, username')
+        .or(`email.eq.${adminUserData.email},username.eq.${adminUserData.username}`);
+      
+      if (checkError) {
+        toast.error(`Error checking existing admins: ${checkError.message}`);
+        throw checkError;
+      }
+      
+      // Check for duplicate email
+      const duplicateEmail = existingUsers?.find(user => user.email === adminUserData.email);
+      if (duplicateEmail) {
+        toast.error('An admin with this email address already exists');
+        return;
+      }
+      
+      // Check for duplicate username
+      const duplicateUsername = existingUsers?.find(user => user.username === adminUserData.username);
+      if (duplicateUsername) {
+        toast.error('An admin with this username already exists');
+        return;
+      }
+      
+      // Continue with creating the admin user
       const { data, error } = await supabase
         .from('admin_user')
         .insert({
@@ -369,9 +453,20 @@ export default function AdminUserManagement() {
         })
         .select()
         .single();
-      
+        
       if (error) {
-        toast.error(`Failed to create admin: ${error.message}`);
+        // Handle specific database errors
+        if (error.code === '23505') {
+          if (error.message.includes('email')) {
+            toast.error('An admin with this email already exists');
+          } else if (error.message.includes('username')) {
+            toast.error('An admin with this username already exists');
+          } else {
+            toast.error(`Database constraint violation: ${error.message}`);
+          }
+        } else {
+          toast.error(`Failed to create admin: ${error.message}`);
+        }
         throw error;
       }
       
@@ -404,7 +499,8 @@ export default function AdminUserManagement() {
       fetchAdminUsers();
       
     } catch (error) {
-      toast.error(`Error creating admin user: ${error.message}`);
+      // Error is already handled in the specific code blocks
+      console.error('Error creating admin user:', error);
     }
   };
   

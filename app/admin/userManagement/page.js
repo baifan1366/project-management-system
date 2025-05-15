@@ -126,6 +126,48 @@ export default function UserManagement() {
       // Store original user data for activity logging
       const originalUserData = { ...selectedUser };
       
+      // Check if email is being changed
+      if (userData.email && userData.email !== originalUserData.email) {
+        // Check if the new email already exists for a different user
+        const { data: existingUsers, error: checkError } = await supabase
+          .from('user')
+          .select('id')
+          .eq('email', userData.email)
+          .neq('id', selectedUser.id); // Exclude the current user
+        
+        if (checkError) {
+          console.error('Error checking existing user:', checkError);
+          toast.error(`Error checking existing user: ${checkError.message}`);
+          throw checkError;
+        }
+        
+        if (existingUsers && existingUsers.length > 0) {
+          toast.error('A user with this email address already exists');
+          return;
+        }
+      }
+      
+      // Check if phone is being changed
+      if (userData.phone && userData.phone !== originalUserData.phone) {
+        // Check if the new phone already exists for a different user
+        const { data: existingPhones, error: phoneCheckError } = await supabase
+          .from('user')
+          .select('id')
+          .eq('phone', userData.phone)
+          .neq('id', selectedUser.id); // Exclude the current user
+        
+        if (phoneCheckError) {
+          console.error('Error checking existing phone:', phoneCheckError);
+          toast.error(`Error checking existing phone: ${phoneCheckError.message}`);
+          throw phoneCheckError;
+        }
+        
+        if (existingPhones && existingPhones.length > 0) {
+          toast.error('A user with this phone number already exists');
+          return;
+        }
+      }
+      
       // Handle checkbox inputs that come as 'on' or undefined
       if ('notifications_enabled' in userData) {
         userData.notifications_enabled = userData.notifications_enabled === 'on';
@@ -142,7 +184,21 @@ export default function UserManagement() {
         .single();
       
       if (error) {
-        toast.error(`Failed to update user: ${error.message}`);
+        console.error('Supabase error:', error);
+        
+        // Handle specific database errors
+        if (error.code === '23505') {
+          if (error.message.includes('email')) {
+            toast.error('A user with this email address already exists');
+          } else if (error.message.includes('phone')) {
+            toast.error('A user with this phone number already exists');
+          } else {
+            toast.error(`Database constraint violation: ${error.message}`);
+          }
+          error.isHandled = true;
+        } else {
+          toast.error(`Failed to update user: ${error.message}`);
+        }
         throw error;
       }
       
@@ -185,7 +241,10 @@ export default function UserManagement() {
       
     } catch (error) {
       console.error('Error updating user:', error);
-      toast.error(`Failed to update user: ${error.message}`);
+      // Don't double-toast errors that are already handled
+      if (!error.isHandled) {
+        toast.error(`Failed to update user: ${error.message}`);
+      }
     } finally {
       setProcessing(false);
     }
@@ -273,6 +332,43 @@ export default function UserManagement() {
   const addUser = async (userData) => {
     try {
       setProcessing(true);
+      
+      // First, check if email already exists
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('user')
+        .select('id')
+        .eq('email', userData.email);
+      
+      if (checkError) {
+        console.error('Error checking existing user:', checkError);
+        toast.error(`Error checking existing user: ${checkError.message}`);
+        throw checkError;
+      }
+      
+      if (existingUsers && existingUsers.length > 0) {
+        toast.error('A user with this email address already exists');
+        return;
+      }
+      
+      // If phone is provided, check for duplicate phone
+      if (userData.phone) {
+        const { data: existingPhones, error: phoneCheckError } = await supabase
+          .from('user')
+          .select('id')
+          .eq('phone', userData.phone);
+          
+        if (phoneCheckError) {
+          console.error('Error checking existing phone:', phoneCheckError);
+          toast.error(`Error checking existing phone: ${phoneCheckError.message}`);
+          throw phoneCheckError;
+        }
+        
+        if (existingPhones && existingPhones.length > 0) {
+          toast.error('A user with this phone number already exists');
+          return;
+        }
+      }
+      
       // Generate a proper UUID (follows RFC4122 format)
       const id = crypto.randomUUID ? crypto.randomUUID() : 
         'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -301,7 +397,20 @@ export default function UserManagement() {
       
       if (error) {
         console.error('Supabase error:', error);
-        toast.error(`Failed to add user: ${error.message}`);
+        
+        // Handle specific database errors
+        if (error.code === '23505') {
+          if (error.message.includes('email')) {
+            toast.error('A user with this email address already exists');
+          } else if (error.message.includes('phone')) {
+            toast.error('A user with this phone number already exists');
+          } else {
+            toast.error(`Database constraint violation: ${error.message}`);
+          }
+          error.isHandled = true;
+        } else {
+          toast.error(`Failed to add user: ${error.message}`);
+        }
         throw error;
       }
       
@@ -326,7 +435,10 @@ export default function UserManagement() {
       
     } catch (error) {
       console.error('Error adding user:', error);
-      toast.error(`Failed to add user: ${error.message}`);
+      // Don't double-toast errors that are already handled above
+      if (!error.isHandled) {
+        toast.error(`Failed to add user: ${error.message}`);
+      }
     } finally {
       setProcessing(false);
     }
