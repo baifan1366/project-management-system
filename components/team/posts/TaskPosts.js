@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Filter, Search, SortAsc, Grid3X3, List, Moon, Sun, Bookmark, Heart, MessageSquare, MoreHorizontal, ThumbsUp, Calendar, Clock, Tag, Pin, PinOff, Star, ChevronDown, Pen, Trash2 } from 'lucide-react';
+import { Plus, Filter, Search, SortAsc, Grid3X3, List, Moon, Sun, Bookmark, Heart, MessageSquare, MoreHorizontal, ThumbsUp, Calendar, Clock, Tag, Pin, PinOff, Star, ChevronDown, Pen, Trash2, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -73,7 +73,11 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   const [newPostContent, setNewPostContent] = useState('');
   const [postType, setPostType] = useState('post'); // 'post' or 'announcement'
   const [isFormValid, setIsFormValid] = useState(false);
-
+  const [expandedPosts, setExpandedPosts] = useState({});
+  
+  // 添加内联编辑器的引用
+  const inlineEditorRef = useRef(null);
+  
   // Hook into data handlers
   const { 
     CreatePost, 
@@ -204,12 +208,13 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
       if (aIsPinned && !bIsPinned) return -1;
       if (!aIsPinned && bIsPinned) return 1;
       
+      // If both posts have the same pin status, sort by date (oldest at top, newest at bottom)
       // Then apply the selected sort option
       switch (sortOption) {
         case 'newest':
-          return new Date(b.created_at) - new Date(a.created_at);
+          return new Date(a.created_at) - new Date(b.created_at); // 反转：最新的在底部
         case 'oldest':
-          return new Date(a.created_at) - new Date(b.created_at);
+          return new Date(b.created_at) - new Date(a.created_at); // 反转：最旧的在顶部
         case 'alphabetical':
           return a.title.localeCompare(b.title);
         case 'popular':
@@ -218,18 +223,15 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           const bReactions = Object.values(b.reactions || {}).flat().length;
           return bReactions - aReactions;
         default:
-          return 0;
+          return new Date(a.created_at) - new Date(b.created_at); // 默认最新的在底部
       }
     });
-
+  
   // 验证表单输入
   useEffect(() => {
     const titleValid = newPostTitle.trim().length >= 2 && newPostTitle.trim().length <= 50;
-    const contentValid = (newPostContent.trim().length >= 10 && newPostContent.trim().length <= 1000) || 
-                         (newPostDescription.trim().length >= 10 && newPostDescription.trim().length <= 1000);
-    
-    setIsFormValid(titleValid && contentValid);
-  }, [newPostTitle, newPostContent, newPostDescription]);
+    setIsFormValid(titleValid);
+  }, [newPostTitle, newPostDescription]);
 
   // 重置表单
   const resetForm = () => {
@@ -254,29 +256,23 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   // Handle post creation
   const handleCreatePost = async () => {
     const trimmedTitle = newPostTitle.trim();
-    const trimmedContent = newPostContent.trim() || newPostDescription.trim();
     
     if (trimmedTitle.length < 2 || trimmedTitle.length > 50) {
       toast.error(t('titleLengthError'));
       return;
     }
     
-    if (trimmedContent.length < 10 || trimmedContent.length > 1000) {
-      toast.error(t('contentLengthError'));
-      return;
-    }
-    
     try {
       const result = await CreatePost({
         title: trimmedTitle,
-        description: trimmedContent,
+        description: showInlineEditor ? newPostContent : newPostDescription,
         type: 'post',
         teamId
       });
       
       if (result) {
-        // Add new post to the posts array
-        setPosts(prev => [result, ...prev]);
+        // Add new post to the posts array at the end (to show at the bottom)
+        setPosts(prev => [...prev, result]);
         // Reset form and close editor
         resetForm();
       }
@@ -370,11 +366,33 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     });
   };
   
+  // 切换帖子展开/收起状态
+  const togglePostExpand = (postId) => {
+    setExpandedPosts(prev => ({
+      ...prev,
+      [postId]: !prev[postId]
+    }));
+  };
+  
+  // 处理富文本内容显示
+  const renderRichTextContent = (content) => {
+    // 确保content是有效的字符串，防止渲染错误
+    if (!content || typeof content !== 'string') {
+      return <div className="rich-content w-full overflow-x-hidden break-all"></div>;
+    }
+    return (
+      <div 
+        className="rich-content w-full overflow-x-hidden break-all" 
+        dangerouslySetInnerHTML={{ __html: content }} 
+      />
+    );
+  };
+  
   // Render loading skeleton
   const renderSkeleton = () => (
     <div className={`grid ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-4`}>
       {[1, 2, 3, 4, 5, 6].map((item) => (
-        <Card key={item} className="h-[320px] rounded-lg border transition-all bg-white border-[#E1DFDD] dark:bg-[#2D2C2C] dark:border-[#3B3A39] dark:text-white">
+        <Card key={item} className="flex flex-col h-full min-h-[260px] rounded-lg border transition-all bg-white border-[#E1DFDD] dark:bg-[#2D2C2C] dark:border-[#3B3A39] dark:text-white">
           <CardHeader className="pb-2">
             <div className="flex items-center space-x-2">
               <Skeleton className="h-10 w-10 rounded-full bg-[#F3F2F1] dark:bg-[#3B3A39]" />
@@ -384,7 +402,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pb-2">
+          <CardContent className="pb-2 flex-grow">
             <Skeleton className="h-4 w-full mb-2 bg-[#F3F2F1] dark:bg-[#3B3A39]" />
             <Skeleton className="h-4 w-5/6 mb-2 bg-[#F3F2F1] dark:bg-[#3B3A39]" />
             <Skeleton className="h-4 w-4/6 bg-[#F3F2F1] dark:bg-[#3B3A39]" />
@@ -410,7 +428,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         <Card 
           key={post.id} 
           className={cn(
-            "overflow-hidden transition-all hover:shadow-md relative border-[#E1DFDD] hover:bg-accent dark:border-[#3B3A39] dark:text-white",
+            "overflow-hidden transition-all hover:shadow-md relative border-[#E1DFDD] hover:bg-accent dark:border-[#3B3A39] dark:text-white flex flex-col h-full min-h-[260px]",
             post.is_pinned && "border-l-4"
           )}
           style={post.is_pinned ? { borderLeftColor: getColorHexCode(themeColor) } : {}}
@@ -426,7 +444,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center">
-                    <CardTitle className="text-base font-semibold truncate max-w-[150px] sm:max-w-[180px] md:max-w-[120px] lg:max-w-[160px]">
+                    <CardTitle className="text-base font-semibold w-full truncate max-w-[200px] sm:max-w-[300px] md:max-w-[400px] lg:max-w-[600px] xl:max-w-[800px]">
                       {post.title || t('noTitle')}
                     </CardTitle>
                   </div>
@@ -447,7 +465,6 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
                   align="end"
-                  // className="bg-white border-[#E1DFDD] dark:bg-[#2D2C2C] dark:border-[#3B3A39]"
                 >
                   <DropdownMenuItem 
                     className="hover:bg-accent"
@@ -482,10 +499,42 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               </DropdownMenu>
             </div>
           </CardHeader>
-          <CardContent className="pb-2">
-            <p className="text-sm line-clamp-4 min-h-[80px] text-[#605E5C] dark:text-[#C8C6C4]">
-              {post.description || t('noDescription')}
-            </p>
+          <CardContent className="pb-2 flex-grow">
+            <div className={cn(
+              "rich-text-container overflow-hidden relative w-full flex-grow",
+              expandedPosts[post.id] 
+                ? "max-h-full overflow-y-auto" 
+                : "max-h-[80px]"
+            )}>
+              {post.description ? (
+                <div className="prose prose-sm max-w-full dark:prose-invert break-words break-all overflow-x-hidden">
+                  {renderRichTextContent(post.description)}
+                </div>
+              ) : (
+                <p className="text-sm text-[#605E5C] dark:text-[#C8C6C4]">
+                  {t('noDescription')}
+                </p>
+              )}
+            </div>
+            
+            {post.description && typeof post.description === 'string' && post.description.length > 100 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-1 text-xs flex items-center justify-center"
+                onClick={() => togglePostExpand(post.id)}
+              >
+                {expandedPosts[post.id] ? (
+                  <>
+                    <ChevronUp className="h-3 w-3 ml-1" />
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-3 w-3 ml-1" />
+                  </>
+                )}
+              </Button>
+            )}
           </CardContent>
           <CardFooter className="pt-2 flex justify-between">
             <div className="flex space-x-2">
@@ -538,13 +587,13 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         <Card 
           key={post.id} 
           className={cn(
-            "overflow-hidden transition-all hover:shadow-md relative border-[#E1DFDD] hover:bg-accent dark:border-[#3B3A39] dark:text-white",
+            "overflow-hidden overflow-x-auto transition-all hover:shadow-md relative border-[#E1DFDD] hover:bg-accent dark:border-[#3B3A39] dark:text-white",
             post.is_pinned && "border-l-4"
           )}
           style={post.is_pinned ? { borderLeftColor: getColorHexCode(themeColor) } : {}}
         >
-          <div className="flex flex-col md:flex-row p-0">
-            <div className="flex-grow p-4">
+          <div className="flex flex-col md:flex-row p-0 h-full">
+            <div className="flex-grow p-4 flex flex-col">
               <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-3">
                   <Avatar className="border-2">
@@ -555,7 +604,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center">
-                      <h3 className="text-base font-semibold truncate max-w-[200px] sm:max-w-[250px] md:max-w-[300px] lg:max-w-[350px]">
+                      <h3 className="text-base font-semibold truncate max-w-[200px] sm:max-w-[250px] md:max-w-[350px] lg:max-w-[450px] xl:max-w-[550px]">
                         {post.title || t('noTitle')}
                       </h3>
                       {post.is_pinned && (
@@ -584,7 +633,6 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent 
                       align="end"
-                      // className="bg-white dark:bg-[#2D2C2C]"
                     >
                       <DropdownMenuItem 
                         className="hover:bg-accent"
@@ -620,11 +668,43 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                 </div>
               </div>
               
-              <p className="text-sm mt-2 line-clamp-2 text-[#605E5C] dark:text-[#C8C6C4]">
-                {post.description || t('noDescription')}
-              </p>
+              <div className={cn(
+                "rich-text-container overflow-hidden overflow-x-auto relative mt-2 w-full flex-grow",
+                expandedPosts[post.id] 
+                  ? "max-h-full overflow-y-auto" 
+                  : "max-h-[80px]"
+              )}>
+                {post.description ? (
+                  <div className="prose prose-sm max-w-full dark:prose-invert break-words break-all overflow-x-hidden">
+                    {renderRichTextContent(post.description)}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#605E5C] dark:text-[#C8C6C4]">
+                    {t('noDescription')}
+                  </p>
+                )}
+              </div>
               
-              <div className="flex justify-start items-center mt-3">
+              {post.description && typeof post.description === 'string' && post.description.length > 100 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full mt-1 text-xs flex items-center justify-center"
+                  onClick={() => togglePostExpand(post.id)}
+                >
+                  {expandedPosts[post.id] ? (
+                    <>
+                      <ChevronUp className="h-3 w-3 ml-1" />
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </>
+                  )}
+                </Button>
+              )}
+              
+              <div className="flex justify-start items-center mt-auto pt-3">
                 <div className="flex space-x-3">
                   <Button 
                     variant="ghost" 
@@ -660,9 +740,25 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     </div>
   );
   
+  // 添加滚动效果
+  useEffect(() => {
+    if (showInlineEditor && inlineEditorRef.current) {
+      // 使用setTimeout确保DOM已更新
+      setTimeout(() => {
+        inlineEditorRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 100);
+    }
+  }, [showInlineEditor]);
+  
   // Render inline post editor
   const renderInlineEditor = () => (
-    <Card className="mb-4 mt-2 overflow-hidden border bg-white border-[#E1DFDD] dark:bg-[#2D2C2C] dark:border-[#3B3A39] dark:text-white">
+    <Card 
+      ref={inlineEditorRef}
+      className="mb-4 mt-2 overflow-hidden border bg-background border-[#E1DFDD] dark:border-[#3B3A39] dark:text-white"
+    >
       <div className="p-4">
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center space-x-3 flex-grow">
@@ -673,21 +769,24 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0 w-full max-w-full">
-              <div className="mb-1">
-                <div className="font-medium text-sm text-[#252423] dark:text-white mb-1">
-                  {t('title')}
-                </div>
-                <Input
-                  placeholder={t('postTitlePlaceholder')}
-                  value={newPostTitle}
-                  onChange={(e) => setNewPostTitle(e.target.value)}
-                  className="border border-[#E1DFDD] focus:border-[#6264A7] focus-visible:ring-0 focus-visible:ring-offset-0 text-[#252423] dark:text-white dark:border-[#3B3A39] w-full text-lg"
-                  maxLength={50}
-                />
-                <div className="text-xs text-[#605E5C] dark:text-[#C8C6C4] mt-1 text-right">
-                  <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded font-medium">
-                    {newPostTitle.trim().length}/50
-                  </span>
+              <div className="grid gap-2">
+                <div className="">
+                  <div className="relative">
+                    <Input
+                      id="title"
+                      autoFocus
+                      placeholder={t('postTitlePlaceholder')}
+                      value={newPostTitle}
+                      onChange={(e) => setNewPostTitle(e.target.value)}
+                      className="text-lg border-border border shadow-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[#252423] dark:text-white w-full focus:border-gray-500 dark:focus:border-white pr-16"
+                      maxLength={50}
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-[#605E5C] dark:text-[#C8C6C4]">
+                      <span className="font-medium">
+                        {newPostTitle.trim().length}/50
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -709,21 +808,25 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                 <div className="py-1">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start gap-2 rounded-none"
+                    className="w-full justify-between gap-2 rounded-none"
                     onClick={() => setPostType('post')}
                   >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      <span>{t('post')}</span>
+                    </div>
                     {postType === 'post' && <Check className="h-4 w-4" />}
-                    <MessageSquare className="h-4 w-4" />
-                    <span>{t('post')}</span>
                   </Button>
                   <Button
                     variant="ghost"
-                    className="w-full justify-start gap-2 rounded-none"
+                    className="w-full justify-between gap-2 rounded-none"
                     onClick={() => setPostType('announcement')}
                   >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 rotate-180" />
+                      <span>{t('announcement')}</span>
+                    </div>
                     {postType === 'announcement' && <Check className="h-4 w-4" />}
-                    <MessageSquare className="h-4 w-4 rotate-180" />
-                    <span>{t('announcement')}</span>
                   </Button>
                 </div>
               </PopoverContent>
@@ -735,25 +838,21 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
               onClick={resetForm}
             >
-              <Trash2 className="h-4 w-4 text-[#252423] dark:text-white" />
+              <Trash2 className="h-4 w-4 text-red-500 hover:text-red-600" />
             </Button>
           </div>
         </div>
         
-        <div className="relative mb-6">
-          <div className="font-medium text-sm text-[#252423] dark:text-white mb-1">
-            {t('description')}
-          </div>
-          <RichEditor
-            placeholder={t('postDescriptionPlaceholder')}
-            value={newPostContent}
-            onChange={setNewPostContent}
-            className="min-h-[120px] text-[#252423] dark:text-white"
-          />
-          <div className="text-xs text-[#605E5C] dark:text-[#C8C6C4] mt-1 text-right">
-            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded font-medium">
-              {newPostContent.trim().length}/1000
-            </span>
+        <div className="border-t pt-4 border-[#E1DFDD] dark:border-[#3B3A39]">
+          <div className="grid gap-4">
+            <div className="relative mb-6">
+              <RichEditor
+                placeholder={t('postDescriptionPlaceholder')}
+                value={newPostContent}
+                onChange={setNewPostContent}
+                className="h-[100px] min-h-[100px] max-h-[100px] overflow-hidden text-[#252423] dark:text-white border-[#E1DFDD] dark:border-[#3B3A39]"
+              />
+            </div>
           </div>
         </div>
         
@@ -822,6 +921,40 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   
   return (
     <div className="container mx-auto pb-6 text-[#252423] dark:text-white">
+      <style jsx global>{`
+        .rich-content img {
+          max-width: 100%;
+          height: auto;
+        }
+        .rich-content pre {
+          white-space: pre-wrap;
+          overflow-x: auto;
+          max-width: 100%;
+        }
+        .rich-content * {
+          max-width: 100%;
+          overflow-wrap: break-word;
+          word-wrap: break-word;
+          word-break: break-word;
+        }
+        .rich-text-container {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+          height: auto;
+        }
+        .prose {
+          max-width: 100%;
+          overflow-wrap: break-word;
+          word-break: break-word;
+        }
+        .rich-editor-container {
+          display: flex;
+          flex-direction: column;
+          height: auto;
+        }
+      `}</style>
+      
       {/* Header */}
       <div className="sticky top-0 z-10 px-4 py-3 mb-4 shadow-sm border-b bg-background border-[#E1DFDD] dark:border-[#3B3A39]">
         <div className="flex flex-col md:flex-row justify-between bg-background items-start md:items-center gap-4">
@@ -840,56 +973,21 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                 <DialogContent 
                   onPointerDownOutside={(e) => e.preventDefault()}
                   onEscapeKeyDown={(e) => e.preventDefault()}
-                  className="sm:max-w-[425px]"
+                  className="sm:max-w-[650px]"
                 >
                   <DialogHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center"> 
                       <DialogTitle>{t('createNewPost')}</DialogTitle>
                       <div className="flex items-center space-x-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 rounded-md hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39] flex items-center gap-1 text-[#252423] dark:text-white"
-                            >
-                              <span>{t('postType')}</span>
-                              <ChevronDown className="h-3 w-3" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-48 p-0">
-                            <div className="py-1">
-                              <Button
-                                variant="ghost"
-                                className="w-full justify-start gap-2 rounded-none"
-                                onClick={() => setPostType('post')}
-                              >
-                                {postType === 'post' && <Check className="h-4 w-4" />}
-                                <MessageSquare className="h-4 w-4" />
-                                <span>{t('post')}</span>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                className="w-full justify-start gap-2 rounded-none"
-                                onClick={() => setPostType('announcement')}
-                              >
-                                {postType === 'announcement' && <Check className="h-4 w-4" />}
-                                <MessageSquare className="h-4 w-4 rotate-180" />
-                                <span>{t('announcement')}</span>
-                              </Button>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                        
-                        <Button
+                        {/* <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
                           onClick={resetForm}
                         >
                           <Trash2 className="h-4 w-4 text-[#252423] dark:text-white" />
-                        </Button>
-                      </div>
+                        </Button> */}
+                      </div> 
                     </div>
                     <DialogDescription className="text-[#605E5C] dark:text-[#C8C6C4]">
                       {t('createPostDescription')}
@@ -899,56 +997,142 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                     <div className="grid gap-2">
                       <Label htmlFor="title" className="font-medium">{t('title')}</Label>
                       <div className="mb-3">
-                        <Input
-                          id="title"
-                          placeholder={t('postTitlePlaceholder')}
-                          value={newPostTitle}
-                          onChange={(e) => setNewPostTitle(e.target.value)}
-                          className="border border-[#E1DFDD] text-[#252423] dark:border-[#3B3A39] dark:text-white w-full"
-                          maxLength={50}
-                        />
-                        <div className="text-xs text-[#605E5C] dark:text-[#C8C6C4] mt-1 text-right">
-                          <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded font-medium">
-                            {newPostTitle.trim().length}/50
-                          </span>
+                        <div className="relative">
+                          <Input
+                            id="title"
+                            placeholder={t('postTitlePlaceholder')}
+                            value={newPostTitle}
+                            onChange={(e) => setNewPostTitle(e.target.value)}
+                            className="border border-[#E1DFDD] text-[#252423] dark:border-[#3B3A39] dark:text-white w-full pr-16"
+                            maxLength={50}
+                          />
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-[#605E5C] dark:text-[#C8C6C4] bg-background px-1">
+                            <span className="font-medium">
+                              {newPostTitle.trim().length}/50
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="description" className="font-medium">{t('description')}</Label>
                       <div className="mb-3">
-                        <Textarea
+                        <RichEditor
                           id="description"
                           placeholder={t('postDescriptionPlaceholder')}
                           value={newPostDescription}
-                          onChange={(e) => setNewPostDescription(e.target.value)}
-                          className="min-h-[100px] border border-[#E1DFDD] text-[#252423] dark:border-[#3B3A39] dark:text-white"
-                          maxLength={1000}
+                          onChange={setNewPostDescription}
+                          className="h-[135px] min-h-[135px] max-h-[250px] overflow-y-auto border border-[#E1DFDD] text-[#252423] dark:border-[#3B3A39] dark:text-white"
                         />
-                        <div className="text-xs text-[#605E5C] dark:text-[#C8C6C4] mt-1 text-right">
-                          <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded font-medium">
-                            {newPostDescription.trim().length}/1000
-                          </span>
+                        <div className="mt-2 flex justify-between items-center">
+                          <div className="flex items-center space-x-2">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+                                >
+                                  <Smile className="h-4 w-4 text-[#252423] dark:text-white" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80 p-2">
+                                <div className="grid grid-cols-8 gap-2">
+                                  {['😊', '👍', '❤️', '😂', '🎉', '🙌', '👏', '🔥',
+                                    '💯', '⭐', '✅', '🚀', '💪', '👀', '🤔', '🙏'].map(emoji => (
+                                    <Button
+                                      key={emoji}
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-full"
+                                      onClick={() => setNewPostDescription(prev => prev + emoji)}
+                                    >
+                                      {emoji}
+                                    </Button>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                            
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+                            >
+                              <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setShowCreateDialog(false)}
-                    >
-                      {t('cancel')}
-                    </Button>
-                    <Button 
-                      variant={themeColor}
-                      type="submit" 
-                      onClick={handleCreatePost}
-                      disabled={!isFormValid}
-                    >
-                      {t('create')}
-                    </Button>
+                  <DialogFooter className="flex w-full justify-between items-center">                    
+                    <div className="mr-auto">                      
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 rounded-md border-[#E1DFDD] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:hover:bg-[#3B3A39] flex items-center gap-1 text-[#252423] dark:text-white"
+                          >
+                            <div className="flex items-center gap-1">
+                              {postType === 'post' ? (
+                                <MessageSquare className="h-4 w-4" />
+                              ) : (
+                                <MessageSquare className="h-4 w-4 rotate-180" />
+                              )}
+                              <span>{postType === 'post' ? t('post') : t('announcement')}</span>
+                            </div>
+                            <ChevronDown className="h-3 w-3 ml-1" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-0">
+                          <div className="py-1">
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start gap-2 rounded-none"
+                              onClick={() => setPostType('post')}
+                            >
+                              <div className="flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4" />
+                                <span>{t('post')}</span>
+                              </div>
+                              {postType === 'post' && <Check className="h-4 w-4 ml-auto" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start gap-2 rounded-none"
+                              onClick={() => setPostType('announcement')}
+                            >
+                              <div className="flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4 rotate-180" />
+                                <span>{t('announcement')}</span>
+                              </div>
+                              {postType === 'announcement' && <Check className="h-4 w-4 ml-auto" />}
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setShowCreateDialog(false)}
+                        className="border-[#E1DFDD] dark:border-[#3B3A39]"
+                      >
+                        {t('cancel')}
+                      </Button>
+                      <Button 
+                        variant={themeColor}
+                        type="submit" 
+                        onClick={handleCreatePost}
+                        disabled={!isFormValid}
+                        className="min-w-[80px]"
+                      >
+                        {t('post')}
+                      </Button>
+                    </div>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -968,7 +1152,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                 placeholder={t('searchPosts')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 rounded-md border bg-white border-[#E1DFDD] text-[#252423] placeholder:text-[#8A8886] focus-visible:ring-[#6264A7] focus-visible:ring-offset-white dark:bg-[#201F1F] dark:border-[#3B3A39] dark:text-white dark:placeholder:text-[#979593] dark:focus-visible:ring-[#6264A7] dark:focus-visible:ring-offset-[#201F1F]"
+                className="pl-9 rounded-md border bg-background border-[#E1DFDD] text-[#252423] placeholder:text-[#8A8886] focus-visible:ring-offset-white dark:border-[#3B3A39] dark:text-white dark:placeholder:text-[#979593]"
               />
             </div>
             <div className="flex items-center gap-2 sm:ml-auto">
@@ -996,11 +1180,9 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         {isLoading ? (
           renderSkeleton()
         ) : (
-          <div className="mt-4">
-            {viewMode === 'list' && showInlineEditor && renderInlineEditor()}
-            
+          <div className="mt-4">            
             {posts.length === 0 && !showInlineEditor ? (
-              <div className="text-center py-12 border rounded-md bg-white border-[#E1DFDD] text-[#252423] dark:bg-[#2D2C2C] dark:border-[#3B3A39] dark:text-white">
+              <div className="text-center py-12 border rounded-md bg-background border-[#E1DFDD] text-[#252423] dark:border-[#3B3A39] dark:text-white">
                 <div className="mx-auto flex flex-col items-center">
                   <MessageSquare className="h-12 w-12 mb-4 text-[#8A8886] dark:text-[#979593]" />
                   <h3 className="text-lg font-medium mb-1">{t('noPosts')}</h3>
@@ -1019,6 +1201,8 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
             ) : (
               viewMode === 'grid' ? renderGridView() : renderListView()
             )}
+            {viewMode === 'list' && showInlineEditor && renderInlineEditor()}
+
           </div>
         )}
       </div>

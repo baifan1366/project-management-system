@@ -2122,7 +2122,7 @@
     "commentRequired": "Comment cannot be empty",
     "addCommentError": "Error adding comment:",
     "confirmDeleteTitle": "Confirm Delete Post",
-    "confirmDeleteDescription": "This action cannot be undone.",
+    "confirmDeleteDescription": "Are you sure you want to delete this post? This action cannot be undone.",
     "delete": "Delete",
     "cancel": "Cancel",
     "deletePostError": "Error deleting post:",
