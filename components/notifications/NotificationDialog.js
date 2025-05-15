@@ -30,6 +30,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN, enUS } from 'date-fns/locale';
 import { Check, Trash, Bell, BellOff, Calendar, User, MessageSquare, Video } from 'lucide-react';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import NotificationItem from '@/components/notifications/NotificationItem';
 
 export function NotificationDialog({ open, onOpenChange, headerHandlesSubscription = false }) {
@@ -43,6 +44,7 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
   const { user } = useGetUser();
   const [locale, setLocale] = useState('en');
   const dialogSubscriptionCreatedRef = useRef(false);
+  const { formatDateToUserTimezone, formatToUserTimezone, hourFormat } = useUserTimezone();
 
   useEffect(() => {
     // Only take action when dialog opens and we have a user
@@ -106,16 +108,17 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
         handleDeleteNotification(notificationId);
         break;
       case 'accept':
-        // 会议邀请接受后已在NotificationItem中处理
+        // Meeting invitation acceptance handled in NotificationItem
         break;
       case 'decline':
-        // 会议邀请拒绝后已在NotificationItem中处理
+        // Meeting invitation rejection handled in NotificationItem
         break;
       default:
         break;
     }
   };
 
+  // Format using relative time (e.g. "2 hours ago")
   const formatTime = (dateString) => {
     try {
       const date = new Date(dateString);
@@ -137,7 +140,7 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
       case 'MENTION':
         return <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600"><User className="h-4 w-4" /></div>;
       case 'SYSTEM':
-        // 检查是否是会议邀请
+        // Check if this is a meeting invitation
         try {
           if (notificationData) {
             const data = typeof notificationData === 'string' 
@@ -205,6 +208,8 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
               notifications={filteredNotifications}
               loading={loading}
               formatTime={formatTime}
+              formatDateToUserTimezone={formatDateToUserTimezone}
+              formatToUserTimezone={formatToUserTimezone}
               onAction={handleNotificationAction}
               t={t}
             />
@@ -215,6 +220,8 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
               notifications={filteredNotifications}
               loading={loading}
               formatTime={formatTime}
+              formatDateToUserTimezone={formatDateToUserTimezone}
+              formatToUserTimezone={formatToUserTimezone}
               onAction={handleNotificationAction}
               t={t}
             />
@@ -238,6 +245,8 @@ function NotificationList({
   notifications, 
   loading, 
   formatTime, 
+  formatDateToUserTimezone,
+  formatToUserTimezone,
   onAction,
   t
 }) {
@@ -267,6 +276,8 @@ function NotificationList({
             key={notification.id}
             notification={notification}
             onAction={onAction}
+            formatDateToUserTimezone={formatDateToUserTimezone}
+            formatToUserTimezone={formatToUserTimezone}
           />
         ))}
       </div>
