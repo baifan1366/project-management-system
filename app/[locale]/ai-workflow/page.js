@@ -34,7 +34,12 @@ import {
   ChevronLeft,
   Menu,
   CheckCircle,
-  MessageSquare
+  MessageSquare,
+  Mail,
+  Calendar,
+  ListChecks,
+  Lightbulb,
+  BookOpen
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -114,6 +119,19 @@ const workflowTypes = [
   { id: 'document_generation', name: 'Document Generation', icon: <FileText size={18} /> },
   { id: 'api_request', name: 'API Request', icon: <Code size={18} /> },
   { id: 'data_analysis', name: 'Data Analysis', icon: <BarChart4 size={18} /> },
+  { id: 'email_template', name: 'Email Template', icon: <Mail size={18} /> },
+  { id: 'meeting_summary', name: 'Meeting Summary', icon: <Calendar size={18} /> },
+  { id: 'task_automation', name: 'Task Automation', icon: <ListChecks size={18} /> },
+  { id: 'idea_generation', name: 'Idea Generation', icon: <Lightbulb size={18} /> },
+  { id: 'learning_content', name: 'Learning Content', icon: <BookOpen size={18} /> },
+];
+
+// Prompt templates
+const promptTemplates = [
+  { id: 'default', name: 'Default', template: 'Generate based on {{topic}}' },
+  { id: 'detailed', name: 'Detailed', template: 'Create a comprehensive output about {{topic}}. Include key points, examples, and analysis.' },
+  { id: 'creative', name: 'Creative', template: 'Think outside the box and generate creative content about {{topic}}. Be innovative and unique.' },
+  { id: 'professional', name: 'Professional', template: 'Write a professional analysis of {{topic}} suitable for business contexts. Include relevant data and insights.' },
 ];
 
 export default function AIWorkflow() {
@@ -135,6 +153,7 @@ export default function AIWorkflow() {
   const [workflowDescription, setWorkflowDescription] = useState('');
   const [workflowType, setWorkflowType] = useState('document_generation');
   const [workflowPrompt, setWorkflowPrompt] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState('');
   
   // State for saving/loading workflows
   const [isLoading, setIsLoading] = useState(false);
@@ -277,7 +296,12 @@ export default function AIWorkflow() {
       return;
     }
     
-    if (!workflowName || !workflowType || !workflowPrompt) {
+    if (!workflowName.trim()) {
+      toast.error(t('nameRequired') || 'Workflow name is required');
+      return;
+    }
+    
+    if (!workflowType || !workflowPrompt) {
       toast.error(t('missingRequiredFields'));
       return;
     }
@@ -549,6 +573,15 @@ export default function AIWorkflow() {
     }
   };
   
+  // Set prompt template
+  const setPromptTemplate = (templateId) => {
+    const template = promptTemplates.find(t => t.id === templateId);
+    if (template) {
+      setWorkflowPrompt(template.template);
+      setSelectedTemplate(templateId);
+    }
+  };
+
   // Create a new workflow
   const createNewWorkflow = () => {
     setCurrentWorkflow(null);
@@ -556,6 +589,7 @@ export default function AIWorkflow() {
     setWorkflowDescription('');
     setWorkflowType('document_generation');
     setWorkflowPrompt('');
+    setSelectedTemplate('');
     setNodes(initialNodes);
     setEdges(initialEdges);
     setInputFields([
@@ -1007,8 +1041,8 @@ export default function AIWorkflow() {
                 type="text"
                 value={workflowName}
                 onChange={(e) => setWorkflowName(e.target.value)}
-                className="text-lg font-semibold bg-transparent border-none focus:outline-none focus:ring-0 w-full dark:text-gray-200 dark:placeholder-gray-500"
-                placeholder="Workflow Name"
+                className="text-lg font-semibold bg-transparent border-b-2 border-transparent hover:border-gray-200 dark:hover:border-[#444444] focus:border-[#39ac91] dark:focus:border-[#39ac91] focus:outline-none focus:ring-0 w-full dark:text-gray-200 dark:placeholder-gray-500 transition-colors duration-200"
+                placeholder="Enter Workflow Name"
               />
               <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                 <Select value={workflowType} onValueChange={setWorkflowType}>
@@ -1075,10 +1109,28 @@ export default function AIWorkflow() {
               
               <div>
                 <Label className="dark:text-gray-300">{t('promptTemplate')}</Label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {promptTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      onClick={() => setPromptTemplate(template.id)}
+                      className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                        selectedTemplate === template.id
+                          ? 'bg-[#39ac91] text-white dark:bg-[#39ac91] dark:text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-[#333333] dark:text-gray-300 dark:hover:bg-[#444444]'
+                      }`}
+                    >
+                      {template.name}
+                    </button>
+                  ))}
+                </div>
                 <Textarea
                   value={workflowPrompt}
-                  onChange={(e) => setWorkflowPrompt(e.target.value)}
-                  placeholder="Enter your prompt template with {{variable}} placeholders"
+                  onChange={(e) => {
+                    setWorkflowPrompt(e.target.value);
+                    setSelectedTemplate('');
+                  }}
+                  placeholder="Generate based on {{topic}}"
                   className="h-40 font-mono text-sm dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -1100,44 +1152,46 @@ export default function AIWorkflow() {
                   </Button>
                 </div>
                 
-                <div className="space-y-2">
-                  {inputFields.map((field, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <Input
-                        value={field.name}
-                        onChange={(e) => updateInputField(index, 'name', e.target.value)}
-                        placeholder="Variable name"
-                        className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
-                      />
-                      <Input
-                        value={field.label}
-                        onChange={(e) => updateInputField(index, 'label', e.target.value)}
-                        placeholder="Display label"
-                        className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
-                      />
-                      <Select
-                        value={field.type}
-                        onValueChange={(value) => updateInputField(index, 'type', value)}
-                      >
-                        <SelectTrigger className="w-1/4 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
-                          <SelectValue placeholder="Type" />
-                        </SelectTrigger>
-                        <SelectContent className="dark:bg-[#333333] dark:border-[#444444]">
-                          <SelectItem value="text" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text</SelectItem>
-                          <SelectItem value="textarea" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text Area</SelectItem>
-                          <SelectItem value="number" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Number</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        onClick={() => removeInputField(index)}
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-[#333333] dark:hover:text-red-400"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                <div className="border rounded-md dark:border-[#444444] max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-[#444444] scrollbar-track-transparent p-2">
+                  <div className="space-y-2">
+                    {inputFields.map((field, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Input
+                          value={field.name}
+                          onChange={(e) => updateInputField(index, 'name', e.target.value)}
+                          placeholder="Variable name"
+                          className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
+                        />
+                        <Input
+                          value={field.label}
+                          onChange={(e) => updateInputField(index, 'label', e.target.value)}
+                          placeholder="Display label"
+                          className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
+                        />
+                        <Select
+                          value={field.type}
+                          onValueChange={(value) => updateInputField(index, 'type', value)}
+                        >
+                          <SelectTrigger className="w-1/4 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
+                            <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent className="dark:bg-[#333333] dark:border-[#444444]">
+                            <SelectItem value="text" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text</SelectItem>
+                            <SelectItem value="textarea" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text Area</SelectItem>
+                            <SelectItem value="number" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Number</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          onClick={() => removeInputField(index)}
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-[#333333] dark:hover:text-red-400"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
