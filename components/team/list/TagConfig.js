@@ -2336,3 +2336,150 @@ export function renderTagsCell(value, suggestedTags = [], onChange) {
     </Popover>
   );
 }
+
+//check text
+/**
+ * 检查字段是否为文本类型
+ * @param {Object} tag - 标签对象
+ * @returns {boolean} 是否为文本类型
+ */
+export function isTextType(tag) {
+  // 检查tag对象
+  if (!tag) return false;
+  
+  // 如果有明确的type属性，检查是否为TEXT
+  if (tag.type) {
+    return checkFieldType(tag) === 'TEXT';
+  }
+  
+  // 如果没有明确type，所有未被其他类型识别的都默认为文本类型
+  // 也可以检查名称是否暗示为文本类型
+  if (tag.name) {
+    const textNames = ['text', 'description', 'note', '文本', '描述', '备注', 'title', '标题', 'content', '内容'];
+    
+    if (textNames.some(name => tag.name.toLowerCase().includes(name.toLowerCase()))) {
+      return true;
+    }
+  }
+  
+  // 没有明确指定其他类型时，默认为文本类型
+  return true;
+}
+
+/**
+ * 检查列名是否为文本列
+ * @param {string} tagName - 标签名称
+ * @returns {boolean} 是否为文本列
+ */
+export function isTextColumn(tagName) {
+  if (!tagName) return false;
+  
+  // 检查标准名称
+  if (typeof tagName === 'string') {
+    // 文本是默认类型，只要不满足其他特定类型就可以视为文本
+    if (!isNumberColumn(tagName) && !isDateColumn(tagName) && 
+        !isFileColumn(tagName) && !isPeopleColumn(tagName) && 
+        !isIdColumn(tagName) && !isSingleSelectColumn(tagName) && 
+        !isMultiSelectColumn(tagName) && !isTagsColumn(tagName)) {
+      return true;
+    }
+  }
+  
+  // 检查标签对象
+  if (typeof tagName === 'object' && tagName !== null) {
+    // 检查对象是否有type属性
+    if (tagName.type && tagName.type.toUpperCase() === 'TEXT') {
+      return true;
+    }
+    
+    // 如果没有明确的其他类型，默认为TEXT
+    if (!tagName.type || tagName.type === '') {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * 验证文本输入
+ * @param {string} value - 文本值
+ * @param {Object} options - 验证选项
+ * @param {boolean} options.required - 是否必填
+ * @param {number} options.maxLength - 最大长度
+ * @param {number} options.minLength - 最小长度
+ * @returns {Object} 验证结果，包含isValid和message
+ */
+export function validateTextInput(value, options = {}) {
+  const { required = false, maxLength, minLength } = options;
+  
+  // 检查必填
+  if (required && (!value || value.trim() === '')) {
+    return {
+      isValid: false,
+      message: '此字段不能为空'
+    };
+  }
+  
+  // 如果非必填且值为空，直接返回有效
+  if (!required && (!value || value.trim() === '')) {
+    return {
+      isValid: true,
+      message: ''
+    };
+  }
+  
+  // 检查最小长度
+  if (minLength !== undefined && value && value.length < minLength) {
+    return {
+      isValid: false,
+      message: `输入内容至少需要${minLength}个字符`
+    };
+  }
+  
+  // 检查最大长度
+  if (maxLength !== undefined && value && value.length > maxLength) {
+    return {
+      isValid: false,
+      message: `输入内容不能超过${maxLength}个字符`
+    };
+  }
+  
+  return {
+    isValid: true,
+    message: ''
+  };
+}
+
+/**
+ * 渲染文本单元格内容
+ * @param {string} value - 文本值
+ * @param {Function} onChange - 文本修改处理函数
+ * @param {Object} options - 选项
+ * @returns {JSX.Element} 渲染的文本单元格组件
+ */
+export function renderTextCell(value, onChange, options = {}) {
+  const { multiline = false, placeholder = '输入文本...' } = options;
+  
+  return (
+    <div className="w-full">
+      {multiline ? (
+        <textarea
+          value={value || ''}
+          onChange={(e) => onChange && onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded p-1 text-sm"
+          rows={2}
+        />
+      ) : (
+        <input
+          type="text"
+          value={value || ''}
+          onChange={(e) => onChange && onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded p-1 text-sm"
+        />
+      )}
+    </div>
+  );
+}

@@ -233,6 +233,10 @@
     "dueDate": "截止日期",
     "priority": "优先级",
     "members": "成员",
+    "projectNotFound": "项目未找到",
+    "noAccessToProject": "您没有访问此项目的权限。您可能不是团队成员或项目所有者。",
+    "close": "关闭",
+    "loading": "加载中...",
     "filters": {
       "all": "全部",
       "recent": "最近",
@@ -508,7 +512,12 @@
     "field_description_description": "字段的描述",
     "field_options_description": "字段的选项",
     "taskDeleted": "任务已成功删除",
-    "deleteError": "删除任务时出错"
+    "deleteError": "删除任务时出错",
+    "deleteTaskTitle": "确认删除任务",
+    "deleteTaskDescription": "您确定要删除此任务吗？此操作无法撤销。",
+    "deleteTaskFailed": "删除任务失败",
+    "teamNotFound": "团队未找到",
+    "noAccessToTeam": "您没有访问此团队的权限。您可能不是团队成员或团队所有者。"
   },
   "ChatDialog": {
     "privateMessages": "私人消息",
@@ -827,7 +836,12 @@
     "dayView": "日视图",
     "dayViewDescription": "日视图显示当天的所有任务",
     "tasksFor": "任务列表 -",
-    "noTasksForThisDay": "当天暂无任务"
+    "noTasksForThisDay": "当天暂无任务",
+    "cannotEditPastTask": "无法编辑已过期的任务",
+    "cannotDeletePastTask": "无法删除已过期的任务",
+    "pastTask": "已过期任务",
+    "viewTask": "查看任务",
+    "viewTaskDescription": "查看任务详情"
   },
   "notificationCenter": {
     "title": "通知中心",
@@ -1220,5 +1234,11 @@
     "openInNewTab": "在新标签页中打开",
     "fileNotFound": "未找到文件",
     "closePreview": "关闭预览"
+  },
+  "Team": {
+    "transferOwner": "转移所有权",
+    "pendingRemoval": "待移除",
+    "undoRemoval": "撤销移除",
+    "undoRoleChange": "撤销角色变更"
   }
 }

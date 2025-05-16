@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Upload, File, X, FileText, Sheet, Film, Music, Eye, ChevronLeft } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { api } from '@/lib/api';
 import { useParams } from "next/navigation";
@@ -22,7 +22,6 @@ import { useSelector } from "react-redux"
 
 export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath = '/', onFilesUploaded }) {
   const t = useTranslations('File')
-  const { toast } = useToast()
   const [files, setFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
   const [previewFile, setPreviewFile] = useState(null)
@@ -260,10 +259,8 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
       
       setFiles([])
       
-      toast({
-        title: t('uploadSuccess'),
+      toast.success(t('uploadSuccess'), {
         description: t('filesUploadedSuccessfully'),
-        variant: 'default'
       })
       
       // 调用回调函数
@@ -274,10 +271,8 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
       onClose()
     } catch (error) {
       console.error('Upload error:', error)
-      toast({
-        title: t('uploadError'),
+      toast.error(t('uploadError'), {
         description: error.message,
-        variant: 'destructive'
       })
     } finally {
       setIsUploading(false)
@@ -504,7 +499,7 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
                 <h3 className="font-medium mb-2">{t('selectedFiles')}</h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto p-1">
                   {files.map(file => (
-                    <div key={file.id} className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
+                    <div key={file.id} className="flex items-center justify-between bg-accent p-2 rounded-md">
                       <div 
                         className="flex items-center space-x-2 cursor-pointer flex-1" 
                         onClick={() => openPreview(file)}
@@ -536,7 +531,7 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7"
+                          className="h-7 w-7 hover:text-red-500"
                           onClick={() => removeFile(file.id)}
                           title={t('delete')}
                         >

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, 
-  startOfWeek, addDays, getDay, isSameDay, parseISO, addWeeks, subWeeks } from 'date-fns'
+  startOfWeek, addDays, getDay, isSameDay, parseISO, addWeeks, subWeeks, startOfDay, isBefore } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -417,7 +417,9 @@ export default function TaskCalendar({ teamId }) {
           name,
           dueDate,
           assigneeId,
-          sectionId: task.section_id
+          sectionId: task.section_id,
+          tag_values: tagValues, // 保留原始tag_values以备后用
+          rawTask: task // 保存原始任务对象以便访问其他可能需要的字段
         });
       });
       
@@ -473,10 +475,13 @@ export default function TaskCalendar({ teamId }) {
         acc[dateKey] = [];
       }
       
+      // 保留原始日期格式
       acc[dateKey].push({
         id: task.taskId,
         name: task.name,
-        assigneeId: task.assigneeId
+        assigneeId: task.assigneeId,
+        dueDate: dateKey, // 保存格式化的日期，确保是yyyy-MM-dd格式
+        tag_values: task.tag_values
       });
       
       return acc;
@@ -525,6 +530,13 @@ export default function TaskCalendar({ teamId }) {
 
   // Create task handler
   const handleOpenCreateTask = (date = new Date()) => {
+    // 检查所选日期是否在今天或之后
+    const today = startOfDay(new Date())
+    if (isBefore(date, today)) {
+      toast.warning(t('cannotCreateTaskInPast'))
+      return
+    }
+    
     setSelectedDate(date)
     setIsCreateTaskOpen(true)
   }
@@ -593,19 +605,6 @@ export default function TaskCalendar({ teamId }) {
             <Skeleton className="h-9 w-32 rounded-md" />
           </div>
         </div>
-        
-        {/* 添加加载进度指示器 */}
-        {dataLoadingProgress > 0 && (
-          <div className="w-full bg-gray-200 rounded-full h-1.5 mb-4 dark:bg-gray-700">
-            <div 
-              className="bg-blue-600 h-1.5 rounded-full transition-all duration-300 ease-in-out"
-              style={{ width: `${dataLoadingProgress}%` }}
-            ></div>
-            <div className="text-xs text-center mt-1 text-muted-foreground">
-              {dataLoadingProgress < 100 ? `${t('loading')} ${dataLoadingProgress}%` : t('loadingComplete')}
-            </div>
-          </div>
-        )}
       </div>
       
       <div className="flex-1 overflow-hidden">
@@ -712,9 +711,9 @@ export default function TaskCalendar({ teamId }) {
         </Tabs>
       </div>
       
-      <Button variant={themeColor} onClick={() => handleOpenCreateTask()}>
-        <Plus className="h-4 w-4 mr-2" />
-        {t('newTask')}
+      <Button variant={themeColor} size="icon" onClick={() => handleOpenCreateTask()}>
+        <Plus className="h-4 w-4" />
+        {/* {t('newTask')} */}
       </Button>
     </div>
   )
@@ -725,6 +724,7 @@ export default function TaskCalendar({ teamId }) {
     const monthEnd = endOfMonth(currentDate)
     const startDate = startOfWeek(monthStart)
     const days = []
+    const today = startOfDay(new Date())
 
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
@@ -747,6 +747,8 @@ export default function TaskCalendar({ teamId }) {
     for (let i = 0; i < 42; i++) {
       const formattedDate = format(day, 'yyyy-MM-dd')
       const isCurrentMonth = isSameMonth(day, currentDate)
+      const isPastDay = isBefore(day, today)
+      const isToday = isSameDay(day, today)
       const currentDay = new Date(day)
       
       // 获取当天任务并检查是否有数据
@@ -759,18 +761,21 @@ export default function TaskCalendar({ teamId }) {
         <div 
           key={formattedDate}
           className={cn(
-            "min-h-[120px] p-1.5 pt-1 border border-border/50 cursor-pointer transition-colors relative",
+            "min-h-[120px] p-1.5 pt-1 border border-border/50 transition-colors relative",
             !isCurrentMonth && "bg-muted/30 text-muted-foreground",
-            isSameDay(day, new Date()) && "bg-accent/10",
-            "hover:bg-accent/5"
+            isPastDay && "bg-muted/50 text-muted-foreground opacity-75", // 为过去的日期添加额外的样式
+            isToday && "bg-accent/10",
+            !isPastDay && "hover:bg-accent/5 cursor-pointer", // 只有未来的日期才有指针样式和悬停效果
+            isPastDay && "cursor-not-allowed" // 过去的日期显示禁止光标
           )}
-          onClick={() => handleOpenCreateTask(currentDay)}
+          onClick={() => !isPastDay && handleOpenCreateTask(currentDay)} // 只有未来的日期才能点击创建任务
         >
           <div className="flex flex-col h-full">
             <div className="flex justify-between items-start mb-2">
               <span className={cn(
                 "inline-flex h-5 w-5 items-center justify-center rounded-full text-xs",
-                isSameDay(day, new Date()) && "bg-primary text-primary-foreground font-medium"
+                isToday && "bg-primary text-primary-foreground font-medium",
+                isPastDay && !isToday && "line-through" // 为过去的日期添加删除线
               )}>
                 {format(day, 'd')}
               </span>
@@ -782,12 +787,14 @@ export default function TaskCalendar({ teamId }) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpenCreateTask(currentDay)
-                    }}>
-                      {t('addTask')}
-                    </DropdownMenuItem>
+                    {!isPastDay && (
+                      <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenCreateTask(currentDay)
+                      }}>
+                        {t('addTask')}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={(e) => {
                       e.stopPropagation()
                       handleViewAllTasks(currentDay, dayTasks)
@@ -814,7 +821,10 @@ export default function TaskCalendar({ teamId }) {
                 return (
                   <div 
                     key={`task-${task.id}`} 
-                    className="text-xs py-0.5 px-1 rounded truncate cursor-pointer transition-opacity hover:opacity-80 bg-blue-100 dark:bg-blue-900/30 border-l-2 border-blue-500"
+                    className={cn(
+                      "text-xs py-0.5 px-1 rounded truncate cursor-pointer transition-opacity hover:opacity-80 bg-blue-100 dark:bg-blue-900/30 border-l-2 border-blue-500",
+                      isPastDay && "opacity-60" // 降低过去日期任务的不透明度
+                    )}
                     title={taskName}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -906,7 +916,49 @@ export default function TaskCalendar({ teamId }) {
 
   // 修改任务点击事件处理函数
   const handleTaskClick = (task) => {
-    setSelectedTask(task)
+    // 检查任务是否在过去的日期
+    const today = startOfDay(new Date())
+    
+    // 首先尝试直接使用格式化后的dueDate字段，这是我们在日历渲染时添加的
+    let taskDueDate = null
+    let taskDueDateString = null
+    
+    // 从不同来源获取日期信息，确保能够正确显示
+    if (task.dueDate) {
+      // 1. 直接使用日历格式化的日期
+      taskDueDateString = task.dueDate
+      taskDueDate = new Date(task.dueDate.replace(/-/g, '/'))
+      console.log('使用日历格式化的日期:', taskDueDateString)
+    } else if (task.tag_values && tagIdDueDate && task.tag_values[tagIdDueDate]) {
+      // 2. 从任务的tag_values中获取日期
+      taskDueDateString = task.tag_values[tagIdDueDate]
+      taskDueDate = new Date(taskDueDateString.replace(/-/g, '/'))
+      console.log('使用tag_values中的日期:', taskDueDateString)
+    } else if (task.rawTask && task.rawTask.tag_values && tagIdDueDate && task.rawTask.tag_values[tagIdDueDate]) {
+      // 3. 从原始任务对象的tag_values中获取日期
+      taskDueDateString = task.rawTask.tag_values[tagIdDueDate]
+      taskDueDate = new Date(taskDueDateString.replace(/-/g, '/'))
+      console.log('使用rawTask中的日期:', taskDueDateString)
+    }
+    
+    // 如果都没找到，则使用当前日期
+    if (!taskDueDate || isNaN(taskDueDate.getTime())) {
+      console.warn('无法确定任务日期，使用当前日期')
+      taskDueDate = new Date()
+      taskDueDateString = format(taskDueDate, 'yyyy-MM-dd')
+    }
+    
+    // 如果任务有截止日期并且截止日期在今天之前，则标记为只读
+    const isPastTask = taskDueDate && isBefore(taskDueDate, today)
+    
+    console.log('打开任务:', task.name, '截止日期:', taskDueDateString, task)
+    
+    // 保存原始的日期值以便在编辑对话框中正确显示
+    setSelectedTask({
+      ...task,
+      isReadOnly: isPastTask, // 为过去的任务添加只读标志
+      dueDate: taskDueDateString // 使用原始字符串格式的日期
+    })
     setIsEditTaskOpen(true)
     // 关闭DayTasksDialog
     setIsDayTasksOpen(false)

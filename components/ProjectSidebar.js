@@ -168,6 +168,44 @@ export default function ProjectSidebar({ projectId }) {
            color?.toLowerCase().startsWith('#f') || color?.toLowerCase().startsWith('#e');
   };
 
+  // 根据颜色值获取对应的Tailwind类
+  const getColorClass = (color) => {
+    if (!color) return "bg-gray-500 text-white"; // 默认颜色
+
+    // 颜色名称到Tailwind类的映射
+    const colorClassMap = {
+      "black": "bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90",
+      "red": "bg-[#c72c41] text-white hover:bg-[#c72c41]/90 dark:bg-[#c72c41] dark:text-white dark:hover:bg-[#c72c41]/90",
+      "orange": "bg-[#d76d2b] text-white hover:bg-[#d76d2b]/90 dark:bg-[#d76d2b] dark:text-white dark:hover:bg-[#d76d2b]/90",
+      "green": "bg-[#008000] text-white hover:bg-[#008000]/90 dark:bg-[#008000] dark:text-white dark:hover:bg-[#008000]/90",
+      "blue": "bg-[#3b6dbf] text-white hover:bg-[#3b6dbf]/90 dark:bg-[#3b6dbf] dark:text-white dark:hover:bg-[#3b6dbf]/90",
+      "purple": "bg-[#5c4b8a] text-white hover:bg-[#5c4b8a]/90 dark:bg-[#5c4b8a] dark:text-white dark:hover:bg-[#5c4b8a]/90",
+      "pink": "bg-[#d83c5e] text-white hover:bg-[#d83c5e]/90 dark:bg-[#d83c5e] dark:text-white dark:hover:bg-[#d83c5e]/90",
+      "white": "bg-white text-black border border-gray-200 hover:bg-gray-50",
+      "lightGreen": "bg-[#bbf7d0] text-black hover:bg-[#bbf7d0]/90",
+      "lightYellow": "bg-[#fefcbf] text-black hover:bg-[#fefcbf]/90",
+      "lightCoral": "bg-[#f08080] text-white hover:bg-[#f08080]/90",
+      "lightOrange": "bg-[#ffedd5] text-black hover:bg-[#ffedd5]/90",
+      "peach": "bg-[#ffcccb] text-black hover:bg-[#ffcccb]/90",
+      "lightCyan": "bg-[#e0ffff] text-black hover:bg-[#e0ffff]/90",
+    };
+
+    // 尝试直接匹配颜色名称（不区分大小写）
+    const normalizedColor = color.toLowerCase();
+    
+    // 先检查是否是已知的颜色名
+    for (const [colorName, className] of Object.entries(colorClassMap)) {
+      if (colorName.toLowerCase() === normalizedColor) {
+        return className;
+      }
+    }
+    
+    // 如果没有找到匹配的颜色名，使用默认的深色/浅色判断
+    return shouldUseDarkText(color) 
+      ? "bg-white text-black border border-gray-200 hover:bg-gray-50" 
+      : "bg-black text-white hover:bg-black/90";
+  };
+
   const renderTooltip = (Icon, tooltipText) => (
     <Tooltip delayDuration={50} side="right">
       <TooltipTrigger asChild>
@@ -191,14 +229,16 @@ export default function ProjectSidebar({ projectId }) {
               onClick={() => setDropdownOpen(!isDropdownOpen)} 
               className="flex items-center justify-between w-full px-4 py-2.5 text-foreground hover:bg-accent/50 transition-colors"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div 
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-white text-sm font-medium"
-                  style={{ backgroundColor: themeColor || '#E91E63' }}
+                  className={cn(
+                    "w-6 h-6 rounded-md flex items-center justify-center text-sm font-medium",
+                    getColorClass(themeColor)
+                  )}
                 >
                   {getProjectInitial(projectName)}
                 </div>
-                <span className="text-sm font-medium">{projectName}</span>
+                <span className="text-sm font-medium break-all overflow-wrap w-[130px] text-left">{projectName}</span>
               </div>
               <ChevronDown className="h-4 w-4"/>           
             </button>
@@ -285,22 +325,21 @@ export default function ProjectSidebar({ projectId }) {
                                   "transition-colors"
                                 )}
                               >
-                                <div className="flex items-center w-full justify-between">
-                                  <div className="flex items-center gap-2">
+                                <div className="flex items-center w-full justify-between flex-wrap">
+                                  <div className="flex items-center gap-2 min-w-0">
                                     <div 
                                       className={cn(
                                         "w-4 h-4 rounded-md flex items-center justify-center text-xs font-medium transition-all",
-                                        shouldUseDarkText(themeColor) ? "text-gray-900" : "text-white",
+                                        getColorClass(themeColor),
                                         "ring-offset-background",
                                         isActive
                                           ? ""
                                           : ""
                                       )}
-                                      style={{ backgroundColor: themeColor }}
                                     >
                                       {getProjectInitial(item.label)}
                                     </div>
-                                    <span className="text-sm">{item.label}</span>
+                                    <span className="text-sm break-all w-[130px]">{item.label}</span>
                                   </div>
                                   <div className="flex items-center">
                                     {(() => {
