@@ -129,18 +129,31 @@ async function handleLogin(data) {
       .order('created_at', { ascending: false })
       .limit(1);
 
-    // Set cookie - Note: cookies() needs to be awaited
-    await cookies().set('auth_token', token, { 
-      httpOnly: false , 
+    // Set cookie with improved settings
+    const cookieOptions = {
+      httpOnly: true, // Better security by not allowing JavaScript access
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
       path: '/',
-      sameSite: 'strict'
-    });
-
-    // Log all cookies for debugging
-    const allCookies = await cookies().getAll();
-    console.log('All cookies:', Object.fromEntries(allCookies.map(c => [c.name, c.value])));
+      sameSite: 'lax' // Better compatibility with third-party contexts while maintaining security
+    };
+    
+    try {
+      await cookies().set('auth_token', token, cookieOptions);
+      
+      // For client-side detection of login state (non-sensitive)
+      await cookies().set('user_logged_in', 'true', {
+        ...cookieOptions,
+        httpOnly: false // Allow JavaScript to read this cookie
+      });
+      
+      // Log all cookies for debugging
+      const allCookies = await cookies().getAll();
+      console.log('All cookies:', Object.fromEntries(allCookies.map(c => [c.name, c.value])));
+    } catch (cookieError) {
+      console.error('Error setting cookies:', cookieError);
+      // Continue with response but log the issue
+    }
 
     // Remove sensitive data
     delete user.password_hash;

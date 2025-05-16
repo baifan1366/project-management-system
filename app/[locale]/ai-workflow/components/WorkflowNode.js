@@ -1,7 +1,7 @@
 import React, { memo, useState, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, PresentationIcon, Code, Edit, Check, X, Loader2, MessageSquare } from 'lucide-react';
+import { FileText, PresentationIcon, Code, Edit, Check, X, Loader2, MessageSquare, Mail } from 'lucide-react';
 import ModelSelector from './ModelSelector';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,6 +32,17 @@ function WorkflowNode({ data, selected, id }) {
   const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
   const [messageTemplate, setMessageTemplate] = useState(data.messageTemplate || 'Hello, this is an automated message from the workflow system:\n\n{{content}}');
   const [messageFormat, setMessageFormat] = useState(data.messageFormat || 'text');
+  
+  // Email node settings
+  const [emailRecipients, setEmailRecipients] = useState(data.emailRecipients || '');
+  const [emailSubject, setEmailSubject] = useState(data.emailSubject || 'Automated email from workflow system');
+  const [emailTemplate, setEmailTemplate] = useState(data.emailTemplate || 'Hello,\n\nThis is an automated email from the workflow system:\n\n{{content}}\n\nRegards,\nWorkflow System');
+  const [useCustomSmtp, setUseCustomSmtp] = useState(data.useCustomSmtp || false);
+  const [smtpHost, setSmtpHost] = useState(data.smtpHost || '');
+  const [smtpPort, setSmtpPort] = useState(data.smtpPort || '587');
+  const [smtpUser, setSmtpUser] = useState(data.smtpUser || '');
+  const [smtpPassword, setSmtpPassword] = useState(data.smtpPassword || '');
+  const [smtpFrom, setSmtpFrom] = useState(data.smtpFrom || '');
 
   // Fetch user's projects on component mount
   useEffect(() => {
@@ -214,6 +225,25 @@ function WorkflowNode({ data, selected, id }) {
     setIsEditing(false);
   };
 
+  // Save email settings
+  const saveEmailSettings = () => {
+    if (data.handleInputChange) {
+      data.handleInputChange(id, 'emailRecipients', emailRecipients);
+      data.handleInputChange(id, 'emailSubject', emailSubject);
+      data.handleInputChange(id, 'emailTemplate', emailTemplate);
+      data.handleInputChange(id, 'useCustomSmtp', useCustomSmtp);
+      
+      if (useCustomSmtp) {
+        data.handleInputChange(id, 'smtpHost', smtpHost);
+        data.handleInputChange(id, 'smtpPort', smtpPort);
+        data.handleInputChange(id, 'smtpUser', smtpUser);
+        data.handleInputChange(id, 'smtpPassword', smtpPassword);
+        data.handleInputChange(id, 'smtpFrom', smtpFrom);
+      }
+    }
+    setIsEditing(false);
+  };
+
   // Cancel editing
   const cancelEditing = () => {
     setTempJsonFormat(jsonFormat || '{\n  "title": "Example",\n  "content": "Content here"\n}');
@@ -221,6 +251,15 @@ function WorkflowNode({ data, selected, id }) {
     setTempApiMethod(apiMethod || 'GET');
     setMessageTemplate(data.messageTemplate || 'Hello, this is an automated message from the workflow system:\n\n{{content}}');
     setMessageFormat(data.messageFormat || 'text');
+    setEmailRecipients(data.emailRecipients || '');
+    setEmailSubject(data.emailSubject || 'Automated email from workflow system');
+    setEmailTemplate(data.emailTemplate || 'Hello,\n\nThis is an automated email from the workflow system:\n\n{{content}}\n\nRegards,\nWorkflow System');
+    setUseCustomSmtp(data.useCustomSmtp || false);
+    setSmtpHost(data.smtpHost || '');
+    setSmtpPort(data.smtpPort || '587');
+    setSmtpUser(data.smtpUser || '');
+    setSmtpPassword(data.smtpPassword || '');
+    setSmtpFrom(data.smtpFrom || '');
     setIsEditing(false);
   };
 
@@ -252,6 +291,8 @@ function WorkflowNode({ data, selected, id }) {
           return 'bg-white dark:bg-[#323a30] border-amber-100 dark:border-[#424a40]';
         } else if (outputType === 'chat') {
           return 'bg-white dark:bg-[#303842] border-indigo-100 dark:border-[#404a55]';
+        } else if (outputType === 'email') {
+          return 'bg-white dark:bg-[#383030] border-cyan-100 dark:border-[#484040]';
         }
         return 'bg-white dark:bg-[#303842] border-gray-100 dark:border-[#404a55]';
       default:
@@ -279,6 +320,8 @@ function WorkflowNode({ data, selected, id }) {
           return 'text-amber-500 dark:text-amber-400';
         } else if (outputType === 'chat') {
           return 'text-indigo-500 dark:text-indigo-400';
+        } else if (outputType === 'email') {
+          return 'text-cyan-500 dark:text-cyan-400';
         }
         return 'text-gray-500 dark:text-gray-400';
       default:
@@ -306,6 +349,8 @@ function WorkflowNode({ data, selected, id }) {
           return 'bg-amber-500 dark:bg-amber-400';
         } else if (outputType === 'chat') {
           return 'bg-indigo-500 dark:bg-indigo-400';
+        } else if (outputType === 'email') {
+          return 'bg-cyan-500 dark:bg-cyan-400';
         }
         return 'bg-gray-500 dark:bg-gray-400';
       default:
@@ -335,6 +380,167 @@ function WorkflowNode({ data, selected, id }) {
             <div className="bg-gray-50 dark:bg-[#2b2529] p-1 rounded text-xs flex items-center border border-gray-100 dark:border-[#3b3539]">
               <PresentationIcon className="h-3 w-3 mr-1 text-red-500" />
               <span className="dark:text-gray-300">{t('powerPointSlides')}</span>
+            </div>
+          </div>
+        );
+      case 'email':
+        return (
+          <div className="mt-2 text-xs">
+            <p className="font-semibold mb-1 dark:text-gray-200">{t('emailOutput') || 'Email Output'}</p>
+            <div className="bg-gray-50 dark:bg-[#2a2526] p-1 rounded text-xs flex items-center border border-gray-100 dark:border-[#3a3536]">
+              <Mail className="h-3 w-3 mr-1 text-cyan-500" />
+              <span className="dark:text-gray-300">{t('sendEmail') || 'Send Email'}</span>
+            </div>
+            
+            {/* Email Recipients */}
+            <div className="mt-2">
+              <p className="font-semibold mb-1 flex justify-between items-center dark:text-gray-200">
+                {t('emailSettings') || 'Email Settings'}
+                {!isEditing ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#3a3536]"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                ) : (
+                  <div className="flex items-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4 mr-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#3a3536]"
+                      onClick={saveEmailSettings}
+                    >
+                      <Check className="h-3 w-3 text-green-500" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon" 
+                      className="h-4 w-4 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#3a3536]"
+                      onClick={cancelEditing}
+                    >
+                      <X className="h-3 w-3 text-red-500" />
+                    </Button>
+                  </div>
+                )}
+              </p>
+              
+              {!isEditing ? (
+                <div className="bg-gray-50 dark:bg-[#2a2526] p-2 rounded text-xs space-y-1 border border-gray-100 dark:border-[#3a3536]">
+                  <div className="flex items-center">
+                    <span className="font-semibold mr-1 dark:text-gray-300">{t('recipients') || 'Recipients'}:</span>
+                    <span className="truncate dark:text-gray-400">{emailRecipients || 'No recipients specified'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="font-semibold mr-1 dark:text-gray-300">{t('subject') || 'Subject'}:</span>
+                    <span className="dark:text-gray-400">{emailSubject || 'Automated email from workflow system'}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold dark:text-gray-300">{t('smtp') || 'SMTP'}: </span>
+                    <span className="dark:text-gray-400">{useCustomSmtp ? t('custom') || 'Custom' : t('default') || 'Default (Environment)'}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs mb-1 dark:text-gray-300">{t('recipients') || 'Recipients'} <span className="text-gray-400">(comma separated)</span>:</p>
+                    <Input 
+                      value={emailRecipients}
+                      onChange={(e) => setEmailRecipients(e.target.value)}
+                      className="h-6 text-xs p-1 dark:bg-[#2a2526] dark:border-[#3a3536] dark:text-gray-200"
+                      placeholder="user@example.com, another@example.com"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs mb-1 dark:text-gray-300">{t('subject') || 'Subject'}:</p>
+                    <Input 
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      className="h-6 text-xs p-1 dark:bg-[#2a2526] dark:border-[#3a3536] dark:text-gray-200"
+                      placeholder="Email subject"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs mb-1 dark:text-gray-300">{t('emailTemplate') || 'Email Template'}:</p>
+                    <Textarea
+                      value={emailTemplate}
+                      onChange={(e) => setEmailTemplate(e.target.value)}
+                      className="text-xs p-1 font-mono h-20 dark:bg-[#2a2526] dark:border-[#3a3536] dark:text-gray-200"
+                      placeholder="Use {{content}} as a placeholder for the workflow output content"
+                    />
+                    <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                      {t('templateHint') || 'Use {{content}} as a placeholder for content'}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="use-custom-smtp"
+                      checked={useCustomSmtp}
+                      onCheckedChange={setUseCustomSmtp}
+                      className="h-3 w-3 text-cyan-500 dark:text-cyan-400"
+                    />
+                    <label 
+                      htmlFor="use-custom-smtp"
+                      className="text-xs cursor-pointer dark:text-gray-300"
+                    >
+                      {t('useCustomSmtp') || 'Use custom SMTP settings'}
+                    </label>
+                  </div>
+                  
+                  {useCustomSmtp && (
+                    <div className="space-y-2 pl-5 border-l-2 border-cyan-200 dark:border-cyan-800">
+                      <div>
+                        <p className="text-xs mb-1 dark:text-gray-300">{t('smtpHost') || 'SMTP Host'}:</p>
+                        <Input 
+                          value={smtpHost}
+                          onChange={(e) => setSmtpHost(e.target.value)}
+                          className="h-6 text-xs p-1 dark:bg-[#2a2526] dark:border-[#3a3536] dark:text-gray-200"
+                          placeholder="smtp.example.com"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs mb-1 dark:text-gray-300">{t('smtpPort') || 'SMTP Port'}:</p>
+                        <Input 
+                          value={smtpPort}
+                          onChange={(e) => setSmtpPort(e.target.value)}
+                          className="h-6 text-xs p-1 dark:bg-[#2a2526] dark:border-[#3a3536] dark:text-gray-200"
+                          placeholder="587"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs mb-1 dark:text-gray-300">{t('smtpUser') || 'SMTP User'}:</p>
+                        <Input 
+                          value={smtpUser}
+                          onChange={(e) => setSmtpUser(e.target.value)}
+                          className="h-6 text-xs p-1 dark:bg-[#2a2526] dark:border-[#3a3536] dark:text-gray-200"
+                          placeholder="user@example.com"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs mb-1 dark:text-gray-300">{t('smtpPassword') || 'SMTP Password'}:</p>
+                        <Input 
+                          type="password"
+                          value={smtpPassword}
+                          onChange={(e) => setSmtpPassword(e.target.value)}
+                          className="h-6 text-xs p-1 dark:bg-[#2a2526] dark:border-[#3a3536] dark:text-gray-200"
+                          placeholder="••••••••"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs mb-1 dark:text-gray-300">{t('smtpFrom') || 'From Email'}:</p>
+                        <Input 
+                          value={smtpFrom}
+                          onChange={(e) => setSmtpFrom(e.target.value)}
+                          className="h-6 text-xs p-1 dark:bg-[#2a2526] dark:border-[#3a3536] dark:text-gray-200"
+                          placeholder="noreply@example.com"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );
