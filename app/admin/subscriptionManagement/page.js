@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { clsx } from 'clsx';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
 
 export default function AdminSubscriptions() {
   const router = useRouter();
@@ -58,6 +59,8 @@ export default function AdminSubscriptions() {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('ALL');
   const [planTypeFilter, setPlanTypeFilter] = useState('all');
+  const [isUserSubscriptionDetailsModalOpen, setIsUserSubscriptionDetailsModalOpen] = useState(false);
+  const [selectedSubscriptionDetails, setSelectedSubscriptionDetails] = useState(null);
   
   // initialize the page
   useEffect(() => {
@@ -238,123 +241,75 @@ export default function AdminSubscriptions() {
     setIsCodeSelected(null);
   };
 
-  // Fix the addPromoCode function
-  const addPromoCode = async (codeData) =>{
-    try{
-      setLoading(true);
-
-      const { data, error } = await supabase
-        .from('promo_code')
-        .insert({
-          code: codeData.code,
-          discount_type: codeData.discount_type,
-          discount_value: codeData.discount_value,
-          description: codeData.description,
-          is_active: codeData.is_active,
-          start_date: codeData.start_date,
-          end_date: codeData.end_date,
-          current_uses: 0,
-          max_uses: codeData.max_uses || 0
-        });
-        
-      if(error){
-        console.error('Error in addPromoCode:', error);
-        alert(`Failed to add promo code: ${error.message}`);
-        return false;
-      }
-
-      console.log('Promo code added successfully:', data);
-      
-      await fetchPromoCodes();
-      return true;
-
-    } catch (error) {
-      console.error('Error in addPromoCode:', error);
-      alert('An unexpected error occurred while adding the promo code');
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Update subscription plan
-  const updateSubscriptionPlan = async (planId, planData) => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('subscription_plan')
-        .update(planData)
-        .eq('id', planId);
-        
-      if (error) {
-        console.error('Error updating subscription plan:', error);
-        return;
-      }
-      
-      console.log('Subscription plan updated successfully:', data);
-      
-      // Now fetchSubscriptionPlans is accessible here
-      await fetchSubscriptionPlans();
-      
-    } catch (error) {
-      console.error('Error in updateSubscriptionPlan:', error);
-    } finally {
-      setLoading(false);
-    } 
-  };
-
-  const updatePromoCode = async (codeId, codeData) => {
-    try {
-        setLoading(true);
-        
-        const { data, error } = await supabase
-          .from('promo_code')
-          .update(codeData)
-          .eq('id', codeId);
-          
-        if (error) {
-          console.error('Error updating promo code:', error);
-          return;
-        }
-        
-        console.log('Promo code updated successfully:', data);
-        
-        // Now fetchPromoCodes is accessible here
-        await fetchPromoCodes();
-        
-      } catch (error) {
-        console.error('Error in updatePromoCode:', error);
-      } finally {
-        setLoading(false);
-      } 
-  }
   // deactivate or activate subscription plan and promo code
   const toggleActive = async (id, isActive, type) => {
     try {
       setLoading(true);
       
       if(type === 'subscription_plan'){
+        // First get the plan name
+        const { data: planData, error: planError } = await supabase
+          .from('subscription_plan')
+          .select('name')
+          .eq('id', id)
+          .single();
+          
+        if (planError) {
+          console.error('Error getting plan details:', planError);
+        }
+        
+        const planName = planData?.name || 'Plan';
+        
         const { data, error } = await supabase
           .from('subscription_plan')
           .update({ is_active: isActive })
           .eq('id', id);
 
-      if (error) {
-        console.error('Error in toggleActive:', error);
-      }
+        if (error) {
+          console.error('Error in toggleActive:', error);
+          toast.error(`Failed to update ${planName} status`, {
+            description: error.message
+          });
+          return;
+        }
+        
+        toast.success(`${planName} plan ${isActive ? 'activated' : 'deactivated'} successfully`);
 
       } else if(type === 'promo_code'){
+        // First get the code name
+        const { data: codeData, error: codeError } = await supabase
+          .from('promo_code')
+          .select('code')
+          .eq('id', id)
+          .single();
+          
+        if (codeError) {
+          console.error('Error getting promo code details:', codeError);
+        }
+        
+        const codeName = codeData?.code || 'Promo code';
+        
         const { data, error } = await supabase
           .from('promo_code')
           .update({ is_active: isActive })
           .eq('id', id);
+          
+        if (error) {
+          console.error('Error in toggleActive:', error);
+          toast.error(`Failed to update ${codeName} status`, {
+            description: error.message
+          });
+          return;
+        }
+        
+        toast.success(`Promo code "${codeName}" ${isActive ? 'activated' : 'deactivated'} successfully`);
       }
 
       await fetchSubscriptionPlans();
       await fetchPromoCodes();
     } catch (error) {
       console.error('Error in toggleActive:', error);
+      toast.error('An error occurred while updating status');
     } finally {
       setLoading(false);
     }
@@ -411,8 +366,21 @@ export default function AdminSubscriptions() {
 
   const deletePromoCode = async (codeId) => {
     try {
+      // Get the code name first
+      const { data: codeData, error: codeError } = await supabase
+        .from('promo_code')
+        .select('code')
+        .eq('id', codeId)
+        .single();
+        
+      if (codeError) {
+        console.error('Error getting promo code details:', codeError);
+      }
+      
+      const codeName = codeData?.code || 'Promo code';
+      
       // Confirm deletion
-      if (!confirm('Are you sure you want to delete this promo code?')) {
+      if (!confirm(`Are you sure you want to delete this promo code: ${codeName}?`)) {
         return;
       }
       
@@ -425,18 +393,21 @@ export default function AdminSubscriptions() {
         
       if (error) {
         console.error('Error deleting promo code:', error);
-        alert(`Failed to delete promo code: ${error.message}`);
+        toast.error(`Failed to delete ${codeName}`, {
+          description: error.message
+        });
         return;
       }
       
       console.log('Promo code deleted successfully');
+      toast.success(`Promo code "${codeName}" deleted successfully`);
       
       // Refresh the promo codes list
       await fetchPromoCodes();
       
     } catch (error) {
       console.error('Error in deletePromoCode:', error);
-      alert('An unexpected error occurred while deleting the promo code');
+      toast.error('An unexpected error occurred while deleting the promo code');
     } finally {
       setLoading(false);
     }
@@ -513,13 +484,14 @@ export default function AdminSubscriptions() {
     }
   }, [activeTab, paymentStatusFilter, paymentSearchQuery, currentPaymentPage]);
 
-  // 添加一个导出CSV功能
+  // Add toast for exporting csv
   const exportPaymentsToCSV = async () => {
     try {
-      // 显示加载状态
+      // Show loading toast
+      const loadingToast = toast.loading('Preparing payment history export...');
       setIsPaymentLoading(true);
       
-      // 获取所有支付记录，不分页
+      // Get all payment records, not paginated
       const { data, error } = await supabase
         .from('payment')
         .select(`
@@ -532,7 +504,7 @@ export default function AdminSubscriptions() {
         throw error;
       }
       
-      // 格式化数据
+      // Format data
       const formattedData = data.map(payment => ({
         'User Name': payment.user?.name || 'Unknown',
         'User Email': payment.user?.email || 'No email',
@@ -546,7 +518,7 @@ export default function AdminSubscriptions() {
         'Promo Code': payment.applied_promo_code || 'None'
       }));
       
-      // 创建CSV内容
+      // Create CSV content
       const headers = Object.keys(formattedData[0]).join(',');
       const csvRows = formattedData.map(row => 
         Object.values(row).map(value => 
@@ -555,20 +527,30 @@ export default function AdminSubscriptions() {
       );
       
       const csvContent = [headers, ...csvRows].join('\n');
+      const fileName = `payment_history_${new Date().toISOString().split('T')[0]}.csv`;
       
-      // 创建Blob和下载链接
+      // Create Blob and download link
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `payment_history_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', fileName);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
+      // Dismiss loading toast and show success toast
+      toast.dismiss(loadingToast);
+      toast.success(`Payment history exported to ${fileName}`, {
+        description: `${data.length} records exported successfully`
+      });
+      
     } catch (error) {
       console.error('Error exporting payments:', error);
+      toast.error('Error exporting payment data', {
+        description: error.message
+      });
       setPaymentError('An error occurred while exporting payment history.');
     } finally {
       setIsPaymentLoading(false);
@@ -589,12 +571,224 @@ export default function AdminSubscriptions() {
     }
   }, [activeTab, userSearchQuery, subscriptionStatusFilter, planTypeFilter]);
 
+  // Open subscription details modal function (add after parseFeatures function)
+  const openSubscriptionDetailsModal = (subscription) => {
+    setSelectedSubscriptionDetails(subscription);
+    setIsUserSubscriptionDetailsModalOpen(true);
+  };
+
+  // Close subscription details modal
+  const closeSubscriptionDetailsModal = () => {
+    setIsUserSubscriptionDetailsModalOpen(false);
+    setSelectedSubscriptionDetails(null);
+  };
+
+  // Update subscription plan
+  const updateSubscriptionPlan = async (planId, planData) => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('subscription_plan')
+        .update(planData)
+        .eq('id', planId);
+        
+      if (error) {
+        console.error('Error updating subscription plan:', error);
+        toast.error(`Failed to update ${planData.name}`, {
+          description: error.message
+        });
+        return;
+      }
+      
+      console.log('Subscription plan updated successfully:', data);
+      toast.success(`${planData.name} updated successfully`);
+      
+      // Now fetchSubscriptionPlans is accessible here
+      await fetchSubscriptionPlans();
+      
+    } catch (error) {
+      console.error('Error in updateSubscriptionPlan:', error);
+      toast.error('An error occurred while updating the subscription plan');
+    } finally {
+      setLoading(false);
+    } 
+  };
+
+  const updatePromoCode = async (codeId, codeData) => {
+    try {
+        setLoading(true);
+        
+        const { data, error } = await supabase
+          .from('promo_code')
+          .update(codeData)
+          .eq('id', codeId);
+          
+        if (error) {
+          console.error('Error updating promo code:', error);
+          toast.error(`Failed to update promo code "${codeData.code}"`, {
+            description: error.message
+          });
+          return;
+        }
+        
+        console.log('Promo code updated successfully:', data);
+        toast.success(`Promo code "${codeData.code}" updated successfully`);
+        
+        // Now fetchPromoCodes is accessible here
+        await fetchPromoCodes();
+        
+      } catch (error) {
+        console.error('Error in updatePromoCode:', error);
+        toast.error('An error occurred while updating the promo code');
+      } finally {
+        setLoading(false);
+      } 
+  }
+
+  // Fix the addPromoCode function
+  const addPromoCode = async (codeData) =>{
+    try{
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('promo_code')
+        .insert({
+          code: codeData.code,
+          discount_type: codeData.discount_type,
+          discount_value: codeData.discount_value,
+          description: codeData.description,
+          is_active: codeData.is_active,
+          start_date: codeData.start_date,
+          end_date: codeData.end_date,
+          current_uses: 0,
+          max_uses: codeData.max_uses || 0
+        });
+        
+      if(error){
+        console.error('Error in addPromoCode:', error);
+        toast.error(`Failed to add promo code "${codeData.code}"`, {
+          description: error.message
+        });
+        return false;
+      }
+
+      console.log('Promo code added successfully:', data);
+      toast.success(`Promo code "${codeData.code}" added successfully`);
+      
+      await fetchPromoCodes();
+      return true;
+
+    } catch (error) {
+      console.error('Error in addPromoCode:', error);
+      toast.error('An unexpected error occurred while adding the promo code');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading subscription management...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {/* Skeleton Tabs */}
+          <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+            <ul className="flex flex-wrap -mb-px">
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  Subscription Plans
+                </div>
+              </li>
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  Promo Codes
+                </div>
+              </li>
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  User Subscriptions
+                </div>
+              </li>
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  Payment History
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          {/* Subscription Plans Skeleton */}
+          <div>
+            <div className="mb-6 flex justify-between items-center">
+              <div className="h-7 w-56 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-8">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((item) => (
+                        <th key={item} scope="col" className="px-6 py-3 text-left">
+                          <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {[1, 2, 3, 4, 5].map((row) => (
+                      <tr key={row}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                          <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((feat) => (
+                              <div key={feat} className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((limit) => (
+                              <div key={limit} className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex justify-end space-x-3">
+                            {[1, 2].map((action) => (
+                              <div key={action} className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          
         </div>
       </div>
     );
@@ -993,7 +1187,11 @@ export default function AdminSubscriptions() {
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {userSubscriptions.map((subscription) => {
                           return (
-                            <tr key={subscription.id} className={subscription.status.toUpperCase() !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
+                            <tr 
+                              key={subscription.id} 
+                              className={`${subscription.status.toUpperCase() !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''} cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700`}
+                              onClick={() => openSubscriptionDetailsModal(subscription)}
+                            >
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
                                   <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
@@ -1159,7 +1357,6 @@ export default function AdminSubscriptions() {
                                   {subscription.status.toUpperCase() === 'ACTIVE' ? (
                                     <button 
                                       onClick={() => {
-                                        if(confirm('Are you sure you want to cancel this subscription?')) {
                                           // Update subscription status to CANCELED
                                           supabase
                                             .from('user_subscription_plan')
@@ -1171,12 +1368,14 @@ export default function AdminSubscriptions() {
                                             .then(({error}) => {
                                               if(error) {
                                                 console.error('Error canceling subscription:', error);
-                                                alert(`Failed to cancel subscription: ${error.message}`);
+                                                toast.error(`Failed to cancel subscription for "${subscription.user?.name || 'user'}"`, {
+                                                  description: error.message
+                                                });
                                               } else {
+                                                toast.success(`Subscription for "${subscription.user?.name || 'user'}" canceled successfully`);
                                                 fetchUserSubscriptions();
                                               }
                                             });
-                                        }
                                       }}
                                       className={clsx(
                                         'text-2xl transition-colors duration-200',
@@ -1189,7 +1388,6 @@ export default function AdminSubscriptions() {
                                   ) : (
                                     <button 
                                       onClick={() => {
-                                        if(confirm('Are you sure you want to reactivate this subscription?')) {
                                           // Update subscription status to ACTIVE
                                           supabase
                                             .from('user_subscription_plan')
@@ -1201,12 +1399,14 @@ export default function AdminSubscriptions() {
                                             .then(({error}) => {
                                               if(error) {
                                                 console.error('Error reactivating subscription:', error);
-                                                alert(`Failed to reactivate subscription: ${error.message}`);
+                                                toast.error(`Failed to reactivate subscription for "${subscription.user?.name || 'user'}"`, {
+                                                  description: error.message
+                                                });
                                               } else {
+                                                toast.success(`Subscription for "${subscription.user?.name || 'user'}" reactivated successfully`);
                                                 fetchUserSubscriptions();
                                               }
                                             });
-                                        }
                                       }}
                                       className={clsx(
                                         'text-2xl transition-colors duration-200',
@@ -2159,6 +2359,10 @@ export default function AdminSubscriptions() {
                   updated_at: new Date().toISOString()
                 };
                 
+                // Get the plan name for the toast
+                const planName = subscriptionPlans.find(p => p.id === updatedData.plan_id)?.name || 'plan';
+                const userName = isUserSubscriptionPlanSelected.user?.name || 'user';
+                
                 // Update the subscription in the database
                 const { data, error } = await supabase
                   .from('user_subscription_plan')
@@ -2167,11 +2371,14 @@ export default function AdminSubscriptions() {
                 
                 if (error) {
                   console.error('Error updating user subscription:', error);
-                  alert(`Failed to update subscription: ${error.message}`);
+                  toast.error(`Failed to update subscription for "${userName}"`, {
+                    description: error.message
+                  });
                   return;
                 }
                 
                 console.log('User subscription updated successfully:', data);
+                toast.success(`Subscription for "${userName}" updated to ${planName} successfully`);
                 
                 // Refresh the user subscriptions list
                 await fetchUserSubscriptions();
@@ -2181,7 +2388,7 @@ export default function AdminSubscriptions() {
                 
               } catch (error) {
                 console.error('Error in form submission:', error);
-                alert('An unexpected error occurred while updating the subscription');
+                toast.error('An unexpected error occurred while updating the subscription');
               } finally {
                 setLoading(false);
               }
@@ -2477,6 +2684,351 @@ export default function AdminSubscriptions() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Subscription Details Modal */}
+      {isUserSubscriptionDetailsModalOpen && selectedSubscriptionDetails && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] flex flex-col p-6 overflow-hidden'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+                Subscription Details
+              </h2>
+              <button
+                onClick={closeSubscriptionDetailsModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="space-y-6 overflow-y-auto pr-2">
+              {/* User Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">User Information</h3>
+                <div className="flex items-center space-x-4 mb-3">
+                  <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-xl">
+                    {(selectedSubscriptionDetails.user?.name?.charAt(0) || selectedSubscriptionDetails.user?.email?.charAt(0) || '?').toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-800 dark:text-white">
+                      {selectedSubscriptionDetails.user?.name || 'Unknown User'}
+                    </h4>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {selectedSubscriptionDetails.user?.email || 'No email available'}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">User ID</p>
+                    <p className="text-gray-700 dark:text-gray-300">{selectedSubscriptionDetails.user_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Joined</p>
+                    <p className="text-gray-700 dark:text-gray-300">{formatDate(selectedSubscriptionDetails.user?.created_at || new Date())}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Subscription Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Subscription Information</h3>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Plan</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${selectedSubscriptionDetails.plan?.type === 'FREE' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : 
+                          selectedSubscriptionDetails.plan?.type === 'PRO' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
+                          'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}
+                      >
+                        {selectedSubscriptionDetails.plan?.name || selectedSubscriptionDetails.plan?.type || 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${selectedSubscriptionDetails.status.toUpperCase() === 'ACTIVE' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
+                          : selectedSubscriptionDetails.status.toUpperCase() === 'CANCELED'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                        }`}
+                      >
+                        {selectedSubscriptionDetails.status.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Start Date</p>
+                    <p className="text-gray-700 dark:text-gray-300">{formatDate(selectedSubscriptionDetails.start_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">End Date</p>
+                    <p className="text-gray-700 dark:text-gray-300">{formatDate(selectedSubscriptionDetails.end_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Price</p>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      {formatCurrency(selectedSubscriptionDetails.plan?.price || 0)}
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                        /{selectedSubscriptionDetails.plan?.billing_interval?.toLowerCase() || 'month'}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Subscription ID</p>
+                    <p className="text-gray-700 dark:text-gray-300 text-xs truncate">{selectedSubscriptionDetails.id}</p>
+                  </div>
+                </div>
+                <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Timeline</p>
+                  <div className="space-y-2">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 h-4 w-4 rounded-full bg-green-400 mt-1"></div>
+                      <div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">Subscription created</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(selectedSubscriptionDetails.created_at)}</p>
+                      </div>
+                    </div>
+                    {selectedSubscriptionDetails.updated_at !== selectedSubscriptionDetails.created_at && (
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 h-4 w-4 rounded-full bg-blue-400 mt-1"></div>
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">Last updated</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(selectedSubscriptionDetails.updated_at)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedSubscriptionDetails.status.toUpperCase() === 'CANCELED' && (
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 h-4 w-4 rounded-full bg-red-400 mt-1"></div>
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">Subscription canceled</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(selectedSubscriptionDetails.updated_at)}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Usage Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Usage & Limits</h3>
+                <div className="space-y-4">
+                  {/* Projects Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_projects} / {selectedSubscriptionDetails.plan?.max_projects === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_projects}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_projects !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.8 
+                              ? 'bg-red-500' 
+                              : selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, (selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Members Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Team Members</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_members} / {selectedSubscriptionDetails.plan?.max_members === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_members}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_members !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.8 
+                              ? 'bg-red-500' 
+                              : selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, (selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* AI Chat Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Chat</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_ai_chat || 0} / {selectedSubscriptionDetails.plan?.max_ai_chat === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_chat}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_ai_chat !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.8 
+                              ? 'bg-red-500' 
+                              : (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* AI Task Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Tasks</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_ai_task || 0} / {selectedSubscriptionDetails.plan?.max_ai_task === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_task}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_ai_task !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.8 
+                              ? 'bg-red-500' 
+                              : (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* AI Workflow Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Workflows</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_ai_workflow || 0} / {selectedSubscriptionDetails.plan?.max_ai_workflow === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_workflow}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_ai_workflow !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.8 
+                              ? 'bg-red-500' 
+                              : (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div>
+                {selectedSubscriptionDetails.status.toUpperCase() === 'ACTIVE' ? (
+                  <button 
+                    onClick={() => {
+                        // Update subscription status to CANCELED
+                        supabase
+                          .from('user_subscription_plan')
+                          .update({ 
+                            status: 'CANCELED',
+                            updated_at: new Date().toISOString()
+                          })
+                          .eq('id', selectedSubscriptionDetails.id)
+                          .then(({error}) => {
+                            if(error) {
+                              console.error('Error canceling subscription:', error);
+                              toast.error(`Failed to cancel subscription for "${selectedSubscriptionDetails.user?.name || 'user'}"`, {
+                                description: error.message
+                              });
+                            } else {
+                              toast.success(`Subscription for "${selectedSubscriptionDetails.user?.name || 'user'}" canceled successfully`);
+                              fetchUserSubscriptions();
+                              closeSubscriptionDetailsModal();
+                            }
+                          });
+                    }}
+                    className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    Cancel Subscription
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                        // Update subscription status to ACTIVE
+                        supabase
+                          .from('user_subscription_plan')
+                          .update({ 
+                            status: 'ACTIVE',
+                            updated_at: new Date().toISOString() 
+                          })
+                          .eq('id', selectedSubscriptionDetails.id)
+                          .then(({error}) => {
+                            if(error) {
+                              console.error('Error reactivating subscription:', error);
+                              toast.error(`Failed to reactivate subscription for "${selectedSubscriptionDetails.user?.name || 'user'}"`, {
+                                description: error.message
+                              });
+                            } else {
+                              toast.success(`Subscription for "${selectedSubscriptionDetails.user?.name || 'user'}" reactivated successfully`);
+                              fetchUserSubscriptions();
+                              closeSubscriptionDetailsModal();
+                            }
+                          });
+                    }}
+                    className="px-4 py-2 border border-green-500 text-green-500 rounded-md text-sm hover:bg-green-50 dark:hover:bg-green-900/20"
+                  >
+                    Reactivate Subscription
+                  </button>
+                )}
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={closeSubscriptionDetailsModal}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUserSubscriptionPlanSelected(selectedSubscriptionDetails);
+                    setIsModalOpen(true);
+                    setModalType('edit');
+                    closeSubscriptionDetailsModal();
+                  }}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Edit Subscription
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -461,10 +461,50 @@ export default function AdminAnalytics() {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading analytics data...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {/* Summary Stats Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((item) => (
+              <div key={item} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                    <div className="h-8 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                </div>
+                <div className="mt-4">
+                  <div className="h-3 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Charts Skeleton - Revenue and User Growth */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {[1, 2].map((chart) => (
+              <div key={chart} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
+                <div className="h-80 bg-gray-100 dark:bg-gray-700 rounded animate-pulse flex items-center justify-center">
+                  <div className="h-40 w-40 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse opacity-50"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Charts Skeleton - Payment Methods and Plan Distribution */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[1, 2].map((chart) => (
+              <div key={chart} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
+                <div className="h-80 bg-gray-100 dark:bg-gray-700 rounded animate-pulse flex items-center justify-center">
+                  <div className="h-60 w-60 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse opacity-50"></div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

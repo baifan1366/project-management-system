@@ -54,7 +54,7 @@ export default function AdminSidebar({ activePage, adminData, onLogout }) {
   ];
   
   return (
-    <div className="w-64 bg-slate-800 dark:bg-gray-800 text-white h-screen flex flex-col">
+    <div className="w-64 bg-slate-800 dark:bg-gray-800 text-white fixed h-screen overflow-y-auto z-10">
       <div className="p-4 flex items-center">
         <Link href="/admin/adminDashboard">
           <div className="flex items-center">

@@ -7,6 +7,8 @@ import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUse
 import { useSelector, useDispatch } from 'react-redux';
 import { checkAdminSession } from '@/lib/redux/features/adminSlice';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
+
 
 export default function AdminUserManagement() {
 
@@ -196,19 +198,117 @@ export default function AdminUserManagement() {
     setSelectedAdmin(null);
   };
   
+  // Initialize permissions for a new admin user
+  const initializeAdminPermissions = async (adminId) => {
+    try {
+      // Fetch all available permissions
+      const { data: allPermissions, error: permissionsError } = await supabase
+        .from('admin_permission')
+        .select('id, name')
+        .order('id', { ascending: true });
+      
+      if (permissionsError) {
+        toast.error(`Failed to fetch permissions: ${permissionsError.message}`);
+        throw permissionsError;
+      }
+      
+      // Default permissions to give to new admins
+      // For basic admin access but not super admin access
+      const defaultPermissionNames = ['view_users', 'edit_users', 'add_users', 'delete_users']; //default permissions
+      
+      // Prepare batch insert data
+      const permissionsToInsert = allPermissions.map(permission => ({
+        admin_id: adminId,
+        permission_id: permission.id,
+        is_active: defaultPermissionNames.includes(permission.name)
+      }));
+      
+      // Insert permissions in a single batch operation
+      if (permissionsToInsert.length > 0) {
+        const { error: batchInsertError } = await supabase
+          .from('admin_role_permission')
+          .insert(permissionsToInsert);
+        
+        if (batchInsertError) {
+          console.error('Failed to insert permissions batch:', batchInsertError);
+          
+          // If batch insert fails, try one by one as fallback
+          let someSucceeded = false;
+          for (const permData of permissionsToInsert) {
+            try {
+              // Check if this specific permission already exists for this admin
+              const { data: existingPerm } = await supabase
+                .from('admin_role_permission')
+                .select('id')
+                .eq('admin_id', adminId)
+                .eq('permission_id', permData.permission_id)
+                .maybeSingle();
+              
+              if (existingPerm) {
+                // Update existing permission
+                await supabase
+                  .from('admin_role_permission')
+                  .update({ is_active: permData.is_active })
+                  .eq('id', existingPerm.id);
+              } else {
+                // Insert new permission
+                await supabase
+                  .from('admin_role_permission')
+                  .insert(permData);
+              }
+              
+              someSucceeded = true;
+            } catch (error) {
+              console.error(`Failed to insert/update permission ${permData.permission_id}:`, error);
+            }
+          }
+          
+          return someSucceeded;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error initializing admin permissions:', error);
+      return false;
+    }
+  };
+
   // Edit admin
   const editAdmin = async (newAdminData) => {
     try {
       // Verify permission
       if (!hasPermission('edit_admins')) {
+        toast.error('Permission denied: You do not have permission to edit admin users');
         throw new Error('You do not have permission to edit admin users');
       }
       
       // Create a filtered version of newAdminData that only includes non-empty values
       const filteredAdminData = {};
       
-      // Only include fields that have values
+      // Check for duplicate username if username is being updated
       if (newAdminData.username && newAdminData.username.trim() !== '') {
+        // Only check for duplicates if the username is different from the current one
+        if (newAdminData.username !== selectedAdmin.username) {
+          // Check if username already exists for another admin
+          const { data: existingUserByUsername, error: usernameCheckError } = await supabase
+            .from('admin_user')
+            .select('id')
+            .eq('username', newAdminData.username)
+            .not('id', 'eq', selectedAdmin.id) // Exclude the current admin from the check
+            .single();
+          
+          if (existingUserByUsername) {
+            toast.error('Another admin with this username already exists');
+            return;
+          }
+          
+          if (usernameCheckError && usernameCheckError.code !== 'PGRST116') {
+            toast.error(`Error checking existing username: ${usernameCheckError.message}`);
+            throw usernameCheckError;
+          }
+        }
+        
         filteredAdminData.username = newAdminData.username;
       }
       
@@ -216,7 +316,29 @@ export default function AdminUserManagement() {
         filteredAdminData.full_name = newAdminData.full_name;
       }
       
+      // Check for duplicate email if email is being updated
       if (newAdminData.email && newAdminData.email.trim() !== '') {
+        // Only check for duplicates if the email is different from the current one
+        if (newAdminData.email !== selectedAdmin.email) {
+          // Check if email already exists for another admin
+          const { data: existingUserByEmail, error: emailCheckError } = await supabase
+            .from('admin_user')
+            .select('id')
+            .eq('email', newAdminData.email)
+            .not('id', 'eq', selectedAdmin.id) // Exclude the current admin from the check
+            .single();
+          
+          if (existingUserByEmail) {
+            toast.error('Another admin with this email address already exists');
+            return;
+          }
+          
+          if (emailCheckError && emailCheckError.code !== 'PGRST116') {
+            toast.error(`Error checking existing email: ${emailCheckError.message}`);
+            throw emailCheckError;
+          }
+        }
+        
         filteredAdminData.email = newAdminData.email;
       }
       
@@ -227,12 +349,32 @@ export default function AdminUserManagement() {
       // Always update the updated_at timestamp
       filteredAdminData.updated_at = new Date().toISOString();
       
+      // Only proceed with update if there are fields to update
+      if (Object.keys(filteredAdminData).length === 1 && filteredAdminData.updated_at) {
+        toast.info('No changes to update');
+        return;
+      }
+      
       const { error } = await supabase
         .from('admin_user')
         .update(filteredAdminData)
         .eq('id', selectedAdmin.id);
       
-      if (error) throw error;
+      if (error) {
+        // Handle specific database errors
+        if (error.code === '23505') {
+          if (error.message.includes('email')) {
+            toast.error('Another admin with this email already exists');
+          } else if (error.message.includes('username')) {
+            toast.error('Another admin with this username already exists');
+          } else {
+            toast.error(`Database constraint violation: ${error.message}`);
+          }
+        } else {
+          toast.error(`Failed to update admin: ${error.message}`);
+        }
+        throw error;
+      }
       
       // Update local data
       setAdmins(admins.map(admin => 
@@ -252,6 +394,7 @@ export default function AdminUserManagement() {
         }]);
       }
       
+      toast.success(`Admin user "${filteredAdminData.username || selectedAdmin.username}" updated successfully`);
       closeModal();
       
       // Refresh admin data to ensure permissions are correctly displayed
@@ -261,17 +404,42 @@ export default function AdminUserManagement() {
       console.error('Error updating admin user:', error);
     }
   };
-  
+
   // Create new admin
   const createAdmin = async (adminUserData) => {
     try {
       // Verify permission
-      if (!hasPermission('manage_admins')) {
+      if (!hasPermission('add_admins')) {
+        toast.error('Permission denied: You do not have permission to create admin users');
         throw new Error('You do not have permission to create admin users');
       }
       
-      // For simplicity, in a real app you would hash the password properly
-      // and handle authentication through your auth provider
+      // Check for both duplicate email and username in a single query
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('admin_user')
+        .select('id, email, username')
+        .or(`email.eq.${adminUserData.email},username.eq.${adminUserData.username}`);
+      
+      if (checkError) {
+        toast.error(`Error checking existing admins: ${checkError.message}`);
+        throw checkError;
+      }
+      
+      // Check for duplicate email
+      const duplicateEmail = existingUsers?.find(user => user.email === adminUserData.email);
+      if (duplicateEmail) {
+        toast.error('An admin with this email address already exists');
+        return;
+      }
+      
+      // Check for duplicate username
+      const duplicateUsername = existingUsers?.find(user => user.username === adminUserData.username);
+      if (duplicateUsername) {
+        toast.error('An admin with this username already exists');
+        return;
+      }
+      
+      // Continue with creating the admin user
       const { data, error } = await supabase
         .from('admin_user')
         .insert({
@@ -285,8 +453,28 @@ export default function AdminUserManagement() {
         })
         .select()
         .single();
+        
+      if (error) {
+        // Handle specific database errors
+        if (error.code === '23505') {
+          if (error.message.includes('email')) {
+            toast.error('An admin with this email already exists');
+          } else if (error.message.includes('username')) {
+            toast.error('An admin with this username already exists');
+          } else {
+            toast.error(`Database constraint violation: ${error.message}`);
+          }
+        } else {
+          toast.error(`Failed to create admin: ${error.message}`);
+        }
+        throw error;
+      }
       
-      if (error) throw error;
+      // Initialize permissions for the new admin
+      const permissionsInitialized = await initializeAdminPermissions(data.id);
+      if (!permissionsInitialized) {
+        toast.warning('Admin created but permissions initialization failed. Please assign permissions manually.');
+      }
       
       // Update local data
       setAdmins([data, ...admins]);
@@ -298,17 +486,20 @@ export default function AdminUserManagement() {
           action: 'create_admin_user',
           entity_type: 'admin_user',
           entity_id: String(data.id),
+          details: { updated_fields: Object.keys(adminUserData) },
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
         }]);
       }
       
+      toast.success(`Admin user "${data.username}" created successfully`);
       closeModal();
       
       // Refresh admin data to ensure permissions are correctly displayed
       fetchAdminUsers();
       
     } catch (error) {
+      // Error is already handled in the specific code blocks
       console.error('Error creating admin user:', error);
     }
   };
@@ -317,12 +508,14 @@ export default function AdminUserManagement() {
   const deleteAdmin = async () => {
     try {
       // Verify permission
-      if (!hasPermission('manage_admins')) {
+      if (!hasPermission('delete_admins')) {
+        toast.error('Permission denied: You do not have permission to delete admin users');
         throw new Error('You do not have permission to delete admin users');
       }
       
       // Prevent deleting your own account
       if (adminData && selectedAdmin.id === adminData.id) {
+        toast.error('You cannot delete your own account');
         throw new Error('You cannot delete your own account');
       }
       
@@ -331,7 +524,10 @@ export default function AdminUserManagement() {
         .delete()
         .eq('id', selectedAdmin.id);
       
-      if (error) throw error;
+      if (error) {
+        toast.error(`Failed to delete admin: ${error.message}`);
+        throw error;
+      }
       
       // Update local data
       setAdmins(admins.filter(admin => admin.id !== selectedAdmin.id));
@@ -348,13 +544,14 @@ export default function AdminUserManagement() {
         }]);
       }
       
+      toast.success(`Admin user deleted successfully`);
       closeModal();
       
       // Refresh admin data to ensure permissions are correctly displayed
       fetchAdminUsers();
       
     } catch (error) {
-      console.error('Error deleting admin user:', error);
+      toast.error(`Error deleting admin user: ${error.message}`);
     }
   };
   
@@ -424,6 +621,13 @@ export default function AdminUserManagement() {
       // For other admins, check from our computed roles
       return adminRoles[admin.id] || 'ADMIN';
     }
+  };
+
+  // Open admin details modal
+  const openAdminDetailsModal = (admin) => {
+    setSelectedAdmin(admin);
+    setModalType('details');
+    setIsModalOpen(true);
   };
 
   // Password validation function
@@ -526,6 +730,7 @@ export default function AdminUserManagement() {
     try {
       // Verify permission
       if (!hasPermission('edit_admins')) {
+        toast.error('Permission denied: You do not have permission to manage admin permissions');
         throw new Error('You do not have permission to manage admin permissions');
       }
       
@@ -538,7 +743,10 @@ export default function AdminUserManagement() {
         .select('*')
         .eq('admin_id', selectedAdmin.id);
       
-      if (currentError) throw currentError;
+      if (currentError) {
+        toast.error(`Failed to fetch current permissions: ${currentError.message}`);
+        throw currentError;
+      }
       
       // Process each permission
       for (const permission of allPermissions) {
@@ -553,19 +761,51 @@ export default function AdminUserManagement() {
               .update({ is_active: isActive })
               .eq('id', existingPerm.id);
             
-            if (updateError) throw updateError;
+            if (updateError) {
+              toast.error(`Failed to update permission: ${updateError.message}`);
+              throw updateError;
+            }
           }
         } else if (isActive) {
-          // Insert new permission if it should be active
-          const { error: insertError } = await supabase
+          // First check if this permission already exists for this admin
+          const { data: existingData, error: checkError } = await supabase
             .from('admin_role_permission')
-            .insert({
-              admin_id: selectedAdmin.id,
-              permission_id: permission.id,
-              is_active: true
-            });
+            .select('id')
+            .eq('admin_id', selectedAdmin.id)
+            .eq('permission_id', permission.id)
+            .single();
+            
+          if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows returned
+            toast.error(`Failed to check existing permission: ${checkError.message}`);
+            throw checkError;
+          }
           
-          if (insertError) throw insertError;
+          // If the permission already exists, update it instead of inserting
+          if (existingData) {
+            const { error: updateError } = await supabase
+              .from('admin_role_permission')
+              .update({ is_active: true })
+              .eq('id', existingData.id);
+              
+            if (updateError) {
+              toast.error(`Failed to update permission: ${updateError.message}`);
+              throw updateError;
+            }
+          } else {
+            // Insert new permission if it should be active and doesn't exist
+            const { error: insertError } = await supabase
+              .from('admin_role_permission')
+              .insert({
+                admin_id: selectedAdmin.id,
+                permission_id: permission.id,
+                is_active: true
+              });
+            
+            if (insertError) {
+              toast.error(`Failed to add permission: ${insertError.message}`);
+              throw insertError;
+            }
+          }
         }
       }
       
@@ -582,6 +822,7 @@ export default function AdminUserManagement() {
         }]);
       }
       
+      toast.success(`Permissions for "${selectedAdmin.username}" updated successfully`);
       // Show success notification in a real app
       // For now, just close the modal
       closeModal();
@@ -592,6 +833,7 @@ export default function AdminUserManagement() {
     } catch (error) {
       console.error('Error saving admin permissions:', error);
       setPermissionError(error.message || 'Failed to save permissions. Please try again.');
+      toast.error(`Error saving permissions: ${error.message}`);
     } finally {
       setSavingPermissions(false);
     }
@@ -611,20 +853,111 @@ export default function AdminUserManagement() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading admin management...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        {/* Main Content */}
+        <div className="w-full p-6">
+          {/* Top Controls Skeleton */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              {/* Filter Icon */}
+              <div className="flex items-center text-gray-400">
+                <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+              
+              {/* Filter Dropdown */}
+              <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md h-9 w-32 animate-pulse">
+                <div className="h-full flex items-center px-3">
+                  <span className="text-gray-400 animate-pulse">All Admins</span>
+                </div>
+              </div>
+              
+              {/* Search Bar */}
+              <div className="relative">
+                <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md h-9 w-64 animate-pulse">
+                  <div className="h-full flex items-center px-9">
+                    <span className="text-gray-400 animate-pulse">Search admins...</span>
+                  </div>
+                </div>
+                <div className="absolute left-3 top-2.5 text-gray-400">
+                  <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Add New Admin Button */}
+            <div className="bg-indigo-600 rounded-md h-9 w-44 animate-pulse flex items-center justify-center">
+              <span className="text-white animate-pulse">Add New Admin</span>
+            </div>
+          </div>
+          
+          {/* Admins Table Skeleton */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    {[1, 2, 3, 4, 5, 6].map((header) => (
+                      <th key={header} className="px-4 py-3 text-left">
+                        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((row) => (
+                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse mr-3"></div>
+                          <div>
+                            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                            <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <div className="flex justify-end space-x-3">
+                          <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                          <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination Skeleton */}
+            <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+              <div className="flex-1 flex justify-between items-center">
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+    <div className="w-full">
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="w-full">
 
         {/* Content Area */}
         {hasPermission('view_admins') ? (
@@ -662,7 +995,7 @@ export default function AdminUserManagement() {
               </div>
               
               {/* Add Admin Button */}
-              {hasPermission('manage_admins') && (
+              {hasPermission('add_admins') && (
               <button
                 onClick={() => openModal('add')}
                 className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm"
@@ -702,7 +1035,7 @@ export default function AdminUserManagement() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {currentAdmins.length > 0 ? (
                       currentAdmins.map((admin) => (
-                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
@@ -743,23 +1076,33 @@ export default function AdminUserManagement() {
                             {admin.last_login ? formatDate(admin.last_login) : 'Never logged in'}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
-                            {hasPermission("edit_admins") && (
-                            <button
-                              onClick={() => openModal('edit', admin)}
-                              className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
-                              disabled={adminData && adminData.id === admin.id && adminData.role !== 'SUPER_ADMIN'}
-                            >
-                              <FaEdit />
-                            </button>
-                            )}
-                            {hasPermission("delete_admins") && (
-                            <button
-                              onClick={() => openModal('delete', admin)}
-                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                              disabled={adminData && adminData.id === admin.id}
-                            >
-                              <FaTrash />
-                            </button>
+                            {adminData && adminData.id === admin.id ? (
+                              <span className="text-xs text-gray-500 dark:text-gray-400 italic">Current User</span>
+                            ) : (
+                              <>
+                                {hasPermission("edit_admins") && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openModal('edit', admin);
+                                  }}
+                                  className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
+                                >
+                                  <FaEdit />
+                                </button>
+                                )}
+                                {hasPermission("delete_admins") && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openModal('delete', admin);
+                                  }}
+                                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                >
+                                  <FaTrash />
+                                </button>
+                                )}
+                              </>
                             )}
                           </td>
                         </tr>
@@ -1175,7 +1518,7 @@ export default function AdminUserManagement() {
               </div>
             </div>
             
-            <div className='p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600'>
+            <div className='p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700'>
               <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>User Details</h4>
               <div className='flex items-center mb-2'>
                 <div className='w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3'>
@@ -1423,6 +1766,217 @@ export default function AdminUserManagement() {
               ) : (
                 'Save Permissions'
               )}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Admin Details Modal */}
+    {isModalOpen && modalType === 'details' && selectedAdmin && (
+      <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col p-6 overflow-hidden'>
+          <div className='flex justify-between items-center mb-4'>
+            <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>Admin Details</h2>
+            <button
+              onClick={closeModal}
+              className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            >
+              &times;
+            </button>
+          </div>
+          
+          <div className='space-y-6 overflow-y-auto pr-2'>
+            {/* Admin Header with Avatar */}
+            <div className='flex items-center'>
+              <div className='w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 text-xl font-semibold mr-4'>
+                {selectedAdmin.full_name?.charAt(0).toUpperCase() || selectedAdmin.username?.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h3 className='text-lg font-medium text-gray-900 dark:text-white'>{selectedAdmin.full_name || selectedAdmin.username}</h3>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>@{selectedAdmin.username}</p>
+              </div>
+              <div className='ml-auto'>
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleBadgeStyle(getEffectiveRole(selectedAdmin))}`}>
+                  {getEffectiveRole(selectedAdmin) === 'SUPER_ADMIN' && <FaUserShield className='mr-1' />}
+                  {getEffectiveRole(selectedAdmin) === 'ADMIN' && <FaUserCog className='mr-1' />}
+                  {getEffectiveRole(selectedAdmin)}
+                </span>
+              </div>
+            </div>
+            
+            {/* Admin Details Grid */}
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-750 p-4 rounded-lg border border-gray-200 dark:border-gray-700'>
+              <div>
+                <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Basic Information</h4>
+                <div className='space-y-3'>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>ID</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white break-all'>{selectedAdmin.id}</p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Username</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.username}</p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Full Name</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.full_name || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Email</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.email || 'Not provided'}</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Account Information</h4>
+                <div className='space-y-3'>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Registered</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{formatDate(selectedAdmin.created_at)}</p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Last Updated</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{formatDate(selectedAdmin.updated_at) || 'Never updated'}</p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Last Login</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{formatDate(selectedAdmin.last_login) || 'Never logged in'}</p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Status</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>
+                      {selectedAdmin.is_active ? (
+                        <span className='inline-flex items-center text-green-600 dark:text-green-400'>
+                          <span className='w-2 h-2 bg-green-500 rounded-full mr-1.5'></span>
+                          Active
+                        </span>
+                      ) : (
+                        <span className='inline-flex items-center text-red-600 dark:text-red-400'>
+                          <span className='w-2 h-2 bg-red-500 rounded-full mr-1.5'></span>
+                          Inactive
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Permissions Summary */}
+            <div className='bg-gray-50 dark:bg-gray-750 p-4 rounded-lg border border-gray-200 dark:border-gray-700'>
+              <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Permissions</h4>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div>
+                  <p className='text-xs text-gray-500 dark:text-gray-400'>Role</p>
+                  <p className='text-sm font-medium text-gray-900 dark:text-white capitalize'>{getEffectiveRole(selectedAdmin)}</p>
+                </div>
+                <div>
+                  <p className='text-xs text-gray-500 dark:text-gray-400'>Access Level</p>
+                  <p className='text-sm font-medium text-gray-900 dark:text-white'>
+                    {getEffectiveRole(selectedAdmin) === 'SUPER_ADMIN' ? 'Full System Access' : 'Limited Access'}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Permission Groups */}
+              <div className='mt-4 grid grid-cols-1 md:grid-cols-3 gap-2'>
+                {Object.entries(permissionsByCategory).length > 0 ? (
+                  Object.entries(permissionsByCategory).map(([category, perms]) => {
+                    // Check if admin has any permissions from this category
+                    const hasPermissionsInCategory = perms.some(p => adminPermissions.includes(p.id));
+                    
+                    return (
+                      <div key={category} className='border border-gray-200 dark:border-gray-600 rounded p-2'>
+                        <p className='text-xs font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                          {formatCategoryName(category)}
+                        </p>
+                        <p className='text-xs'>
+                          {hasPermissionsInCategory ? (
+                            <span className='text-green-600 dark:text-green-400'>
+                              <span className='w-1.5 h-1.5 bg-green-500 rounded-full inline-block mr-1'></span>
+                              Access Granted
+                            </span>
+                          ) : (
+                            <span className='text-red-600 dark:text-red-400'>
+                              <span className='w-1.5 h-1.5 bg-red-500 rounded-full inline-block mr-1'></span>
+                              No Access
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className='text-sm text-gray-500 dark:text-gray-400 col-span-3'>
+                    No permission data available
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {/* Activity Summary */}
+            <div className='bg-gray-50 dark:bg-gray-750 p-4 rounded-lg border border-gray-200 dark:border-gray-700'>
+              <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Recent Activity</h4>
+              <p className='text-sm text-gray-700 dark:text-gray-300'>
+                Last login: {formatDate(selectedAdmin.last_login) || 'Never logged in'}
+              </p>
+              <div className='mt-2'>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>
+                  Account created: {formatDate(selectedAdmin.created_at)}
+                </p>
+                {selectedAdmin.updated_at && selectedAdmin.updated_at !== selectedAdmin.created_at && (
+                  <p className='text-xs text-gray-500 dark:text-gray-400'>
+                    Last profile update: {formatDate(selectedAdmin.updated_at)}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className='flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700'>
+            {adminData && adminData.id === selectedAdmin.id ? (
+              <p className='text-sm text-gray-500 dark:text-gray-400 italic mr-auto'>
+                This is your account. Some actions are restricted for security reasons.
+              </p>
+            ) : (
+              <>
+                {hasPermission('edit_admins') && (
+                  <button
+                    type='button'
+                    onClick={() => {
+                      closeModal();
+                      openModal('edit', selectedAdmin);
+                    }}
+                    className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                      text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                  >
+                    Edit Admin
+                  </button>
+                )}
+                {hasPermission('edit_admins') && (
+                  <button
+                    type='button'
+                    onClick={() => {
+                      closeModal();
+                      openModal('editPermission', selectedAdmin);
+                    }}
+                    className='px-4 py-2 border border-indigo-500 text-indigo-500 rounded-md text-sm font-medium
+                      bg-white dark:bg-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                  >
+                    Manage Permissions
+                  </button>
+                )}
+              </>
+            )}
+            <button
+              type='button'
+              onClick={closeModal}
+              className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                focus:ring-offset-2 focus:ring-indigo-500'
+            >
+              Close
             </button>
           </div>
         </div>

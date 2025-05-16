@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaFilter, FaSearch, FaEnvelope, FaBuilding, FaUser, FaClock, FaCheck, FaTimes, FaSpinner, FaReply } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
+
 export default function AdminSupport() {
   const router = useRouter();
   const params = useParams();
@@ -21,12 +23,18 @@ export default function AdminSupport() {
   const [searchQuery, setSearchQuery] = useState('');
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
+  const adminState = useSelector((state) => state.admin);
 
   // initialize the page
   useEffect(() => {
     const initAdminSupport = async () => {
       try {
         setLoading(true);
+        
+        // Set admin data from redux store
+        if (adminState.admin) {
+          setAdminData(adminState.admin);
+        }
         
         // Fetch support tickets
         await fetchSupportTickets();
@@ -41,7 +49,7 @@ export default function AdminSupport() {
     };
     
     initAdminSupport();
-  }, [dispatch, router]);
+  }, [dispatch, router, adminState.admin]);
   
   // Add useEffect to fetch tickets when filter changes
   useEffect(() => {
@@ -130,6 +138,17 @@ export default function AdminSupport() {
         updated_at: new Date().toISOString()
       });
       
+      // Show toast notification based on status
+      if (newStatus === 'IN_PROGRESS') {
+        toast.success(`Ticket #${selectedTicket.id} marked as Active`);
+      } else if (newStatus === 'COMPLETED') {
+        toast.success(`Ticket #${selectedTicket.id} marked as Closed`);
+      } else if (newStatus === 'SPAM') {
+        toast.warning(`Ticket #${selectedTicket.id} marked as Spam`);
+      } else {
+        toast.success(`Ticket #${selectedTicket.id} status updated to ${newStatus}`);
+      }
+      
       // Log activity
       if (adminData) {
         supabase.from('admin_activity_log').insert({
@@ -143,8 +162,12 @@ export default function AdminSupport() {
         });
       }
       
+      // Refresh tickets to update the list with the new status
+      fetchSupportTickets();
+      
     } catch (error) {
       console.error('Error updating ticket status:', error);
+      toast.error(`Failed to update ticket status: ${error.message}`);
     }
   };
   
@@ -187,21 +210,22 @@ export default function AdminSupport() {
       }
       
       // Store the reply in the database (optional)
-      const { error: replyError } = await supabase
-        .from('support_replies')
-        .insert({
-          contact_id: selectedTicket.id,
-          admin_id: adminData.id,
-          message: replyText,
-          sent_at: new Date().toISOString()
-        });
-        
-      if (replyError) {
-        console.error('Error saving reply to database:', replyError);
-      }
-      
-      // Log the reply activity
       if (adminData) {
+        const { error: replyError } = await supabase
+          .from('support_replies')
+          .insert({
+            contact_id: selectedTicket.id,
+            admin_id: adminData.id,
+            message: replyText,
+            sent_at: new Date().toISOString()
+          });
+          
+        if (replyError) {
+          console.error('Error saving reply to database:', replyError);
+          toast.error(`Error saving reply to database: ${replyError.message}`);
+        }
+        
+        // Log the reply activity
         await supabase.from('admin_activity_log').insert({
           admin_id: adminData.id,
           action: 'reply_to_ticket',
@@ -211,19 +235,23 @@ export default function AdminSupport() {
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
         });
+      } else {
+        // If adminData is not available, just log the issue
+        console.warn('Admin data not available for logging reply activity');
       }
       
       // Clear reply text
       setReplyText('');
       
-      // Show success message (in a real app, you'd use a toast notification)
-      alert('Reply sent successfully!');
-      // toast.success('Reply sent successfully!');
+      // Show success toast notification
+      toast.success(`Reply sent to ${selectedTicket.email} successfully!`);
+      
+      // Refresh tickets to update the list
+      fetchSupportTickets();
       
     } catch (error) {
       console.error('Error sending reply:', error);
-      alert(`Error sending reply: ${error.message}`);
-      // toast.error('Error sending reply:', error);
+      toast.error(`Error sending reply: ${error.message}`);
     }
   };
   
@@ -271,10 +299,109 @@ export default function AdminSupport() {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading support tickets...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto p-4">
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Tickets List Skeleton */}
+            <div className="w-full md:w-1/3 lg:w-1/4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
+                <div className="flex items-center mb-4">
+                  <div className="relative flex-1">
+                    <div className="w-full h-10 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                  </div>
+                  <div className="ml-2 p-2 w-10 h-10 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                </div>
+                
+                <div className="flex mb-4 border-b border-gray-200 dark:border-gray-700">
+                  {[1, 2, 3, 4].map((item) => (
+                    <div key={item} className="flex-1 py-2">
+                      <div className="h-5 mx-auto w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto">
+                  {[1, 2, 3, 4, 5, 6].map((item) => (
+                    <div key={item} className="p-3 rounded-lg">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        <div className="h-5 w-16 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                      </div>
+                      <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                      <div className="flex items-center mt-2">
+                        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Ticket Details Skeleton */}
+            <div className="w-full md:w-2/3 lg:w-3/4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <div className="h-7 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                    <div className="h-5 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    {[1, 2, 3].map((item) => (
+                      <div key={item} className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"></div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <div className="h-5 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                    <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
+                      {[1, 2, 3].map((item) => (
+                        <div key={item} className="flex items-start mb-3">
+                          <div className="h-8 w-8 bg-gray-200 dark:bg-gray-600 rounded mr-3"></div>
+                          <div className="flex-1">
+                            <div className="h-5 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse mb-2"></div>
+                            <div className="h-5 w-40 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="h-5 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                    <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {[1, 2, 3, 4].map((item) => (
+                          <div key={item}>
+                            <div className="h-5 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse mb-2"></div>
+                            <div className="h-5 w-32 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mb-6">
+                  <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
+                    <div className="h-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
+                  <div className="flex justify-end">
+                    <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

@@ -161,17 +161,6 @@ export default function ContactUs(){
 
     return(
         <div className="min-h-screen bg-black text-white">
-            {/* Header navigation */}
-            <div className="flex justify-between items-center p-4 border-b border-gray-800">
-                <Link href="/" className="flex items-center">
-                <span className="text-xl font-bold">Back to Home</span>
-                </Link>
-                <div className="flex space-x-4">
-                <Link href="/privacy" className="hover:text-gray-300">Privacy</Link>
-                <Link href="/terms" className="hover:text-gray-300">Terms</Link>
-                <Link href="/contact" className="hover:text-gray-300">Contact</Link>
-                </div>
-            </div>
         
             {/* Main content */}
             <div className="max-w-4xl mx-auto py-12 px-4">

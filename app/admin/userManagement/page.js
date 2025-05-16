@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function UserManagement() {
   const router = useRouter();
@@ -24,6 +26,7 @@ export default function UserManagement() {
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminData, setAdminData] = useState(null);
+  const [processing, setProcessing] = useState(false);
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
 
@@ -119,8 +122,51 @@ export default function UserManagement() {
   // Edit user
   const editUser = async (userData) => {
     try {
+      setProcessing(true);
       // Store original user data for activity logging
       const originalUserData = { ...selectedUser };
+      
+      // Check if email is being changed
+      if (userData.email && userData.email !== originalUserData.email) {
+        // Check if the new email already exists for a different user
+        const { data: existingUsers, error: checkError } = await supabase
+          .from('user')
+          .select('id')
+          .eq('email', userData.email)
+          .neq('id', selectedUser.id); // Exclude the current user
+        
+        if (checkError) {
+          console.error('Error checking existing user:', checkError);
+          toast.error(`Error checking existing user: ${checkError.message}`);
+          throw checkError;
+        }
+        
+        if (existingUsers && existingUsers.length > 0) {
+          toast.error('A user with this email address already exists');
+          return;
+        }
+      }
+      
+      // Check if phone is being changed
+      if (userData.phone && userData.phone !== originalUserData.phone) {
+        // Check if the new phone already exists for a different user
+        const { data: existingPhones, error: phoneCheckError } = await supabase
+          .from('user')
+          .select('id')
+          .eq('phone', userData.phone)
+          .neq('id', selectedUser.id); // Exclude the current user
+        
+        if (phoneCheckError) {
+          console.error('Error checking existing phone:', phoneCheckError);
+          toast.error(`Error checking existing phone: ${phoneCheckError.message}`);
+          throw phoneCheckError;
+        }
+        
+        if (existingPhones && existingPhones.length > 0) {
+          toast.error('A user with this phone number already exists');
+          return;
+        }
+      }
       
       // Handle checkbox inputs that come as 'on' or undefined
       if ('notifications_enabled' in userData) {
@@ -137,7 +183,24 @@ export default function UserManagement() {
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        
+        // Handle specific database errors
+        if (error.code === '23505') {
+          if (error.message.includes('email')) {
+            toast.error('A user with this email address already exists');
+          } else if (error.message.includes('phone')) {
+            toast.error('A user with this phone number already exists');
+          } else {
+            toast.error(`Database constraint violation: ${error.message}`);
+          }
+          error.isHandled = true;
+        } else {
+          toast.error(`Failed to update user: ${error.message}`);
+        }
+        throw error;
+      }
       
       // Update local data
       setUsers(users.map(user => 
@@ -173,23 +236,31 @@ export default function UserManagement() {
         });
       }
       
+      toast.success(`User "${data.name || data.email}" updated successfully`);
       closeModal();
       
     } catch (error) {
       console.error('Error updating user:', error);
-      alert(`Failed to update user: ${error.message}`);
+      // Don't double-toast errors that are already handled
+      if (!error.isHandled) {
+        toast.error(`Failed to update user: ${error.message}`);
+      }
+    } finally {
+      setProcessing(false);
     }
   };
   
   // Delete user
   const deleteUser = async () => {
     try {
+      setProcessing(true);
       const confirmationInput = document.getElementById('delete-confirmation');
       const confirmationValue = confirmationInput.value.trim();
       const expectedValue = selectedUser.name || selectedUser.email;
       
       if (confirmationValue !== expectedValue) {
-        alert('Confirmation text does not match. Please try again.');
+        toast.error('Confirmation text does not match. Please try again.');
+        setProcessing(false);
         return;
       }
       
@@ -198,7 +269,10 @@ export default function UserManagement() {
         .delete()
         .eq('id', selectedUser.id);
       
-      if (error) throw error;
+      if (error) {
+        toast.error(`Failed to delete user: ${error.message}`);
+        throw error;
+      }
       
       // Update local data
       setUsers(users.filter(user => user.id !== selectedUser.id));
@@ -215,11 +289,14 @@ export default function UserManagement() {
         });
       }
       
+      toast.success(`User deleted successfully`);
       closeModal();
       
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert(`Failed to delete user: ${error.message}`);
+      toast.error(`Failed to delete user: ${error.message}`);
+    } finally {
+      setProcessing(false);
     }
   };
   
@@ -252,8 +329,46 @@ export default function UserManagement() {
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
   
   // Add user
-const addUser = async (userData) => {
+  const addUser = async (userData) => {
     try {
+      setProcessing(true);
+      
+      // First, check if email already exists
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('user')
+        .select('id')
+        .eq('email', userData.email);
+      
+      if (checkError) {
+        console.error('Error checking existing user:', checkError);
+        toast.error(`Error checking existing user: ${checkError.message}`);
+        throw checkError;
+      }
+      
+      if (existingUsers && existingUsers.length > 0) {
+        toast.error('A user with this email address already exists');
+        return;
+      }
+      
+      // If phone is provided, check for duplicate phone
+      if (userData.phone) {
+        const { data: existingPhones, error: phoneCheckError } = await supabase
+          .from('user')
+          .select('id')
+          .eq('phone', userData.phone);
+          
+        if (phoneCheckError) {
+          console.error('Error checking existing phone:', phoneCheckError);
+          toast.error(`Error checking existing phone: ${phoneCheckError.message}`);
+          throw phoneCheckError;
+        }
+        
+        if (existingPhones && existingPhones.length > 0) {
+          toast.error('A user with this phone number already exists');
+          return;
+        }
+      }
+      
       // Generate a proper UUID (follows RFC4122 format)
       const id = crypto.randomUUID ? crypto.randomUUID() : 
         'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -266,7 +381,6 @@ const addUser = async (userData) => {
       const userDataWithId = {
         ...userData,
         id,
-        provider: 'local', // From your signup code
         theme: 'system', // Default from your schema
         language: 'en', // Default from your schema
         notifications_enabled: true // Default from your schema
@@ -283,6 +397,20 @@ const addUser = async (userData) => {
       
       if (error) {
         console.error('Supabase error:', error);
+        
+        // Handle specific database errors
+        if (error.code === '23505') {
+          if (error.message.includes('email')) {
+            toast.error('A user with this email address already exists');
+          } else if (error.message.includes('phone')) {
+            toast.error('A user with this phone number already exists');
+          } else {
+            toast.error(`Database constraint violation: ${error.message}`);
+          }
+          error.isHandled = true;
+        } else {
+          toast.error(`Failed to add user: ${error.message}`);
+        }
         throw error;
       }
       
@@ -302,20 +430,114 @@ const addUser = async (userData) => {
         });
       }
       
+      toast.success(`User "${data.name || data.email}" created successfully`);
       closeModal();
       
     } catch (error) {
       console.error('Error adding user:', error);
-      alert(`Failed to add user: ${error.message}`);
+      // Don't double-toast errors that are already handled above
+      if (!error.isHandled) {
+        toast.error(`Failed to add user: ${error.message}`);
+      }
+    } finally {
+      setProcessing(false);
     }
   };
   
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading user data...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        {/* Main Content */}
+        <div className="w-full p-6">
+          {/* Top Controls Skeleton */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              {/* Filter Icon */}
+              <div className="flex items-center text-gray-400">
+                <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+              
+              {/* Filter Dropdown */}
+              <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md h-9 w-32 animate-pulse">
+                <div className="h-full flex items-center px-3">
+                  <span className="text-gray-400 animate-pulse">All Users</span>
+                </div>
+              </div>
+              
+              {/* Search Bar */}
+              <div className="relative">
+                <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md h-9 w-64 animate-pulse">
+                  <div className="h-full flex items-center px-9">
+                    <span className="text-gray-400 animate-pulse">Search users...</span>
+                  </div>
+                </div>
+                <div className="absolute left-3 top-2.5 text-gray-400">
+                  <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Add New User Button */}
+            <div className="bg-indigo-600 rounded-md h-9 w-36 animate-pulse flex items-center justify-center">
+              <span className="text-white animate-pulse">Add New User</span>
+            </div>
+          </div>
+          
+          {/* Users Table Skeleton */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    {["User", "Email", "Status", "Registered", "Actions"].map((header) => (
+                      <th key={header} className="px-4 py-3 text-left">
+                        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((row) => (
+                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse mr-3"></div>
+                          <div>
+                            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                            <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <div className="flex justify-end space-x-3">
+                          <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                          <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination Skeleton */}
+            <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+              <div className="flex-1 flex justify-between items-center">
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -395,7 +617,7 @@ const addUser = async (userData) => {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {currentUsers.length > 0 ? (
                   currentUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer" onClick={() => openModal('details', user)}>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
@@ -432,7 +654,7 @@ const addUser = async (userData) => {
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {formatDate(user.created_at)}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right" onClick={(e) => e.stopPropagation()}>
                         {hasPermission('edit_users') && (
                         <button
                           onClick={() => openModal('edit', user)}
@@ -505,7 +727,6 @@ const addUser = async (userData) => {
       </div>
       )}
       
-      {/* Modals would go here in a real implementation */}
       {/* Add User Modal */}
       {isModalOpen && modalType === 'add' && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
@@ -590,17 +811,24 @@ const addUser = async (userData) => {
                   onClick={closeModal}
                   className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
                     text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                  disabled={processing}
                 >
                   Cancel
                 </button>
                 
                 <button
                   type='submit'
+                  disabled={processing}
                   className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                     text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                    focus:ring-offset-2 focus:ring-indigo-500'
+                    focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed'
                 >
-                  Add User
+                  {processing ? (
+                    <>
+                      <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                      Adding...
+                    </>
+                  ) : 'Add User'}
                 </button>
               </div>
             </form>
@@ -748,6 +976,7 @@ const addUser = async (userData) => {
                 <button
                   type='button'
                   onClick={closeModal}
+                  disabled={processing}
                   className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
                     text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
                 >
@@ -756,11 +985,17 @@ const addUser = async (userData) => {
                 
                 <button
                   type='submit'
+                  disabled={processing}
                   className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                     text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                    focus:ring-offset-2 focus:ring-indigo-500'
+                    focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed'
                 >
-                  Save Changes
+                  {processing ? (
+                    <>
+                      <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                      Saving...
+                    </>
+                  ) : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -832,6 +1067,7 @@ const addUser = async (userData) => {
               <button
                 type='button'
                 onClick={closeModal}
+                disabled={processing}
                 className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
                   text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
               >
@@ -841,11 +1077,214 @@ const addUser = async (userData) => {
               <button
                 type='button'
                 onClick={deleteUser}
+                disabled={processing}
                 className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                   text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2
-                  focus:ring-offset-2 focus:ring-red-500'
+                  focus:ring-offset-2 focus:ring-red-500 disabled:bg-red-400 disabled:cursor-not-allowed'
               >
-                Delete User
+                {processing ? (
+                  <>
+                    <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                    Deleting...
+                  </>
+                ) : 'Delete User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Details Modal */}
+      {isModalOpen && modalType === 'details' && selectedUser && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col p-6 overflow-hidden'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>User Details</h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className='space-y-6 overflow-y-auto pr-2'>
+              {/* User Header with Avatar */}
+              <div className='flex items-center'>
+                <div className='w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 text-xl font-semibold mr-4'>
+                  {selectedUser.name?.charAt(0).toUpperCase() || selectedUser.email?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div>
+                  <h3 className='text-lg font-medium text-gray-900 dark:text-white'>{selectedUser.name || 'Unnamed User'}</h3>
+                  <p className='text-sm text-gray-500 dark:text-gray-400'>{selectedUser.email}</p>
+                </div>
+                <div className='ml-auto'>
+                  {selectedUser.email_verified ? (
+                    <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'>
+                      <FaUserCheck className='mr-1' />
+                      Verified
+                    </span>
+                  ) : (
+                    <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'>
+                      <FaUserLock className='mr-1' />
+                      Unverified
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {/* User Details Grid */}
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-750 p-4 rounded-lg border border-gray-200 dark:border-gray-700'>
+                <div>
+                  <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Basic Information</h4>
+                  <div className='space-y-3'>
+                    <div>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>ID</p>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white break-all'>{selectedUser.id}</p>
+                    </div>
+                    <div>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>Name</p>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedUser.name || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>Email</p>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedUser.email}</p>
+                    </div>
+                    <div>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>Phone</p>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedUser.phone || 'Not provided'}</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Account Information</h4>
+                  <div className='space-y-3'>
+                    <div>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>Registered</p>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white'>{formatDate(selectedUser.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>Last Updated</p>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white'>{formatDate(selectedUser.updated_at) || 'Never updated'}</p>
+                    </div>
+                    <div>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>Last Login</p>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white'>{formatDate(selectedUser.last_seen_at) || 'Never logged in'}</p>
+                    </div>
+                    <div>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>Status</p>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white'>
+                        {selectedUser.is_online ? (
+                          <span className='inline-flex items-center text-green-600 dark:text-green-400'>
+                            <span className='w-2 h-2 bg-green-500 rounded-full mr-1.5'></span>
+                            Online
+                          </span>
+                        ) : (
+                          <span className='inline-flex items-center text-gray-600 dark:text-gray-400'>
+                            <span className='w-2 h-2 bg-gray-400 rounded-full mr-1.5'></span>
+                            Offline
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Settings & Preferences */}
+              <div className='bg-gray-50 dark:bg-gray-750 p-4 rounded-lg border border-gray-200 dark:border-gray-700'>
+                <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Settings & Preferences</h4>
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Theme</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white capitalize'>{selectedUser.theme || 'System'}</p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Language</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white uppercase'>{selectedUser.language || 'EN'}</p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Notifications</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>
+                      {selectedUser.notifications_enabled !== false ? 'Enabled' : 'Disabled'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>MFA</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>
+                      {selectedUser.is_mfa_enabled ? 'Enabled' : 'Disabled'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Timezone</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedUser.timezone || 'UTC+0'}</p>
+                  </div>
+                  <div>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>Hour Format</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedUser.hour_format || '24h'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Connected Accounts */}
+              <div className='bg-gray-50 dark:bg-gray-750 p-4 rounded-lg border border-gray-200 dark:border-gray-700'>
+                <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Connected Accounts</h4>
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                  <div className='flex items-center'>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${selectedUser.google_provider_id ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'}`}>
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white'>Google</p>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>
+                        {selectedUser.google_provider_id ? 'Connected' : 'Not connected'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className='flex items-center'>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${selectedUser.github_provider_id ? 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300' : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'}`}>
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white'>GitHub</p>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>
+                        {selectedUser.github_provider_id ? 'Connected' : 'Not connected'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className='flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700'>
+              {hasPermission('edit_users') && (
+                <button
+                  type='button'
+                  onClick={() => {
+                    closeModal();
+                    openModal('edit', selectedUser);
+                  }}
+                  className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                    text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                >
+                  Edit User
+                </button>
+              )}
+              <button
+                type='button'
+                onClick={closeModal}
+                className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                  text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                  focus:ring-offset-2 focus:ring-indigo-500'
+              >
+                Close
               </button>
             </div>
           </div>
