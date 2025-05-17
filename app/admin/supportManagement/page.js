@@ -184,7 +184,7 @@ export default function AdminSupport() {
     
     try {
       setIsSendingReply(true);
-      toast.loading('Sending reply...'); // Show loading toast
+      const loadingToastId = toast.loading('Sending reply...'); // Store the loading toast ID
 
       // First save the reply to the database
       const { data: replyData, error: replyError } = await supabase
@@ -251,11 +251,13 @@ export default function AdminSupport() {
       // Refresh replies
       await fetchTicketReplies(selectedTicket.id);
       
-      // Show success toast notification
+      // Dismiss loading toast and show success toast
+      toast.dismiss(loadingToastId);
       toast.success(`Reply sent to ${selectedTicket.email} successfully!`);
       
     } catch (error) {
       console.error('Error sending reply:', error);
+      toast.dismiss(); // Dismiss any existing toasts
       toast.error(`Error sending reply: ${error.message}`);
     } finally {
       setIsSendingReply(false); // Reset sending state
