@@ -495,6 +495,25 @@ CREATE TABLE "contact" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Support Contact Reply Table (integrates with existing contact table)
+CREATE TABLE "contact_reply" (
+  "id" SERIAL PRIMARY KEY,
+  "contact_id" INT NOT NULL REFERENCES "contact"("id") ON DELETE CASCADE,
+  "content" TEXT NOT NULL,
+  "attachment_urls" TEXT[] DEFAULT '{}',
+  -- Sender can be either admin or the original contact person
+  "admin_id" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
+  "is_from_contact" BOOLEAN DEFAULT FALSE, -- TRUE if reply is from original contact person
+  "is_internal_note" BOOLEAN DEFAULT FALSE, -- For admin-only notes
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for better performance
+CREATE INDEX idx_contact_reply_contact_id ON "contact_reply"("contact_id");
+CREATE INDEX idx_contact_reply_admin_id ON "contact_reply"("admin_id");
+CREATE INDEX idx_contact_reply_created_at ON "contact_reply"("created_at");
+
 -- 管理员表 - 存储系统管理员信息
 CREATE TABLE "admin_user" (
   "id" SERIAL PRIMARY KEY,
