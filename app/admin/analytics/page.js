@@ -21,6 +21,7 @@ import {
 import { Line, Bar, Pie } from 'react-chartjs-2';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
 
 // 注册Chart.js组件
 ChartJS.register(
@@ -62,13 +63,9 @@ export default function AdminAnalytics() {
     const initAdminAnalytics = async () => {
       try {
         setLoading(true);
-        
-        // 获取分析数据
         await fetchAnalyticsData(dateRange);
-        
       } catch (error) {
-        console.error('Errror in fetching analytics data:', error);
-        // 重定向到管理员登录
+        console.error('Error in fetching analytics data:', error);
         router.replace(`/admin/adminLogin`);
       } finally {
         setLoading(false);
@@ -76,15 +73,8 @@ export default function AdminAnalytics() {
     };
     
     initAdminAnalytics();
-  }, [dispatch, router]);
+  }, [dateRange]);
 
-  // 当日期范围变化时获取新数据
-  useEffect(() => {
-    if (adminData) {
-      fetchAnalyticsData(dateRange);
-    }
-  }, [dateRange, adminData]);
-  
   // Add function to verify permission access TODO: 模块化这个代码
   const hasPermission = (permissionName) => {
     return permissions.includes(permissionName);
@@ -92,13 +82,30 @@ export default function AdminAnalytics() {
 
   // 获取分析数据
   const fetchAnalyticsData = async (days) => {
+    // Create loading toast and store its ID
+    const loadingToastId = toast.loading('Updating analytics data...', {
+      description: `Fetching data for the last ${days} days`,
+    });
+
     try {
       setLoading(true);
       
       // 获取日期范围
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - parseInt(days));// how
+      startDate.setDate(endDate.getDate() - parseInt(days));
+
+      // Clear existing data
+      setRevenueData({ labels: [], datasets: [] });
+      setUserGrowthData({ labels: [], datasets: [] });
+      setPaymentMethodData({ labels: [], datasets: [] });
+      setPlanDistributionData({ labels: [], datasets: [] });
+      setSummaryStats({
+        totalRevenue: 0,
+        averageOrderValue: 0,
+        conversionRate: 0,
+        successRate: 0
+      });
       
       // 获取收入数据
       await fetchRevenueData(startDate, endDate);
@@ -107,16 +114,27 @@ export default function AdminAnalytics() {
       await fetchUserGrowthData(startDate, endDate);
       
       // 获取支付方式分布
-      await fetchPaymentMethodDistribution();
+      await fetchPaymentMethodDistribution(startDate, endDate);
       
       // 获取订阅计划分布
-      await fetchPlanDistribution();
+      await fetchPlanDistribution(startDate, endDate);
       
       // 获取摘要统计数据
       await fetchSummaryStatistics(startDate, endDate);
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToastId);
+      toast.success('Analytics updated', {
+        description: `Successfully loaded data for the last ${days} days`,
+      });
       
     } catch (error) {
       console.error('Error fetching analytics data:', error);
+      // Dismiss loading toast and show error
+      toast.dismiss(loadingToastId);
+      toast.error('Failed to update analytics', {
+        description: 'There was an error fetching the analytics data',
+      });
     } finally {
       setLoading(false);
     }
@@ -230,13 +248,15 @@ export default function AdminAnalytics() {
   };
   
   // 获取支付方式分布
-  const fetchPaymentMethodDistribution = async () => {
+  const fetchPaymentMethodDistribution = async (startDate, endDate) => {
     try {
       const { data, error } = await supabase
         .from('payment')
         .select('payment_method, count')
         .eq('status', 'COMPLETED')
-        .not('payment_method', 'is', null);
+        .not('payment_method', 'is', null)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
         
       if (error) throw error;
       
@@ -275,7 +295,7 @@ export default function AdminAnalytics() {
   };
   
   // 获取订阅计划分布
-  const fetchPlanDistribution = async () => {
+  const fetchPlanDistribution = async (startDate, endDate) => {
     try {
       // 获取用户订阅计划统计
       const { data, error } = await supabase
@@ -288,7 +308,9 @@ export default function AdminAnalytics() {
           count
         `)
         .eq('status', 'ACTIVE')
-        .not('plan_id', 'is', null);
+        .not('plan_id', 'is', null)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
         
       if (error) throw error;
       
@@ -459,57 +481,6 @@ export default function AdminAnalytics() {
     },
   };
   
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto p-6">
-          {/* Summary Stats Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[1, 2, 3, 4].map((item) => (
-              <div key={item} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
-                    <div className="h-8 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
-                </div>
-                <div className="mt-4">
-                  <div className="h-3 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {/* Charts Skeleton - Revenue and User Growth */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {[1, 2].map((chart) => (
-              <div key={chart} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
-                <div className="h-80 bg-gray-100 dark:bg-gray-700 rounded animate-pulse flex items-center justify-center">
-                  <div className="h-40 w-40 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse opacity-50"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {/* Charts Skeleton - Payment Methods and Plan Distribution */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[1, 2].map((chart) => (
-              <div key={chart} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
-                <div className="h-80 bg-gray-100 dark:bg-gray-700 rounded animate-pulse flex items-center justify-center">
-                  <div className="h-60 w-60 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse opacity-50"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       {/* Main Content */}
@@ -518,146 +489,217 @@ export default function AdminAnalytics() {
         {/* Analytics Content */}
         {hasPermission('view_analytics') ? (
           <div className="p-6">
-            {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
-                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.totalRevenue)}</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-500 dark:text-green-300">
-                    <FaMoneyBillWave />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    For the selected period
-                  </p>
-                </div>
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Order Value</p>
-                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.averageOrderValue)}</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-500 dark:text-blue-300">
-                    <FaChartLine />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Per successful transaction
-                  </p>
-                </div>
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Conversion Rate</p>
-                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.conversionRate.toFixed(2)}%</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
-                    <FaUsers />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Users to paid subscribers
-                  </p>
-                </div>
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Success Rate</p>
-                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.successRate.toFixed(2)}%</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center text-yellow-500 dark:text-yellow-300">
-                    <FaChartBar />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Completed transactions
-                  </p>
+            {/* Period Selector - Always visible */}
+            <div className="mb-8">
+              <div className="flex items-center justify-end">
+                <div className="flex items-center space-x-4">
+                  <label htmlFor="period" className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Time Period:
+                  </label>
+                  <select
+                    id="period"
+                    value={dateRange}
+                    onChange={(e) => setDateRange(e.target.value)}
+                    className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="7">Last 7 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="90">Last 90 Days</option>
+                    <option value="180">Last 6 Months</option>
+                    <option value="365">Last Year</option>
+                  </select>
                 </div>
               </div>
             </div>
-            
-            {/* Charts - Revenue and User Growth */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Revenue Trend</h3>
-                {revenueData.labels.length > 0 ? (
-                  <div className="h-80">
-                    <Line data={revenueData} options={lineOptions} />
+
+            {loading ? (
+              <>
+                {/* Summary Stats Skeleton */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  {[1, 2, 3, 4].map((item) => (
+                    <div key={item} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                          <div className="h-8 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </div>
+                        <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                      </div>
+                      <div className="mt-4">
+                        <div className="h-3 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Charts Skeleton - Revenue and User Growth */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                  {[1, 2].map((chart) => (
+                    <div key={chart} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                      <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
+                      <div className="h-80 bg-gray-100 dark:bg-gray-700 rounded animate-pulse flex items-center justify-center">
+                        <div className="h-40 w-40 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse opacity-50"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Charts Skeleton - Payment Methods and Plan Distribution */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {[1, 2].map((chart) => (
+                    <div key={chart} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                      <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
+                      <div className="h-80 bg-gray-100 dark:bg-gray-700 rounded animate-pulse flex items-center justify-center">
+                        <div className="h-60 w-60 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse opacity-50"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Summary Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
+                        <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.totalRevenue)}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-500 dark:text-green-300">
+                        <FaMoneyBillWave />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        For the selected period
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center">
-                    <p className="text-gray-500 dark:text-gray-400">No revenue data available for the selected period</p>
+                  
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Order Value</p>
+                        <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.averageOrderValue)}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-500 dark:text-blue-300">
+                        <FaChartLine />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Per successful transaction
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">User Growth</h3>
-                {userGrowthData.labels.length > 0 ? (
-                  <div className="h-80">
-                    <Bar data={userGrowthData} options={barOptions} />
+                  
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Conversion Rate</p>
+                        <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.conversionRate.toFixed(2)}%</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
+                        <FaUsers />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Users to paid subscribers
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center">
-                    <p className="text-gray-500 dark:text-gray-400">No user growth data available for the selected period</p>
+                  
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Success Rate</p>
+                        <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.successRate.toFixed(2)}%</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center text-yellow-500 dark:text-yellow-300">
+                        <FaChartBar />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Completed transactions
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Charts - Payment Methods and Plan Distribution */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Payment Methods</h3>
-                {paymentMethodData.labels.length > 0 ? (
-                  <div className="h-80">
-                    <Pie data={paymentMethodData} options={pieOptions} />
+                </div>
+                
+                {/* Charts - Revenue and User Growth */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Revenue Trend</h3>
+                    {revenueData.labels.length > 0 ? (
+                      <div className="h-80">
+                        <Line data={revenueData} options={lineOptions} />
+                      </div>
+                    ) : (
+                      <div className="h-80 flex items-center justify-center">
+                        <p className="text-gray-500 dark:text-gray-400">No revenue data available for the selected period</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center">
-                    <p className="text-gray-500 dark:text-gray-400">No payment method data available</p>
+                  
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">User Growth</h3>
+                    {userGrowthData.labels.length > 0 ? (
+                      <div className="h-80">
+                        <Bar data={userGrowthData} options={barOptions} />
+                      </div>
+                    ) : (
+                      <div className="h-80 flex items-center justify-center">
+                        <p className="text-gray-500 dark:text-gray-400">No user growth data available for the selected period</p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Subscription Plan Distribution</h3>
-                {planDistributionData.labels.length > 0 ? (
-                  <div className="h-80">
-                    <Pie 
-                      data={planDistributionData} 
-                      options={{
-                        ...pieOptions,
-                        plugins: {
-                          ...pieOptions.plugins,
-                          title: {
-                            ...pieOptions.plugins.title,
-                            text: 'Subscription Plans'
-                          }
-                        }
-                      }} 
-                    />
+                </div>
+                
+                {/* Charts - Payment Methods and Plan Distribution */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Payment Methods</h3>
+                    {paymentMethodData.labels.length > 0 ? (
+                      <div className="h-80">
+                        <Pie data={paymentMethodData} options={pieOptions} />
+                      </div>
+                    ) : (
+                      <div className="h-80 flex items-center justify-center">
+                        <p className="text-gray-500 dark:text-gray-400">No payment method data available</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center">
-                    <p className="text-gray-500 dark:text-gray-400">No subscription plan data available</p>
+                  
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Subscription Plan Distribution</h3>
+                    {planDistributionData.labels.length > 0 ? (
+                      <div className="h-80">
+                        <Pie 
+                          data={planDistributionData} 
+                          options={{
+                            ...pieOptions,
+                            plugins: {
+                              ...pieOptions.plugins,
+                              title: {
+                                ...pieOptions.plugins.title,
+                                text: 'Subscription Plans'
+                              }
+                            }
+                          }} 
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-80 flex items-center justify-center">
+                        <p className="text-gray-500 dark:text-gray-400">No subscription plan data available</p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="min-h-screen flex items-center justify-center w-full">
