@@ -701,6 +701,7 @@ CREATE INDEX idx_landing_page_content_sort ON "landing_page_content"("sort_order
 -- Payment table for Stripe integration
 CREATE TABLE "payment" (
   "id" SERIAL PRIMARY KEY,
+  "order_id" UUID NOT NULL UNIQUE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "amount" DECIMAL(10, 2) NOT NULL,
   "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
@@ -715,6 +716,9 @@ CREATE TABLE "payment" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Create index for order_id
+CREATE INDEX idx_payment_order_id ON "payment"("order_id");
 
 -- For better performance when querying payment by user
 CREATE INDEX idx_payment_user_id ON "payment"("user_id");

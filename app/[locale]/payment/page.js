@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { useSelector, useDispatch } from 'react-redux'
 import { createPaymentIntent, setPaymentMetadata, setFinalTotal } from '@/lib/redux/features/paymentSlice'
 import useGetUser from '@/lib/hooks/useGetUser';
+import { v4 as uuidv4 } from 'uuid';
 
 // Initialize Stripe outside the component
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -126,7 +127,9 @@ export default function PaymentPage() {
         console.log('Payment initialization parameters:', { 
           planId, 
           userId, 
-          planPrice: planDetails?.price 
+          planPrice: planDetails?.price,
+          discount,
+          finalAmount: calculateFinalTotal()
         });
         
         // Verify all required parameters are present
@@ -145,6 +148,9 @@ export default function PaymentPage() {
           return;
         }
 
+        // Generate order ID
+        const orderId = uuidv4();
+
         // Calculate the final total (with discount applied)
         const finalAmount = calculateFinalTotal();
         
@@ -155,20 +161,34 @@ export default function PaymentPage() {
         const paymentMetadata = {
           planId,
           userId,
+          orderId,
           planName: planDetails?.name,
-          amount: finalAmount, // Use the final amount with discount
+          amount: finalAmount, // Use finalAmount here
           promoCode: appliedPromoCode,
           discount: discount,
-          quantity: 1
+          quantity: 1,
+          payment_method: 'card'
         };
 
         console.log('Setting payment metadata:', paymentMetadata);
         dispatch(setPaymentMetadata(paymentMetadata));
 
-        // 创建支付意向
+        // 创建支付意向 - Make sure to use finalAmount
         const result = await dispatch(createPaymentIntent({
-          ...paymentMetadata,
-          amount: finalAmount // Use the final amount with discount
+          amount: finalAmount, // Use finalAmount here
+          userId: userId,
+          planId: planId,
+          metadata: {
+            orderId,
+            userId: userId,
+            planId: planId,
+            planName: planDetails?.name,
+            promoCode: appliedPromoCode,
+            discount: discount,
+            payment_method: 'card',
+            quantity: 1,
+            finalAmount: finalAmount // Add finalAmount to metadata
+          }
         })).unwrap();
 
         console.log('Payment intent created:', result);
@@ -214,34 +234,53 @@ export default function PaymentPage() {
 
   // Update the handlePayment function
   const handlePayment = async () => {
-    // First verify that we have the userId
-    if (!userId) {
-      console.error('Missing required userId for payment');
+    // First verify that we have the userId and planId
+    if (!userId || !planId) {
+      console.error('Missing required parameters:', { userId, planId });
       return;
     }
 
-    // Always use the most recent calculated final total
+    // Calculate the final total with any applied discounts
     const finalAmount = calculateFinalTotal();
+    console.log('Final amount for payment:', finalAmount);
+    
+    // Store the final total in Redux
     dispatch(setFinalTotal(finalAmount));
 
-    // Ensure we have all required metadata, using userId from props if not in metadata
+    // Generate a new order ID
+    const orderId = uuidv4();
+
+    // Ensure we have all required metadata
     const paymentData = {
+      amount: finalAmount, // Use the calculated final amount
       userId: userId,
       planId: planId,
-      planName: planDetails?.name,
-      amount: finalAmount,
-      quantity: 1,
-      ...metadata // Include any other metadata fields, but our explicit values take precedence
+      metadata: {
+        orderId: orderId,
+        userId: userId,
+        planId: planId,
+        planName: planDetails?.name,
+        promoCode: appliedPromoCode,
+        discount: discount,
+        payment_method: 'card',
+        quantity: 1,
+        finalAmount: finalAmount // Include final amount in metadata
+      }
     };
 
     // Update metadata in Redux
-    dispatch(setPaymentMetadata(paymentData));
+    dispatch(setPaymentMetadata({
+      ...paymentData.metadata,
+      orderId: orderId,
+      amount: finalAmount // Ensure the amount in metadata matches
+    }));
 
     try {
       const result = await dispatch(createPaymentIntent(paymentData)).unwrap();
       // 处理支付结果
       if (result.clientSecret) {
-        // 处理成功
+        setClientSecret(result.clientSecret);
+        setPaymentStatus('ready');
       }
     } catch (err) {
       console.error('Payment failed:', err);
@@ -276,8 +315,11 @@ export default function PaymentPage() {
       return;
     }
     
-    // Store the final total in Redux before proceeding with payment
+    // Calculate the final total with any applied discounts
     const finalAmount = calculateFinalTotal();
+    console.log('Final amount for Alipay payment:', finalAmount);
+    
+    // Store the final total in Redux
     dispatch(setFinalTotal(finalAmount));
     
     setIsProcessing(true);
@@ -289,11 +331,14 @@ export default function PaymentPage() {
         },
         body: JSON.stringify({
           planName: planDetails.name,
-          price: finalAmount, // Use the discounted amount
+          price: finalAmount, // Use the final amount here
           quantity: 1,
           email: email,
-          userId: userId, // Include userId
-          planId: planId  // Include planId
+          userId: userId,
+          planId: planId,
+          promoCode: appliedPromoCode,
+          discount: discount,
+          finalAmount: finalAmount // Include final amount in request
         }),
       });
       
