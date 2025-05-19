@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaFilter, FaSearch, FaEnvelope, FaBuilding, FaUser, FaClock, FaCheck, FaTimes, FaSpinner, FaReply } from 'react-icons/fa';
+import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell, FaFilter, FaSearch, FaEnvelope, FaBuilding, FaUser, FaClock, FaCheck, FaTimes, FaSpinner, FaReply, FaFile } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 import { toast } from 'sonner';
@@ -21,6 +21,8 @@ export default function AdminSupport() {
   const [replyText, setReplyText] = useState('');
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [ticketReplies, setTicketReplies] = useState([]);
+  const [isSendingReply, setIsSendingReply] = useState(false);
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
   const adminState = useSelector((state) => state.admin);
@@ -58,7 +60,7 @@ export default function AdminSupport() {
     }
   }, [filter]);
 
-  // Add function to verify permission access TODO: 模块化这个代码
+  // Add function to verify permission access
   const hasPermission = (permissionName) => {
     return permissions.includes(permissionName);
   };
@@ -99,9 +101,12 @@ export default function AdminSupport() {
   };
   
   // Handle ticket selection
-  const handleSelectTicket = (ticket) => {
+  const handleSelectTicket = async (ticket) => {
     setSelectedTicket(ticket);
     setReplyText('');
+    
+    // Fetch replies for this ticket
+    await fetchTicketReplies(ticket.id);
     
     // Log activity
     if (adminData) {
@@ -178,6 +183,26 @@ export default function AdminSupport() {
     if (!selectedTicket || !replyText.trim()) return;
     
     try {
+      setIsSendingReply(true);
+      const loadingToastId = toast.loading('Sending reply...'); // Store the loading toast ID
+
+      // First save the reply to the database
+      const { data: replyData, error: replyError } = await supabase
+        .from('contact_reply')
+        .insert({
+          contact_id: selectedTicket.id,
+          content: replyText,
+          admin_id: adminData.id,
+          is_from_contact: false,
+          is_internal_note: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (replyError) throw replyError;
+
       // Send email using the API route
       const response = await fetch('/api/send-email', {
         method: 'POST',
@@ -202,30 +227,13 @@ export default function AdminSupport() {
         throw new Error(result.error || 'Failed to send email');
       }
       
-      console.log('Email sent successfully:', result);
-      
       // Update ticket status to IN_PROGRESS if it's NEW
       if (selectedTicket.status === 'NEW') {
         await handleStatusChange('IN_PROGRESS');
       }
       
-      // Store the reply in the database (optional)
+      // Log the reply activity
       if (adminData) {
-        const { error: replyError } = await supabase
-          .from('support_replies')
-          .insert({
-            contact_id: selectedTicket.id,
-            admin_id: adminData.id,
-            message: replyText,
-            sent_at: new Date().toISOString()
-          });
-          
-        if (replyError) {
-          console.error('Error saving reply to database:', replyError);
-          toast.error(`Error saving reply to database: ${replyError.message}`);
-        }
-        
-        // Log the reply activity
         await supabase.from('admin_activity_log').insert({
           admin_id: adminData.id,
           action: 'reply_to_ticket',
@@ -235,23 +243,24 @@ export default function AdminSupport() {
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
         });
-      } else {
-        // If adminData is not available, just log the issue
-        console.warn('Admin data not available for logging reply activity');
       }
       
       // Clear reply text
       setReplyText('');
       
-      // Show success toast notification
-      toast.success(`Reply sent to ${selectedTicket.email} successfully!`);
+      // Refresh replies
+      await fetchTicketReplies(selectedTicket.id);
       
-      // Refresh tickets to update the list
-      fetchSupportTickets();
+      // Dismiss loading toast and show success toast
+      toast.dismiss(loadingToastId);
+      toast.success(`Reply sent to ${selectedTicket.email} successfully!`);
       
     } catch (error) {
       console.error('Error sending reply:', error);
+      toast.dismiss(); // Dismiss any existing toasts
       toast.error(`Error sending reply: ${error.message}`);
+    } finally {
+      setIsSendingReply(false); // Reset sending state
     }
   };
   
@@ -296,6 +305,31 @@ export default function AdminSupport() {
       (ticket.message && ticket.message.toLowerCase().includes(query))
     );
   });
+  
+  // Add this function after fetchSupportTickets
+  const fetchTicketReplies = async (ticketId) => {
+    try {
+      const { data, error } = await supabase
+        .from('contact_reply')
+        .select(`
+          *,
+          admin_user:admin_id (
+            username,
+            full_name
+          )
+        `)
+        .eq('contact_id', ticketId)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      
+      setTicketReplies(data || []);
+      
+    } catch (error) {
+      console.error('Error fetching ticket replies:', error);
+      toast.error(`Failed to load replies: ${error.message}`);
+    }
+  };
   
   if (loading) {
     return (
@@ -641,6 +675,89 @@ export default function AdminSupport() {
                     </div>
                   </div>
                   
+                  {/* Reply History */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Reply History</h4>
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-4 max-h-[400px] overflow-y-auto">
+                      {ticketReplies.length > 0 ? (
+                        ticketReplies.map((reply) => (
+                          <div 
+                            key={reply.id} 
+                            className={`p-4 rounded-lg ${
+                              reply.is_internal_note 
+                                ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800'
+                                : reply.is_from_contact
+                                  ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800'
+                                  : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                                  reply.is_internal_note
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
+                                    : reply.is_from_contact
+                                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
+                                      : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-100'
+                                }`}>
+                                  {reply.is_from_contact 
+                                    ? selectedTicket.first_name?.charAt(0).toUpperCase() || selectedTicket.email.charAt(0).toUpperCase()
+                                    : reply.admin_user?.full_name?.charAt(0).toUpperCase() || reply.admin_user?.username?.charAt(0).toUpperCase() || 'A'}
+                                </div>
+                                <div className="ml-3">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {reply.is_from_contact 
+                                      ? (selectedTicket.first_name && selectedTicket.last_name 
+                                          ? `${selectedTicket.first_name} ${selectedTicket.last_name}`
+                                          : selectedTicket.email)
+                                      : (reply.admin_user?.full_name || reply.admin_user?.username || 'Admin')}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {formatDate(reply.created_at)}
+                                  </p>
+                                </div>
+                              </div>
+                              {reply.is_internal_note && (
+                                <span className="text-xs font-medium text-yellow-800 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900 px-2 py-1 rounded">
+                                  Internal Note
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line pl-11">
+                              {reply.content}
+                            </div>
+                            
+                            {reply.attachment_urls && reply.attachment_urls.length > 0 && (
+                              <div className="mt-2 pl-11">
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Attachments:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {reply.attachment_urls.map((url, index) => (
+                                    <a
+                                      key={index}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center"
+                                    >
+                                      <FaFile className="mr-1" />
+                                      {url.split('/').pop()}
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                          <FaReply className="mx-auto text-3xl mb-2 opacity-30" />
+                          <p>No replies yet</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
                   {hasPermission('reply_to_tickets') && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Reply</h4>
@@ -651,15 +768,28 @@ export default function AdminSupport() {
                         placeholder="Type your reply here..."
                         className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 min-h-[120px]"
                         required
+                        disabled={isSendingReply}
                       ></textarea>
                       
                       <div className="mt-4 flex justify-end">
                         <button
                           type="submit"
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg font-medium transition-colors flex items-center"
+                          disabled={isSendingReply || !replyText.trim()}
+                          className={`px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg font-medium transition-colors flex items-center ${
+                            (isSendingReply || !replyText.trim()) ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
                         >
-                          <FaReply className="mr-2" />
-                          Send Reply
+                          {isSendingReply ? (
+                            <>
+                              <span className="inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <FaReply className="mr-2" />
+                              Send Reply
+                            </>
+                          )}
                         </button>
                       </div>
                     </form>

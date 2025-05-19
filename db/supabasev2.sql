@@ -421,45 +421,47 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER; 
 
--- 订阅计划表
-CREATE TABLE "subscription_plan" (
-  "id" SERIAL PRIMARY KEY,
-  "name" VARCHAR(50) NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
-  "price" DECIMAL(10, 2) NOT NULL,
-  "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
-  "description" TEXT,
-  "features" JSONB NOT NULL, -- 存储计划包含的功能列表
-  "max_projects" INT NOT NULL, -- 最大项目数
-  "max_teams" INT NOT NULL, -- 最大团队数
-  "max_members" INT NOT NULL, -- 最大团队成员数
-  "max_ai_chat" INT NOT NULL, -- 最大AI聊天数
-  "max_ai_task" INT NOT NULL, -- 最大AI任务数
-  "max_ai_workflow" INT NOT NULL, -- 最大AI工作流数
-  "is_active" BOOLEAN DEFAULT TRUE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+  -- 订阅计划表
+  CREATE TABLE "subscription_plan" (
+    "id" SERIAL PRIMARY KEY,
+    "name" VARCHAR(50) NOT NULL,
+    "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
+    "price" DECIMAL(10, 2) NOT NULL,
+    "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
+    "description" TEXT,
+    "features" JSONB NOT NULL, -- 存储计划包含的功能列表
+    "max_projects" INT NOT NULL, -- 最大项目数
+    "max_teams" INT NOT NULL, -- 最大团队数
+    "max_members" INT NOT NULL, -- 最大团队成员数
+    "max_ai_chat" INT NOT NULL, -- 最大AI聊天数
+    "max_ai_task" INT NOT NULL, -- 最大AI任务数
+    "max_ai_workflow" INT NOT NULL, -- 最大AI工作流数
+    "max_storage" INT NOT NULL DEFAULT 0, -- 最大存储空间(GB)
+    "is_active" BOOLEAN DEFAULT TRUE,
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
 
--- 用户订阅计划表
-CREATE TABLE "user_subscription_plan" (
-  "id" SERIAL PRIMARY KEY,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
-  "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
-  "start_date" TIMESTAMP NOT NULL,
-  "end_date" TIMESTAMP NOT NULL,
-  -- 使用统计
-  "current_projects" INT DEFAULT 0,
-  "current_teams" INT DEFAULT 0,
-  "current_members" INT DEFAULT 0,
-  "current_ai_chat" INT DEFAULT 0,
-  "current_ai_task" INT DEFAULT 0,
-  "current_ai_workflow" INT DEFAULT 0,
-  -- 时间戳
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+  -- 用户订阅计划表
+  CREATE TABLE "user_subscription_plan" (
+    "id" SERIAL PRIMARY KEY,
+    "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+    "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
+    "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
+    "start_date" TIMESTAMP NOT NULL,
+    "end_date" TIMESTAMP NOT NULL,
+    -- 使用统计
+    "current_projects" INT DEFAULT 0,
+    "current_teams" INT DEFAULT 0,
+    "current_members" INT DEFAULT 0,
+    "current_ai_chat" INT DEFAULT 0,
+    "current_ai_task" INT DEFAULT 0,
+    "current_ai_workflow" INT DEFAULT 0,
+    "current_storage" INT DEFAULT 0,
+    -- 时间戳
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
 
 -- 促销码表
 CREATE TABLE "promo_code" (
@@ -494,6 +496,25 @@ CREATE TABLE "contact" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Support Contact Reply Table (integrates with existing contact table)
+CREATE TABLE "contact_reply" (
+  "id" SERIAL PRIMARY KEY,
+  "contact_id" INT NOT NULL REFERENCES "contact"("id") ON DELETE CASCADE,
+  "content" TEXT NOT NULL,
+  "attachment_urls" TEXT[] DEFAULT '{}',
+  -- Sender can be either admin or the original contact person
+  "admin_id" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
+  "is_from_contact" BOOLEAN DEFAULT FALSE, -- TRUE if reply is from original contact person
+  "is_internal_note" BOOLEAN DEFAULT FALSE, -- For admin-only notes
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for better performance
+CREATE INDEX idx_contact_reply_contact_id ON "contact_reply"("contact_id");
+CREATE INDEX idx_contact_reply_admin_id ON "contact_reply"("admin_id");
+CREATE INDEX idx_contact_reply_created_at ON "contact_reply"("created_at");
 
 -- 管理员表 - 存储系统管理员信息
 CREATE TABLE "admin_user" (

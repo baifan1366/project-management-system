@@ -36,6 +36,8 @@ export default function AdminUserManagement() {
   const [isPasswordValid, setIsPasswordValid] = useState(false)
   const [isPasswordMatch, setIsPasswordMatch] = useState(false)
   const [isEmailValid, setIsEmailValid] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [processing, setProcessing] = useState(false);
   const permissions = useSelector((state) => state.admin.permissions);
   
   // State for admin permissions management
@@ -196,6 +198,16 @@ export default function AdminUserManagement() {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedAdmin(null);
+    // Reset form values for other modal types
+    setUsername('');
+    setFullName('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setIsPasswordValid(false);
+    setIsPasswordMatch(false);
+    setIsEmailValid(false);
+    setDeleteConfirmation(''); // Reset delete confirmation text
   };
   
   // Initialize permissions for a new admin user
@@ -507,11 +519,15 @@ export default function AdminUserManagement() {
   // Delete admin
   const deleteAdmin = async () => {
     try {
-      // Verify permission
-      if (!hasPermission('delete_admins')) {
-        toast.error('Permission denied: You do not have permission to delete admin users');
-        throw new Error('You do not have permission to delete admin users');
+      const confirmationValue = deleteConfirmation.trim();
+      const expectedValue = selectedAdmin.username || selectedAdmin.email;
+      
+      if (confirmationValue !== expectedValue) {
+        toast.error('Confirmation text does not match. Please try again.');
+        return;
       }
+      
+      setProcessing(true);
       
       // Prevent deleting your own account
       if (adminData && selectedAdmin.id === adminData.id) {
@@ -547,11 +563,11 @@ export default function AdminUserManagement() {
       toast.success(`Admin user deleted successfully`);
       closeModal();
       
-      // Refresh admin data to ensure permissions are correctly displayed
-      fetchAdminUsers();
-      
     } catch (error) {
-      toast.error(`Error deleting admin user: ${error.message}`);
+      console.error('Error deleting admin user:', error);
+      toast.error(`Failed to delete admin user: ${error.message}`);
+    } finally {
+      setProcessing(false);
     }
   };
   
@@ -1490,88 +1506,97 @@ export default function AdminUserManagement() {
       )}
 
       {/* Delete User Modal */}
-    {isModalOpen && modalType === 'delete' && selectedAdmin && (
-      <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
-        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6'>
-          <div className='flex justify-between items-center mb-4'>
-            <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>Delete Admin</h2>
-            <button
-              onClick={closeModal}
-              className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            >
-              &times;
-            </button>
-          </div>
-          
-          <div className='space-y-4'>
-            <div className='flex items-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800'>
-              <div className='flex-shrink-0 mr-3 text-red-500 dark:text-red-400'>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <h3 className='text-sm font-medium text-red-800 dark:text-red-200'>Warning: This action cannot be undone</h3>
-                <p className='mt-1 text-sm text-red-700 dark:text-red-300'>
-                  You are about to permanently delete this user account and all associated data.
-                </p>
-              </div>
+      {isModalOpen && modalType === 'delete' && selectedAdmin && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>Delete Admin</h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
             </div>
             
-            <div className='p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700'>
-              <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>User Details</h4>
-              <div className='flex items-center mb-2'>
-                <div className='w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3'>
-                  {selectedAdmin.username?.charAt(0).toUpperCase() || selectedAdmin.email?.charAt(0).toUpperCase() || 'U'}
+            <div className='space-y-4'>
+              <div className='flex items-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800'>
+                <div className='flex-shrink-0 mr-3 text-red-500 dark:text-red-400'>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
                 </div>
                 <div>
-                  <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.username || 'Admin'}</p>
-                  <p className='text-xs text-gray-500 dark:text-gray-400'>{selectedAdmin.email}</p>
+                  <h3 className='text-sm font-medium text-red-800 dark:text-red-200'>Warning: This action cannot be undone</h3>
+                  <p className='mt-1 text-sm text-red-700 dark:text-red-300'>
+                    You are about to permanently delete this admin account and all associated data.
+                  </p>
                 </div>
               </div>
-              <p className='text-xs text-gray-500 dark:text-gray-400'>
-                Registered: {formatDate(selectedAdmin.created_at)}
-              </p>
+              
+              <div className='p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700'>
+                <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>Admin Details</h4>
+                <div className='flex items-center mb-2'>
+                  <div className='w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3'>
+                    {selectedAdmin.full_name?.charAt(0).toUpperCase() || selectedAdmin.username?.charAt(0).toUpperCase() || 'A'}
+                  </div>
+                  <div>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.username || 'Admin'}</p>
+                    <p className='text-xs text-gray-500 dark:text-gray-400'>{selectedAdmin.email}</p>
+                  </div>
+                </div>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>
+                  Registered: {formatDate(selectedAdmin.created_at)}
+                </p>
+              </div>
+              
+              <div className='p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800'>
+                <p className='text-sm text-yellow-700 dark:text-yellow-300'>
+                  To confirm deletion, please type <strong>{selectedAdmin.username || selectedAdmin.email}</strong> below:
+                </p>
+                <input
+                  type='text'
+                  id='delete-confirmation'
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  className='mt-2 w-full px-3 py-2 border border-yellow-300 dark:border-yellow-700 rounded-md text-sm
+                    placeholder-yellow-500 dark:placeholder-yellow-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                    focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500'
+                  placeholder={`Type ${selectedAdmin.username || selectedAdmin.email} to confirm`}
+                />
+              </div>
             </div>
             
-            <div className='p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800'>
-              <p className='text-sm text-yellow-700 dark:text-yellow-300'>
-                To confirm deletion, please type <strong>{selectedAdmin.username || selectedAdmin.email}</strong> below:
-              </p>
-              <input
-                type='text'
-                id='delete-confirmation'
-                className='mt-2 w-full px-3 py-2 border border-yellow-300 dark:border-yellow-700 rounded-md text-sm
-                  placeholder-yellow-500 dark:placeholder-yellow-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                  focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500'
-                placeholder={`Type ${selectedAdmin.username || selectedAdmin.email} to confirm`}
-              />
+            <div className='mt-6 flex justify-end space-x-3'>
+              <button
+                type='button'
+                onClick={closeModal}
+                disabled={processing}
+                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                  text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+              >
+                Cancel
+              </button>
+              
+              <button
+                type='button'
+                onClick={deleteAdmin}
+                disabled={processing}
+                className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                  text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2
+                  focus:ring-offset-2 focus:ring-red-500'
+              >
+                {processing ? (
+                  <>
+                    <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                    Deleting...
+                  </>
+                ) : 'Delete Admin'}
+              </button>
             </div>
-          </div>
-          
-          <div className='mt-6 flex justify-end space-x-3'>
-            <button
-              type='button'
-              onClick={closeModal}
-              className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
-                text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-            >
-              Cancel
-            </button>
-            
-            <button
-              type='button'
-              onClick={deleteAdmin}
-              className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
-                text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2
-                focus:ring-offset-2 focus:ring-red-500'
-            >
-              Delete User
-            </button>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
     {/* Edit Admin Permissions Modal */}
     {isModalOpen && modalType === 'editPermission' && selectedAdmin && (

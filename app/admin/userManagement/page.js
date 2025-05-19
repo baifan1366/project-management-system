@@ -8,6 +8,32 @@ import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import bcrypt from 'bcryptjs';
+
+// Add generateSecurePassword function
+const generateSecurePassword = () => {
+  const length = 16; // Increased length for better security
+  const uppercaseChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lowercaseChars = 'abcdefghijklmnopqrstuvwxyz';
+  const numberChars = '0123456789';
+  const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+  
+  // Ensure at least one of each type
+  let password = '';
+  password += uppercaseChars[Math.floor(Math.random() * uppercaseChars.length)];
+  password += lowercaseChars[Math.floor(Math.random() * lowercaseChars.length)];
+  password += numberChars[Math.floor(Math.random() * numberChars.length)];
+  password += specialChars[Math.floor(Math.random() * specialChars.length)];
+  
+  // Fill the rest with random characters from all types
+  const allChars = uppercaseChars + lowercaseChars + numberChars + specialChars;
+  for (let i = password.length; i < length; i++) {
+    password += allChars[Math.floor(Math.random() * allChars.length)];
+  }
+  
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+};
 
 export default function UserManagement() {
   const router = useRouter();
@@ -119,6 +145,42 @@ export default function UserManagement() {
     setSelectedUser(null);
   };
   
+  // Add function to hash password
+  const hashPassword = async (password) => {
+    const salt = await bcrypt.genSalt(10);
+    return bcrypt.hash(password, salt);
+  };
+
+  // Add function to send email
+  const sendEmail = async (type, { to, name, password, locale }) => {
+    try {
+      const response = await fetch('/api/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type,
+          to,
+          name,
+          password,
+          locale,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send email');
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error sending email:', error);
+      throw error;
+    }
+  };
+  
   // Edit user
   const editUser = async (userData) => {
     try {
@@ -173,12 +235,22 @@ export default function UserManagement() {
         userData.notifications_enabled = userData.notifications_enabled === 'on';
       }
       
+      // Remove update_password from userData since it's not a database column
+      const { update_password, ...dataToUpdate } = userData;
+      
+      // If password update is requested, generate and hash new password
+      let newPassword = null;
+      if (update_password) {
+        newPassword = generateSecurePassword();
+        dataToUpdate.password_hash = await hashPassword(newPassword);
+      }
+      
       // Add updated_at timestamp
-      userData.updated_at = new Date().toISOString();
+      dataToUpdate.updated_at = new Date().toISOString();
       
       const { data, error } = await supabase
         .from('user')
-        .update(userData)
+        .update(dataToUpdate)
         .eq('id', selectedUser.id)
         .select()
         .single();
@@ -202,18 +274,35 @@ export default function UserManagement() {
         throw error;
       }
       
+      // If password was updated, send email notification
+      if (newPassword) {
+        try {
+          await sendEmail('password_update', {
+            to: data.email,
+            name: data.name || data.email,
+            password: newPassword,
+            locale: data.language || 'en'
+          });
+          toast.success('Password updated and sent to user via email');
+        } catch (emailError) {
+          console.error('Error sending password update email:', emailError);
+          toast.error('User updated but failed to send password notification email');
+          throw emailError;
+        }
+      }
+      
       // Update local data
       setUsers(users.map(user => 
-        user.id === selectedUser.id ? { ...user, ...userData } : user
+        user.id === selectedUser.id ? { ...user, ...dataToUpdate } : user
       ));
       
       // Create a detailed changes log for admin activity
       const changes = {};
-      Object.keys(userData).forEach(key => {
-        if (key !== 'updated_at' && userData[key] !== originalUserData[key]) {
+      Object.keys(dataToUpdate).forEach(key => {
+        if (key !== 'updated_at' && dataToUpdate[key] !== originalUserData[key]) {
           changes[key] = {
             from: originalUserData[key],
-            to: userData[key]
+            to: dataToUpdate[key]
           };
         }
       });
@@ -377,13 +466,20 @@ export default function UserManagement() {
           return v.toString(16);
         });
       
-      // Add the ID to the user data
+      // Generate a secure password
+      const password = generateSecurePassword();
+      
+      // Hash the password
+      const password_hash = await hashPassword(password);
+      
+      // Add the ID and hashed password to the user data
       const userDataWithId = {
         ...userData,
         id,
-        theme: 'system', // Default from your schema
-        language: 'en', // Default from your schema
-        notifications_enabled: true // Default from your schema
+        password_hash,
+        theme: 'system',
+        language: 'en',
+        notifications_enabled: true
       };
       
       console.log('Inserting user with data:', userDataWithId);
@@ -412,6 +508,19 @@ export default function UserManagement() {
           toast.error(`Failed to add user: ${error.message}`);
         }
         throw error;
+      }
+      
+      // Send account creation email with the plain text password
+      try {
+        await sendEmail('account_creation', {
+          to: data.email,
+          name: data.name || data.email,
+          password: password,
+          locale: data.language || 'en'
+        });
+      } catch (emailError) {
+        console.error('Error sending account creation email:', emailError);
+        toast.error('User created but failed to send email notification');
       }
       
       // Update local data
@@ -857,6 +966,7 @@ export default function UserManagement() {
                 email: email,
                 phone: phone || null,
                 email_verified: isEmailVerified,
+                update_password: e.target.querySelector('[name="update_password"]').checked,
                 updated_at: new Date().toISOString()
               };
               
@@ -961,6 +1071,19 @@ export default function UserManagement() {
                       Enable email notifications
                     </label>
                   </div>
+                </div>
+                
+                <div>
+                  <label className='flex items-center space-x-2'>
+                    <input
+                      type='checkbox'
+                      name='update_password'
+                      className='h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
+                    />
+                    <span className='text-sm text-gray-700 dark:text-gray-300'>
+                      Generate and send new password to user
+                    </span>
+                  </label>
                 </div>
                 
                 <div className='pt-3 border-t border-gray-200 dark:border-gray-700'>
