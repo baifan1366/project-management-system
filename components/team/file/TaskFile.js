@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { 
   File, FileText, Upload, MoreHorizontal, 
@@ -16,7 +16,7 @@ import {
 import { useTranslations } from 'next-intl'
 import FileTools from './FileTools'
 import { supabase } from '@/lib/supabase'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useGetUser } from '@/lib/hooks/useGetUser';
@@ -25,6 +25,7 @@ import { useParams } from "next/navigation";
 import { useConfirm } from '@/hooks/use-confirm'
 import ShareFile from './ShareFile'
 import GridView from './GridView'
+import { createSection } from '@/lib/redux/features/sectionSlice';
 
 // 文件项组件 - 移除DnD包装
 const FileItem = ({ file, handleSelectFile, selectedFiles, openFileMenu, navigateToFolder, moveFileToParentFolder, currentPath, openFilePreview, downloadFile, onDragStart, onDragOver, onDragLeave, onDrop, handleDeleteSelected, confirmAndDeleteFiles, confirm, openShareFile }) => {
@@ -179,10 +180,12 @@ const FileItem = ({ file, handleSelectFile, selectedFiles, openFileMenu, navigat
                 {t('download')}
               </DropdownMenuItem>
             )}
+            {file.type !== 'folder' && (
             <DropdownMenuItem className="cursor-pointer" onClick={() => openShareFile(file)}>
               <Send className="mr-2 h-4 w-4" />
               {t('share')}
             </DropdownMenuItem>
+            )}
             {currentPath !== '/' && (
               <DropdownMenuItem className="cursor-pointer" onClick={() => moveFileToParentFolder(file)}>
                 <FolderUp className="mr-2 h-4 w-4" />
@@ -210,9 +213,9 @@ const FileItem = ({ file, handleSelectFile, selectedFiles, openFileMenu, navigat
 export default function TaskFile({ taskId, teamId }) {
   const t = useTranslations('File')
   const tConfirm = useTranslations('confirmation')
-  const { toast } = useToast()
   const { user } = useGetUser();
   const { confirm } = useConfirm();
+  const dispatch = useDispatch();
   const params = useParams()
   const { id: projectId } = params
   const [themeColor, setThemeColor] = useState('#64748b')
@@ -470,10 +473,8 @@ export default function TaskFile({ taskId, teamId }) {
       setFiles([...processedFolders, ...processedAttachments])
     } catch (error) {
       console.error('Error fetching files:', error)
-      toast({
-        title: t('errorFetchingFiles'),
-        description: error.message,
-        variant: 'destructive'
+      toast.error(t('errorFetchingFiles'), {
+        description: error.message
       })
       // 错误情况下设置空列表
       setFiles([])
@@ -519,10 +520,8 @@ export default function TaskFile({ taskId, teamId }) {
     
     // Avoid dropping folder into its subfolder
     if (droppedFile.type === 'folder' && targetFolder.path.startsWith(droppedFile.path)) {
-      toast({
-        title: '无法移动',
-        description: '不能将文件夹移动到其子文件夹中',
-        variant: 'destructive'
+      toast.error(t('cannotMoveFolderToSubfolder'), {
+        description: t('cannotMoveFolderToSubfolderDescription')
       });
       return;
     }
@@ -575,20 +574,19 @@ export default function TaskFile({ taskId, teamId }) {
         if (error) throw error;
       }
       
-      toast({
-        title: '文件已移动',
-        description: `已将${file.name}移动到${targetFolder.name}文件夹`,
-        variant: 'default'
+      toast.success(t('fileMoved'), {
+        description: t('fileMovedToFolder', {
+          fileName: file.name,
+          folderName: targetFolder.name
+        })
       });
       
       // Refresh file list display
       fetchFiles();
     } catch (error) {
       console.error('Error moving file:', error);
-      toast({
-        title: '移动文件失败',
-        description: error.message,
-        variant: 'destructive'
+      toast.error(t('errorMovingFile'), {
+        description: error.message
       });
     }
   };
@@ -613,11 +611,9 @@ export default function TaskFile({ taskId, teamId }) {
   // Create new folder
   const createNewFolder = async () => {
     if (!newFolderName.trim()) {
-      toast({
-        title: t('invalidFolderName'),
-        description: t('folderNameCannotBeEmpty'),
-        variant: 'destructive'
-      })
+      toast.error(t('invalidFolderName'), {
+        description: t('folderNameCannotBeEmpty')
+      });
       return
     }
     
@@ -633,16 +629,16 @@ export default function TaskFile({ taskId, teamId }) {
       )
       
       if (folderExists) {
-        toast({
-          title: t('folderAlreadyExists'),
-          description: t('pleaseChooseDifferentName'),
-          variant: 'destructive'
-        })
+        toast.error(t('folderAlreadyExists'), {
+          description: t('pleaseChooseDifferentName')
+        });
         setIsCreatingFolder(false)
         return
       }
       
       // 1. Get File tag ID
+      const tagName = await api.tags.getByName('Name')
+      const nameTagId = tagName.id
       const tagResponse = await api.tags.getByName('File')
       const fileTagId = tagResponse.id
       
@@ -653,19 +649,48 @@ export default function TaskFile({ taskId, teamId }) {
       if (sections && sections.length > 0) {
         // Use first section
         sectionId = sections[0].id
+        console.log('使用现有section:', sectionId)
       } else {
         // Create new section
-        const newSection = await api.teams.teamSection.create(teamId, {
-          name: 'New Section',
-          task_ids: []
-        })
-        sectionId = newSection.id
+        try {
+          const newSection = await dispatch(createSection({
+            teamId: teamId,
+            sectionData: {
+                teamId: teamId,
+                sectionName: 'New Section',
+                createdBy: userId
+            }
+          }));
+          
+          // 检查newSection返回值
+          console.log('创建的新section:', newSection)
+          
+          if (!newSection || !newSection.id) {
+            throw new Error('创建section后未返回有效ID')
+          }
+          
+          sectionId = newSection.id
+          console.log('新创建的sectionId:', sectionId)
+        } catch (error) {
+          console.error('创建section失败:', error)
+          throw new Error(`创建section失败: ${error.message}`)
+        }
+      }
+      
+      // 确保sectionId和teamId都是有效的整数
+      if (!sectionId || isNaN(Number(sectionId))) {
+        toast.error(t('errorCreatingFolder'), {
+          description: '无效的section ID'
+        });
+        setIsCreatingFolder(false)
+        return
       }
       
       // 3. Create new task, include file tag value
       const taskData = {
         created_by: userId,
         tag_values: {
+          [nameTagId]: newFolderName,
           [fileTagId]: newFolderName
         }
       }
@@ -674,9 +699,29 @@ export default function TaskFile({ taskId, teamId }) {
       const newTaskId = taskResponse.id
       
       // 4. Update section's task_ids
-      const sectionDetails = await api.teams.teamSection.getSectionById(teamId, sectionId)
-      const currentTaskIds = sectionDetails.task_ids || []
-      await api.teams.teamSection.updateTaskIds(sectionId, teamId, [...currentTaskIds, newTaskId])
+      try {
+        if (!sectionId || !teamId) {
+          console.error('无效的sectionId或teamId:', { sectionId, teamId })
+          throw new Error('无效的section或team ID')
+        }
+        
+        const sectionDetails = await api.teams.teamSection.getSectionById(teamId, sectionId)
+        console.log('获取到的section详情:', sectionDetails)
+        
+        if (!sectionDetails) {
+          throw new Error('无法获取section详情')
+        }
+        
+        const currentTaskIds = sectionDetails.task_ids || []
+        await api.teams.teamSection.updateTaskIds(sectionId, teamId, [...currentTaskIds, newTaskId])
+      } catch (error) {
+        console.error('更新section的task_ids失败:', error)
+        toast.error(t('errorCreatingFolder'), {
+          description: `更新section失败: ${error.message}`
+        })
+        setIsCreatingFolder(false)
+        // 继续执行，至少创建文件夹记录
+      }
       
       // 5. Create folder record
       const { data, error } = await supabase
@@ -708,18 +753,14 @@ export default function TaskFile({ taskId, teamId }) {
       setNewFolderName('')
       setShowNewFolderDialog(false)
       
-      toast({
-        title: t('folderCreated'),
-        description: t('folderCreatedSuccessfully'),
-        variant: 'default'
-      })
+      toast.success(t('folderCreated'), {
+        description: t('folderCreatedSuccessfully')
+      });
     } catch (error) {
       console.error('Error creating folder:', error)
-      toast({
-        title: t('errorCreatingFolder'),
-        description: error.message,
-        variant: 'destructive'
-      })
+      toast.error(t('errorCreatingFolder'), {
+        description: error.message
+      });
     } finally {
       setIsCreatingFolder(false)
     }
@@ -846,18 +887,14 @@ export default function TaskFile({ taskId, teamId }) {
       setFiles(files.filter(file => !selectedFiles.includes(file.id)))
       setSelectedFiles([])
       
-      toast({
-        title: t('itemsDeleted'),
-        description: t('selectedItemsDeleted'),
-        variant: 'default'
-      })
+      toast.success(t('itemsDeleted'), {
+        description: t('selectedItemsDeleted')
+      });
     } catch (error) {
       console.error('Error deleting items:', error)
-      toast({
-        title: t('errorDeletingItems'),
-        description: error.message,
-        variant: 'destructive'
-      })
+      toast.error(t('errorDeletingItems'), {
+        description: error.message
+      });
     }
   }
   
@@ -973,10 +1010,7 @@ export default function TaskFile({ taskId, teamId }) {
       const onConfirm = async () => {
         // 如果是文件夹删除，显示正在删除内容的提示
         if (isFolder) {
-          toast({
-            title: t('deletingFolderContents'),
-            variant: 'default'
-          });
+          toast.loading(t('deletingFolderContents'));
         }
         
         await handleDeleteSelected();
@@ -1022,11 +1056,9 @@ export default function TaskFile({ taskId, teamId }) {
       window.open(fileUrl, '_blank')
     } catch (error) {
       console.error('Error opening file preview:', error)
-      toast({
-        title: t('errorPreviewingFile'),
-        description: error.message,
-        variant: 'destructive'
-      })
+      toast.error(t('errorPreviewingFile'), {
+        description: error.message
+      });
     }
   }
   
@@ -1036,11 +1068,9 @@ export default function TaskFile({ taskId, teamId }) {
       // If file URL exists, use directly
       if (file.file_url) {
         // Set downloading prompt
-        toast({
-          title: t('downloadStarted'),
-          description: t('downloadingFile'),
-          variant: 'default'
-        })
+        toast.loading(t('downloadStarted'), {
+          description: t('downloadingFile')
+        });
         
         // Get file content from URL
         const response = await fetch(file.file_url)
@@ -1066,21 +1096,17 @@ export default function TaskFile({ taskId, teamId }) {
         window.URL.revokeObjectURL(blobUrl)
         document.body.removeChild(a)
         
-        toast({
-          title: t('downloadCompleted'),
-          description: t('fileDownloadedSuccessfully'),
-          variant: 'default'
-        })
+        toast.success(t('downloadCompleted'), {
+          description: t('fileDownloadedSuccessfully')
+        });
       } else {
         throw new Error('File URL does not exist')
       }
     } catch (error) {
       console.error('Error downloading file:', error)
-      toast({
-        title: t('errorDownloadingFile'),
-        description: error.message,
-        variant: 'destructive'
-      })
+      toast.error(t('errorDownloadingFile'), {
+        description: error.message
+      });
     }
   }
 
@@ -1124,21 +1150,17 @@ export default function TaskFile({ taskId, teamId }) {
       // 更新UI
       setFiles(files.filter(f => f.id !== file.id))
       
-      toast({
-        title: t('fileMoved'),
-        description: t('fileMovedToParentFolder'),
-        variant: 'default'
-      })
+      toast.success(t('fileMoved'), {
+        description: t('fileMovedToParentFolder')
+      });
       
       // 刷新文件列表
       fetchFiles()
     } catch (error) {
       console.error('Error moving file to parent folder:', error)
-      toast({
-        title: t('errorMovingFile'),
-        description: error.message,
-        variant: 'destructive'
-      })
+      toast.error(t('errorMovingFile'), {
+        description: error.message
+      });
     }
   }
 
@@ -1177,7 +1199,7 @@ export default function TaskFile({ taskId, teamId }) {
           {currentPath !== '/' && (
             <Button 
               variant="ghost" 
-              className="gap-1 text-gray-800 hover:text-black hover:font-medium transition-colors"
+              className="gap-1 text-muted-foreground transition-colors"
               onClick={navigateBack}
             >
               <ChevronDown className="h-4 w-4 mr-1 rotate-90" />
@@ -1280,18 +1302,12 @@ export default function TaskFile({ taskId, teamId }) {
                       }
                     } else if (selectedFiles.length > 1) {
                       // 多文件选择的情况
-                      toast({
-                        title: t('shareError'),
-                        description: t('selectOnlyOneFileToShare'),
-                        variant: 'destructive'
+                      toast.error(t('shareError'), {
+                        description: t('selectOnlyOneFileToShare')
                       });
                     } else {
                       // 没有选择文件的情况
-                      toast({
-                        title: t('shareError'),
-                        description: t('selectFileToShare'),
-                        variant: 'destructive'
-                      });
+                      toast.error(t('selectFileToShare') || '请选择要分享的文件');
                     }
                   }}
                 >
@@ -1388,7 +1404,12 @@ export default function TaskFile({ taskId, teamId }) {
       )}
       
       {/* New Folder Dialog */}
-      <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>
+      <Dialog open={showNewFolderDialog} onOpenChange={(open) => {
+        setShowNewFolderDialog(open);
+        if (!open) {
+          setNewFolderName(''); // 在对话框关闭时重置名称
+        }
+      }}>
         <DialogContent className="sm:max-w-md"
          onPointerDownOutside={(e) => e.preventDefault()}
          onEscapeKeyDown={(e) => e.preventDefault()}>
@@ -1402,18 +1423,29 @@ export default function TaskFile({ taskId, teamId }) {
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               className="col-span-3"
+              minLength={2}
+              maxLength={100}
             />
+            <span className="text-xs text-gray-500 text-right">{newFolderName.trim().length}/100</span>
           </div>
           <DialogFooter>
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => setShowNewFolderDialog(false)}
+              onClick={() => {
+                setShowNewFolderDialog(false);
+                setNewFolderName(''); // 点击取消时重置名称
+              }}
               disabled={isCreatingFolder}
             >
               {t('cancel')}
             </Button>
-            <Button type="button" variant={themeColor} onClick={createNewFolder} disabled={isCreatingFolder}>
+            <Button 
+              type="button" 
+              variant={themeColor} 
+              onClick={createNewFolder} 
+              disabled={isCreatingFolder || !newFolderName.trim() || newFolderName.trim().length < 2}
+            >
               {isCreatingFolder ? t('creating') : t('create')}
             </Button>
           </DialogFooter>

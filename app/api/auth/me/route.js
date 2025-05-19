@@ -1,9 +1,25 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/auth';
+import { cookies } from 'next/headers';
 
 export async function GET() {
   try {
     const userData = await getCurrentUser();
+    
+    // Check if token exists but is invalid
+    const token = (await cookies()).get('auth_token')?.value;
+    
+    if (token && !userData) {
+      // If there's a token but no user data, it's likely an expired or invalid token
+      return NextResponse.json(
+        { 
+          error: 'Unauthorized', 
+          code: 'TOKEN_EXPIRED',
+          message: 'Your session has expired. Please login again.'
+        },
+        { status: 401 }
+      );
+    }
     
     if (!userData) {
       return NextResponse.json(

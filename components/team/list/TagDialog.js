@@ -1,3 +1,4 @@
+//todo- prevent duplicate tag name with the default tag
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -19,7 +20,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { createTag, fetchAllTags } from '@/lib/redux/features/tagSlice'
 import { updateTagIds, getTags } from '@/lib/redux/features/teamCFSlice'
 import { useGetUser } from '@/lib/hooks/useGetUser';
-import { Plus, Text, Calendar, User, Sigma, Fingerprint, SquareCheck, CircleCheck, Hash, ClipboardList, Clock3, Tag, Pen, Timer } from 'lucide-react'
+import { Plus, Text, Calendar, User, Sigma, Fingerprint, SquareCheck, CircleCheck, Hash, ClipboardList, Clock3, Tag, Pen, Timer, File } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { fetchProjectById } from '@/lib/redux/features/projectSlice'
 import { createTagValidationSchema, tagFormTransforms } from '@/components/validation/tagSchema'
@@ -32,7 +33,7 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [showDescription, setShowDescription] = useState(false)
     const { user } = useGetUser();
-    const [tagTypes, setTagTypes] = useState(['TEXT', 'NUMBER', 'ID', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TAGS'])
+    const [tagTypes, setTagTypes] = useState(['TEXT', 'NUMBER', 'ID', 'SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TAGS', 'FILE'])
     const [themeColor, setThemeColor] = useState('#64748b')
     const project = useSelector(state => 
       state.projects.projects.find(p => String(p.id) === String(projectId))
@@ -132,7 +133,8 @@ export default function CreateTagDialog({ isOpen, onClose, projectId, teamId, te
             'MULTI-SELECT': <SquareCheck className="w-4 h-4 mr-2 text-gray-500" />,
             'DATE': <Calendar className="w-4 h-4 mr-2 text-gray-500" />,
             'PEOPLE': <User className="w-4 h-4 mr-2 text-gray-500" />,
-            'TAGS': <Tag className="w-4 h-4 mr-2 text-gray-500" />
+            'TAGS': <Tag className="w-4 h-4 mr-2 text-gray-500" />,
+            'FILE': <File className="w-4 h-4 mr-2 text-gray-500" />
         }
         return iconMap[type] || null
     }

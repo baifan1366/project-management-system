@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { clsx } from 'clsx';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
+import { toast } from 'sonner';
 
 export default function AdminSubscriptions() {
   const router = useRouter();
@@ -20,27 +21,29 @@ export default function AdminSubscriptions() {
   const [isPlanSelected, setIsPlanSelected] = useState(null);
   const [planName, setPlanName] = useState('');
   const [planType, setPlanType] = useState('');
-  const [planPrice, setPrice] = useState('');
+  const [planPrice, setPlanPrice] = useState('0');
   const [planBilling, setPlanBilling] = useState('');
   const [description, setDescription] = useState('');
-  const [planFeatures, setPlanFeatures] = useState('');
   const [planActiveUsers, setPlanActiveUsers] = useState('');
-  const [planMaxMembers, setPlanMaxMembers] = useState('');
-  const [planMaxProjects, setPlanMaxProjects] = useState('');
-  const [planMaxStorage, setPlanMaxStorage] = useState('');
-  const [planIsActive, setPlanIsActive] = useState('');
+  const [planMaxMembers, setPlanMaxMembers] = useState('0');
+  const [planMaxProjects, setPlanMaxProjects] = useState('0');
+  const [planMaxStorage, setPlanMaxStorage] = useState('0');
+  const [planMaxAiChat, setPlanMaxAiChat] = useState('0');
+  const [planMaxAiTask, setPlanMaxAiTask] = useState('0');
+  const [planMaxAiWorkflow, setPlanMaxAiWorkflow] = useState('0');
+  const [planIsActive, setPlanIsActive] = useState('true');
   const [currentModalPage, setCurrentModalPage] = useState(1);
   const [features, setFeatures] = useState([]);
   const [newFeature, setNewFeature] = useState('');
   const [activeTab, setActiveTab] = useState("subscriptionPlans");
   const [promoCodes, setPromoCodes] = useState([]);
   const [isCodeSelected, setIsCodeSelected] = useState(null);
+  const [isUserSubscriptionPlanSelected, setIsUserSubscriptionPlanSelected] = useState(null);
   const [codeName, setCodeName] = useState('');
   const [codeType, setCodeType] = useState('');
   const [codeValue, setCodeValue] = useState('');
   const [codeDescription, setCodeDescription] = useState('');
   const [codeIsActive, setCodeIsActive] = useState('true');
-  const [modalFor, setModalFor] = useState(null);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]);
   const [maxUses, setMaxUses] = useState('100');
@@ -57,8 +60,15 @@ export default function AdminSubscriptions() {
   const permissions = useSelector((state) => state.admin.permissions);
   const [userSubscriptions, setUserSubscriptions] = useState([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('all');
+  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('ALL');
   const [planTypeFilter, setPlanTypeFilter] = useState('all');
+  const [isUserSubscriptionDetailsModalOpen, setIsUserSubscriptionDetailsModalOpen] = useState(false);
+  const [selectedSubscriptionDetails, setSelectedSubscriptionDetails] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [isCodeToDelete, setIsCodeToDelete] = useState(null);
+  const [planMaxTeams, setPlanMaxTeams] = useState('0');
+  const [isPlanToDelete, setIsPlanToDelete] = useState(null);
   
   // initialize the page
   useEffect(() => {
@@ -136,7 +146,7 @@ export default function AdminSubscriptions() {
         .order('created_at', { ascending: false });
       
       // Apply filters if they are set
-      if (subscriptionStatusFilter !== 'all') {
+      if (subscriptionStatusFilter !== 'ALL') {
         query = query.eq('status', subscriptionStatusFilter);
       }
       
@@ -193,17 +203,10 @@ export default function AdminSubscriptions() {
     setIsCodeSelected(code);
     setCurrentModalPage(1);
     
-    // Set modalFor based on current activeTab or object type
-    if (type === 'add') {
-      setModalFor(activeTab === "promoCodes" ? "promoCode" : "subscriptionPlan");
-    } else if (type === 'edit') {
-      setModalFor(plan ? "subscriptionPlan" : "promoCode");
-    }
-    
     if (type === 'edit' && plan) {
       setPlanName(plan.name || '');
       setPlanType(plan.type || '');
-      setPrice(plan.price || 0);
+      setPlanPrice(plan.price || '0');
       setPlanBilling(plan.billing_interval || '');
       setDescription(plan.description || '');
 
@@ -212,9 +215,16 @@ export default function AdminSubscriptions() {
       setFeatures(featuresArray);
 
       setPlanActiveUsers(plan.active_users || '');
-      setPlanMaxMembers(plan.max_members || '');
-      setPlanMaxProjects(plan.max_projects || '');
-      setPlanMaxStorage(plan.storage_limit || '');
+      setPlanMaxMembers(plan.max_members || '0');
+      setPlanMaxProjects(plan.max_projects || '0');
+      setPlanMaxTeams(plan.max_teams || '0');
+      setPlanMaxAiChat(plan.max_ai_chat || '0');
+      setPlanMaxAiTask(plan.max_ai_task || '0');
+      setPlanMaxAiWorkflow(plan.max_ai_workflow || '0');
+      setPlanMaxStorage(plan.max_storage || '0');
+      setPlanMaxAiChat(plan.max_ai_chat || '0');
+      setPlanMaxAiTask(plan.max_ai_task || '0');
+      setPlanMaxAiWorkflow(plan.max_ai_workflow || '0');
       setPlanIsActive(plan.is_active ? 'true' : 'false');
       
     } else if(type === 'edit' && code){
@@ -239,130 +249,103 @@ export default function AdminSubscriptions() {
     setIsModalOpen(true);
   };
 
+  // Reset form fields
+  const resetFormFields = () => {
+    setPlanName('');
+    setPlanType('');
+    setPlanPrice('0');
+    setPlanBilling('');
+    setDescription('');
+    setFeatures([]);
+    setPlanActiveUsers('');
+    setPlanMaxMembers('0');
+    setPlanMaxProjects('0');
+    setPlanMaxTeams('0');
+    setPlanMaxAiChat('0');
+    setPlanMaxAiTask('0');
+    setPlanMaxAiWorkflow('0');
+    setPlanMaxStorage('0');
+    setPlanIsActive('true');
+    setCurrentModalPage(1);
+  };
+
   // Close modal
   const closeModal = () => {
-    setIsModalOpen(false);
+    resetFormFields();
+    setModalType(null);
     setIsPlanSelected(null);
     setIsCodeSelected(null);
   };
 
-  // Fix the addPromoCode function
-  const addPromoCode = async (codeData) =>{
-    try{
-      setLoading(true);
-
-      const { data, error } = await supabase
-        .from('promo_code')
-        .insert({
-          code: codeData.code,
-          discount_type: codeData.discount_type,
-          discount_value: codeData.discount_value,
-          description: codeData.description,
-          is_active: codeData.is_active,
-          start_date: codeData.start_date,
-          end_date: codeData.end_date,
-          current_uses: 0,
-          max_uses: codeData.max_uses || 0
-        });
-        
-      if(error){
-        console.error('Error in addPromoCode:', error);
-        alert(`Failed to add promo code: ${error.message}`);
-        return false;
-      }
-
-      console.log('Promo code added successfully:', data);
-      
-      await fetchPromoCodes();
-      return true;
-
-    } catch (error) {
-      console.error('Error in addPromoCode:', error);
-      alert('An unexpected error occurred while adding the promo code');
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Update subscription plan
-  const updateSubscriptionPlan = async (planId, planData) => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('subscription_plan')
-        .update(planData)
-        .eq('id', planId);
-        
-      if (error) {
-        console.error('Error updating subscription plan:', error);
-        return;
-      }
-      
-      console.log('Subscription plan updated successfully:', data);
-      
-      // Now fetchSubscriptionPlans is accessible here
-      await fetchSubscriptionPlans();
-      
-    } catch (error) {
-      console.error('Error in updateSubscriptionPlan:', error);
-    } finally {
-      setLoading(false);
-    } 
-  };
-
-  const updatePromoCode = async (codeId, codeData) => {
-    try {
-        setLoading(true);
-        
-        const { data, error } = await supabase
-          .from('promo_code')
-          .update(codeData)
-          .eq('id', codeId);
-          
-        if (error) {
-          console.error('Error updating promo code:', error);
-          return;
-        }
-        
-        console.log('Promo code updated successfully:', data);
-        
-        // Now fetchPromoCodes is accessible here
-        await fetchPromoCodes();
-        
-      } catch (error) {
-        console.error('Error in updatePromoCode:', error);
-      } finally {
-        setLoading(false);
-      } 
-  }
   // deactivate or activate subscription plan and promo code
   const toggleActive = async (id, isActive, type) => {
     try {
       setLoading(true);
       
       if(type === 'subscription_plan'){
+        // First get the plan name
+        const { data: planData, error: planError } = await supabase
+          .from('subscription_plan')
+          .select('name')
+          .eq('id', id)
+          .single();
+          
+        if (planError) {
+          console.error('Error getting plan details:', planError);
+        }
+        
+        const planName = planData?.name || 'Plan';
+        
         const { data, error } = await supabase
           .from('subscription_plan')
           .update({ is_active: isActive })
           .eq('id', id);
 
-      if (error) {
-        console.error('Error in toggleActive:', error);
-      }
+        if (error) {
+          console.error('Error in toggleActive:', error);
+          toast.error(`Failed to update ${planName} status`, {
+            description: error.message
+          });
+          return;
+        }
+        
+        toast.success(`${planName} plan ${isActive ? 'activated' : 'deactivated'} successfully`);
 
       } else if(type === 'promo_code'){
+        // First get the code name
+        const { data: codeData, error: codeError } = await supabase
+          .from('promo_code')
+          .select('code')
+          .eq('id', id)
+          .single();
+          
+        if (codeError) {
+          console.error('Error getting promo code details:', codeError);
+        }
+        
+        const codeName = codeData?.code || 'Promo code';
+        
         const { data, error } = await supabase
           .from('promo_code')
           .update({ is_active: isActive })
           .eq('id', id);
+          
+        if (error) {
+          console.error('Error in toggleActive:', error);
+          toast.error(`Failed to update ${codeName} status`, {
+            description: error.message
+          });
+          return;
+        }
+        
+        toast.success(`Promo code "${codeName}" ${isActive ? 'activated' : 'deactivated'} successfully`);
       }
 
       await fetchSubscriptionPlans();
       await fetchPromoCodes();
     } catch (error) {
       console.error('Error in toggleActive:', error);
+      toast.error('An error occurred while updating status');
     } finally {
       setLoading(false);
     }
@@ -417,36 +400,40 @@ export default function AdminSubscriptions() {
     setFeatures(updatedFeatures);
   };
 
-  const deletePromoCode = async (codeId) => {
+  const deletePromoCode = async () => {
     try {
-      // Confirm deletion
-      if (!confirm('Are you sure you want to delete this promo code?')) {
+      if (deleteConfirmation !== isCodeToDelete.code) {
+        toast.error('Please type the promo code correctly to confirm deletion');
         return;
       }
+
+      setProcessing(true);
       
-      setLoading(true);
-      
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('promo_code')
         .delete()
-        .eq('id', codeId);
+        .eq('id', isCodeToDelete.id);
         
       if (error) {
         console.error('Error deleting promo code:', error);
-        alert(`Failed to delete promo code: ${error.message}`);
+        toast.error(`Failed to delete ${isCodeToDelete.code}`, {
+          description: error.message
+        });
         return;
       }
       
       console.log('Promo code deleted successfully');
+      toast.success(`Promo code "${isCodeToDelete.code}" deleted successfully`);
       
       // Refresh the promo codes list
       await fetchPromoCodes();
+      closeModal();
       
     } catch (error) {
       console.error('Error in deletePromoCode:', error);
-      alert('An unexpected error occurred while deleting the promo code');
+      toast.error('An unexpected error occurred while deleting the promo code');
     } finally {
-      setLoading(false);
+      setProcessing(false);
     }
   };
 
@@ -521,13 +508,14 @@ export default function AdminSubscriptions() {
     }
   }, [activeTab, paymentStatusFilter, paymentSearchQuery, currentPaymentPage]);
 
-  // 添加一个导出CSV功能
+  // Add toast for exporting csv
   const exportPaymentsToCSV = async () => {
     try {
-      // 显示加载状态
+      // Show loading toast
+      const loadingToast = toast.loading('Preparing payment history export...');
       setIsPaymentLoading(true);
       
-      // 获取所有支付记录，不分页
+      // Get all payment records, not paginated
       const { data, error } = await supabase
         .from('payment')
         .select(`
@@ -540,7 +528,7 @@ export default function AdminSubscriptions() {
         throw error;
       }
       
-      // 格式化数据
+      // Format data
       const formattedData = data.map(payment => ({
         'User Name': payment.user?.name || 'Unknown',
         'User Email': payment.user?.email || 'No email',
@@ -554,7 +542,7 @@ export default function AdminSubscriptions() {
         'Promo Code': payment.applied_promo_code || 'None'
       }));
       
-      // 创建CSV内容
+      // Create CSV content
       const headers = Object.keys(formattedData[0]).join(',');
       const csvRows = formattedData.map(row => 
         Object.values(row).map(value => 
@@ -563,20 +551,30 @@ export default function AdminSubscriptions() {
       );
       
       const csvContent = [headers, ...csvRows].join('\n');
+      const fileName = `payment_history_${new Date().toISOString().split('T')[0]}.csv`;
       
-      // 创建Blob和下载链接
+      // Create Blob and download link
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `payment_history_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', fileName);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
+      // Dismiss loading toast and show success toast
+      toast.dismiss(loadingToast);
+      toast.success(`Payment history exported to ${fileName}`, {
+        description: `${data.length} records exported successfully`
+      });
+      
     } catch (error) {
       console.error('Error exporting payments:', error);
+      toast.error('Error exporting payment data', {
+        description: error.message
+      });
       setPaymentError('An error occurred while exporting payment history.');
     } finally {
       setIsPaymentLoading(false);
@@ -597,12 +595,289 @@ export default function AdminSubscriptions() {
     }
   }, [activeTab, userSearchQuery, subscriptionStatusFilter, planTypeFilter]);
 
+  // Open subscription details modal function (add after parseFeatures function)
+  const openSubscriptionDetailsModal = (subscription) => {
+    setSelectedSubscriptionDetails(subscription);
+    setIsUserSubscriptionDetailsModalOpen(true);
+  };
+
+  // Close subscription details modal
+  const closeSubscriptionDetailsModal = () => {
+    setIsUserSubscriptionDetailsModalOpen(false);
+    setSelectedSubscriptionDetails(null);
+  };
+
+  // Update subscription plan
+  const updateSubscriptionPlan = async (planId, planData) => {
+    try {
+      setProcessing(true);
+      const { data, error } = await supabase
+        .from('subscription_plan')
+        .update(planData)
+        .eq('id', planId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating subscription plan:', error);
+        toast.error(error.message || 'Failed to update subscription plan');
+        return;
+      }
+
+      await fetchSubscriptionPlans();
+      resetFormFields();
+      closeModal();
+      toast.success('Subscription plan updated successfully');
+    } catch (error) {
+      console.error('Error updating subscription plan:', error);
+      toast.error(error.message || 'Failed to update subscription plan');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const updatePromoCode = async (codeId, codeData) => {
+    try {
+        setLoading(true);
+        
+        const { data, error } = await supabase
+          .from('promo_code')
+          .update(codeData)
+          .eq('id', codeId);
+          
+        if (error) {
+          console.error('Error updating promo code:', error);
+          toast.error(`Failed to update promo code "${codeData.code}"`, {
+            description: error.message
+          });
+          return;
+        }
+        
+        console.log('Promo code updated successfully:', data);
+        toast.success(`Promo code "${codeData.code}" updated successfully`);
+        
+        // Now fetchPromoCodes is accessible here
+        await fetchPromoCodes();
+        
+      } catch (error) {
+        console.error('Error in updatePromoCode:', error);
+        toast.error('An error occurred while updating the promo code');
+      } finally {
+        setLoading(false);
+      } 
+  }
+
+  // Fix the addPromoCode function
+  const addPromoCode = async (codeData) =>{
+    try{
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('promo_code')
+        .insert({
+          code: codeData.code,
+          discount_type: codeData.discount_type,
+          discount_value: codeData.discount_value,
+          description: codeData.description,
+          is_active: codeData.is_active,
+          start_date: codeData.start_date,
+          end_date: codeData.end_date,
+          current_uses: 0,
+          max_uses: codeData.max_uses || 0
+        });
+        
+      if(error){
+        console.error('Error in addPromoCode:', error);
+        toast.error(`Failed to add promo code "${codeData.code}"`, {
+          description: error.message
+        });
+        return false;
+      }
+
+      console.log('Promo code added successfully:', data);
+      toast.success(`Promo code "${codeData.code}" added successfully`);
+      
+      await fetchPromoCodes();
+      return true;
+
+    } catch (error) {
+      console.error('Error in addPromoCode:', error);
+      toast.error('An unexpected error occurred while adding the promo code');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add subscription plan
+  const addSubscriptionPlan = async (planData) => {
+    try {
+      setProcessing(true);
+      const { data, error } = await supabase
+        .from('subscription_plan')
+        .insert([planData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding subscription plan:', error);
+        toast.error(error.message || 'Failed to add subscription plan');
+        return;
+      }
+
+      await fetchSubscriptionPlans();
+      resetFormFields();
+      closeModal();
+      toast.success('Subscription plan added successfully');
+    } catch (error) {
+      console.error('Error adding subscription plan:', error);
+      toast.error(error.message || 'Failed to add subscription plan');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Handle price change
+  const handlePriceChange = (value) => {
+    // Allow empty string and any valid number including 0
+    if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0 && /^\d*\.?\d{0,2}$/.test(value))) {
+      setPlanPrice(value);
+    }
+  };
+
+  const deleteSubscriptionPlan = async () => {
+    if (deleteConfirmation !== isPlanToDelete.name) {
+      toast.error('Please type the plan name correctly to confirm deletion');
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      const { error } = await supabase
+        .from('subscription_plan')
+        .delete()
+        .eq('id', isPlanToDelete.id);
+
+      if (error) {
+        console.error('Error deleting subscription plan:', error);
+        toast.error(error.message || 'Failed to delete subscription plan');
+        return;
+      }
+
+      await fetchSubscriptionPlans();
+      setIsPlanToDelete(null);
+      setDeleteConfirmation('');
+      closeModal();
+      toast.success('Subscription plan deleted successfully');
+    } catch (error) {
+      console.error('Error deleting subscription plan:', error);
+      toast.error(error.message || 'Failed to delete subscription plan');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading subscription management...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {/* Skeleton Tabs */}
+          <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+            <ul className="flex flex-wrap -mb-px">
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  Subscription Plans
+                </div>
+              </li>
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  Promo Codes
+                </div>
+              </li>
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  User Subscriptions
+                </div>
+              </li>
+              <li className="mr-2">
+                <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
+                  Payment History
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          {/* Subscription Plans Skeleton */}
+          <div>
+            <div className="mb-6 flex justify-between items-center">
+              <div className="h-7 w-56 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-8">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((item) => (
+                        <th key={item} scope="col" className="px-6 py-3 text-left">
+                          <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {[1, 2, 3, 4, 5].map((row) => (
+                      <tr key={row}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                          <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((feat) => (
+                              <div key={feat} className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((limit) => (
+                              <div key={limit} className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex justify-end space-x-3">
+                            {[1, 2].map((action) => (
+                              <div key={action} className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          
         </div>
       </div>
     );
@@ -667,10 +942,19 @@ export default function AdminSubscriptions() {
           </div>
           
           {/* Subscription Plans Section */}
-          { hasPermission('view_subscription_plans') && activeTab === "subscriptionPlans" && (
+          {hasPermission('view_subscription_plans') && activeTab === "subscriptionPlans" && (
             <div>
               <div className="mb-6 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Subscription Plans</h3>
+                {hasPermission('add_sub_plans') && (
+                  <button
+                    onClick={() => openModal({ type: 'add' })}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm flex items-center space-x-2"
+                  >
+                    <FaPlus className="h-4 w-4" />
+                    <span>Add New Plan</span>
+                  </button>
+                )}
               </div>
               
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-8">
@@ -739,11 +1023,12 @@ export default function AdminSubscriptions() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-xs text-gray-500 dark:text-gray-400">
-                              <div>Projects: {plan.max_projects === -1 ? 'Unlimited' : plan.max_projects}</div>
-                              <div>Members: {plan.max_members === -1 ? 'Unlimited' : plan.max_members}</div>
-                              <div>AI Chat: {plan.max_ai_chat === -1 ? 'Unlimited' : plan.max_ai_chat}</div>
-                              <div>AI Task: {plan.max_ai_task === -1 ? 'Unlimited' : plan.max_ai_task}</div>
-                              <div>AI Workflow: {plan.max_ai_workflow === -1 ? 'Unlimited' : plan.max_ai_workflow}</div>
+                              <div>Projects: {plan.max_projects === 0 ? 'Unlimited' : plan.max_projects}</div>
+                              <div>Members: {plan.max_members === 0 ? 'Unlimited' : plan.max_members}</div>
+                              <div>AI Chat: {plan.max_ai_chat === 0 ? 'Unlimited' : plan.max_ai_chat}</div>
+                              <div>AI Task: {plan.max_ai_task === 0 ? 'Unlimited' : plan.max_ai_task}</div>
+                              <div>AI Workflow: {plan.max_ai_workflow === 0 ? 'Unlimited' : plan.max_ai_workflow}</div>
+                              <div>Storage: {plan.max_storage === 0 ? 'Unlimited' : plan.max_storage} GB</div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -783,6 +1068,19 @@ export default function AdminSubscriptions() {
                                 {plan.is_active ? <FaToggleOn /> : <FaToggleOff />}
                               </button>
                               )}
+                              {/* delete button */}
+                              {hasPermission('delete_sub_plans') && (
+                              <button
+                                onClick={() => {
+                                  setIsPlanToDelete(plan);
+                                  setModalType('delete');
+                                  setIsModalOpen(true);
+                                }}
+                                className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                              >
+                                <FaTrash />
+                              </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -803,7 +1101,7 @@ export default function AdminSubscriptions() {
                 <div className="flex space-x-2">
                   {hasPermission('add_promo_codes') && (
                   <button 
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg flex items-center"
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm flex items-center space-x-2"
                     onClick={() => openModal({type: 'add'})}
                   >
                     <FaPlus className="mr-2" />
@@ -813,6 +1111,7 @@ export default function AdminSubscriptions() {
                 </div>
               </div>
               
+              {/* Promo Codes Table */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -898,7 +1197,11 @@ export default function AdminSubscriptions() {
                               {/* delete button */}
                               {hasPermission('delete_promo_codes') && (
                               <button
-                                onClick={() => deletePromoCode(code.id)}
+                                onClick={() => {
+                                  setIsCodeToDelete(code);
+                                  setModalType('delete');
+                                  setIsModalOpen(true);
+                                }}
                                 className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                               >
                                 <FaTrash />
@@ -1000,11 +1303,15 @@ export default function AdminSubscriptions() {
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {userSubscriptions.map((subscription) => {
                           return (
-                            <tr key={subscription.id} className={subscription.status !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
+                            <tr 
+                              key={subscription.id} 
+                              className={`${subscription.status.toUpperCase() !== 'ACTIVE' ? 'bg-gray-50 dark:bg-gray-900/50' : ''} cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700`}
+                              onClick={() => openSubscriptionDetailsModal(subscription)}
+                            >
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
-                                  <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-3">
-                                    {subscription.user?.name?.charAt(0).toUpperCase() || subscription.user?.email?.charAt(0).toUpperCase() || 'U'}
+                                  <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
+                                    {(subscription.user?.name?.charAt(0) || subscription.user?.email?.charAt(0) || '?').toUpperCase()}
                                   </div>
                                   <div>
                                     <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -1139,26 +1446,15 @@ export default function AdminSubscriptions() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
                                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                    ${subscription.status === 'ACTIVE' 
+                                    ${subscription.status.toUpperCase() === 'ACTIVE' 
                                       ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
-                                      : subscription.status === 'CANCELED'
+                                      : subscription.status.toUpperCase() === 'CANCELED'
                                       ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
                                       : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
                                     }`}
                                   >
-                                    {subscription.status}
+                                    {subscription.status.toUpperCase()}
                                   </span>
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  {subscription.auto_renew ? (
-                                    <span className="text-green-600 dark:text-green-400">
-                                      <FaCheck className="inline mr-1" /> Auto-renew
-                                    </span>
-                                  ) : (
-                                    <span className="text-red-600 dark:text-red-400">
-                                      <FaTimes className="inline mr-1" /> No renewal
-                                    </span>
-                                  )}
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1166,22 +1462,75 @@ export default function AdminSubscriptions() {
                                   <button 
                                     className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                                     title="Edit subscription"
+                                    onClick={() => {
+                                      setIsUserSubscriptionPlanSelected(subscription);
+                                      setIsModalOpen(true);
+                                      setModalType('edit');
+                                    }}
                                   >
                                     <FaEdit />
                                   </button>
-                                  {subscription.status === 'ACTIVE' ? (
+                                  {subscription.status.toUpperCase() === 'ACTIVE' ? (
                                     <button 
-                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                      onClick={() => {
+                                          // Update subscription status to CANCELED
+                                          supabase
+                                            .from('user_subscription_plan')
+                                            .update({ 
+                                              status: 'CANCELED',
+                                              updated_at: new Date().toISOString()
+                                            })
+                                            .eq('id', subscription.id)
+                                            .then(({error}) => {
+                                              if(error) {
+                                                console.error('Error canceling subscription:', error);
+                                                toast.error(`Failed to cancel subscription for "${subscription.user?.name || 'user'}"`, {
+                                                  description: error.message
+                                                });
+                                              } else {
+                                                toast.success(`Subscription for "${subscription.user?.name || 'user'}" canceled successfully`);
+                                                fetchUserSubscriptions();
+                                              }
+                                            });
+                                      }}
+                                      className={clsx(
+                                        'text-2xl transition-colors duration-200',
+                                        'text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300'
+                                      )}
                                       title="Cancel subscription"
                                     >
-                                      <FaTimes />
+                                      <FaToggleOn />
                                     </button>
                                   ) : (
                                     <button 
-                                      className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+                                      onClick={() => {
+                                          // Update subscription status to ACTIVE
+                                          supabase
+                                            .from('user_subscription_plan')
+                                            .update({ 
+                                              status: 'ACTIVE',
+                                              updated_at: new Date().toISOString() 
+                                            })
+                                            .eq('id', subscription.id)
+                                            .then(({error}) => {
+                                              if(error) {
+                                                console.error('Error reactivating subscription:', error);
+                                                toast.error(`Failed to reactivate subscription for "${subscription.user?.name || 'user'}"`, {
+                                                  description: error.message
+                                                });
+                                              } else {
+                                                toast.success(`Subscription for "${subscription.user?.name || 'user'}" reactivated successfully`);
+                                                fetchUserSubscriptions();
+                                              }
+                                            });
+                                      }}
+                                      className={clsx(
+                                        'text-2xl transition-colors duration-200',
+                                        'text-gray-400 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-500'
+                                      )}
                                       title="Reactivate subscription"
                                     >
-                                      <FaCheck />
+                                      <FaToggleOff />
                                     </button>
                                   )}
                                 </div>
@@ -1535,6 +1884,423 @@ export default function AdminSubscriptions() {
       </div>
 
       {/* SUBSCRIPTION MODALS */}
+      {/*TODO: add subscription plan modal*/}
+      {isModalOpen && modalType === 'add' && activeTab === "subscriptionPlans" && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+                Add New Subscription Plan
+              </h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              
+              // Validate required fields
+              if (!planName || !planType || !planBilling) {
+                toast.error('Please fill in all required fields');
+                return;
+              }
+
+              const price = parseFloat(planPrice);
+              if (isNaN(price)) {
+                toast.error('Please enter a valid price');
+                return;
+              }
+              
+              const planData = {
+                name: planName,
+                type: planType,
+                price: price,
+                billing_interval: planBilling,
+                description: description || '',
+                features: { features: features },
+                max_members: parseInt(planMaxMembers) || 0,
+                max_projects: parseInt(planMaxProjects) || 0,
+                max_teams: parseInt(planMaxTeams) || 0,
+                max_ai_chat: parseInt(planMaxAiChat) || 0,
+                max_ai_task: parseInt(planMaxAiTask) || 0,
+                max_ai_workflow: parseInt(planMaxAiWorkflow) || 0,
+                max_storage: parseInt(planMaxStorage) || 0,
+                is_active: planIsActive === 'true',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              
+              // Add subscription plan logic
+              addSubscriptionPlan(planData);
+            }}>
+              {currentModalPage === 1 ? (
+                // Page 1: Basic Information
+                <div className='space-y-4'>
+                  <div>
+                    <label htmlFor='add-name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Plan Name
+                    </label>
+                    <input
+                      type='text'
+                      id='add-name'
+                      name='name'
+                      required
+                      value={planName}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter plan name'
+                      onChange={(e) => setPlanName(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor='add-type' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Plan Type
+                    </label>
+                    <select
+                      id='add-type'
+                      name='type'
+                      required
+                      value={planType}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      onChange={(e) => setPlanType(e.target.value)}
+                    >
+                      <option value=''>Select plan type</option>
+                      <option value='FREE'>Free</option>
+                      <option value='PRO'>Pro</option>
+                      <option value='ENTERPRISE'>Enterprise</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label htmlFor='add-price' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Price
+                    </label>
+                    <input
+                      type='number'
+                      id='add-price'
+                      name='price'
+                      required
+                      min='0'
+                      step='0.01'
+                      value={planPrice}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter price (e.g. 9.99)'
+                      onChange={(e) => handlePriceChange(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor='add-billing' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Billing Interval
+                    </label>
+                    <select
+                      id='add-billing'
+                      name='billing_interval'
+                      required
+                      value={planBilling}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      onChange={(e) => setPlanBilling(e.target.value)}
+                    >
+                      <option value=''>Select billing interval</option>
+                      <option value='MONTHLY'>Monthly</option>
+                      <option value='YEARLY'>Yearly</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label htmlFor='add-description' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Description
+                    </label>
+                    <textarea
+                      id='add-description'
+                      name='description'
+                      rows='3'
+                      value={description}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter plan description'
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                // Page 2: Technical Details
+                <div className='space-y-4'>
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Features for Display
+                    </label>
+                    
+                    {/* Features List */}
+                    <div className='space-y-2 mb-2 border border-gray-300 dark:border-gray-500 rounded-md p-4'>
+                      {features.map((feature, index) => (
+                        <div key={index} className='flex items-center justify-between space-x-2 p-2 border border-gray-200 dark:border-gray-700 rounded'>
+                          <div className='flex-1'>
+                            <p className='text-sm text-gray-800 dark:text-gray-200'>{feature}</p>
+                          </div>
+                          <div className='flex items-center space-x-2'>
+                            <button
+                              type='button'
+                              onClick={() => handleRemoveFeature(index)}
+                              className='text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300'
+                            >
+                              <FaTrash className='h-4 w-4' />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {features.length === 0 && (
+                        <p className='text-sm text-gray-500 dark:text-gray-400 text-center py-2'>
+                          No features added yet
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Add New Feature Form */}
+                    <div className='flex items-center space-x-2 mb-2'>
+                      <input
+                        type='text'
+                        value={newFeature}
+                        onChange={(e) => setNewFeature(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddFeature();
+                          }
+                        }}
+                        className='flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm'
+                        placeholder='Type a feature and press Enter or click Add'
+                      />
+                      <button
+                        type='button'
+                        onClick={handleAddFeature}
+                        disabled={!newFeature.trim()}
+                        className={`px-4 py-2 text-white rounded-md text-sm flex items-center ${
+                          !newFeature.trim() 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-indigo-600 hover:bg-indigo-700'
+                        }`}
+                      >
+                        <FaPlus className='h-4 w-4' />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label htmlFor='add-max-teams' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max Teams
+                    </label>
+                    <input
+                      type='number'
+                      id='add-max-teams'
+                      name='max_teams'
+                      required
+                      min='0'
+                      value={planMaxTeams}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max teams (0 for unlimited)'
+                      onChange={(e) => setPlanMaxTeams(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor='add-max-members' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max Members
+                    </label>
+                    <input
+                      type='number'
+                      id='add-max-members'
+                      name='max_members'
+                      required
+                      min='0'
+                      value={planMaxMembers}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max members (0 for unlimited)'
+                      onChange={(e) => setPlanMaxMembers(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor='add-max-projects' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max Projects
+                    </label>
+                    <input
+                      type='number'
+                      id='add-max-projects'
+                      name='max_projects'
+                      required
+                      min='-1'
+                      value={planMaxProjects}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max projects (-1 for unlimited)'
+                      onChange={(e) => setPlanMaxProjects(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor='add-max-storage' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max Storage (GB)
+                    </label>
+                    <input
+                      type='number'
+                      id='add-max-storage'
+                      name='max_storage'
+                      required
+                      min='0'
+                      value={planMaxStorage}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter storage limit in GB'
+                      onChange={(e) => setPlanMaxStorage(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor='add-max-ai-chat' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max AI Chat Messages
+                    </label>
+                    <input
+                      type='number'
+                      id='add-max-ai-chat'
+                      name='max_ai_chat'
+                      required
+                      min='-1'
+                      value={planMaxAiChat}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max AI chat messages (-1 for unlimited)'
+                      onChange={(e) => setPlanMaxAiChat(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor='add-max-ai-task' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max AI Tasks
+                    </label>
+                    <input
+                      type='number'
+                      id='add-max-ai-task'
+                      name='max_ai_task'
+                      required
+                      min='-1'
+                      value={planMaxAiTask}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max AI tasks (-1 for unlimited)'
+                      onChange={(e) => setPlanMaxAiTask(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor='add-max-ai-workflow' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max AI Workflows
+                    </label>
+                    <input
+                      type='number'
+                      id='add-max-ai-workflow'
+                      name='max_ai_workflow'
+                      required
+                      min='-1'
+                      value={planMaxAiWorkflow}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max AI workflows (-1 for unlimited)'
+                      onChange={(e) => setPlanMaxAiWorkflow(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <div className='mt-6 flex justify-between space-x-3'>
+                {currentModalPage === 2 ? (
+                  <>
+                    <button
+                      type='button'
+                      onClick={() => setCurrentModalPage(1)}
+                      className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                        text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    >
+                      Back
+                    </button>
+                    <div className='flex space-x-3'>
+                      <button
+                        type='button'
+                        onClick={closeModal}
+                        className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                          text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type='submit'
+                        onClick={(e) => {
+                          if (newFeature.trim()) {
+                            e.preventDefault(); // 阻止表单提交
+                            toast.error('You have an unsaved feature. Please click the Add button or clear the feature input before saving.', {
+                              duration: 4000, // 显示4秒
+                              description: `Unsaved feature: "${newFeature.trim()}"`,
+                            });
+                            return;
+                          }
+                        }}
+                        className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                          text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                          focus:ring-offset-2 focus:ring-indigo-500'
+                      >
+                        Create Plan
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type='button'
+                      onClick={closeModal}
+                      className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                        text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type='button'
+                      onClick={() => setCurrentModalPage(2)}
+                      className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                        text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                        focus:ring-offset-2 focus:ring-indigo-500'
+                    >
+                      Continue
+                    </button>
+                  </>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/*subscription edit modal*/}
       {isModalOpen && modalType === 'edit' && isPlanSelected && (
         <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
@@ -1553,16 +2319,33 @@ export default function AdminSubscriptions() {
             
             <form onSubmit={(e) => {
               e.preventDefault();
+              
+              // Validate required fields
+              if (!planName || !planType || !planBilling) {
+                toast.error('Please fill in all required fields');
+                return;
+              }
+
+              const price = parseFloat(planPrice);
+              if (isNaN(price)) {
+                toast.error('Please enter a valid price');
+                return;
+              }
+              
               const planData = {
                 name: planName,
                 type: planType,
-                price: parseFloat(planPrice),
+                price: price,
                 billing_interval: planBilling,
                 description: description,
                 features: { features: features },
                 max_members: parseInt(planMaxMembers),
                 max_projects: parseInt(planMaxProjects),
-                storage_limit: parseInt(planMaxStorage),
+                max_teams: parseInt(planMaxTeams),
+                max_ai_chat: parseInt(planMaxAiChat),
+                max_ai_task: parseInt(planMaxAiTask),
+                max_ai_workflow: parseInt(planMaxAiWorkflow),
+                max_storage: parseInt(planMaxStorage),
                 is_active: planIsActive === 'true',
                 updated_at: new Date().toISOString()
               };
@@ -1627,8 +2410,8 @@ export default function AdminSubscriptions() {
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter price'
-                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder='Enter price (e.g. 9.99)'
+                      onChange={(e) => handlePriceChange(e.target.value)}
                     />
                   </div>
                   
@@ -1708,19 +2491,49 @@ export default function AdminSubscriptions() {
                         type='text'
                         value={newFeature}
                         onChange={(e) => setNewFeature(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddFeature();
+                          }
+                        }}
                         className='flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm'
-                        placeholder='Add a new feature'
+                        placeholder='Type a feature and press Enter or click Add'
                       />
                       <button
                         type='button'
                         onClick={handleAddFeature}
-                        className='px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700'
+                        disabled={!newFeature.trim()}
+                        className={`px-4 py-2 text-white rounded-md text-sm flex items-center ${
+                          !newFeature.trim() 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-indigo-600 hover:bg-indigo-700'
+                        }`}
                       >
                         <FaPlus className='h-4 w-4' />
                       </button>
                     </div>
                   </div>
                   
+                  <div>
+                    <label htmlFor='edit-max-teams' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max Teams
+                    </label>
+                    <input
+                      type='number'
+                      id='edit-max-teams'
+                      name='max_teams'
+                      required
+                      min='0'
+                      value={planMaxTeams}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max teams (0 for unlimited)'
+                      onChange={(e) => setPlanMaxTeams(e.target.value)}
+                    />
+                  </div>
+
                   <div>
                     <label htmlFor='edit-max-members' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                       Max Members
@@ -1730,12 +2543,12 @@ export default function AdminSubscriptions() {
                       id='edit-max-members'
                       name='max_members'
                       required
-                      min='-1'
+                      min='0'
                       value={planMaxMembers}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter max members (-1 for unlimited)'
+                      placeholder='Enter max members (0 for unlimited)'
                       onChange={(e) => setPlanMaxMembers(e.target.value)}
                     />
                   </div>
@@ -1759,62 +2572,80 @@ export default function AdminSubscriptions() {
                     />
                   </div>
                   
-                  <div>
-                    <label htmlFor='edit-storage-limit' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Storage Limit (bytes)
+                                    <div>
+                    <label htmlFor='edit-max-storage' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max Storage (GB)
                     </label>
                     <input
                       type='number'
-                      id='edit-storage-limit'
-                      name='storage_limit'
+                      id='edit-max-storage'
+                      name='max_storage'
                       required
                       min='0'
                       value={planMaxStorage}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter storage limit in bytes'
+                      placeholder='Enter storage limit in GB'
                       onChange={(e) => setPlanMaxStorage(e.target.value)}
                     />
                   </div>
-                  
+
                   <div>
-                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Status
+                    <label htmlFor='edit-max-ai-chat' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max AI Chat Messages
                     </label>
-                    <div className='flex items-center space-x-4'>
-                      <label className='inline-flex items-center'>
-                        <input
-                          type='radio'
-                          name='is_active'
-                          value='true'
-                          checked={planIsActive === 'true'}
-                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                          onChange={() => setPlanIsActive('true')}
-                        />
-                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Active</span>
-                      </label>
-                      
-                      <label className='inline-flex items-center'>
-                        <input
-                          type='radio'
-                          name='is_active'
-                          value='false'
-                          checked={planIsActive === 'false'}
-                          className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
-                          onChange={() => setPlanIsActive('false')}
-                        />
-                        <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Inactive</span>
-                      </label>
-                    </div>
+                    <input
+                      type='number'
+                      id='edit-max-ai-chat'
+                      name='max_ai_chat'
+                      required
+                      min='-1'
+                      value={planMaxAiChat}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max AI chat messages (-1 for unlimited)'
+                      onChange={(e) => setPlanMaxAiChat(e.target.value)}
+                    />
                   </div>
 
-                  <div className='pt-3 border-t border-gray-200 dark:border-gray-700'>
-                    <p className='text-xs text-gray-500 dark:text-gray-400'>
-                      Plan ID: {isPlanSelected.id}<br />
-                      Created: {formatDate(isPlanSelected.created_at)}<br />
-                      Last Updated: {formatDate(isPlanSelected.updated_at)}
-                    </p>
+                  <div>
+                    <label htmlFor='edit-max-ai-task' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max AI Tasks
+                    </label>
+                    <input
+                      type='number'
+                      id='edit-max-ai-task'
+                      name='max_ai_task'
+                      required
+                      min='-1'
+                      value={planMaxAiTask}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max AI tasks (-1 for unlimited)'
+                      onChange={(e) => setPlanMaxAiTask(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor='edit-max-ai-workflow' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                      Max AI Workflows
+                    </label>
+                    <input
+                      type='number'
+                      id='edit-max-ai-workflow'
+                      name='max_ai_workflow'
+                      required
+                      min='-1'
+                      value={planMaxAiWorkflow}
+                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      placeholder='Enter max AI workflows (-1 for unlimited)'
+                      onChange={(e) => setPlanMaxAiWorkflow(e.target.value)}
+                    />
                   </div>
                 </div>
               )}
@@ -1841,6 +2672,16 @@ export default function AdminSubscriptions() {
                       </button>
                       <button
                         type='submit'
+                        onClick={(e) => {
+                          if (newFeature.trim()) {
+                            e.preventDefault(); // 阻止表单提交
+                            toast.error('You have an unsaved feature. Please click the Add button or clear the feature input before saving.', {
+                              duration: 4000, // 显示4秒
+                              description: `Unsaved feature: "${newFeature.trim()}"`,
+                            });
+                            return;
+                          }
+                        }}
                         className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                           text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
                           focus:ring-offset-2 focus:ring-indigo-500'
@@ -1872,6 +2713,234 @@ export default function AdminSubscriptions() {
                 )}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Promo Code Modal */}
+      {isModalOpen && modalType === 'add' && activeTab === "promoCodes" && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+                Add New Promo Code
+              </h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const codeData = {
+                code: codeName,
+                discount_type: codeType,
+                discount_value: parseFloat(codeValue),
+                start_date: new Date(startDate).toISOString(),
+                end_date: new Date(endDate).toISOString(),
+                description: codeDescription,
+                is_active: codeIsActive === 'true',
+                max_uses: parseInt(maxUses) || 0
+              };
+              
+              // Add promo code logic
+              addPromoCode(codeData).then(success => {
+                if (success) {
+                  closeModal();
+                }
+              });
+            }}>
+              <div className='space-y-4'>
+                <div>
+                  <label htmlFor='add-code-name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Promo Code
+                  </label>
+                  <input
+                    type='text'
+                    id='add-code-name'
+                    name='code'
+                    required
+                    value={codeName}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter promo code'
+                    onChange={(e) => setCodeName(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-code-type' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Discount Type
+                  </label>
+                  <select
+                    id='add-code-type'
+                    name='discount_type'
+                    required
+                    value={codeType}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    onChange={(e) => setCodeType(e.target.value)}
+                  >
+                    <option value=''>Select discount type</option>
+                    <option value='PERCENTAGE'>Percentage</option>
+                    <option value='FIXED'>Fixed Amount</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor='add-code-value' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Discount Value
+                  </label>
+                  <input
+                    type='number'
+                    id='add-code-value'
+                    name='discount_value'
+                    required
+                    min='0'
+                    step='0.01'
+                    value={codeValue}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder={codeType === 'PERCENTAGE' ? 'Enter discount percentage' : 'Enter discount amount'}
+                    onChange={(e) => setCodeValue(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-code-description' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Description
+                  </label>
+                  <textarea
+                    id='add-code-description'
+                    name='description'
+                    rows='3'
+                    value={codeDescription}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter promo code description'
+                    onChange={(e) => setCodeDescription(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-max-uses' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Max Usage Count
+                  </label>
+                  <input
+                    type='number'
+                    id='add-max-uses'
+                    name='max_uses'
+                    required
+                    min='0'
+                    value={maxUses}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    placeholder='Enter maximum number of uses'
+                    onChange={(e) => setMaxUses(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Enter 0 for unlimited uses</p>
+                </div>
+                
+                <div>
+                  <label htmlFor='add-start-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Start Date
+                  </label>
+                  <input
+                    type='date'
+                    id='add-start-date'
+                    name='start_date'
+                    required
+                    min={new Date().toISOString().split('T')[0]}
+                    value={startDate}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor='add-end-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    End Date
+                  </label>
+                  <input
+                    type='date'
+                    id='add-end-date'
+                    name='end_date'
+                    required
+                    value={endDate}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className='mt-6 flex justify-end space-x-3'>
+                <button
+                  type='button'
+                  onClick={closeModal}
+                  className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                    text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                >
+                  Cancel
+                </button>
+                <button
+                  type='submit'
+                  className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500'
+                >
+                  Add Promo Code
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Promo Code Modal */}
+      {isModalOpen && modalType === 'delete' && isCodeToDelete && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>Delete Promo Code</h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            <p className='text-gray-600 dark:text-gray-300 mb-4'>
+              Are you sure you want to delete the promo code "{isCodeToDelete.code}"? This action cannot be undone.
+            </p>
+            <div className='flex justify-end space-x-3'>
+              <button
+                onClick={closeModal}
+                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                  text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deletePromoCode}
+                className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                  text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2
+                  focus:ring-offset-2 focus:ring-red-500'
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2015,6 +3084,7 @@ export default function AdminSubscriptions() {
                     id='edit-start-date'
                     name='start_date'
                     required
+                    min={new Date().toISOString().split('T')[0]}
                     value={startDate}
                     className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
@@ -2094,6 +3164,597 @@ export default function AdminSubscriptions() {
         </div>
       )}
 
+      {/*User SubscriptionPlan edit modal*/}
+      {isModalOpen && modalType === 'edit' && isUserSubscriptionPlanSelected && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+                Edit User Subscription
+              </h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              
+              try {
+                setLoading(true);
+                
+                // Get form values
+                const formData = new FormData(e.target);
+                const updatedData = {
+                  plan_id: parseInt(formData.get('plan_id')),
+                  status: 'ACTIVE',
+                  start_date: formData.get('start_date'),
+                  end_date: formData.get('end_date'),
+                  updated_at: new Date().toISOString()
+                };
+                
+                // Get the plan name for the toast
+                const planName = subscriptionPlans.find(p => p.id === updatedData.plan_id)?.name || 'plan';
+                const userName = isUserSubscriptionPlanSelected.user?.name || 'user';
+                
+                // Update the subscription in the database
+                const { data, error } = await supabase
+                  .from('user_subscription_plan')
+                  .update(updatedData)
+                  .eq('id', isUserSubscriptionPlanSelected.id);
+                
+                if (error) {
+                  console.error('Error updating user subscription:', error);
+                  toast.error(`Failed to update subscription for "${userName}"`, {
+                    description: error.message
+                  });
+                  return;
+                }
+                
+                console.log('User subscription updated successfully:', data);
+                toast.success(`Subscription for "${userName}" updated to ${planName} successfully`);
+                
+                // Refresh the user subscriptions list
+                await fetchUserSubscriptions();
+                
+                // Close the modal
+                closeModal();
+                
+              } catch (error) {
+                console.error('Error in form submission:', error);
+                toast.error('An unexpected error occurred while updating the subscription');
+              } finally {
+                setLoading(false);
+              }
+            }}>
+              <div className='space-y-4'>
+                {/* User Info (Read-only) */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-md mb-2">
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">User Information</h3>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
+                      {(isUserSubscriptionPlanSelected.user?.name?.charAt(0) || isUserSubscriptionPlanSelected.user?.email?.charAt(0) || '?').toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {isUserSubscriptionPlanSelected.user?.name || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {isUserSubscriptionPlanSelected.user?.email || 'No email'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Subscription Plan Selection */}
+                <div>
+                  <label htmlFor='subscription-plan' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Subscription Plan
+                  </label>
+                  <select
+                    id='subscription-plan'
+                    name='plan_id'
+                    required
+                    defaultValue={isUserSubscriptionPlanSelected.plan_id}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  >
+                    {subscriptionPlans.map(plan => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} ({plan.type}) : {formatCurrency(plan.price)}/{plan.billing_interval.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+         
+                {/* Start Date */}
+                <div>
+                  <label htmlFor='start-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    Start Date
+                  </label>
+                  <input
+                    type='date'
+                    id='start-date'
+                    name='start_date'
+                    required
+                    defaultValue={new Date(isUserSubscriptionPlanSelected.start_date).toISOString().split('T')[0]}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  />
+                </div>
+                
+                {/* End Date */}
+                <div>
+                  <label htmlFor='end-date' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                    End Date
+                  </label>
+                  <input
+                    type='date'
+                    id='end-date'
+                    name='end_date'
+                    required
+                    defaultValue={new Date(isUserSubscriptionPlanSelected.end_date).toISOString().split('T')[0]}
+                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                  />
+                </div>
+                
+                {/* Subscription Info */}
+                <div className="text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
+                  <p>Subscription ID: {isUserSubscriptionPlanSelected.id}</p>
+                  <p>Created: {formatDate(isUserSubscriptionPlanSelected.created_at)}</p>
+                  <p>Last Updated: {formatDate(isUserSubscriptionPlanSelected.updated_at)}</p>
+                </div>
+              </div>
+              
+              <div className='mt-6 flex justify-end space-x-3'>
+                <button
+                  type='button'
+                  onClick={closeModal}
+                  className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                >
+                  Cancel
+                </button>
+                <button
+                  type='submit'
+                  className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500'
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Subscription Details Modal */}
+      {isUserSubscriptionDetailsModalOpen && selectedSubscriptionDetails && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] flex flex-col p-6 overflow-hidden'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>
+                Subscription Details
+              </h2>
+              <button
+                onClick={closeSubscriptionDetailsModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="space-y-6 overflow-y-auto pr-2">
+              {/* User Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">User Information</h3>
+                <div className="flex items-center space-x-4 mb-3">
+                  <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-xl">
+                    {(selectedSubscriptionDetails.user?.name?.charAt(0) || selectedSubscriptionDetails.user?.email?.charAt(0) || '?').toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-800 dark:text-white">
+                      {selectedSubscriptionDetails.user?.name || 'Unknown User'}
+                    </h4>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {selectedSubscriptionDetails.user?.email || 'No email available'}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">User ID</p>
+                    <p className="text-gray-700 dark:text-gray-300">{selectedSubscriptionDetails.user_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Joined</p>
+                    <p className="text-gray-700 dark:text-gray-300">{formatDate(selectedSubscriptionDetails.user?.created_at || new Date())}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Subscription Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Subscription Information</h3>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Plan</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${selectedSubscriptionDetails.plan?.type === 'FREE' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : 
+                          selectedSubscriptionDetails.plan?.type === 'PRO' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
+                          'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}
+                      >
+                        {selectedSubscriptionDetails.plan?.name || selectedSubscriptionDetails.plan?.type || 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${selectedSubscriptionDetails.status.toUpperCase() === 'ACTIVE' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
+                          : selectedSubscriptionDetails.status.toUpperCase() === 'CANCELED'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                        }`}
+                      >
+                        {selectedSubscriptionDetails.status.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Start Date</p>
+                    <p className="text-gray-700 dark:text-gray-300">{formatDate(selectedSubscriptionDetails.start_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">End Date</p>
+                    <p className="text-gray-700 dark:text-gray-300">{formatDate(selectedSubscriptionDetails.end_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Price</p>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      {formatCurrency(selectedSubscriptionDetails.plan?.price || 0)}
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                        /{selectedSubscriptionDetails.plan?.billing_interval?.toLowerCase() || 'month'}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Subscription ID</p>
+                    <p className="text-gray-700 dark:text-gray-300 text-xs truncate">{selectedSubscriptionDetails.id}</p>
+                  </div>
+                </div>
+                <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Timeline</p>
+                  <div className="space-y-2">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 h-4 w-4 rounded-full bg-green-400 mt-1"></div>
+                      <div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">Subscription created</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(selectedSubscriptionDetails.created_at)}</p>
+                      </div>
+                    </div>
+                    {selectedSubscriptionDetails.updated_at !== selectedSubscriptionDetails.created_at && (
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 h-4 w-4 rounded-full bg-blue-400 mt-1"></div>
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">Last updated</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(selectedSubscriptionDetails.updated_at)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedSubscriptionDetails.status.toUpperCase() === 'CANCELED' && (
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 h-4 w-4 rounded-full bg-red-400 mt-1"></div>
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">Subscription canceled</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(selectedSubscriptionDetails.updated_at)}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Usage Information */}
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Usage & Limits</h3>
+                <div className="space-y-4">
+                  {/* Projects Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_projects} / {selectedSubscriptionDetails.plan?.max_projects === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_projects}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_projects !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.8 
+                              ? 'bg-red-500' 
+                              : selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, (selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Members Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Team Members</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_members} / {selectedSubscriptionDetails.plan?.max_members === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_members}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_members !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.8 
+                              ? 'bg-red-500' 
+                              : selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, (selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* AI Chat Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Chat</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_ai_chat || 0} / {selectedSubscriptionDetails.plan?.max_ai_chat === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_chat}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_ai_chat !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.8 
+                              ? 'bg-red-500' 
+                              : (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* AI Task Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Tasks</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_ai_task || 0} / {selectedSubscriptionDetails.plan?.max_ai_task === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_task}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_ai_task !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.8 
+                              ? 'bg-red-500' 
+                              : (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* AI Workflow Usage */}
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Workflows</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedSubscriptionDetails.current_ai_workflow || 0} / {selectedSubscriptionDetails.plan?.max_ai_workflow === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_workflow}
+                      </p>
+                    </div>
+                    {selectedSubscriptionDetails.plan?.max_ai_workflow !== -1 && (
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.8 
+                              ? 'bg-red-500' 
+                              : (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.5 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                          }`} 
+                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow * 100))}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div>
+                {selectedSubscriptionDetails.status.toUpperCase() === 'ACTIVE' ? (
+                  <button 
+                    onClick={() => {
+                        // Update subscription status to CANCELED
+                        supabase
+                          .from('user_subscription_plan')
+                          .update({ 
+                            status: 'CANCELED',
+                            updated_at: new Date().toISOString()
+                          })
+                          .eq('id', selectedSubscriptionDetails.id)
+                          .then(({error}) => {
+                            if(error) {
+                              console.error('Error canceling subscription:', error);
+                              toast.error(`Failed to cancel subscription for "${selectedSubscriptionDetails.user?.name || 'user'}"`, {
+                                description: error.message
+                              });
+                            } else {
+                              toast.success(`Subscription for "${selectedSubscriptionDetails.user?.name || 'user'}" canceled successfully`);
+                              fetchUserSubscriptions();
+                              closeSubscriptionDetailsModal();
+                            }
+                          });
+                    }}
+                    className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    Cancel Subscription
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                        // Update subscription status to ACTIVE
+                        supabase
+                          .from('user_subscription_plan')
+                          .update({ 
+                            status: 'ACTIVE',
+                            updated_at: new Date().toISOString() 
+                          })
+                          .eq('id', selectedSubscriptionDetails.id)
+                          .then(({error}) => {
+                            if(error) {
+                              console.error('Error reactivating subscription:', error);
+                              toast.error(`Failed to reactivate subscription for "${selectedSubscriptionDetails.user?.name || 'user'}"`, {
+                                description: error.message
+                              });
+                            } else {
+                              toast.success(`Subscription for "${selectedSubscriptionDetails.user?.name || 'user'}" reactivated successfully`);
+                              fetchUserSubscriptions();
+                              closeSubscriptionDetailsModal();
+                            }
+                          });
+                    }}
+                    className="px-4 py-2 border border-green-500 text-green-500 rounded-md text-sm hover:bg-green-50 dark:hover:bg-green-900/20"
+                  >
+                    Reactivate Subscription
+                  </button>
+                )}
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={closeSubscriptionDetailsModal}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUserSubscriptionPlanSelected(selectedSubscriptionDetails);
+                    setIsModalOpen(true);
+                    setModalType('edit');
+                    closeSubscriptionDetailsModal();
+                  }}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
+                    focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Edit Subscription
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Subscription Plan Modal */}
+      {isModalOpen && modalType === 'delete' && activeTab === "subscriptionPlans" && (
+        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+          <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6'>
+            <div className='flex justify-between items-center mb-4'>
+              <h2 className='text-xl font-semibold text-gray-800 dark:text-white'>Delete Subscription Plan</h2>
+              <button
+                onClick={closeModal}
+                className='text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className='space-y-4'>
+              <div className='flex items-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800'>
+                <div className='flex-shrink-0 mr-3 text-red-500 dark:text-red-400'>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className='text-sm font-medium text-red-800 dark:text-red-200'>Warning: This action cannot be undone</h3>
+                  <p className='mt-1 text-sm text-red-700 dark:text-red-300'>
+                    You are about to permanently delete this subscription plan and all associated data.
+                  </p>
+                </div>
+              </div>
+
+              <div className='p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800'>
+                <p className='text-sm text-yellow-700 dark:text-yellow-300'>
+                  To confirm deletion, please type <strong>{isPlanToDelete?.name}</strong> below:
+                </p>
+                <input
+                  type='text'
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  className='mt-2 w-full px-3 py-2 border border-yellow-300 dark:border-yellow-700 rounded-md text-sm
+                    placeholder-yellow-500 dark:placeholder-yellow-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                    focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500'
+                  placeholder={`Type ${isPlanToDelete?.name} to confirm`}
+                />
+              </div>
+            </div>
+            
+            <div className='mt-6 flex justify-end space-x-3'>
+              <button
+                type='button'
+                onClick={closeModal}
+                disabled={processing}
+                className='px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium
+                  text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+              >
+                Cancel
+              </button>
+              
+              <button
+                type='button'
+                onClick={deleteSubscriptionPlan}
+                disabled={processing}
+                className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                  text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2
+                  focus:ring-offset-2 focus:ring-red-500'
+              >
+                {processing ? (
+                  <>
+                    <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                    Deleting...
+                  </>
+                ) : 'Delete Subscription Plan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

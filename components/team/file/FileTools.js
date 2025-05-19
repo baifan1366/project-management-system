@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Upload, File, X, FileText, Sheet, Film, Music, Eye, ChevronLeft } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { api } from '@/lib/api';
 import { useParams } from "next/navigation";
@@ -22,7 +22,6 @@ import { useSelector } from "react-redux"
 
 export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath = '/', onFilesUploaded }) {
   const t = useTranslations('File')
-  const { toast } = useToast()
   const [files, setFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
   const [previewFile, setPreviewFile] = useState(null)
@@ -260,10 +259,8 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
       
       setFiles([])
       
-      toast({
-        title: t('uploadSuccess'),
+      toast.success(t('uploadSuccess'), {
         description: t('filesUploadedSuccessfully'),
-        variant: 'default'
       })
       
       // 调用回调函数
@@ -274,10 +271,8 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
       onClose()
     } catch (error) {
       console.error('Upload error:', error)
-      toast({
-        title: t('uploadError'),
+      toast.error(t('uploadError'), {
         description: error.message,
-        variant: 'destructive'
       })
     } finally {
       setIsUploading(false)
@@ -291,51 +286,59 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
     
     // 2. 根据名称获取File标签ID
     let fileTagId
-    try {
-      const tagResponse = await api.tags.getByName('File')
-      fileTagId = tagResponse.id
-    } catch (error) {
-      console.error('Error getting File tag:', error)
-      throw new Error(t('errorGettingFileTag'))
-    }
+    const tagName = await api.tags.getByName('Name')
+    const nameTagId = tagName.id
+    const tagResponse = await api.tags.getByName('File')
+    fileTagId = tagResponse.id
     
     // 3. 检查当前团队是否有section，如果没有则创建一个
     let sectionId
-    try {
-      const sections = await api.teams.teamSection.getSectionByTeamId(teamId)
+    const sections = await api.teams.teamSection.getSectionByTeamId(teamId)
       
-      if (sections && sections.length > 0) {
-        // 使用第一个section
-        sectionId = sections[0].id
-      } else {
-        // 创建新section
-        const newSection = await api.teams.teamSection.create(teamId, {
-          name: 'New Section',
-          task_ids: []
-        })
-        sectionId = newSection.id
-      }
-    } catch (error) {
-      console.error('Error checking/creating section:', error)
-      throw new Error(t('errorCheckingSection'))
+    if (sections && sections.length > 0) {
+      // 使用第一个section
+      sectionId = sections[0].id
+    } else {
+      // 创建新section
+      const sectionData = {
+        teamId: teamId,
+        sectionName: 'New Section',
+        createdBy: userId
+      };
+      const newSection = await api.teams.teamSection.create(teamId, sectionData);
+      sectionId = newSection.id
     }
     
     // 4. 创建新任务，只包含必要的标签值
     let taskId
-    try {
-      const taskData = {
-        created_by: userId,
-        tag_values: {
-          [fileTagId]: fileName
-        }
+    const taskData = {
+      created_by: userId,
+      tag_values: {
+        [nameTagId]: fileName,
+        [fileTagId]: fileName
       }
-      
-      const taskResponse = await api.teams.teamSectionTasks.create(taskData)
-      taskId = taskResponse.id
-    } catch (error) {
-      console.error('Error creating task:', error)
-      throw new Error(t('errorCreatingTask'))
     }
+    
+    const taskResponse = await api.teams.teamSectionTasks.create(taskData)
+    taskId = taskResponse.id
+    //it may also create a notion_page, then update the notion_page id into the task table, page_id column
+    const { data: notionPageData, error: notionPageError } = await supabase
+      .from('notion_page')
+      .insert({
+        created_by: userId,
+        last_edited_by: userId
+      })
+      .select()
+      .single();
+    console.log(notionPageData);
+    //update the notion_page id into the task table, page_id column
+    const { data: newTaskData, error: taskError } = await supabase
+      .from('task')
+      .update({
+        page_id: notionPageData.id
+      })
+      .eq('id', taskId);
+    console.log(newTaskData);
     
     // 5. 更新section的task_ids
     try {
@@ -496,7 +499,7 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
                 <h3 className="font-medium mb-2">{t('selectedFiles')}</h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto p-1">
                   {files.map(file => (
-                    <div key={file.id} className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
+                    <div key={file.id} className="flex items-center justify-between bg-accent p-2 rounded-md">
                       <div 
                         className="flex items-center space-x-2 cursor-pointer flex-1" 
                         onClick={() => openPreview(file)}
@@ -528,7 +531,7 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7"
+                          className="h-7 w-7 hover:text-red-500"
                           onClick={() => removeFile(file.id)}
                           title={t('delete')}
                         >

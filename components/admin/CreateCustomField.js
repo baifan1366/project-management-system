@@ -20,7 +20,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
     const tValidation = useTranslations('validationRules');
     const dispatch = useDispatch();
     const [isSaving, setIsSaving] = useState(false);
-    const validTypes = ['LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'AGILE', 'WORKFLOW', 'KANBAN', 'FILES'];
+    const validTypes = ['LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'AGILE', 'WORKFLOW', 'KANBAN', 'FILES', 'POSTS'];
     const { user } = useGetUser();
     
     // 设置自定义验证器

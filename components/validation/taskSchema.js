@@ -10,7 +10,7 @@ export function createTaskValidationSchema(tValidation) {
     .addRule('taskName', [
       validators.required(tValidation('taskNameRequired')),
       validators.minLength(2, tValidation('taskNameMin')),
-      validators.maxLength(50, tValidation('taskNameMax'))
+      validators.maxLength(100, tValidation('taskNameMax'))
     ])
     .addRule('startDate', [
       validators.required(tValidation('startDateRequired'))

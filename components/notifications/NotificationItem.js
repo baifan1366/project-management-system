@@ -1,24 +1,31 @@
 import { Button } from "@/components/ui/button";
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { formatDistanceToNow } from 'date-fns';
-import { Check, X, Bell, Calendar, User, MessageSquare, Video } from 'lucide-react';
+import { Check, X, Bell, Calendar, User, MessageSquare, Video, ExternalLink, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
-export default function NotificationItem({ notification, onAction }) {
+export default function NotificationItem({ notification, onAction, formatDateToUserTimezone, formatToUserTimezone }) {
   const t = useTranslations('notifications');
   const tCalendar = useTranslations('Calendar');
   const tNotif = useTranslations('notificationCenter');
+  const { user } = useGetUser();
+  const router = useRouter();
   
-  // 添加状态来跟踪会议邀请的状态
+  // Add state to track meeting invitation status
   const [localMeetingData, setLocalMeetingData] = useState(null);
   const [localIsDeclined, setLocalIsDeclined] = useState(false);
   const [localIsAccepted, setLocalIsAccepted] = useState(false);
+  const [isActioning, setIsActioning] = useState(false);
   
-  // 初始化本地状态
+  // Initialize local state
   useEffect(() => {
     const data = getMeetingData();
     setLocalMeetingData(data);
@@ -26,38 +33,52 @@ export default function NotificationItem({ notification, onAction }) {
     setLocalIsAccepted(data && data.accepted);
   }, [notification]);
   
+  // Format using relative time (e.g. "2 hours ago")
   const formatDate = (date) => {
     const d = new Date(date);
     return formatDistanceToNow(d, { addSuffix: true });
   };
 
-  const handleMarkAsRead = async (id) => {
+  // Format exact date and time using user's timezone
+  const formatExactTime = (date) => {
+    if (!formatDateToUserTimezone) {
+      // Fallback if timezone formatting function isn't available
+      return new Date(date).toLocaleString();
+    }
+    return formatDateToUserTimezone(date);
+  };
+
+  const handleMarkAsRead = async (e) => {
+    e.stopPropagation();
+    setIsActioning(true);
     try {
       const { error } = await supabase
         .from('notification')
         .update({ is_read: true })
-        .eq('id', id);
+        .eq('id', notification.id);
       
       if (error) throw error;
       
-      // 通知父组件更新状态
-      if (onAction) onAction('read', id);
+      // Notify parent component to update state
+      if (onAction) onAction('read', notification.id);
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
+    } finally {
+      setTimeout(() => setIsActioning(false), 500);
     }
   };
 
-  // 根据通知类型获取图标
+  // Get icon based on notification type
   const getIcon = (type) => {
     switch (type) {
       case 'TASK_ASSIGNED':
-        return <Calendar className="h-4 w-4" />;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Task icon */}</div>;
       case 'COMMENT_ADDED':
-        return <MessageSquare className="h-4 w-4" />;  
+        return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full">{/* Comment icon */}</div>;
       case 'MENTION':
-        return <User className="h-4 w-4" />;
+        return <div className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 p-2 rounded-full">{/* Mention icon */}</div>;
       case 'SYSTEM':
-        // 检查是否是会议邀请
+        // Check if this is a meeting invitation
         try {
           if (notification.data) {
             const data = typeof notification.data === 'string' 
@@ -65,23 +86,23 @@ export default function NotificationItem({ notification, onAction }) {
               : notification.data;
             
             if (data.isMeetingInvitation) {
-              return <Video className="h-4 w-4" />;
+              return <div className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 p-2 rounded-full">{/* System icon */}</div>;
             }
           }
         } catch (e) {
           console.error('Error parsing notification data', e);
         }
-        return <Bell className="h-4 w-4" />;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Default icon */}</div>;
       default:
-        return <Bell className="h-4 w-4" />;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Default icon */}</div>;
     }
   };
 
-  // 处理notification.data字段
+  // Process notification.data field
   const getMeetingData = () => {
     try {
       if (notification.data) {
-        // 判断data是对象还是字符串
+        // Determine if data is an object or string
         if (typeof notification.data === 'object' && notification.data !== null) {
           return notification.data;
         } else if (typeof notification.data === 'string') {
@@ -95,42 +116,43 @@ export default function NotificationItem({ notification, onAction }) {
     }
   };
 
-  // 检查是否是会议邀请
+  // Check if this is a meeting invitation
   const isMeetingInvitation = () => {
     const data = getMeetingData();
     return data && data.isMeetingInvitation;
   };
 
-  // 检查会议是否已被拒绝
+  // Check if meeting has been declined
   const isMeetingDeclined = () => {
     const data = getMeetingData();
     return data && data.declined;
   };
 
-  // 向邀请人发送通知
+  // Send notification to the inviter when a user accepts or declines a meeting invitation
+  // This creates a new notification in the database for the person who sent the original invitation
+  // letting them know whether their invitation was accepted or declined
   const sendResponseNotification = async (meetData, isAccepted) => {
     if (!meetData || !meetData.inviterId) return;
     
     try {
-      // 获取当前用户信息
-      const { user } = useGetUser();
-      if (!user) throw new Error('未获取到用户信息');
+      // Check if we have user information
+      if (!user) throw new Error('Failed to get user information');
       
-      // 准备通知数据
+      // Prepare notification data
       const notificationData = {
-        user_id: meetData.inviterId,  // 通知发送给邀请人
+        user_id: meetData.inviterId,  // Send notification to the inviter
         title: isAccepted 
           ? tNotif('meetingAccepted') 
           : tNotif('meetingDeclined'),
         content: `${user.name || user.email} ${isAccepted 
           ? tNotif('acceptedYourMeeting') 
-          : tNotif('declinedYourMeeting')} "${meetData.meetingTitle || '会议'}"`,
+          : tNotif('declinedYourMeeting')} "${meetData.eventTitle || 'meeting'}"`,
         type: 'SYSTEM',
         is_read: false,
         data: {
           responseToMeeting: true,
-          meetingId: meetData.meetingId,
-          meetingTitle: meetData.meetingTitle,
+          meetingId: meetData.eventId,
+          meetingTitle: meetData.eventTitle,
           responderName: user.name || user.email,
           responderEmail: user.email,
           accepted: isAccepted,
@@ -138,44 +160,48 @@ export default function NotificationItem({ notification, onAction }) {
         }
       };
       
-      // 发送通知
+      // Send notification
       const { error } = await supabase
         .from('notification')
         .insert(notificationData);
       
       if (error) throw error;
       
-      console.log(`已向邀请人 ${meetData.inviterId} 发送${isAccepted ? '接受' : '拒绝'}会议通知`);
+      console.log(`Sent ${isAccepted ? 'acceptance' : 'decline'} notification to inviter ${meetData.inviterId}`);
     } catch (error) {
-      console.error('发送会议响应通知失败:', error);
+      console.error('Failed to send meeting response notification:', error);
     }
   };
 
-  // 接受会议邀请
-  const handleAcceptMeeting = async (id, meetData) => {
+  // Accept meeting invitation
+  const handleAcceptMeeting = async (e, id, meetData) => {
+    e.stopPropagation();
     try {
-      await handleMarkAsRead(id);
+      setIsActioning(true);
       
-      // 更新通知状态为已接受
+      // Mark as read
+      await handleMarkAsRead(e);
+      
+      // Update notification status to accepted
       const updatedData = { ...meetData, accepted: true };
       
       const { error } = await supabase
         .from('notification')
         .update({ 
-          data: updatedData  // Supabase将自动处理JSON序列化
+          data: updatedData  // Supabase will handle JSON serialization automatically
         })
         .eq('id', id);
       
       if (error) throw error;
       
-      // 更新本地状态
+      // Update local state
       setLocalMeetingData(updatedData);
       setLocalIsAccepted(true);
       
-      // 向邀请人发送接受通知
+      // Send acceptance notification to the inviter
       await sendResponseNotification(meetData, true);
       
-      // 打开Google Meet链接
+      // Open Google Meet link
       if (meetData && meetData.meetLink) {
         window.open(meetData.meetLink, '_blank');
       }
@@ -183,158 +209,223 @@ export default function NotificationItem({ notification, onAction }) {
       if (onAction) onAction('accept', id);
       toast.success(tNotif('meetingAccepted'));
     } catch (error) {
-      console.error('接受会议邀请失败:', error);
+      console.error('Failed to accept meeting invitation:', error);
       toast.error(t('actionFailed'));
+    } finally {
+      setTimeout(() => setIsActioning(false), 500);
     }
   };
 
-  // 拒绝会议邀请
-  const handleDeclineMeeting = async (id) => {
+  // Decline meeting invitation
+  const handleDeclineMeeting = async (e, id) => {
+    e.stopPropagation();
     try {
+      setIsActioning(true);
       const data = getMeetingData();
       if (!data) return;
 
       const updatedData = { ...data, declined: true };
       
-      // 直接更新data字段
+      // Update data field directly
       const { error } = await supabase
         .from('notification')
         .update({ 
           is_read: true, 
-          data: updatedData  // Supabase将自动处理JSON序列化
+          data: updatedData  // Supabase will handle JSON serialization automatically
         })
         .eq('id', id);
       
       if (error) throw error;
       
-      // 更新本地状态
+      // Update local state
       setLocalMeetingData(updatedData);
       setLocalIsDeclined(true);
       
-      // 向邀请人发送拒绝通知
+      // Send decline notification to the inviter
       await sendResponseNotification(data, false);
       
-      // 通知父组件更新状态
+      // Notify parent component to update state
       if (onAction) onAction('decline', id);
       toast.success(tCalendar('meetingDeclined'));
     } catch (error) {
       console.error('Failed to decline meeting:', error);
       toast.error(t('actionFailed'));
+    } finally {
+      setTimeout(() => setIsActioning(false), 500);
     }
   };
 
-  // 解析会议数据
+  // Parse meeting data
   const meetingData = localMeetingData || getMeetingData();
   const isMeeting = isMeetingInvitation();
   const isDeclined = localIsDeclined || isMeetingDeclined();
   const isAccepted = localIsAccepted || (meetingData && meetingData.accepted);
 
-  return (
-    <div className={cn(
-      "p-3 flex items-start space-x-3 border-b hover:bg-accent/5 transition-colors cursor-pointer",
-      !notification.is_read && "bg-primary/5"
-    )}>
-      <div className={cn(
-        "p-2 rounded-full",
-        !notification.is_read ? "bg-primary text-primary-foreground" : "bg-muted"
-      )}>
-        {getIcon(notification.type)}
-      </div>
+  // Handle notification click - for direct navigation
+  const handleNotificationClick = () => {
+    // For MENTION notifications, navigate directly to the chat
+    if (notification.type === 'MENTION' && notification.data?.session_id) {
+      router.push(`/chat?session=${notification.data.session_id}`);
       
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <p className={cn(
-            "text-sm font-medium truncate",
-            !notification.is_read && "font-semibold"
-          )}>
-            {notification.title}
-          </p>
-          <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-            {formatDate(notification.created_at)}
+      // Mark as read after click
+      if (!notification.is_read) {
+        onAction('read', notification.id);
+      }
+    }
+  };
+
+  // Handle meeting invite actions directly in this component
+  const renderMeetingActions = () => {
+    if (notification.type !== 'MEETING_INVITE' && !isMeeting) return null;
+    
+    if (isDeclined) {
+      return (
+        <div className="mt-2">
+          <span className="text-xs text-muted-foreground">
+            {tCalendar('meetingDeclined')}
           </span>
         </div>
-        
-        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-          {notification.content}
-        </p>
-        
-        {/* 针对会议邀请显示接受/拒绝按钮 */}
-        {isMeeting && meetingData && !isDeclined && !isAccepted && (
-          <div className="mt-2 flex space-x-2">
-            <Button 
-              size="sm" 
-              variant="default" 
-              className="h-8"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAcceptMeeting(notification.id, meetingData);
-              }}
-            >
-              <Check className="h-4 w-4 mr-1" />
-              {tCalendar('accept')}
-            </Button>
-            
+      );
+    }
+
+    if (isAccepted) {
+      return (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-xs text-green-600 font-medium">
+            {tNotif('meetingAccepted')}
+          </span>
+          {meetingData && meetingData.meetLink && (
             <Button 
               size="sm" 
               variant="outline" 
-              className="h-8"
+              className="h-7 text-xs"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDeclineMeeting(notification.id);
+                window.open(meetingData.meetLink, '_blank');
               }}
             >
-              <X className="h-4 w-4 mr-1" />
-              {tCalendar('decline')}
+              <Video className="h-3 w-3 mr-1" />
+              {tCalendar('joinMeeting')}
             </Button>
-          </div>
-        )}
-        
-        {/* 如果会议已被接受 */}
-        {isMeeting && meetingData && isAccepted && (
-          <div className="mt-2">
-            <span className="text-xs text-green-600 font-medium">
-              {tNotif('meetingAccepted')}
-            </span>
-            {meetingData.meetLink && (
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="h-8 ml-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(meetingData.meetLink, '_blank');
-                }}
-              >
-                <Video className="h-4 w-4 mr-1" />
-                {tNotif('joinMeeting')}
-              </Button>
-            )}
-          </div>
-        )}
-        
-        {/* 如果会议已被拒绝 */}
-        {isMeeting && meetingData && isDeclined && (
-          <div className="mt-2">
-            <span className="text-xs text-muted-foreground">
-              {tCalendar('meetingDeclined')}
-            </span>
-          </div>
-        )}
-      </div>
-      
-      {!notification.is_read && (
+          )}
+        </div>
+      );
+    }
+
+    // If not accepted or declined yet, show both options
+    return (
+      <div className="mt-2 flex space-x-2">
         <Button 
-          size="icon" 
-          variant="ghost" 
-          className="h-6 w-6 rounded-full"
+          size="sm" 
+          variant="default" 
+          className="h-7 text-xs"
           onClick={(e) => {
-            e.stopPropagation();
-            handleMarkAsRead(notification.id);
+            handleAcceptMeeting(e, notification.id, meetingData);
           }}
+          disabled={isActioning}
         >
-          <Check className="h-4 w-4" />
+          <Check className="h-3 w-3 mr-1" />
+          {tCalendar('accept')}
         </Button>
-      )}
-    </div>
+        
+        <Button 
+          size="sm" 
+          variant="outline" 
+          className="h-7 text-xs"
+          onClick={(e) => {
+            handleDeclineMeeting(e, notification.id);
+          }}
+          disabled={isActioning}
+        >
+          <X className="h-3 w-3 mr-1" />
+          {tCalendar('decline')}
+        </Button>
+      </div>
+    );
+  };
+
+  return (
+    <Card 
+      className={`border ${notification.is_read ? 'bg-card' : 'bg-accent'} shadow-sm transition-all hover:shadow-md`}
+      onClick={handleNotificationClick}
+    >
+      <CardContent className="p-4 cursor-pointer">
+        <div className="flex gap-3">
+          {getIcon(notification.type)}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h4 className="font-medium text-sm">{notification.title}</h4>
+                <p className="text-sm text-muted-foreground line-clamp-2">{notification.content}</p>
+              </div>
+              <div className="flex flex-shrink-0 gap-1">
+                {!notification.is_read && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-7 w-7" 
+                    onClick={handleMarkAsRead}
+                    disabled={isActioning}
+                  >
+                    <Check className="h-4 w-4" />
+                    <span className="sr-only">{t('markAsRead')}</span>
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsActioning(true);
+                    onAction('delete', notification.id);
+                    setTimeout(() => setIsActioning(false), 500);
+                  }}
+                  disabled={isActioning}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">{t('delete')}</span>
+                </Button>
+              </div>
+            </div>
+            
+            {/* Handle meeting invitations directly in this component */}
+            {renderMeetingActions()}
+            
+            {/* For other notifications with links */}
+            {notification.link && notification.type !== 'MENTION' && (
+              <div className="mt-2">
+                <Link
+                  href={notification.link}
+                  className="text-xs inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!notification.is_read) {
+                      onAction('read', notification.id);
+                    }
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  {t('common.viewDetails')}
+                </Link>
+              </div>
+            )}
+            
+            <div className="text-xs text-muted-foreground mt-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>{formatDate(notification.created_at)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {formatExactTime(notification.created_at)}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 } 

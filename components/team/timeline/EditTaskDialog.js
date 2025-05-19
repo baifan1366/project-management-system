@@ -106,8 +106,37 @@ export default function EditTaskDialog({
       startDate: editTask.start_date || new Date(),
       duration: editTask.duration || 1,
       progress: editTask.progress || 0
-    }
+    },
+    mode: 'onChange'
   });
+
+  // 自定义表单验证
+  const isFormValid = () => {
+    const taskName = form.getValues('taskName') || '';
+    const startDate = form.getValues('startDate');
+    const duration = form.getValues('duration');
+    
+    // 任务名称检查 (2-100字符)
+    const isTaskNameValid = taskName.trim().length >= 2 && taskName.trim().length <= 100;
+    
+    // 开始日期检查 (不能早于当前日期)
+    let isStartDateValid = true;
+    if (startDate) {
+      const selectedDate = new Date(startDate);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      isStartDateValid = selectedDate >= today;
+    }
+    
+    // 持续时间检查 (1-999)
+    const durationValue = parseInt(duration);
+    const isDurationValid = !isNaN(durationValue) && durationValue >= 1 && durationValue <= 999;
+    
+    return isTaskNameValid && isStartDateValid && isDurationValid;
+  };
 
   // 表单验证
   const validateForm = (data) => {
@@ -122,7 +151,7 @@ export default function EditTaskDialog({
 
   // 提交表单
   const onSubmit = async (data) => {
-    if (isSubmitting) return;
+    if (isSubmitting || !isFormValid()) return;
     
     const { isValid, errors } = validateForm(data);
     
@@ -137,7 +166,7 @@ export default function EditTaskDialog({
     try {
       const formattedStartDate = formatGanttDate(data.startDate);
       const updatedTask = {
-        "Name": data.taskName,
+        "Name": data.taskName.trim(),
         "Start Date": formattedStartDate,
         "Duration": data.duration,
         "Progress": data.progress
@@ -149,7 +178,7 @@ export default function EditTaskDialog({
 
       const updatedTaskData = {
           // 使用tagId作为对象键映射相应的值
-          [tagIdName]: data.taskName,
+          [tagIdName]: data.taskName.trim(),
           [tagIdStartDate]: formattedStartDate,
           [tagIdDuration]: parseInt(data.duration),
           [tagIdProgress]: data.progress
@@ -211,6 +240,14 @@ export default function EditTaskDialog({
     }
   }, [showEditForm, editTask, form]);
   
+  // 监听表单变化以验证表单
+  useEffect(() => {
+    const subscription = form.watch(() => {
+      form.trigger();
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+  
   return (
     <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
       <DialogContent 
@@ -241,18 +278,19 @@ export default function EditTaskDialog({
                       {...field} 
                       placeholder={t('enterTaskName')} 
                       aria-label={t('taskName')}
-                      className={formErrors.taskName ? 'border-red-500' : 'border-gray-300'}
+                      className="border-gray-300"
+                      minLength={2}
+                      maxLength={100}
                       onChange={(e) => {
                         field.onChange(e);
-                        if (formErrors.taskName) {
-                          setFormErrors({...formErrors, taskName: undefined});
-                        }
                       }}
                     />
                   </FormControl>
-                  {formErrors.taskName && (
-                    <FormMessage className="text-xs">{formErrors.taskName}</FormMessage>
-                  )}
+                  <FormMessage className="flex justify-end">
+                    <span className="text-gray-500 text-xs ml-2">
+                      {field.value ? `${field.value.trim().length}/100` : "0/100"}
+                    </span>
+                  </FormMessage>
                 </FormItem>
               )}
             />
@@ -270,7 +308,7 @@ export default function EditTaskDialog({
                       <Input 
                         type="date" 
                         aria-label={t('startDate')}
-                        className={`${formErrors.startDate ? 'border-red-500' : ''}`}
+                        min={new Date().toISOString().split('T')[0]}
                         value={field.value instanceof Date 
                           ? field.value.toISOString().split('T')[0] 
                           : typeof field.value === 'string' 
@@ -278,15 +316,9 @@ export default function EditTaskDialog({
                             : field.value}
                         onChange={(e) => {
                           field.onChange(e);
-                          if (formErrors.startDate) {
-                            setFormErrors({...formErrors, startDate: undefined});
-                          }
                         }}
                       />
                     </FormControl>
-                    {formErrors.startDate && (
-                      <FormMessage className="text-xs">{formErrors.startDate}</FormMessage>
-                    )}
                   </FormItem>
                 )}
               />
@@ -303,15 +335,25 @@ export default function EditTaskDialog({
                       <Input 
                         type="number" 
                         min="1"
+                        max="999"
                         placeholder="1"
                         aria-label={t('duration')}
-                        className={`w-full ${formErrors.duration ? 'border-red-500' : ''}`}
+                        className="w-full"
                         {...field}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value, 10);
+                          if (isNaN(value)) {
+                            field.onChange(1);
+                          } else if (value < 1) {
+                            field.onChange(1);
+                          } else if (value > 999) {
+                            field.onChange(999);
+                          } else {
+                            field.onChange(value);
+                          }
+                        }}
                       />
                     </FormControl>
-                    {formErrors.duration && (
-                      <FormMessage className="text-xs">{formErrors.duration}</FormMessage>
-                    )}
                   </FormItem>
                 )}
               />
@@ -363,7 +405,7 @@ export default function EditTaskDialog({
                 <Button 
                   type="submit"
                   variant={taskColor}
-                  disabled={isLoading}
+                  disabled={isLoading || !isFormValid()}
                 >
                   {isLoading ? t('saving') : t('save')}
                 </Button>

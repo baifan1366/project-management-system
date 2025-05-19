@@ -18,6 +18,7 @@ export default function DefaultPage() {
     const [userNames, setUserNames] = useState({});
     const [isLoading, setIsLoading] = useState(false);
     const [dataLoading, setDataLoading] = useState(true);
+    const { user: userData, error: userError } = useGetUser();
 
     useEffect(() => {
         async function loadInitialData() {
@@ -80,7 +81,6 @@ export default function DefaultPage() {
     const handleSave = async (defaultItem) => {
         try {
             setIsLoading(true);
-            const { user: userData, error: userError } = useGetUser();
             
             if (userError) {
                 throw new Error('认证错误');

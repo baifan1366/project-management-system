@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslations } from 'next-intl';
 import { 
@@ -23,15 +23,17 @@ import {
   selectUnreadCount,
   selectNotificationsLoading,
   selectIsSubscribed,
-  unsubscribeFromNotifications
+  unsubscribeFromNotifications,
+  subscribeToNotifications
 } from '@/lib/redux/features/notificationSlice';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN, enUS } from 'date-fns/locale';
 import { Check, Trash, Bell, BellOff, Calendar, User, MessageSquare, Video } from 'lucide-react';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import NotificationItem from '@/components/notifications/NotificationItem';
 
-export function NotificationDialog({ open, onOpenChange }) {
+export function NotificationDialog({ open, onOpenChange, headerHandlesSubscription = false }) {
   const t = useTranslations();
   const dispatch = useDispatch();
   const notifications = useSelector(selectNotifications);
@@ -39,31 +41,45 @@ export function NotificationDialog({ open, onOpenChange }) {
   const loading = useSelector(selectNotificationsLoading);
   const isSubscribed = useSelector(selectIsSubscribed);
   const [activeTab, setActiveTab] = useState('all');
-  const [user, setUser] = useState(null);
-  const [locale, setLocale] = useState('zh');
+  const { user } = useGetUser();
+  const [locale, setLocale] = useState('en');
+  const dialogSubscriptionCreatedRef = useRef(false);
+  const { formatDateToUserTimezone, formatToUserTimezone, hourFormat } = useUserTimezone();
 
   useEffect(() => {
-    if (open) {
-      const getUser = async () => {
-        const { user } = useGetUser();
-        if (user) {
-          setUser(user);
-          setLocale(user.language || 'zh');
-          
-          // 只在没有数据或订阅时获取通知
-          if (notifications.length === 0 || !isSubscribed) {
-            dispatch(fetchNotifications(user.id));
-          }
-        }
-      };
-      
-      getUser();
-    } else if (!open && isSubscribed) {
-      // 对话框关闭后取消订阅，但不清除通知数据
-      // 这样通知图标上的数字仍然会显示正确的未读数量
-      dispatch(unsubscribeFromNotifications());
+    // Only take action when dialog opens and we have a user
+    if (!open || !user) return;
+    
+    // If Header handles subscriptions, we only refresh data but don't manage subscriptions
+    if (headerHandlesSubscription) {
+      // Only refresh data, don't handle subscriptions
+      console.log('NotificationDialog: Header handles subscriptions, only refreshing data');
+      dispatch(fetchNotifications(user.id));
+      return;
     }
-  }, [dispatch, open, notifications.length, isSubscribed]);
+    
+    // If we get here, the dialog is managing its own subscriptions
+    
+    // Don't re-subscribe if already subscribed
+    if (!isSubscribed) {
+      console.log('NotificationDialog: Starting realtime subscription (dialog-managed)');
+      dispatch(subscribeToNotifications(user.id));
+      dialogSubscriptionCreatedRef.current = true;
+    } else {
+      // Just refresh the data if already subscribed
+      console.log('NotificationDialog: Already subscribed, refreshing data');
+      dispatch(fetchNotifications(user.id));
+    }
+    
+    // Clean up when dialog closes, but only if we created the subscription
+    return () => {
+      if (!headerHandlesSubscription && dialogSubscriptionCreatedRef.current && isSubscribed) {
+        console.log('NotificationDialog: Cleaning up dialog-managed subscription');
+        dispatch(unsubscribeFromNotifications());
+        dialogSubscriptionCreatedRef.current = false;
+      }
+    };
+  }, [dispatch, open, user, headerHandlesSubscription, isSubscribed, dialogSubscriptionCreatedRef]);
 
   const handleMarkAsRead = (notificationId) => {
     if (user) {
@@ -92,16 +108,17 @@ export function NotificationDialog({ open, onOpenChange }) {
         handleDeleteNotification(notificationId);
         break;
       case 'accept':
-        // 会议邀请接受后已在NotificationItem中处理
+        // Meeting invitation acceptance handled in NotificationItem
         break;
       case 'decline':
-        // 会议邀请拒绝后已在NotificationItem中处理
+        // Meeting invitation rejection handled in NotificationItem
         break;
       default:
         break;
     }
   };
 
+  // Format using relative time (e.g. "2 hours ago")
   const formatTime = (dateString) => {
     try {
       const date = new Date(dateString);
@@ -123,7 +140,7 @@ export function NotificationDialog({ open, onOpenChange }) {
       case 'MENTION':
         return <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600"><User className="h-4 w-4" /></div>;
       case 'SYSTEM':
-        // 检查是否是会议邀请
+        // Check if this is a meeting invitation
         try {
           if (notificationData) {
             const data = typeof notificationData === 'string' 
@@ -191,6 +208,8 @@ export function NotificationDialog({ open, onOpenChange }) {
               notifications={filteredNotifications}
               loading={loading}
               formatTime={formatTime}
+              formatDateToUserTimezone={formatDateToUserTimezone}
+              formatToUserTimezone={formatToUserTimezone}
               onAction={handleNotificationAction}
               t={t}
             />
@@ -201,6 +220,8 @@ export function NotificationDialog({ open, onOpenChange }) {
               notifications={filteredNotifications}
               loading={loading}
               formatTime={formatTime}
+              formatDateToUserTimezone={formatDateToUserTimezone}
+              formatToUserTimezone={formatToUserTimezone}
               onAction={handleNotificationAction}
               t={t}
             />
@@ -224,6 +245,8 @@ function NotificationList({
   notifications, 
   loading, 
   formatTime, 
+  formatDateToUserTimezone,
+  formatToUserTimezone,
   onAction,
   t
 }) {
@@ -253,6 +276,8 @@ function NotificationList({
             key={notification.id}
             notification={notification}
             onAction={onAction}
+            formatDateToUserTimezone={formatDateToUserTimezone}
+            formatToUserTimezone={formatToUserTimezone}
           />
         ))}
       </div>

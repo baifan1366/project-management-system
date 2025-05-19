@@ -192,9 +192,28 @@ export async function GET(request) {
     // Parse state parameter to get provider and redirect URL
     const stateParams = new URLSearchParams(state);
     const provider = stateParams.get('provider');
-    // 优先使用final_redirect（从Google传递的日历页面）
+    // 获取重定向URL
     const finalRedirect = stateParams.get('final_redirect');
-    const redirectUrl = finalRedirect || stateParams.get('redirect') || '/projects';
+    const redirectParam = stateParams.get('redirect');
+    const planId = stateParams.get('plan_id');
+    
+    console.log('OAuth回调参数:', { provider, finalRedirect, redirectParam, planId });
+    
+    // 构建重定向URL
+    let redirectUrl = '/projects'; // 默认重定向到项目页面
+    
+    if (finalRedirect) {
+      // 优先使用final_redirect
+      redirectUrl = finalRedirect;
+    } else if (redirectParam === 'payment' && planId) {
+      // 支付页面重定向
+      redirectUrl = `/payment?plan_id=${planId}`;
+    } else if (redirectParam && redirectParam.includes('teamInvitation')) {
+      // 团队邀请页面重定向
+      redirectUrl = redirectParam;
+    }
+    
+    console.log('最终重定向URL:', redirectUrl);
     
     if (!provider) {
       return NextResponse.redirect(new URL('/en/login?error=invalid_state', request.url));
@@ -421,14 +440,26 @@ export async function GET(request) {
       });
       
       // 重定向到指定的URL
-      // 检查redirectUrl是否已包含/en前缀
-      const redirectWithLocale = redirectUrl.startsWith('/en') 
-        ? redirectUrl 
-        : `/en${redirectUrl}`;
-      console.log('重定向到:', redirectWithLocale);
+      const locale = 'en'; // 默认使用英文locale
+      
+      // 处理不同类型的重定向URL
+      let finalDestination;
+      
+      if (redirectUrl.startsWith('/') && !redirectUrl.startsWith(`/${locale}`)) {
+        // 如果是相对路径并且没有locale前缀
+        finalDestination = `/${locale}${redirectUrl}`;
+      } else if (redirectUrl.startsWith('/')) {
+        // 如果已经包含了locale前缀
+        finalDestination = redirectUrl;
+      } else {
+        // 其他情况，确保添加locale前缀
+        finalDestination = `/${locale}/${redirectUrl}`;
+      }
+      
+      console.log('最终重定向目标:', finalDestination);
       
       // Redirect to specified URL or dashboard
-      return NextResponse.redirect(new URL(redirectWithLocale, request.url));
+      return NextResponse.redirect(new URL(finalDestination, request.url));
     } catch (authError) {
       console.error('Authentication error:', authError);
       return NextResponse.redirect(new URL(`/en/login?error=auth_error&message=${encodeURIComponent(authError.message)}`, request.url));

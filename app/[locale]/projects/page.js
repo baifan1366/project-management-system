@@ -8,9 +8,14 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarIcon, EyeIcon, CheckCircleIcon, PlusCircleIcon, MessageSquareIcon } from "lucide-react";
+import { CalendarIcon, EyeIcon, CheckCircleIcon, PlusCircleIcon, MessageSquareIcon, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getSubscriptionLimit } from '@/lib/subscriptionService';
+import { useDispatch } from 'react-redux';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
+import useGetUser from '@/lib/hooks/useGetUser';
+import CreateProjectDialog from '@/components/CreateProject';
 
 export default function ProjectsPage() {
   const { locale } = useParams();
@@ -18,6 +23,9 @@ export default function ProjectsPage() {
   const { projects, status } = useSelector(( state) => state.projects);
   const t = useTranslations('Projects');
   const [formattedProjects, setFormattedProjects] = useState([]);
+  const dispatch = useDispatch();
+  const { user } = useGetUser();
+  const [openCreateDialog, setOpenCreateDialog] = useState(false);
 
   useEffect(() => {
     if (projects.length > 0) {
@@ -44,6 +52,36 @@ export default function ProjectsPage() {
     window.open(`https://teams.microsoft.com/l/chat/0/0?users=${projectId}`, '_blank');
   };
 
+  // 添加检查订阅限制的函数
+  const checkLimit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      if (!user || !user.id) {
+        console.error('User not authenticated');
+        router.push(`/${locale}/login`);
+        return;
+      }
+      
+      const limitCheck = await getSubscriptionLimit(user.id, 'create_project');
+      
+      if (limitCheck && !limitCheck.allowed) {
+        // 使用 Redux 的 limitExceeded action 显示限制模态框
+        dispatch(limitExceeded({
+          actionType: 'create_project',
+          origin: 'projects/createProject',
+          limitInfo: limitCheck
+        }));
+        return;
+      }
+      
+      // 限制检查通过，跳转到创建项目页面
+      router.push(`/${locale}/createProject`);
+    } catch (error) {
+      console.error('检查订阅限制失败:', error);
+    }
+  };
+
   if (status === 'loading') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -67,13 +105,14 @@ export default function ProjectsPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold tracking-tight">{t('projects')}</h1>
 
-          <Link
-            href={`/${locale}/createProject`}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 shadow-md hover:shadow-lg"
-          >
-            {t('createNewProject')}
-          </Link>
-
+        <Button
+          onClick={() => setOpenCreateDialog(true)}
+          size="icon"
+          variant="outline"
+          className="inline-flex items-center justify-center transition-colors px-2 py-2"
+        >
+          <Plus size={20}/>
+        </Button>
       </div>
       <ScrollArea className="h-[calc(100vh-10rem)]">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -96,8 +135,10 @@ export default function ProjectsPage() {
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/0 to-primary/0 opacity-0 group-hover:opacity-100 group-hover:via-primary/10 transition-opacity duration-700 pointer-events-none"></div>
                 
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-xl group-hover:text-primary transition-colors duration-300">
-                    {project.project_name}
+                  <CardTitle className="text-xl group-hover:text-primary transition-colors duration-300">
+                    <div className="break-all hyphens-auto overflow-wrap-anywhere whitespace-normal overflow-hidden">
+                      {project.project_name}
+                    </div>
                   </CardTitle>
                   <CardDescription className="line-clamp-2 mt-1">{project.description}</CardDescription>
                 </CardHeader>
@@ -170,6 +211,7 @@ export default function ProjectsPage() {
           )}
         </div>
       </ScrollArea>
+      <CreateProjectDialog open={openCreateDialog} onOpenChange={setOpenCreateDialog} />
     </div>
   );
 }

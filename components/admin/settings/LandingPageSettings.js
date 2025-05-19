@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/lib/supabase';
+import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 
 export default function LandingPageSettings() {
   // const { toast } = useToast();
@@ -15,9 +16,13 @@ export default function LandingPageSettings() {
   const [sections, setSections] = useState([]);
   const [featuresCount, setFeaturesCount] = useState(1);
   const [cardsCount, setCardsCount] = useState(1);
-  const [isCollapsed, setIsCollapsed] = useState([false, false, false]);
+  const [isCollapsed, setIsCollapsed] = useState({
+    hero: false,
+    features: false,
+    solutions: false
+  });
 
-  // Form states for each section
+  // Format states for each section
   const [heroSection, setHeroSection] = useState({
     h1: '',
     mediaType: 'video',
@@ -41,6 +46,14 @@ export default function LandingPageSettings() {
   useEffect(() => {
     fetchSections();
   }, []);
+
+  // Toggle section collapse state
+  const toggleSection = (section) => {
+    setIsCollapsed(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   const fetchSections = async () => {
     try {
@@ -523,236 +536,181 @@ export default function LandingPageSettings() {
       
       {/* Hero Section */}
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold py-2 border-b">Hero Section</h2>
-        <Card className="p-6 shadow-md">
-    <div className="space-y-6">
-            <div>
-              <Label htmlFor="hero-title">H1:</Label>
-              <Input
-                id="hero-title"
-                placeholder="Enter your text here..."
-                value={heroSection.h1}
-                onChange={(e) => setHeroSection(prev => ({ ...prev, h1: e.target.value }))}
-                className="mt-1"
-              />
-            </div>
-            
-            <div>
-              <Label>Media File:</Label>
-              <Tabs defaultValue="video" value={heroSection.mediaType} className="mt-1">
-        <TabsList>
-          <TabsTrigger value="video">Video</TabsTrigger>
-                  <TabsTrigger value="image">Images</TabsTrigger>
-        </TabsList>
-
-                <TabsContent value="video" className="space-y-4 mt-2">
-            <Input
-              type="file"
-              accept="video/*"
-                    onChange={handleHeroMediaChange}
-            />
-                  {(heroSection.mediaFile || heroSection.mediaUrl) && (
-              <div className="mt-4">
-                <video
-                  controls
-                        className="max-w-full h-auto rounded-lg"
-                        src={heroSection.mediaFile ? URL.createObjectURL(heroSection.mediaFile) : heroSection.mediaUrl}
+        <div 
+          className="flex justify-between items-center py-2 border-b cursor-pointer" 
+          onClick={() => toggleSection('hero')}
+        >
+          <h2 className="text-2xl font-bold">Hero Section</h2>
+          <button className="p-1 rounded-full hover:bg-gray-100">
+            {isCollapsed.hero ? <FaChevronDown /> : <FaChevronUp />}
+          </button>
+        </div>
+        
+        {!isCollapsed.hero && (
+          <Card className="p-6 shadow-md">
+            <div className="space-y-6">
+              <div>
+                <Label htmlFor="hero-title">H1:</Label>
+                <Input
+                  id="hero-title"
+                  placeholder="Enter your text here..."
+                  value={heroSection.h1}
+                  onChange={(e) => setHeroSection(prev => ({ ...prev, h1: e.target.value }))}
+                  className="mt-1"
                 />
               </div>
-            )}
-        </TabsContent>
+              
+              <div>
+                <Label>Media File:</Label>
+                <Tabs defaultValue="video" value={heroSection.mediaType} className="mt-1">
+                  <TabsList>
+                    <TabsTrigger value="video">Video</TabsTrigger>
+                    <TabsTrigger value="image">Images</TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="image" className="space-y-4 mt-2">
-            <Input
-              type="file"
-              accept="image/*"
-                    onChange={handleHeroMediaChange}
-                  />
-                  {(heroSection.mediaFile || heroSection.mediaUrl) && (
-                    <div className="mt-4">
-                      <img
-                        className="max-w-full h-auto rounded-lg"
-                        src={heroSection.mediaFile ? URL.createObjectURL(heroSection.mediaFile) : heroSection.mediaUrl}
-                        alt="Hero image"
-                      />
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
+                  <TabsContent value="video" className="space-y-4 mt-2">
+                    <Input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleHeroMediaChange}
+                    />
+                    {(heroSection.mediaFile || heroSection.mediaUrl) && (
+                      <div className="mt-4">
+                        <video
+                          controls
+                          className="max-w-full h-auto rounded-lg"
+                          src={heroSection.mediaFile ? URL.createObjectURL(heroSection.mediaFile) : heroSection.mediaUrl}
+                        />
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="image" className="space-y-4 mt-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleHeroMediaChange}
+                    />
+                    {(heroSection.mediaFile || heroSection.mediaUrl) && (
+                      <div className="mt-4">
+                        <img
+                          className="max-w-full h-auto rounded-lg"
+                          src={heroSection.mediaFile ? URL.createObjectURL(heroSection.mediaFile) : heroSection.mediaUrl}
+                          alt="Hero image"
+                        />
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        )}
       </div>
       
       {/* Features Section */}
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold py-2 border-b">Features Section</h2>
-        <Card className="p-6 shadow-md">
-          <div className="space-y-8">
-            {featuresSection.features && featuresSection.features.map((feature, index) => (
-              <div key={index} className="p-6 border rounded-lg relative bg-gray-50">
-                <h3 className="font-medium mb-4">Feature {index + 1}:</h3>
-                
-                {index >= 1 && (
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="absolute top-2 right-2" 
-                    onClick={() => removeFeature(index)}
-                  >
-                    &times;
-                  </Button>
-                )}
-                
-                <div className="space-y-6">
-                  <div>
-                    <Label htmlFor={`feature-h2-${index}`}>H2:</Label>
-                    <Input
-                      id={`feature-h2-${index}`}
-                      placeholder="Advanced Features"
-                      value={feature.h2}
-                      onChange={(e) => {
-                        const updatedFeatures = [...featuresSection.features];
-                        updatedFeatures[index].h2 = e.target.value;
-                        setFeaturesSection({ ...featuresSection, features: updatedFeatures });
-                      }}
-                      className="mt-1"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor={`feature-span-${index}`}>Span:</Label>
-                    <Input
-                      id={`feature-span-${index}`}
-                      placeholder="Discover our powerful features that help you work smarter"
-                      value={feature.span}
-                      onChange={(e) => {
-                        const updatedFeatures = [...featuresSection.features];
-                        updatedFeatures[index].span = e.target.value;
-                        setFeaturesSection({ ...featuresSection, features: updatedFeatures });
-                      }}
-                      className="mt-1"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label>Media File:</Label>
-                    <Tabs defaultValue="video" value={feature.mediaType} className="mt-1">
-                      <TabsList>
-                        <TabsTrigger value="video">Video</TabsTrigger>
-                        <TabsTrigger value="image">Images</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="video" className="space-y-4 mt-2">
-                        <Input
-                          type="file"
-                          accept="video/*"
-                          onChange={(e) => handleFeatureMediaChange(e, index)}
-                        />
-                        {(feature.mediaFile || feature.mediaUrl) && (
-                          <div className="mt-4">
-                            <video
-                              controls
-                              className="max-w-full h-auto rounded-lg"
-                              src={feature.mediaFile ? URL.createObjectURL(feature.mediaFile) : feature.mediaUrl}
-                            />
-                          </div>
-                        )}
-                      </TabsContent>
-                      
-                      <TabsContent value="image" className="space-y-4 mt-2">
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleFeatureMediaChange(e, index)}
-                        />
-                        {(feature.mediaFile || feature.mediaUrl) && (
-                          <div className="mt-4">
-                            <img
-                              className="max-w-full h-auto rounded-lg"
-                              src={feature.mediaFile ? URL.createObjectURL(feature.mediaFile) : feature.mediaUrl}
-                              alt={`Feature ${index + 1} image`}
-                            />
-                          </div>
-                        )}
-                      </TabsContent>
-                    </Tabs>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            <Button 
-              className="w-full py-4 bg-primary text-white hover:bg-primary/90" 
-              onClick={addFeature}
-            >
-              Add A New Feature
-            </Button>
-          </div>
-        </Card>
-      </div>
-      
-      {/* Solutions Section */}
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold py-2 border-b">Solution Section</h2>
-        <Card className="p-6 shadow-md">
-          <div className="space-y-6">
-            <div>
-              <Label htmlFor="solution-title">H2:</Label>
-              <Input
-                id="solution-title"
-                placeholder="Our Solutions"
-                value={solutionsSection.h2}
-                onChange={(e) => setSolutionsSection(prev => ({ ...prev, h2: e.target.value }))}
-                className="mt-1"
-              />
-            </div>
-            
-            <div className="space-y-8 mt-6">
-              {solutionsSection.cards && solutionsSection.cards.map((card, index) => (
+        <div 
+          className="flex justify-between items-center py-2 border-b cursor-pointer" 
+          onClick={() => toggleSection('features')}
+        >
+          <h2 className="text-2xl font-bold">Features Section</h2>
+          <button className="p-1 rounded-full hover:bg-gray-100">
+            {isCollapsed.features ? <FaChevronDown /> : <FaChevronUp />}
+          </button>
+        </div>
+        
+        {!isCollapsed.features && (
+          <Card className="p-6 shadow-md">
+            <div className="space-y-8">
+              {featuresSection.features && featuresSection.features.map((feature, index) => (
                 <div key={index} className="p-6 border rounded-lg relative bg-gray-50">
-                  <h3 className="font-medium mb-4">Card {index + 1}:</h3>
+                  <h3 className="font-medium mb-4">Feature {index + 1}:</h3>
                   
                   {index >= 1 && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
                       className="absolute top-2 right-2" 
-                      onClick={() => removeCard(index)}
-                  >
+                      onClick={() => removeFeature(index)}
+                    >
                       &times;
-                  </Button>
+                    </Button>
                   )}
                   
                   <div className="space-y-6">
                     <div>
-                      <Label htmlFor={`card-title-${index}`}>Card Title:</Label>
+                      <Label htmlFor={`feature-h2-${index}`}>H2:</Label>
                       <Input
-                        id={`card-title-${index}`}
-                        placeholder="Workflow"
-                        value={card.title}
+                        id={`feature-h2-${index}`}
+                        placeholder="Advanced Features"
+                        value={feature.h2}
                         onChange={(e) => {
-                          const updatedCards = [...solutionsSection.cards];
-                          updatedCards[index].title = e.target.value;
-                          setSolutionsSection({ ...solutionsSection, cards: updatedCards });
+                          const updatedFeatures = [...featuresSection.features];
+                          updatedFeatures[index].h2 = e.target.value;
+                          setFeaturesSection({ ...featuresSection, features: updatedFeatures });
                         }}
                         className="mt-1"
                       />
                     </div>
                     
                     <div>
-                      <Label htmlFor={`card-content-${index}`}>Card Content:</Label>
+                      <Label htmlFor={`feature-span-${index}`}>Span:</Label>
                       <Input
-                        id={`card-content-${index}`}
-                        placeholder="Automate your workflows with AI"
-                        value={card.content}
+                        id={`feature-span-${index}`}
+                        placeholder="Discover our powerful features that help you work smarter"
+                        value={feature.span}
                         onChange={(e) => {
-                          const updatedCards = [...solutionsSection.cards];
-                          updatedCards[index].content = e.target.value;
-                          setSolutionsSection({ ...solutionsSection, cards: updatedCards });
+                          const updatedFeatures = [...featuresSection.features];
+                          updatedFeatures[index].span = e.target.value;
+                          setFeaturesSection({ ...featuresSection, features: updatedFeatures });
                         }}
                         className="mt-1"
                       />
+                    </div>
+                    
+                    <div>
+                      <Label>Media File:</Label>
+                      <Tabs defaultValue="video" value={feature.mediaType} className="mt-1">
+                        <TabsList>
+                          <TabsTrigger value="video">Video</TabsTrigger>
+                          <TabsTrigger value="image">Images</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="video" className="space-y-4 mt-2">
+                          <Input
+                            type="file"
+                            accept="video/*"
+                            onChange={(e) => handleFeatureMediaChange(e, index)}
+                          />
+                          {(feature.mediaFile || feature.mediaUrl) && (
+                            <div className="mt-4">
+                              <video
+                                controls
+                                className="max-w-full h-auto rounded-lg"
+                                src={feature.mediaFile ? URL.createObjectURL(feature.mediaFile) : feature.mediaUrl}
+                              />
+                            </div>
+                          )}
+                        </TabsContent>
+                        
+                        <TabsContent value="image" className="space-y-4 mt-2">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFeatureMediaChange(e, index)}
+                          />
+                          {(feature.mediaFile || feature.mediaUrl) && (
+                            <div className="mt-4">
+                              <img
+                                className="max-w-full h-auto rounded-lg"
+                                src={feature.mediaFile ? URL.createObjectURL(feature.mediaFile) : feature.mediaUrl}
+                                alt={`Feature ${index + 1} image`}
+                              />
+                            </div>
+                          )}
+                        </TabsContent>
+                      </Tabs>
                     </div>
                   </div>
                 </div>
@@ -760,13 +718,101 @@ export default function LandingPageSettings() {
               
               <Button 
                 className="w-full py-4 bg-primary text-white hover:bg-primary/90" 
-                onClick={addCard}
+                onClick={addFeature}
               >
-                Add A New Card
+                Add A New Feature
               </Button>
             </div>
-          </div>
-        </Card>
+          </Card>
+        )}
+      </div>
+      
+      {/* Solutions Section */}
+      <div className="space-y-4">
+        <div 
+          className="flex justify-between items-center py-2 border-b cursor-pointer" 
+          onClick={() => toggleSection('solutions')}
+        >
+          <h2 className="text-2xl font-bold">Solution Section</h2>
+          <button className="p-1 rounded-full hover:bg-gray-100">
+            {isCollapsed.solutions ? <FaChevronDown /> : <FaChevronUp />}
+          </button>
+        </div>
+        
+        {!isCollapsed.solutions && (
+          <Card className="p-6 shadow-md">
+            <div className="space-y-6">
+              <div>
+                <Label htmlFor="solution-title">H2:</Label>
+                <Input
+                  id="solution-title"
+                  placeholder="Our Solutions"
+                  value={solutionsSection.h2}
+                  onChange={(e) => setSolutionsSection(prev => ({ ...prev, h2: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              
+              <div className="space-y-8 mt-6">
+                {solutionsSection.cards && solutionsSection.cards.map((card, index) => (
+                  <div key={index} className="p-6 border rounded-lg relative bg-gray-50">
+                    <h3 className="font-medium mb-4">Card {index + 1}:</h3>
+                    
+                    {index >= 1 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-2 right-2" 
+                        onClick={() => removeCard(index)}
+                      >
+                        &times;
+                      </Button>
+                    )}
+                    
+                    <div className="space-y-6">
+                      <div>
+                        <Label htmlFor={`card-title-${index}`}>Card Title:</Label>
+                        <Input
+                          id={`card-title-${index}`}
+                          placeholder="Workflow"
+                          value={card.title}
+                          onChange={(e) => {
+                            const updatedCards = [...solutionsSection.cards];
+                            updatedCards[index].title = e.target.value;
+                            setSolutionsSection({ ...solutionsSection, cards: updatedCards });
+                          }}
+                          className="mt-1"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor={`card-content-${index}`}>Card Content:</Label>
+                        <Input
+                          id={`card-content-${index}`}
+                          placeholder="Automate your workflows with AI"
+                          value={card.content}
+                          onChange={(e) => {
+                            const updatedCards = [...solutionsSection.cards];
+                            updatedCards[index].content = e.target.value;
+                            setSolutionsSection({ ...solutionsSection, cards: updatedCards });
+                          }}
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button 
+                  className="w-full py-4 bg-primary text-white hover:bg-primary/90" 
+                  onClick={addCard}
+                >
+                  Add A New Card
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
       
       <Button 

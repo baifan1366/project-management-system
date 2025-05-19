@@ -21,6 +21,9 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
 
+  // Call useGetUser at component level
+  const { user, isAuthenticated } = useGetUser();
+
   // 获取 URL 参数
   const planId = searchParams.get('plan_id');
   const userId = searchParams.get('user_id');
@@ -80,19 +83,16 @@ export default function PaymentPage() {
   }, []);
 
   useEffect(() => {
-    const fetchPlanDetails = async () =>{
+    const fetchPlanDetails = async () => {
       if (!planId){
         console.error('No plan ID provided');
         setLoading(false);
         return;
       }
 
-      try{
-        // 获取用户信息
-        const { user} = useGetUser();
-
-        // 如果用户未登录，则重定向到登录页面
-        if(!user){
+      try {
+        // Use the user from component-level hook
+        if (!user) {
           router.push('/login?redirect=payment&plan_id=' + planId);
           return;
         }
@@ -101,17 +101,15 @@ export default function PaymentPage() {
         const {data, error} = await supabase
           .from('subscription_plan')
           .select('*')
-          //eq 表示等于
-          .eq('id',planId)
-          //single 表示只返回一个结果
+          .eq('id', planId)
           .single();
 
-        if(error){
+        if (error) {
           throw new Error('Failed to fetch plan details');
         }
         console.log('Plan details:', data);
         setPlanDetails(data);
-      }catch (err) {
+      } catch (err) {
         console.error('Error fetching plan details:', err);
       } finally {
         setLoading(false);
@@ -119,7 +117,7 @@ export default function PaymentPage() {
     };
 
     fetchPlanDetails();
-  },[planId, router])
+  }, [planId, router, user]);
 
   useEffect(() => {
     const initializePayment = async () => {

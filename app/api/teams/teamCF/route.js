@@ -81,9 +81,9 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url)
     const teamId = searchParams.get('teamId')
-    const customFieldId = searchParams.get('customFieldId')
+    const teamCFId = searchParams.get('teamCFId')
 
-    if (!teamId || !customFieldId) {
+    if (!teamId || !teamCFId) {
       return NextResponse.json({ error: '缺少必需参数' }, { status: 400 })
     }
 
@@ -91,7 +91,7 @@ export async function DELETE(request) {
       .from('team_custom_field')
       .delete()
       .eq('team_id', teamId)
-      .eq('custom_field_id', customFieldId)
+      .eq('id', teamCFId)
 
     if (error) throw error
 

@@ -16,6 +16,22 @@ const requestCache = {
   taskLinks: false // 添加任务链接的缓存标志
 };
 
+// 添加一个新函数用于重置指定团队的缓存
+export const resetTeamCache = (teamId) => {
+  if (teamId) {
+    requestCache.sections[teamId] = false;
+    // 重置其他相关缓存
+    requestCache.taskLinks = false;
+    
+    // 如果有teamTags缓存，也重置相关的
+    Object.keys(requestCache.teamTags).forEach(key => {
+      if (key.startsWith(`${teamId}_`)) {
+        requestCache.teamTags[key] = false;
+      }
+    });
+  }
+};
+
 export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0, refreshKey) => {
   const dispatch = useDispatch();
   const allTags = useSelector(state => state.tags.tags);
@@ -37,6 +53,21 @@ export const useTimelineData = (teamId, teamCFId, gantt, refreshFlag = 0, refres
     taskLinksFetched: false // 添加任务链接的本地跟踪标志
   });
 
+  // 当refreshKey或refreshFlag变化时重置本地请求跟踪器
+  useEffect(() => {
+    localRequestTracker.current = {
+      allTagsFetched: false,
+      teamTagsFetched: false,
+      sectionsFetched: false,
+      taskLinksFetched: false
+    };
+    
+    // 重置特定团队的缓存
+    if (teamId) {
+      resetTeamCache(teamId);
+    }
+  }, [refreshKey, teamId]); // 添加teamId以确保在团队ID变化时也重置缓存
+  
   // 获取所有通用标签 - 全局只请求一次
   useEffect(() => {
     if (!requestCache.allTags && !localRequestTracker.current.allTagsFetched) {

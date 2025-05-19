@@ -417,7 +417,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
             <DialogFooter className="flex justify-end gap-3">
               <Button
                 type="button"
-                variant={themeColor}
+                variant="outline"
                 onClick={onClose}
                 disabled={isLoading}
               >

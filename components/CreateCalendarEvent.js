@@ -27,6 +27,21 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
+  const { user: session } = useGetUser();
+  
+  // Debug: Check Google auth status when component mounts
+  useEffect(() => {
+    if (eventType === 'google') {
+      console.log("Google connection status:", { 
+        isGoogleConnected, 
+        hasProviderToken: !!session?.provider_token,
+        hasRefreshToken: !!session?.provider_refresh_token,
+        hasGoogleAccessToken: !!session?.google_access_token,
+        hasGoogleRefreshToken: !!session?.google_refresh_token,
+        session: JSON.stringify(session)
+      });
+    }
+  }, [eventType, session, isGoogleConnected]);
   
   // 事件表单数据
   const [formData, setFormData] = useState({
@@ -71,7 +86,6 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
   const fetchUsers = async () => {
     try {
       setIsLoadingUsers(true);
-      const { user: session } = useGetUser();
       
       if (!session) {
         throw new Error(t('notLoggedIn'));
@@ -99,7 +113,6 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
   const searchUsers = async (query) => {
     try {
       setIsLoadingUsers(true);
-      const { user: session } = useGetUser();
       
       if (!session) {
         throw new Error(t('notLoggedIn'));
@@ -184,8 +197,6 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         }
       } else if (eventType === 'personal') {
         // 创建个人日历事件
-        const { user: session } = useGetUser();
-        
         if (!session) {
           throw new Error('未登录状态');
         }
@@ -227,13 +238,61 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
           ? format(formData.endDate, 'yyyy-MM-dd')
           : format(formData.endDate, 'yyyy-MM-dd') + 'T' + formData.endTime + ':00';
         
-        // 获取当前会话信息
-        const { user: session } = useGetUser();
-        const accessToken = session?.provider_token;
-        const refreshToken = session?.provider_refresh_token;
+        // Check for Google tokens in the user session
+        let accessToken = session?.google_access_token || null;
+        let refreshToken = session?.google_refresh_token || null;
         
+        // Add debug logging
+        console.log("Google auth tokens check:", { 
+          hasAccessToken: !!accessToken, 
+          hasRefreshToken: !!refreshToken
+        });
+        
+        // Check if we have either token
         if (!accessToken && !refreshToken) {
-          throw new Error('No Google tokens available');
+          // Instead of throwing an error, show a toast and return early
+          toast.error(t('connectGoogleFirst') || 'Please connect your Google account first');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Try to refresh the token if we only have a refresh token or if token might be expired
+        if ((!accessToken && refreshToken) || (refreshToken && session?.id)) {
+          try {
+            console.log("Attempting to refresh token with:", { 
+              refreshTokenLength: refreshToken?.length || 0,
+              userId: session?.id
+            });
+            
+            const response = await fetch('/api/refresh-google-token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ 
+                refresh_token: refreshToken,
+                userId: session.id 
+              }),
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              accessToken = data.access_token;
+              console.log("Successfully refreshed Google token");
+            } else {
+              const errorText = await response.text();
+              console.error("Failed to refresh Google token. Status:", response.status);
+              console.error("Error details:", errorText);
+              toast.error(`${t('tokenRefreshFailed') || 'Failed to refresh your Google authorization'} (${response.status})`);
+              setIsLoading(false);
+              return;
+            }
+          } catch (error) {
+            console.error("Error refreshing Google token:", error);
+            toast.error(t('tokenRefreshError') || 'Error refreshing your Google authorization');
+            setIsLoading(false);
+            return;
+          }
         }
         
         // 准备参与者列表
@@ -310,7 +369,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
               .insert({
                 user_id: user.id,
                 title: `${t('meetingInvitation')}: ${formData.title}`,
-                content: `${session.user.user_metadata.name || '用户'} ${t('invitedYouToMeeting')}`,
+                content: `${session.name || '用户'} ${t('invitedYouToMeeting')}`,
                 type: 'SYSTEM',
                 related_entity_type: 'calendar_event',
                 related_entity_id: eventResponseData.event.id,
@@ -321,7 +380,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
                   startTime: startDateTime,
                   endTime: endDateTime,
                   isMeetingInvitation: true,
-                  inviterId: session.user.id
+                  inviterId: session.id
                 },
                 is_read: false
               });
@@ -379,6 +438,23 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
             <TabsTrigger value="google">Google {t('event')}</TabsTrigger>
           </TabsList>
         </Tabs>
+        
+        {eventType === 'google' && !isGoogleConnected && (
+          <div className="my-4 p-3 border rounded-md bg-amber-50 text-amber-800">
+            <p className="text-sm font-medium mb-2">{t('googleAccountNeeded') || 'Connect your Google account to create Google Calendar events'}</p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => window.location.href = '/api/auth/google?calendar=true&redirectTo=/calendar'}
+              className="flex items-center gap-2 text-xs"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="#4285F4"/>
+              </svg>
+              {t('connectGoogleAccount') || 'Connect Google Account'}
+            </Button>
+          </div>
+        )}
         
         <div className="flex-1 overflow-y-auto pr-2 my-4">
           <form className="space-y-4" id="eventForm">

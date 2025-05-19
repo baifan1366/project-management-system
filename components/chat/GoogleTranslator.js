@@ -4,28 +4,34 @@ import { useState, useImperativeHandle, forwardRef } from 'react';
 import { Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 /**
- * GoogleTranslator 组件
- * 包装消息内容，并在右下角显示翻译按钮
- * 当用户点击翻译按钮时，调用Google Translate API翻译内容
+ * GoogleTranslator component
+ * Wraps message content and displays a translation button in the bottom right
+ * When the user clicks the translation button, the Google Translate API is called to translate the content
+ * Uses the user's language preference by default
  */
 const GoogleTranslator = forwardRef(({ 
   children, 
   content,
-  targetLang = 'en', // 默认翻译目标语言为英文
+  targetLang, // Remove default value to use user's language preference
   className,
   buttonClassName,
-  showButton = true // 添加显示按钮属性，默认为true
+  showButton = true // Display button attribute, defaults to true
 }, ref) => {
   const t = useTranslations('Chat');
+  const { user } = useGetUser(); // Get user data including language preference
   const [translatedText, setTranslatedText] = useState(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Use user's language preference as default, fallback to 'en' if not available
+  const effectiveTargetLang = targetLang || (user?.language || 'en');
 
-  // 翻译内容
+  // Translate content
   const translateText = async () => {
-    // 如果已经有翻译，则切换回原文
+    // If already translated, switch back to original text
     if (translatedText) {
       setTranslatedText(null);
       return;
@@ -42,26 +48,26 @@ const GoogleTranslator = forwardRef(({
         },
         body: JSON.stringify({
           text: content,
-          targetLang: targetLang,
+          targetLang: effectiveTargetLang,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || '翻译失败');
+        throw new Error(errorData.error || 'Translation failed');
       }
 
       const data = await response.json();
       setTranslatedText(data.translatedText);
     } catch (err) {
-      console.error('翻译出错:', err);
-      setError(err.message || '翻译服务出错');
+      console.error('Translation error:', err);
+      setError(err.message || 'Translation service error');
     } finally {
       setIsTranslating(false);
     }
   };
 
-  // 暴露translateText方法给父组件
+  // Expose translateText method to parent component
   useImperativeHandle(ref, () => ({
     translateText,
     isTranslated: translatedText !== null
@@ -69,10 +75,10 @@ const GoogleTranslator = forwardRef(({
 
   return (
     <div className={cn("relative w-full", className)}>
-      {/* 显示原始内容或翻译后的内容 */}
+      {/* Display original content or translated content */}
       {translatedText !== null ? translatedText : children}
       
-      {/* 翻译按钮 - 根据showButton属性决定是否显示 */}
+      {/* Translation button - display based on showButton property */}
       {showButton && (
         <button
           onClick={translateText}
@@ -88,7 +94,7 @@ const GoogleTranslator = forwardRef(({
         </button>
       )}
       
-      {/* 错误提示 */}
+      {/* Error message */}
       {error && (
         <div className="text-xs text-red-500 mt-1">
           {error}

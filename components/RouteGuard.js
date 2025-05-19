@@ -12,9 +12,16 @@ const PUBLIC_PATHS = [
   '/auth/verify',
   '/terms',
   '/privacy',
-  '/adminLogin',
+  '/admin/adminLogin',
 ];
-const SPECIAL_PATHS = ['/auth', '/reset-password', '/pricing', '/payment', '/adminLogin' ]; // Special paths that can be accessed even when logged in
+const SPECIAL_PATHS = [
+  '/auth', 
+  '/reset-password', 
+  '/pricing', 
+  '/payment', 
+  '/admin/adminLogin',
+  '/teamInvitation'
+]; // Special paths that can be accessed even when logged in
 
 export default function RouteGuard({ children }) {
   const router = useRouter();
@@ -22,38 +29,92 @@ export default function RouteGuard({ children }) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      // check for auth_token (will only work if not httpOnly)
-      const isLoggedIn = Cookies.get('auth_token');
+      // Check if it's an admin path
+      const isAdminPath = pathname.startsWith('/admin');
+      
+      // Check auth based on path type
+      let isLoggedIn = false;
+      if (isAdminPath) {
+        // For admin paths, check localStorage
+        try {
+          const adminData = localStorage.getItem('adminData');
+          if (adminData) {
+            const parsedData = JSON.parse(adminData);
+            isLoggedIn = !!(parsedData && parsedData.email);
+          }
+        } catch (error) {
+          console.error('Error checking admin auth:', error);
+        }
+      } else {
+        // For regular paths, check cookie
+        isLoggedIn = !!Cookies.get('auth_token');
+      }
+      
+      // Get redirect URL from query string if exists
+      const searchParams = new URLSearchParams(window.location.search);
+      const redirectUrl = searchParams.get('redirect');
       
       // Check if current path is public
       const isPublicPath = PUBLIC_PATHS.some(path => pathname.includes(path));
       
-      // Check if current path is special (like reset password)
+      // Check if current path is special (like reset password or team invitation)
       const isSpecialPath = SPECIAL_PATHS.some(path => pathname.includes(path));
+      
+      // Check if it's a team invitation path
+      const isTeamInvitationPath = pathname.includes('/teamInvitation');
       
       // Get current locale
       const locale = pathname.split('/')[1] || 'en';
 
       console.log('🔒 Auth check:', { 
         path: pathname,
+        isAdminPath,
         isLoggedIn,
-        hasAuthToken: Boolean(isLoggedIn),
-        authTokenPrefix: isLoggedIn ? `${isLoggedIn.substring(0, 10)}...` : null,
+        hasAuthToken: isLoggedIn,
         isPublicPath,
-        isSpecialPath
+        isSpecialPath,
+        isTeamInvitationPath,
+        redirectUrl
       });
 
-      // If user is not logged in and not accessing public or special paths, redirect to login
-      if (!isLoggedIn && !isPublicPath && !isSpecialPath) {
-        console.log('⚠️ Not logged in, redirecting to login');
-        router.replace(`/${locale}/login`);
+      // Handle team invitation path
+      if (isTeamInvitationPath && !isLoggedIn) {
+        console.log('⚠️ Accessing team invitation page but not logged in, redirecting to login');
+        const redirectPath = pathname.replace(`/${locale}`, '');
+        router.replace(`/${locale}/login?redirect=${encodeURIComponent(redirectPath)}`);
         return;
       }
 
-      // If user is logged in and accessing login/signup pages (but not special paths), redirect to projects
+      // Handle redirect URL for logged in users
+      if (isLoggedIn && redirectUrl) {
+        console.log('⚠️ User is logged in and has redirect parameter, handling redirect:', redirectUrl);
+        if (redirectUrl.includes('teamInvitation')) {
+          const redirectPath = redirectUrl.startsWith('/') ? redirectUrl : `/${redirectUrl}`;
+          console.log('Redirecting to team invitation page:', redirectPath);
+          router.replace(`/${locale}${redirectPath}`);
+          return;
+        }
+      }
+
+      // Handle authentication redirects
+      if (!isLoggedIn && !isPublicPath && !isSpecialPath) {
+        console.log('⚠️ Not logged in, redirecting to appropriate login page');
+        if (isAdminPath) {
+          router.replace('/admin/adminLogin');
+        } else {
+          router.replace(`/${locale}/login${redirectUrl ? `?redirect=${redirectUrl}` : ''}`);
+        }
+        return;
+      }
+
+      // Handle logged in users accessing login pages
       if (isLoggedIn && isPublicPath && !isSpecialPath && pathname !== '/') {
-        console.log('⚠️ Already logged in, redirecting to projects');
-        router.replace(`/${locale}/projects`);
+        console.log('⚠️ Already logged in, redirecting to appropriate dashboard');
+        if (isAdminPath) {
+          router.replace('/admin/adminDashboard');
+        } else if (!redirectUrl) {
+          router.replace(`/${locale}/projects`);
+        }
         return;
       }
     };

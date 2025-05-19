@@ -126,25 +126,12 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 3) { // Files
-    valueData = {
-      team_custom_field_id: teamCustomFieldId,
-      name: "Project Files",
-      description: "Manage task-related files and documents",
-      icon: "Files",
-      value: {
-        sortBy: "createdAt",
-        showFolders: true
-      },
-      created_by: userId
-    };
-  }
-  else if (fieldData.id === 4) { // Timeline
+  else if (fieldData.id === 3) { // Timeline
     valueData = {
       team_custom_field_id: teamCustomFieldId,
       name: "Project Timeline",
       description: "Display tasks in timeline format",
-      icon: "SquareChartGantt",
+      icon: "CalendarClock",
       value: {
         zoom: "month",
         showMilestones: true,
@@ -153,26 +140,12 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 5) { // Gantt
+  else if (fieldData.id === 4) { // Kanban
     valueData = {
       team_custom_field_id: teamCustomFieldId,
-      name: "Gantt Chart",
-      description: "Project progress in Gantt chart format",
-      icon: "ChartGantt",
-      value: {
-        showCriticalPath: true,
-        showDependencies: true,
-        timeScale: "week"
-      },
-      created_by: userId
-    };
-  }
-  else if (fieldData.id === 6) { // Kanban Board
-    valueData = {
-      team_custom_field_id: teamCustomFieldId,
-      name: "Task Board",
+      name: "Kanban Board",
       description: "Kanban board for task management",
-      icon: "LayoutDashboard",
+      icon: "SquareKanban",
       value: {
         defaultView: "board",
         showCompletedTasks: true,
@@ -181,20 +154,7 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 7) { // Workflow
-    valueData = {
-      team_custom_field_id: teamCustomFieldId,
-      name: "Workflow View",
-      description: "Display tasks in workflow format",
-      icon: "LayoutDashboard",
-      value: {
-        showSteps: true,
-        autoProgress: false
-      },
-      created_by: userId
-    };
-  }
-  else if (fieldData.id === 8) { // Calendar
+  else if (fieldData.id === 5) { // Calendar
     valueData = {
       team_custom_field_id: teamCustomFieldId,
       name: "Task Calendar",
@@ -208,12 +168,65 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 9) { // Notion
+  else if (fieldData.id === 6) { // Posts
+    valueData = {
+      team_custom_field_id: teamCustomFieldId,
+      name: "Project Posts",
+      description: "Manage project-related posts and announcements",
+      icon: "Pen",
+      value: {
+        sortBy: "createdAt",
+        showAuthor: true
+      },
+      created_by: userId
+    };
+  }
+  else if (fieldData.id === 7) { // Files
+    valueData = {
+      team_custom_field_id: teamCustomFieldId,
+      name: "Project Files",
+      description: "Manage task-related files and documents",
+      icon: "Files",
+      value: {
+        sortBy: "createdAt",
+        showFolders: true
+      },
+      created_by: userId
+    };
+  }
+  else if (fieldData.id === 8) { // Gantt
+    valueData = {
+      team_custom_field_id: teamCustomFieldId,
+      name: "Gantt Chart",
+      description: "Project progress in Gantt chart format",
+      icon: "ChartGantt",
+      value: {
+        showCriticalPath: true,
+        showDependencies: true,
+        timeScale: "week"
+      },
+      created_by: userId
+    };
+  }
+  else if (fieldData.id === 9) { // Workflow
+    valueData = {
+      team_custom_field_id: teamCustomFieldId,
+      name: "Workflow View",
+      description: "Display tasks in workflow format",
+      icon: "Workflow",
+      value: {
+        showSteps: true,
+        autoProgress: false
+      },
+      created_by: userId
+    };
+  }
+  else if (fieldData.id === 10) { // Note
     valueData = {
       team_custom_field_id: teamCustomFieldId,
       name: "Project Notes",
       description: "Text field for task-related notes",
-      icon: "Text",
+      icon: "NotebookText",
       value: {
         editorType: "rich",
         autosave: true
@@ -221,12 +234,12 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
       created_by: userId
     };
   }
-  else if (fieldData.id === 10) { // Agile
+  else if (fieldData.id === 11) { // Agile
     valueData = {
       team_custom_field_id: teamCustomFieldId,
       name: "Agile Board",
       description: "Agile board for managing tasks in agile workflow",
-      icon: "Pen",
+      icon: "BookText",
       value: {
         sprintDuration: 14,
         showBurndownChart: true,

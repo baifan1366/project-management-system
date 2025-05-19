@@ -14,6 +14,9 @@ export default function PricingPage() {
   const router = useRouter()
   const params = useParams()  
   const { plans, status, error, selectedInterval } = useSelector((state) => state.plans)
+  
+  // Move the hook call to component level
+  const { user, error: userError } = useGetUser()
 
   //cta 按钮更新状态
   const [currentUserPlan, setCurrentUserPlan] = useState(null)
@@ -34,11 +37,9 @@ export default function PricingPage() {
     console.log('选择了计划:', plan);
 
     try {
-      // 获取会话
-      const { user , error } = useGetUser();
-      
-      if (error) {
-        console.error('获取会话错误:', error);
+      // Use the user from the hook called at component level
+      if (userError) {
+        console.error('获取会话错误:', userError);
         // 创建登录重定向参数
         const loginParams = new URLSearchParams({
           plan_id: plan.id.toString(),
@@ -94,34 +95,33 @@ export default function PricingPage() {
   useEffect(() => {
     const updateCtaText = async () => {
       try {
-        const result = await dispatch(fetchCurrentUserPlan());
+        const result = await dispatch(fetchCurrentUserPlan({ user }));
         const userData = result.payload;
         console.log('User data:', userData);
-        
+
         if (!userData) {
-          console.log('No user data available');
+          setCurrentUserPlan(null);
           setCtaText('Subscribe');
           return;
         }
-        
+
         const { isLoggedIn, plan } = userData;
-        
+
         if (isLoggedIn && plan) {
-          // User is logged in and has a plan
-          console.log('User plan:', plan);
           setCurrentUserPlan(plan);
+          setCtaText('Current Plan');
         } else {
-          // User is not logged in or has no plan
+          setCurrentUserPlan(null);
           setCtaText('Subscribe');
         }
       } catch (err) {
-        console.error('Error updating CTA text:', err);
+        setCurrentUserPlan(null);
         setCtaText('Subscribe');
       }
     };
 
     updateCtaText();
-  }, [dispatch]);
+  }, [dispatch, user]);
 
   // 获取每个计划的CTA文本
   const getPlanCtaText = (plan) => {
@@ -136,13 +136,14 @@ export default function PricingPage() {
     }
     
     // 检查当前计划是否与此计划匹配
-    if (currentUserPlan.plan_id === plan.id) {
-      return 'Current Active: Go to Dashboard';
+    const currentPlanId = currentUserPlan.id || currentUserPlan.plan_id;
+    if (Number(currentPlanId) === Number(plan.id)) {
+      return 'Current Plan';
     }
     
     // 判断是升级还是降级
-    const isDowngrade = currentUserPlan.plan_id > plan.id;
-    const isUpgrade = currentUserPlan.plan_id < plan.id;
+    const isDowngrade = Number(currentPlanId) > Number(plan.id);
+    const isUpgrade = Number(currentPlanId) < Number(plan.id);
     
     if (isUpgrade) {
       return 'Upgrade';

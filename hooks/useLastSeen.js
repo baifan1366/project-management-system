@@ -4,58 +4,67 @@ import { useTranslations } from 'next-intl';
 import { useUserTimezone } from './useUserTimezone';
 
 /**
- * 用于格式化用户最后在线时间的hook
- * 根据时间差返回友好的显示格式
- * @param {string} dateString - 用户上次在线的日期字符串
- * @returns {string} 格式化后的文本
+ * Custom hook for formatting user's last seen time
+ * Returns friendly formatted text based on time difference
+ * @param {string} dateString - Date string of user's last seen time
+ * @returns {string} Formatted text
  */
 export function useLastSeen() {
   const t = useTranslations('Chat');
-  const { adjustTimeByOffset } = useUserTimezone();
+  const { adjustTimeByOffset, hourFormat } = useUserTimezone();
   
   const formatLastSeen = (dateString) => {
+    // If no dateString is provided, return empty string
+    // This ensures we don't display last seen time for users who haven't been online
     if (!dateString) return '';
     
+    // Create date objects
     const date = new Date(dateString);
     const now = new Date();
-    
-    // 使用手动时区调整
+
+    // Check if the date is valid
+    if (isNaN(date.getTime())) return '';
+
+    // Then adjust both dates for display purposes
     const dateInUserTz = adjustTimeByOffset(date);
     const nowInUserTz = adjustTimeByOffset(now);
+
+    // Calculate time difference in milliseconds
+    const diffMs = now.getTime() - dateInUserTz.getTime();
     
-    const diffMs = nowInUserTz - dateInUserTz;
+    // Calculate time difference components
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
 
-    // 一分钟内：刚刚在线
+    // Less than a minute: just now
     if (diffMin < 1) {
       return t('justNow');
     }
     
-    // 一小时内：XX分钟前在线
+    // Less than an hour: XX minutes ago
     if (diffHour < 1) {
       return t('minutesAgo', { minutes: diffMin });
     }
     
-    // 今天内：XX小时前在线
-    if (diffDay < 1 && dateInUserTz.getDate() === nowInUserTz.getDate()) {
+    // Today: XX hours ago
+    if (diffDay < 1) {
       return t('hoursAgo', { hours: diffHour });
     }
     
-    // 昨天：昨天在线
+    // Yesterday: yesterday
     if (diffDay < 2) {
       return t('yesterday');
     }
     
-    // 一周内：周X在线
+    // Less than a week: day of week
     if (diffDay < 7) {
       const weekdays = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
       return t(weekdays[dateInUserTz.getDay()]);
     }
     
-    // 超过一周：显示具体日期
+    // More than a week: days ago
     return t('daysAgo', { days: diffDay });
   };
 

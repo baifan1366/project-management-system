@@ -16,6 +16,7 @@ CREATE TABLE "user" (
   "mfa_secret" VARCHAR(255), -- TOTP 秘钥
   "is_mfa_enabled" BOOLEAN DEFAULT FALSE,
   "notifications_enabled" BOOLEAN DEFAULT TRUE,
+  "notifications_settings" JSONB DEFAULT '{"emailNotifications": true, "pushNotifications": true, "weeklyDigest": true, "mentionNotifications": true, "taskAssignments": true, "taskComments": true, "dueDates": true, "teamInvitations": true}',
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "email_verified" BOOLEAN DEFAULT FALSE,
@@ -116,6 +117,7 @@ CREATE TABLE "task" (
   "tag_values" JSONB DEFAULT '{}',
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "like" UUID[] DEFAULT '{}',
+  "page_id" INT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -127,7 +129,7 @@ CREATE TABLE "tag" (
   "name" VARCHAR(255) NOT NULL,
   "description" TEXT,
   "default" BOOLEAN DEFAULT FALSE,
-  "type" TEXT NOT NULL CHECK ("type" IN ('SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'ID', 'TAGS')), 
+  "type" TEXT NOT NULL CHECK ("type" IN ('SINGLE-SELECT', 'MULTI-SELECT', 'DATE', 'PEOPLE', 'TEXT', 'NUMBER', 'ID', 'TAGS', 'FILE')), 
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -149,7 +151,7 @@ CREATE TABLE "time_entry" (
 CREATE TABLE "custom_field" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'WORKFLOW', 'KANBAN', 'AGILE', 'FILES')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'WORKFLOW', 'KANBAN', 'AGILE', 'FILES', 'POSTS')),
   "description" TEXT,
   "icon" VARCHAR(255),
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -182,6 +184,29 @@ CREATE TABLE "team_custom_field_value" (
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
 );
 
+-- Create team posts table
+CREATE TABLE "team_post" (
+  "id" SERIAL PRIMARY KEY,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "type" TEXT NOT NULL CHECK ("type" IN ('post', 'announcement')),
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "attachment_id" INT[] DEFAULT '{}', -- Array of attachments associated with the post
+  "is_pinned" BOOLEAN DEFAULT FALSE,
+  "reactions" JSONB DEFAULT '{}', -- Store reactions as {emoji: [user_ids]} format
+  "comment_id" INT[] DEFAULT '{}', -- Array of comments associated with the post
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for better performance
+CREATE INDEX idx_team_post_team_id ON "team_post"("team_id");
+CREATE INDEX idx_team_post_attachment_id ON "team_post"("attachment_id");
+CREATE INDEX idx_team_post_created_by ON "team_post"("created_by");
+CREATE INDEX idx_team_post_created_at ON "team_post"("created_at");
+CREATE INDEX idx_team_post_is_pinned ON "team_post"("is_pinned");
+CREATE INDEX idx_team_post_reactions ON "team_post" USING GIN("reactions");
 
 -- 任务模板表（用于创建任务模板）
 CREATE TABLE "task_template" (
@@ -396,45 +421,47 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER; 
 
--- 订阅计划表
-CREATE TABLE "subscription_plan" (
-  "id" SERIAL PRIMARY KEY,
-  "name" VARCHAR(50) NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
-  "price" DECIMAL(10, 2) NOT NULL,
-  "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
-  "description" TEXT,
-  "features" JSONB NOT NULL, -- 存储计划包含的功能列表
-  "max_projects" INT NOT NULL, -- 最大项目数
-  "max_teams" INT NOT NULL, -- 最大团队数
-  "max_members" INT NOT NULL, -- 最大团队成员数
-  "max_ai_chat" INT NOT NULL, -- 最大AI聊天数
-  "max_ai_task" INT NOT NULL, -- 最大AI任务数
-  "max_ai_workflow" INT NOT NULL, -- 最大AI工作流数
-  "is_active" BOOLEAN DEFAULT TRUE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+  -- 订阅计划表
+  CREATE TABLE "subscription_plan" (
+    "id" SERIAL PRIMARY KEY,
+    "name" VARCHAR(50) NOT NULL,
+    "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
+    "price" DECIMAL(10, 2) NOT NULL,
+    "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
+    "description" TEXT,
+    "features" JSONB NOT NULL, -- 存储计划包含的功能列表
+    "max_projects" INT NOT NULL, -- 最大项目数
+    "max_teams" INT NOT NULL, -- 最大团队数
+    "max_members" INT NOT NULL, -- 最大团队成员数
+    "max_ai_chat" INT NOT NULL, -- 最大AI聊天数
+    "max_ai_task" INT NOT NULL, -- 最大AI任务数
+    "max_ai_workflow" INT NOT NULL, -- 最大AI工作流数
+    "max_storage" INT NOT NULL DEFAULT 0, -- 最大存储空间(GB)
+    "is_active" BOOLEAN DEFAULT TRUE,
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
 
--- 用户订阅计划表
-CREATE TABLE "user_subscription_plan" (
-  "id" SERIAL PRIMARY KEY,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
-  "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
-  "start_date" TIMESTAMP NOT NULL,
-  "end_date" TIMESTAMP NOT NULL,
-  -- 使用统计
-  "current_projects" INT DEFAULT 0,
-  "current_teams" INT DEFAULT 0,
-  "current_members" INT DEFAULT 0,
-  "current_ai_chat" INT DEFAULT 0,
-  "current_ai_task" INT DEFAULT 0,
-  "current_ai_workflow" INT DEFAULT 0,
-  -- 时间戳
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+  -- 用户订阅计划表
+  CREATE TABLE "user_subscription_plan" (
+    "id" SERIAL PRIMARY KEY,
+    "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+    "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
+    "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
+    "start_date" TIMESTAMP NOT NULL,
+    "end_date" TIMESTAMP NOT NULL,
+    -- 使用统计
+    "current_projects" INT DEFAULT 0,
+    "current_teams" INT DEFAULT 0,
+    "current_members" INT DEFAULT 0,
+    "current_ai_chat" INT DEFAULT 0,
+    "current_ai_task" INT DEFAULT 0,
+    "current_ai_workflow" INT DEFAULT 0,
+    "current_storage" INT DEFAULT 0,
+    -- 时间戳
+    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
 
 -- 促销码表
 CREATE TABLE "promo_code" (
@@ -469,6 +496,25 @@ CREATE TABLE "contact" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Support Contact Reply Table (integrates with existing contact table)
+CREATE TABLE "contact_reply" (
+  "id" SERIAL PRIMARY KEY,
+  "contact_id" INT NOT NULL REFERENCES "contact"("id") ON DELETE CASCADE,
+  "content" TEXT NOT NULL,
+  "attachment_urls" TEXT[] DEFAULT '{}',
+  -- Sender can be either admin or the original contact person
+  "admin_id" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
+  "is_from_contact" BOOLEAN DEFAULT FALSE, -- TRUE if reply is from original contact person
+  "is_internal_note" BOOLEAN DEFAULT FALSE, -- For admin-only notes
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for better performance
+CREATE INDEX idx_contact_reply_contact_id ON "contact_reply"("contact_id");
+CREATE INDEX idx_contact_reply_admin_id ON "contact_reply"("admin_id");
+CREATE INDEX idx_contact_reply_created_at ON "contact_reply"("created_at");
 
 -- 管理员表 - 存储系统管理员信息
 CREATE TABLE "admin_user" (

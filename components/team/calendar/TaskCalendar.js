@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, 
-  startOfWeek, addDays, getDay, isSameDay, parseISO, addWeeks, subWeeks } from 'date-fns'
+  startOfWeek, addDays, getDay, isSameDay, parseISO, addWeeks, subWeeks, startOfDay, isBefore } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -18,66 +18,105 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { useGetUser } from '@/lib/hooks/useGetUser'
 import TeamCalendarTools from './CalendarTools'
+import EditTaskDialog from './EditTaskDialog'
 import { WeekView, DayView } from '@/components/calendar'
-
-// Task status color mapping
-const statusColors = {
-  'PENDING': 'bg-yellow-500',
-  'IN_PROGRESS': 'bg-blue-500',
-  'COMPLETED': 'bg-green-500',
-  'CANCELLED': 'bg-red-500',
-  'ON_HOLD': 'bg-purple-500'
-}
-
-// Task priority color mapping
-const priorityColors = {
-  'LOW': 'bg-blue-300',
-  'MEDIUM': 'bg-yellow-400',
-  'HIGH': 'bg-orange-500',
-  'URGENT': 'bg-red-600'
-}
+import { useDispatch, useSelector } from 'react-redux'
+import { fetchAllTasks } from '@/lib/redux/features/taskSlice'
+import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice'
+import { getTagByName } from '@/lib/redux/features/tagSlice'
+import { store } from '@/lib/redux/store'
+import { fetchTeamById } from '@/lib/redux/features/teamSlice'
+import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice'
+import DayTasksDialog from './DayTasksDialog'
+import { useParams } from "next/navigation";
+// 在组件顶部添加数据转换函数
+const formatUsers = (users) => {
+  if (!users || users.length === 0) return [];
+  
+  // 确保是数组
+  const userArray = Array.isArray(users) ? users : [users];
+  
+  // 返回唯一ID数组
+  return [...new Set(userArray)];
+};
 
 export default function TaskCalendar({ teamId }) {
   const t = useTranslations('Calendar')
+  const dispatch = useDispatch()
   const { user: currentUser, isLoading: userLoading } = useGetUser()
+  const params = useParams()
+  const { id: projectId } = params
+  const [themeColor, setThemeColor] = useState('#64748b')
+  // Redux state
+  const tasks = useSelector(state => state.tasks.tasks)
+  const sections = useSelector(state => state.sections.sections)
+  const currentTag = useSelector(state => state.tags.currentTag)
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
+  // 标签IDs
+  const [tagIdName, setTagIdName] = useState(null)
+  const [tagIdDueDate, setTagIdDueDate] = useState(null)
+  const [tagIdAssignee, setTagIdAssignee] = useState(null)
+  
+  // 存储当前团队的任务ID集合
+  const [teamTaskIds, setTeamTaskIds] = useState(new Set())
   
   // State variables
   const [currentDate, setCurrentDate] = useState(new Date())
   const [view, setView] = useState('month') // month, week, day
-  const [tasks, setTasks] = useState([])
   const [teamMembers, setTeamMembers] = useState([])
   const [selectedMembers, setSelectedMembers] = useState([])
-  const [selectedStatuses, setSelectedStatuses] = useState(['PENDING', 'IN_PROGRESS'])
   const [isLoading, setIsLoading] = useState(true)
   const [isViewLoading, setIsViewLoading] = useState(false)
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [teamName, setTeamName] = useState('')
-
+  const [tasksByDate, setTasksByDate] = useState({})
+  const [isFetchingData, setIsFetchingData] = useState(false)
+  const [filteredTasks, setFilteredTasks] = useState([])
+  const [isEditTaskOpen, setIsEditTaskOpen] = useState(false)
+  const [selectedTask, setSelectedTask] = useState(null)
+  const [isDayTasksOpen, setIsDayTasksOpen] = useState(false)
+  const [selectedDayTasks, setSelectedDayTasks] = useState([])
+  const [selectedDayDate, setSelectedDayDate] = useState(null)
+  // 添加缓存状态，减少不必要的重复请求
+  const [lastFetchTime, setLastFetchTime] = useState(null)
+  const [dataLoadingProgress, setDataLoadingProgress] = useState(0)
+  
+  useEffect(() => {
+    if (project?.theme_color) {
+      setThemeColor(project.theme_color);
+    }
+  }, [project]);
   // Fetch team details
   useEffect(() => {
     async function fetchTeamDetails() {
       if (!teamId) return
       
       try {
-        const { data, error } = await supabase
-          .from('team')
-          .select('name')
-          .eq('id', teamId)
-          .single()
+        const result = await dispatch(fetchTeamById(teamId)).unwrap()
         
-        if (error) throw error
-        
-        if (data) {
-          setTeamName(data.name)
+        if (result) {
+          // 处理不同的响应格式
+          let team = null
+          if (Array.isArray(result) && result.length > 0) {
+            team = result[0]
+          } else if (result && typeof result === 'object') {
+            team = result
+          }
+          
+          if (team) {
+            setTeamName(team.name)
+          }
         }
       } catch (error) {
-        console.error('Error fetching team details:', error)
+        console.error('获取团队详情失败:', error)
       }
     }
     
     fetchTeamDetails()
-  }, [teamId])
+  }, [teamId, dispatch])
 
   // Fetch team members
   useEffect(() => {
@@ -85,138 +124,373 @@ export default function TaskCalendar({ teamId }) {
       if (!teamId) return
       
       try {
-        // Get team members via user_team relationship
-        const { data, error } = await supabase
-          .from('user_team')
-          .select(`
-            user_id,
-            role,
-            user:user_id (
-              id,
-              name,
-              email,
-              avatar_url
-            )
-          `)
-          .eq('team_id', teamId)
+        console.log('开始获取团队成员，teamId:', teamId)
+        const result = await dispatch(fetchTeamUsers(teamId)).unwrap()
         
-        if (error) throw error
+        // 检查并处理返回的数据结构
+        let teamUsers = [];
+        if (result && result.users && Array.isArray(result.users)) {
+          teamUsers = result.users;
+        } else if (Array.isArray(result)) {
+          teamUsers = result;
+        }
         
-        if (data) {
-          const members = data.map(item => ({
-            id: item.user.id,
-            name: item.user.name,
-            email: item.user.email,
-            avatar: item.user.avatar_url,
-            role: item.role
-          }))
+        if (teamUsers.length > 0) {
+          const members = teamUsers.map(teamUser => {
+            // 确保user对象存在
+            const userInfo = teamUser.user || {};
+            
+            return {
+              id: teamUser.user_id || userInfo.id, // 优先使用user_id
+              name: userInfo.name || userInfo.email || '未知用户',
+              email: userInfo.email,
+              avatar: userInfo.avatar_url,
+              role: teamUser.role
+            }
+          }).filter(Boolean) // 移除null值
           
+          console.log('成功获取团队成员:', members)
           setTeamMembers(members)
           
-          // By default, select all members
+          // 默认选择所有成员
           setSelectedMembers(members.map(m => m.id))
+        } else {
+          console.warn('没有找到团队成员:', result)
+          setTeamMembers([])
+          setSelectedMembers([])
         }
       } catch (error) {
-        console.error('Error fetching team members:', error)
+        console.error('获取团队成员失败:', error)
         toast.error(t('errorFetchingTeamMembers'))
+        // 设置一个空数组，以便UI可以正常渲染
+        setTeamMembers([])
+        setSelectedMembers([])
       }
     }
     
     fetchTeamMembers()
-  }, [teamId, t])
+  }, [teamId, dispatch, t])
 
-  // Fetch tasks based on selected date range and filters
+  // 获取任务和分区数据
   useEffect(() => {
-    async function fetchTasks() {
-      if (!teamId || selectedMembers.length === 0) {
-        setTasks([])
-        setIsLoading(false)
+    if (!teamId || selectedMembers.length === 0) {
+      setTasksByDate({})
+      setIsLoading(false)
+      return
+    }
+
+    // 添加简单缓存机制，避免短时间内重复请求
+    const now = Date.now()
+    if (lastFetchTime && now - lastFetchTime < 30000) { // 30秒缓存
+      console.log('使用缓存数据，跳过请求')
+      setIsLoading(false)
+      setIsViewLoading(false)
+      return
+    }
+
+    // 添加重试机制，但减少最大重试次数以加快响应
+    const fetchWithRetry = async (fetchFunction, maxRetries = 2) => {
+      let retries = 0;
+      while (retries < maxRetries) {
+        try {
+          return await fetchFunction();
+        } catch (error) {
+          retries++;
+          console.warn(`请求失败，第 ${retries} 次重试...`);
+          if (retries >= maxRetries) throw error;
+          // 简化退避策略，减少等待时间
+          await new Promise(resolve => setTimeout(resolve, 500 * retries));
+        }
+      }
+    };
+    
+    const fetchData = async () => {
+      // 避免重复加载
+      if (isFetchingData) {
         return
       }
       
+      setIsFetchingData(true)
       setIsLoading(true)
+      setDataLoadingProgress(10) // 初始化进度
+      
       try {
-        // Get month range for queries
-        const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd')
-        const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd')
+        // 并行请求团队信息和分区，减少等待时间
+        setDataLoadingProgress(20)
+        const fetchTeamPromise = dispatch(fetchTeamById(teamId)).unwrap().catch(err => {
+          console.warn('获取团队信息失败:', err)
+          return null
+        })
         
-        // Get sections for this team
-        const { data: sections, error: sectionsError } = await supabase
-          .from('section')
-          .select('id, name, task_ids')
-          .eq('team_id', teamId)
+        const fetchSectionsPromise = fetchWithRetry(() => 
+          dispatch(getSectionByTeamId(teamId)).unwrap()
+        )
         
-        if (sectionsError) throw sectionsError
+        // 等待分区数据完成
+        const sections = await fetchSectionsPromise
+        setDataLoadingProgress(40)
+        console.log('获取到团队分区:', sections?.length || 0);
         
-        // Get all task IDs from sections
-        const taskIds = sections
-          ? sections.flatMap(section => section.task_ids || [])
-          : []
-        
-        if (taskIds.length === 0) {
-          setTasks([])
-          setIsLoading(false)
-          return
+        // 继续等待团队信息
+        const teamResult = await fetchTeamPromise
+        if (teamResult) {
+          let team = null
+          if (Array.isArray(teamResult) && teamResult.length > 0) {
+            team = teamResult[0]
+          } else if (teamResult && typeof teamResult === 'object') {
+            team = teamResult
+          }
+          
+          if (team) {
+            setTeamName(team.name)
+          }
         }
         
-        // Get tasks by IDs
-        const { data: taskData, error: taskError } = await supabase
-          .from('task')
-          .select('*, created_by(id, name, avatar_url)')
-          .in('id', taskIds)
+        if (!sections || sections.length === 0) {
+          setTasksByDate({})
+          setIsLoading(false)
+          setIsFetchingData(false)
+          setLastFetchTime(Date.now())
+          return
+        }
+
+        // 获取分区中的所有任务ID
+        const sectionTaskIds = sections.reduce((acc, section) => {
+          if (section.task_ids && Array.isArray(section.task_ids)) {
+            acc.push(...section.task_ids)
+          }
+          return acc
+        }, [])
         
-        if (taskError) throw taskError
+        // 去除重复的任务ID
+        const uniqueTaskIds = [...new Set(sectionTaskIds)]
+        console.log('团队分区包含的任务IDs:', uniqueTaskIds.length)
+        setDataLoadingProgress(60)
         
-        // Process tasks with tag values and filter by date range and members
-        const processedTasks = taskData
-          .filter(task => {
-            // Filter by status if status is in tag_values
-            const status = task.tag_values?.status || 'PENDING'
-            if (!selectedStatuses.includes(status)) return false
-            
-            // Filter by assignee if assignee is in tag_values
-            const assignees = task.tag_values?.assignees || []
-            if (selectedMembers.length > 0 && !assignees.some(assignee => selectedMembers.includes(assignee))) {
-              return false
-            }
-            
-            // Filter by due date if in current month view
-            if (task.tag_values?.due_date) {
-              const dueDate = task.tag_values.due_date
-              return dueDate >= startDate && dueDate <= endDate
-            }
-            
-            return false
-          })
-          .map(task => ({
-            id: task.id,
-            title: task.tag_values?.title || `Task #${task.id}`,
-            description: task.tag_values?.description || '',
-            status: task.tag_values?.status || 'PENDING',
-            priority: task.tag_values?.priority || 'MEDIUM',
-            assignees: task.tag_values?.assignees || [],
-            due_date: task.tag_values?.due_date,
-            start_date: task.tag_values?.start_date,
-            created_by: {
-              id: task.created_by?.id,
-              name: task.created_by?.name,
-              avatar: task.created_by?.avatar_url
-            },
-            created_at: task.created_at
-          }))
+        if (uniqueTaskIds.length === 0) {
+          console.log('没有找到属于该团队的任务');
+          setTasksByDate({});
+          setFilteredTasks([]);
+          setIsLoading(false);
+          setIsFetchingData(false);
+          setLastFetchTime(Date.now())
+          return;
+        }
         
-        setTasks(processedTasks)
+        try {
+          // 获取任务，如果任务较多，考虑只获取当前显示月份相关的任务
+          setDataLoadingProgress(70)
+          const allTasks = await fetchWithRetry(() => 
+            dispatch(fetchAllTasks()).unwrap()
+          );
+          
+          setDataLoadingProgress(80)
+          if (!allTasks || allTasks.length === 0) {
+            console.log('没有获取到任何任务');
+            setTasksByDate({});
+            setFilteredTasks([]);
+            setIsLoading(false);
+            setIsFetchingData(false);
+            setLastFetchTime(Date.now())
+            return;
+          }
+          
+          console.log('获取到的所有任务:', allTasks.length)
+          
+          // 使用Set加速查找
+          const uniqueTaskIdSet = new Set(uniqueTaskIds)
+          
+          // 筛选属于当前团队的任务
+          const teamTasks = allTasks.filter(task => uniqueTaskIdSet.has(task.id))
+          console.log('属于当前团队的任务:', teamTasks.length)
+          setDataLoadingProgress(90)
+          
+          if (teamTasks.length === 0) {
+            console.log('筛选后没有找到属于该团队的任务');
+            setTasksByDate({});
+            setFilteredTasks([]);
+          } else {
+            // 存储当前团队的任务ID集合
+            const teamTaskIds = new Set(teamTasks.map(task => task.id))
+            
+            // 更新Redux store和本地状态
+            store.dispatch({ type: 'tasks/setTasks', payload: teamTasks })
+            setTeamTaskIds(teamTaskIds)
+            console.log('成功更新任务数据，任务数量:', teamTasks.length);
+          }
+          setDataLoadingProgress(100)
+          // 更新最后加载时间
+          setLastFetchTime(Date.now())
+        } catch (taskError) {
+          console.error('获取任务数据失败:', taskError)
+          toast.error('获取任务数据失败，请检查网络连接并刷新页面')
+        }
       } catch (error) {
-        console.error('Error fetching tasks:', error)
-        toast.error(t('errorFetchingTasks'))
+        console.error('加载团队数据失败:', error)
+        toast.error('加载团队数据失败，请检查网络连接并刷新页面')
       } finally {
+        setIsFetchingData(false)
         setIsLoading(false)
         setIsViewLoading(false)
+        setDataLoadingProgress(0)
       }
     }
     
-    fetchTasks()
-  }, [teamId, currentDate, selectedMembers, selectedStatuses, t])
+    fetchData()
+  }, [teamId, dispatch, t, selectedMembers.length, lastFetchTime])
+
+  // 获取Assignee标签ID，与其他标签合并处理 - 简化逻辑，减少请求次数
+  useEffect(() => {    
+    const fetchTags = async () => {
+      // 创建标签名称到状态的映射，便于集中处理
+      const tagMappings = [
+        { name: "Name", setter: setTagIdName },
+        { name: "Due Date", setter: setTagIdDueDate },
+        { name: "Assignee", setter: setTagIdAssignee }
+      ];
+      
+      // 并行请求所有标签，提高效率
+      const tagPromises = tagMappings.map(({ name }) => {
+        return dispatch(getTagByName(name))
+          .unwrap()
+          .then(tag => ({ name, tag, success: true }))
+          .catch(error => ({ name, error, success: false }));
+      });
+      
+      // 等待所有请求完成
+      const results = await Promise.all(tagPromises);
+      
+      // 处理结果
+      let hasErrors = false;
+      results.forEach(({ name, tag, success, error }) => {
+        const mapping = tagMappings.find(m => m.name === name);
+        if (success && mapping) {
+          console.log(`获取到${name}标签ID:`, tag);
+          mapping.setter(tag);
+        } else {
+          console.error(`获取${name}标签失败:`, error);
+          hasErrors = true;
+        }
+      });
+      
+      // 如果有错误，显示提示
+      if (hasErrors) {
+        toast.warning('部分标签获取失败，日历显示可能不完整');
+      }
+    };
+    
+    if (teamId) {
+      fetchTags();
+    }
+  }, [dispatch, teamId]);
+
+  // 处理任务数据 - 优化筛选规则
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) {
+      console.log('没有任务可筛选')
+      setFilteredTasks([])
+      return
+    }
+
+    if (!tagIdName || !tagIdDueDate || !tagIdAssignee) {
+      console.log('标签ID未就绪')
+      return
+    }
+
+    try {      
+      // 使用更高效的筛选方法，减少循环次数
+      // 第一步：先处理所有任务，获取必要的属性
+      const processedTaskMap = new Map();
+      
+      tasks.forEach(task => {
+        const tagValues = task.tag_values || {};
+        const name = tagValues[tagIdName] || '未命名任务';
+        const dueDate = tagValues[tagIdDueDate] ? new Date(tagValues[tagIdDueDate]) : null;
+        const assigneeId = tagValues[tagIdAssignee]; // 可能是数组或单个值
+        
+        // 初步筛选 - 任务必须有截止日期
+        if (!dueDate || isNaN(dueDate.getTime())) return;
+        
+        // 将处理后的任务添加到Map中
+        processedTaskMap.set(task.id, {
+          taskId: task.id,
+          name,
+          dueDate,
+          assigneeId,
+          sectionId: task.section_id,
+          tag_values: tagValues, // 保留原始tag_values以备后用
+          rawTask: task // 保存原始任务对象以便访问其他可能需要的字段
+        });
+      });
+      
+      // 第二步：应用团队和用户筛选
+      const filteredTasksArray = [];
+      
+      for (const task of processedTaskMap.values()) {
+        // 确保任务属于当前团队
+        if (!teamTaskIds.has(task.taskId)) continue;
+        
+        // 筛选被勾选的用户
+        if (selectedMembers.length > 0 && task.assigneeId) {
+          // 处理assigneeId是数组的情况
+          if (Array.isArray(task.assigneeId)) {
+            // 使用Set优化查找
+            const selectedMembersSet = new Set(selectedMembers);
+            if (!task.assigneeId.some(id => selectedMembersSet.has(id))) continue;
+          } 
+          // 处理assigneeId是单个值的情况
+          else {
+            if (!selectedMembers.includes(task.assigneeId)) continue;
+          }
+        }
+        
+        // 通过所有筛选条件
+        filteredTasksArray.push(task);
+      }
+      
+      console.log('筛选后的任务:', filteredTasksArray.length);
+      setFilteredTasks(filteredTasksArray);
+    } catch (error) {
+      console.error('处理任务数据时出错:', error)
+      toast.error('处理任务数据失败，请刷新页面重试')
+    }
+  }, [tasks, selectedMembers, tagIdName, tagIdDueDate, tagIdAssignee, teamTaskIds]);
+
+  // 按日期分组任务 - 优化处理逻辑
+  useEffect(() => {
+    if (!filteredTasks || filteredTasks.length === 0) {
+      console.log('没有筛选后的任务可分组')
+      setTasksByDate({})
+      return
+    }
+
+    console.log('开始按日期分组筛选后的任务:', filteredTasks.length)
+    
+    // 使用更高效的分组方式
+    const groupedTasks = filteredTasks.reduce((acc, task) => {
+      if (!task.dueDate) return acc;
+      
+      const dateKey = format(task.dueDate, 'yyyy-MM-dd');
+      if (!acc[dateKey]) {
+        acc[dateKey] = [];
+      }
+      
+      // 保留原始日期格式
+      acc[dateKey].push({
+        id: task.taskId,
+        name: task.name,
+        assigneeId: task.assigneeId,
+        dueDate: dateKey, // 保存格式化的日期，确保是yyyy-MM-dd格式
+        tag_values: task.tag_values
+      });
+      
+      return acc;
+    }, {});
+    
+    const totalTasksGrouped = Object.values(groupedTasks).reduce((sum, tasks) => sum + tasks.length, 0);
+    console.log(`分组完成, 共 ${Object.keys(groupedTasks).length} 个日期, ${totalTasksGrouped} 个任务`);
+    setTasksByDate(groupedTasks);
+  }, [filteredTasks]);
 
   // Navigation handlers
   const handlePrevMonth = () => {
@@ -256,6 +530,13 @@ export default function TaskCalendar({ teamId }) {
 
   // Create task handler
   const handleOpenCreateTask = (date = new Date()) => {
+    // 检查所选日期是否在今天或之后
+    const today = startOfDay(new Date())
+    if (isBefore(date, today)) {
+      toast.warning(t('cannotCreateTaskInPast'))
+      return
+    }
+    
     setSelectedDate(date)
     setIsCreateTaskOpen(true)
   }
@@ -270,15 +551,6 @@ export default function TaskCalendar({ teamId }) {
     })
   }
 
-  const handleToggleStatus = (status) => {
-    setSelectedStatuses(prev => {
-      if (prev.includes(status)) {
-        return prev.filter(s => s !== status)
-      }
-      return [...prev, status]
-    })
-  }
-
   const handleSelectAllMembers = () => {
     setSelectedMembers(teamMembers.map(m => m.id))
   }
@@ -288,28 +560,28 @@ export default function TaskCalendar({ teamId }) {
   }
 
   // Task creation success handler
-  const handleTaskCreated = () => {
+  const handleTaskCreated = async () => {
     setIsViewLoading(true)
-    // Re-fetch tasks after creation
-    const fetchTasks = async () => {
-      try {
-        // Implement the same task fetching logic as in the useEffect
-        // ...
-        
-        // For now, just setting a timeout to simulate loading
-        setTimeout(() => {
-          setIsViewLoading(false)
-        }, 1000)
-      } catch (error) {
-        console.error('Error fetching tasks:', error)
-        setIsViewLoading(false)
-      }
+    try {
+      // 重新获取分区数据
+      await dispatch(getSectionByTeamId(teamId)).unwrap()
+      
+      // 重新获取任务数据
+      await dispatch(fetchAllTasks()).unwrap()
+      
+      // 重置加载状态
+      setIsViewLoading(false)
+      
+      // 显示成功提示
+      toast.success(t('calendarRefreshed'))
+    } catch (error) {
+      console.error('Error refreshing calendar data:', error)
+      toast.error(t('errorRefreshingCalendar'))
+      setIsViewLoading(false)
     }
-    
-    fetchTasks()
   }
 
-  // Loading skeleton
+  // Loading skeleton - 添加进度显示
   const renderSkeletonCalendar = () => (
     <div className="h-full flex flex-col">
       <div className="flex-none py-4">
@@ -396,60 +668,53 @@ export default function TaskCalendar({ teamId }) {
 
   // Calendar header with navigation and controls
   const renderCalendarHeader = () => (
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center space-x-2">
-        <CalendarIcon className="h-5 w-5" />
-        <h1 className="text-2xl font-bold">{teamName} {t('taskCalendar')}</h1>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Tabs value={view} onValueChange={(newView) => {
-          if (newView === view) return
-          setIsViewLoading(true)
-          setView(newView)
-        }} className="mr-2">
-          <TabsList>
-            <TabsTrigger value="month">{t('month')}</TabsTrigger>
-            <TabsTrigger value="week">{t('week')}</TabsTrigger>
-            <TabsTrigger value="day">{t('day')}</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="icon" onClick={() => {
+    <div className="flex items-center justify-between mb-2">      
+      <div className="flex items-center">
+        <div className="flex items-center">
+          <Button variant="outline" className="p-1 border-transparent shadow-none" onClick={() => {
             if (view === 'month') handlePrevMonth()
             else if (view === 'week') handlePrevWeek()
             else handlePrevDay()
           }}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="font-medium min-w-32 text-center">
+          <div className="font-semibold text-xs min-w-[85px] max-w-[85px] text-center mx-2">
             {view === 'month' && format(currentDate, 'MMMM yyyy')}
             {view === 'week' && `${format(startOfWeek(currentDate), 'MMM d')} - ${format(addDays(startOfWeek(currentDate), 6), 'MMM d, yyyy')}`}
             {view === 'day' && format(currentDate, 'EEEE, MMMM d, yyyy')}
           </div>
-          <Button variant="outline" size="icon" onClick={() => {
+          <Button variant="outline" className="p-1 border-transparent shadow-none" onClick={() => {
             if (view === 'month') handleNextMonth()
             else if (view === 'week') handleNextWeek()
             else handleNextDay()
           }}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="outline" className="ml-2" onClick={handleTodayClick}>
+        </div>
+
+        <div className="ml-4">
+          <Button variant="outline" onClick={handleTodayClick}>
             {t('today')}
           </Button>
         </div>
-        
-        <Button variant="outline">
-          <Filter className="h-4 w-4 mr-2" />
-          {t('filter')}
-        </Button>
-        
-        <Button onClick={() => handleOpenCreateTask()}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t('newTask')}
-        </Button>
+
+        <Tabs value={view} onValueChange={(newView) => {
+          if (newView === view) return
+          setIsViewLoading(true)
+          setView(newView)
+        }} className="ml-2">
+          <TabsList>
+            <TabsTrigger value="month">{t('month')}</TabsTrigger>
+            <TabsTrigger value="week">{t('week')}</TabsTrigger>
+            <TabsTrigger value="day">{t('day')}</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
+      
+      <Button variant={themeColor} size="icon" onClick={() => handleOpenCreateTask()}>
+        <Plus className="h-4 w-4" />
+        {/* {t('newTask')} */}
+      </Button>
     </div>
   )
 
@@ -459,6 +724,7 @@ export default function TaskCalendar({ teamId }) {
     const monthEnd = endOfMonth(currentDate)
     const startDate = startOfWeek(monthStart)
     const days = []
+    const today = startOfDay(new Date())
 
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
@@ -473,25 +739,6 @@ export default function TaskCalendar({ teamId }) {
       </div>
     )
 
-    // Process tasks for month view
-    const processTasksForMonth = () => {
-      // Group tasks by due date for easier rendering
-      const tasksByDate = {}
-      
-      tasks.forEach(task => {
-        if (task.due_date) {
-          if (!tasksByDate[task.due_date]) {
-            tasksByDate[task.due_date] = []
-          }
-          tasksByDate[task.due_date].push(task)
-        }
-      })
-      
-      return tasksByDate
-    }
-    
-    const tasksByDate = processTasksForMonth()
-
     // Generate calendar days
     let day = startDate
     let weekRows = []
@@ -500,97 +747,115 @@ export default function TaskCalendar({ teamId }) {
     for (let i = 0; i < 42; i++) {
       const formattedDate = format(day, 'yyyy-MM-dd')
       const isCurrentMonth = isSameMonth(day, currentDate)
-      const isToday = isSameDay(day, new Date())
+      const isPastDay = isBefore(day, today)
+      const isToday = isSameDay(day, today)
       const currentDay = new Date(day)
       
-      // Get tasks for this day
+      // 获取当天任务并检查是否有数据
       const dayTasks = tasksByDate[formattedDate] || []
-
-      const dayCellContent = (
-        <div className="flex flex-col h-full">
-          <div className="flex justify-between items-start mb-2">
-            <span className={cn(
-              "inline-flex h-5 w-5 items-center justify-center rounded-full text-xs",
-              isToday && "bg-primary text-primary-foreground font-medium"
-            )}>
-              {format(day, 'd')}
-            </span>
-            {(isCurrentMonth && dayTasks.length > 0) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-5 w-5">
-                    <MoreHorizontal className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => {
-                    e.stopPropagation()
-                    handleOpenCreateTask(currentDay)
-                  }}>
-                    {t('addTask')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>{t('viewAll')}</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-
-          <div className="space-y-0.5 mt-1 max-h-[75px] overflow-y-auto">
-            {dayTasks.map((task) => (
-              <div 
-                key={`task-${task.id}`} 
-                className={cn(
-                  "text-xs py-0.5 px-1 rounded truncate cursor-pointer transition-opacity hover:opacity-80",
-                  statusColors[task.status] ? `${statusColors[task.status]}/20 border-l-2 border-l-${statusColors[task.status]}` : "bg-blue-100 dark:bg-blue-900/30"
-                )}
-                title={`${task.title} (${task.status})`}
-                style={{
-                  borderLeftColor: task.status ? statusColors[task.status]?.replace('bg-', '') : undefined
-                }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  // Handle task click - could open task details
-                  toast.info(`Task: ${task.title}`)
-                }}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="truncate">{task.title}</span>
-                  {task.assignees && task.assignees.length > 0 && (
-                    <div className="flex -space-x-1">
-                      {task.assignees.slice(0, 2).map((assigneeId, idx) => {
-                        const assignee = teamMembers.find(m => m.id === assigneeId)
-                        return assignee ? (
-                          <div key={idx} className="h-3 w-3 rounded-full bg-gray-200 flex items-center justify-center text-[6px] border border-white">
-                            {assignee.name.charAt(0)}
-                          </div>
-                        ) : null
-                      })}
-                      {task.assignees.length > 2 && (
-                        <div className="h-3 w-3 rounded-full bg-gray-200 flex items-center justify-center text-[6px] border border-white">
-                          +{task.assignees.length - 2}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )
+      if (dayTasks.length > 0) {
+        console.log('日期:', formattedDate, '有任务:', dayTasks.length, '个')
+      }
 
       currentWeekDays.push(
         <div 
           key={formattedDate}
           className={cn(
-            "min-h-[120px] p-1.5 pt-1 border border-border/50 cursor-pointer transition-colors relative",
+            "min-h-[120px] p-1.5 pt-1 border border-border/50 transition-colors relative",
             !isCurrentMonth && "bg-muted/30 text-muted-foreground",
+            isPastDay && "bg-muted/50 text-muted-foreground opacity-75", // 为过去的日期添加额外的样式
             isToday && "bg-accent/10",
-            "hover:bg-accent/5"
+            !isPastDay && "hover:bg-accent/5 cursor-pointer", // 只有未来的日期才有指针样式和悬停效果
+            isPastDay && "cursor-not-allowed" // 过去的日期显示禁止光标
           )}
-          onClick={() => handleOpenCreateTask(currentDay)}
+          onClick={() => !isPastDay && handleOpenCreateTask(currentDay)} // 只有未来的日期才能点击创建任务
         >
-          {dayCellContent}
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-start mb-2">
+              <span className={cn(
+                "inline-flex h-5 w-5 items-center justify-center rounded-full text-xs",
+                isToday && "bg-primary text-primary-foreground font-medium",
+                isPastDay && !isToday && "line-through" // 为过去的日期添加删除线
+              )}>
+                {format(day, 'd')}
+              </span>
+              {(isCurrentMonth && dayTasks.length > 0) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-5 w-5">
+                      <MoreHorizontal className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {!isPastDay && (
+                      <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenCreateTask(currentDay)
+                      }}>
+                        {t('addTask')}
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation()
+                      handleViewAllTasks(currentDay, dayTasks)
+                    }}>
+                      {t('viewAll')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+
+            <div className="space-y-0.5 mt-1 max-h-[75px] overflow-y-auto">
+              {dayTasks.map((task) => {
+                // 获取任务名称
+                const taskName = task.name || t('untitledTask')
+                
+                // 获取任务分配人 - 使用formatUsers函数处理
+                const assignees = task.assigneeId ? (
+                  Array.isArray(task.assigneeId) 
+                    ? formatUsers(task.assigneeId) 
+                    : formatUsers([task.assigneeId])
+                ) : []
+                
+                return (
+                  <div 
+                    key={`task-${task.id}`} 
+                    className={cn(
+                      "text-xs py-0.5 px-1 rounded truncate cursor-pointer transition-opacity hover:opacity-80 bg-blue-100 dark:bg-blue-900/30 border-l-2 border-blue-500",
+                      isPastDay && "opacity-60" // 降低过去日期任务的不透明度
+                    )}
+                    title={taskName}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleTaskClick(task)
+                    }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="truncate">{taskName}</span>
+                      {assignees.length > 0 && (
+                        <div className="flex -space-x-1">
+                          {assignees.slice(0, 2).map((assigneeId, idx) => {
+                            const assignee = teamMembers.find(m => m.id === assigneeId)
+                            return assignee ? (
+                              <div key={idx} className="h-3 w-3 rounded-full bg-gray-200 flex items-center justify-center text-[6px] border border-white">
+                                {assignee.name.charAt(0)}
+                              </div>
+                            ) : null
+                          })}
+                          {assignees.length > 2 && (
+                            <div className="h-3 w-3 rounded-full bg-gray-200 flex items-center justify-center text-[6px] border border-white">
+                              +{assignees.length - 2}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )
 
@@ -649,6 +914,63 @@ export default function TaskCalendar({ teamId }) {
     )
   }
 
+  // 修改任务点击事件处理函数
+  const handleTaskClick = (task) => {
+    // 检查任务是否在过去的日期
+    const today = startOfDay(new Date())
+    
+    // 首先尝试直接使用格式化后的dueDate字段，这是我们在日历渲染时添加的
+    let taskDueDate = null
+    let taskDueDateString = null
+    
+    // 从不同来源获取日期信息，确保能够正确显示
+    if (task.dueDate) {
+      // 1. 直接使用日历格式化的日期
+      taskDueDateString = task.dueDate
+      taskDueDate = new Date(task.dueDate.replace(/-/g, '/'))
+      console.log('使用日历格式化的日期:', taskDueDateString)
+    } else if (task.tag_values && tagIdDueDate && task.tag_values[tagIdDueDate]) {
+      // 2. 从任务的tag_values中获取日期
+      taskDueDateString = task.tag_values[tagIdDueDate]
+      taskDueDate = new Date(taskDueDateString.replace(/-/g, '/'))
+      console.log('使用tag_values中的日期:', taskDueDateString)
+    } else if (task.rawTask && task.rawTask.tag_values && tagIdDueDate && task.rawTask.tag_values[tagIdDueDate]) {
+      // 3. 从原始任务对象的tag_values中获取日期
+      taskDueDateString = task.rawTask.tag_values[tagIdDueDate]
+      taskDueDate = new Date(taskDueDateString.replace(/-/g, '/'))
+      console.log('使用rawTask中的日期:', taskDueDateString)
+    }
+    
+    // 如果都没找到，则使用当前日期
+    if (!taskDueDate || isNaN(taskDueDate.getTime())) {
+      console.warn('无法确定任务日期，使用当前日期')
+      taskDueDate = new Date()
+      taskDueDateString = format(taskDueDate, 'yyyy-MM-dd')
+    }
+    
+    // 如果任务有截止日期并且截止日期在今天之前，则标记为只读
+    const isPastTask = taskDueDate && isBefore(taskDueDate, today)
+    
+    console.log('打开任务:', task.name, '截止日期:', taskDueDateString, task)
+    
+    // 保存原始的日期值以便在编辑对话框中正确显示
+    setSelectedTask({
+      ...task,
+      isReadOnly: isPastTask, // 为过去的任务添加只读标志
+      dueDate: taskDueDateString // 使用原始字符串格式的日期
+    })
+    setIsEditTaskOpen(true)
+    // 关闭DayTasksDialog
+    setIsDayTasksOpen(false)
+  }
+
+  // 添加处理查看所有任务的函数
+  const handleViewAllTasks = (date, tasks) => {
+    setSelectedDayDate(date)
+    setSelectedDayTasks(tasks)
+    setIsDayTasksOpen(true)
+  }
+
   if (isLoading) {
     return renderSkeletonCalendar()
   }
@@ -686,36 +1008,13 @@ export default function TaskCalendar({ teamId }) {
                       />
                       <Avatar className="h-6 w-6 mr-2">
                         <AvatarImage src={member.avatar} alt={member.name} />
-                        <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>{member.name ? member.name.charAt(0).toUpperCase() : '?'}</AvatarFallback>
                       </Avatar>
                       <label 
                         htmlFor={`member-${member.id}`}
                         className="text-sm cursor-pointer"
                       >
                         {member.name}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-medium mb-2">{t('taskStatus')}</h3>
-                <div className="space-y-3">
-                  {Object.entries(statusColors).map(([status, color]) => (
-                    <div key={status} className="flex items-center">
-                      <Checkbox 
-                        id={`status-${status}`}
-                        checked={selectedStatuses.includes(status)}
-                        onCheckedChange={() => handleToggleStatus(status)}
-                        className="mr-2"
-                      />
-                      <div className={`w-3 h-3 ${color} rounded-full mr-2`}></div>
-                      <label 
-                        htmlFor={`status-${status}`}
-                        className="text-sm cursor-pointer"
-                      >
-                        {t(status.toLowerCase())}
                       </label>
                     </div>
                   ))}
@@ -783,6 +1082,30 @@ export default function TaskCalendar({ teamId }) {
           teamId={teamId}
           teamMembers={teamMembers}
           onTaskCreated={handleTaskCreated}
+        />
+      )}
+      
+      {/* Task edit modal */}
+      {isEditTaskOpen && selectedTask && (
+        <EditTaskDialog
+          isOpen={isEditTaskOpen}
+          setIsOpen={setIsEditTaskOpen}
+          task={selectedTask}
+          teamId={teamId}
+          teamMembers={teamMembers}
+          onTaskUpdated={handleTaskCreated}
+        />
+      )}
+
+      {/* Day tasks dialog */}
+      {isDayTasksOpen && selectedDayDate && (
+        <DayTasksDialog
+          isOpen={isDayTasksOpen}
+          setIsOpen={setIsDayTasksOpen}
+          date={selectedDayDate}
+          tasks={selectedDayTasks}
+          teamMembers={teamMembers}
+          onTaskClick={handleTaskClick}
         />
       )}
     </div>

@@ -182,6 +182,16 @@
         "title": "升级选项",
         "compare": "比较计划",
         "contactSales": "联系销售"
+      },
+      "limits": {
+        "back": "返回",
+        "subscriptionLimit": "订阅限制",
+        "currentUsage": "当前使用: {current} / {limit}",
+        "upgradeSubscription": "升级订阅",
+        "operationLimited": "操作受限",
+        "createProjectLimited": "创建项目受限",
+        "inviteMemberLimited": "邀请成员受限",
+        "createTeamLimited": "创建团队受限"
       }
     },
     "connectProviderFailed": "连接{provider}失败",
@@ -223,6 +233,10 @@
     "dueDate": "截止日期",
     "priority": "优先级",
     "members": "成员",
+    "projectNotFound": "项目未找到",
+    "noAccessToProject": "您没有访问此项目的权限。您可能不是团队成员或项目所有者。",
+    "close": "关闭",
+    "loading": "加载中...",
     "filters": {
       "all": "全部",
       "recent": "最近",
@@ -498,7 +512,12 @@
     "field_description_description": "字段的描述",
     "field_options_description": "字段的选项",
     "taskDeleted": "任务已成功删除",
-    "deleteError": "删除任务时出错"
+    "deleteError": "删除任务时出错",
+    "deleteTaskTitle": "确认删除任务",
+    "deleteTaskDescription": "您确定要删除此任务吗？此操作无法撤销。",
+    "deleteTaskFailed": "删除任务失败",
+    "teamNotFound": "团队未找到",
+    "noAccessToTeam": "您没有访问此团队的权限。您可能不是团队成员或团队所有者。"
   },
   "ChatDialog": {
     "privateMessages": "私人消息",
@@ -664,22 +683,21 @@
     "teamInvitation": "团队邀请",
     "teamName": "团队名称",
     "role": "角色",
-    "invitationDescription": "接受邀请后，您将成为团队成员",
+    "invitationDescription": "您已被邀请加入此团队。请选择接受或拒绝邀请。",
+    "accepting": "正在接受...",
+    "declining": "正在拒绝...",
     "acceptInvitation": "接受邀请",
-    "accepting": "接受中...",
     "decline": "拒绝",
     "backToHome": "返回首页",
-    "notLoggedIn": "请登录",
+    "notLoggedIn": "请先登录",
     "teamNotFound": "未找到团队",
-    "invitationNotFound": "未找到邀请",
-    "invalidInvitation": "无效邀请",
-    "invitationAccepted": "邀请已接受",
-    "acceptInvitationFailed": "接受邀请失败",
+    "invitationNotFound": "未找到有效邀请",
+    "invalidInvitation": "无效的邀请",
+    "alreadyTeamMember": "您已经是团队成员",
     "invitationAlreadyAccepted": "邀请已被接受",
-    "invitationAlreadyDeclined": "邀请已被拒绝",
-    "CAN_VIEW": "查看者",
-    "CAN_CHECK": "检查者",
-    "CAN_EDIT": "编辑者"
+    "invitationDeclined": "邀请已被拒绝",
+    "invitationNoLongerValid": "邀请已失效",
+    "invitationExpired": "邀请已过期"
   },
   "CustomField": {
     "title": "自定义字段",
@@ -804,7 +822,26 @@
     "hasMeetLink": "点击打开Google Meet",
     "accept": "接受",
     "decline": "拒绝",
-    "meetingDeclined": "已拒绝会议邀请"
+    "meetingDeclined": "已拒绝会议邀请",
+    "newTask": "新建任务",
+    "addTask": "添加任务",
+    "teamMembers": "团队成员",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "untitledTask": "无标题任务",
+    "errorFetchingTeamMembers": "获取团队成员失败",
+    "errorLoadingTasks": "加载任务失败",
+    "weekView": "周视图",
+    "weekViewDescription": "周视图显示一周内的所有任务",
+    "dayView": "日视图",
+    "dayViewDescription": "日视图显示当天的所有任务",
+    "tasksFor": "任务列表 -",
+    "noTasksForThisDay": "当天暂无任务",
+    "cannotEditPastTask": "无法编辑已过期的任务",
+    "cannotDeletePastTask": "无法删除已过期的任务",
+    "pastTask": "已过期任务",
+    "viewTask": "查看任务",
+    "viewTaskDescription": "查看任务详情"
   },
   "notificationCenter": {
     "title": "通知中心",
@@ -931,6 +968,7 @@
     "createdBy": "创建者",
     "assignee": "负责人",
     "loading": "正在加载任务...",
+    "invalidDate": "无效日期",
     "priority": {
       "label": "优先级",
       "low": "低",
@@ -1153,7 +1191,18 @@
     "noTeamKnowledgeBase": "无团队知识库",
     "selectTeamToViewKnowledgeBase": "请选择一个团队以查看其知识库。",
     "goBack": "返回",
-    "subpages": "子页面"
+    "subpages": "子页面",
+    "createNewPage": "创建新页面",
+    "recentlyViewed": "最近查看",
+    "allPages": "所有页面",
+    "coverImagePlaceholder": "输入图片URL",
+    "pageTitle": "页面标题",
+    "pageContent": "页面内容",
+    "favorite": "收藏",
+    "unfavorite": "取消收藏",
+    "confirm": "确认",
+    "confirmDelete": "确认删除",
+    "confirmDeleteDesc": "您确定要删除此页面吗？此操作不可撤销。"
   },
   "File": {
     "editInGridView": "切换到网格视图",
@@ -1162,5 +1211,34 @@
     "folderAndContentsDeleted": "文件夹及其内容已删除",
     "deletingFolderContents": "正在删除文件夹内容...",
     "errorDeletingFolderContents": "删除文件夹内容时出错"
+  },
+  "TaskDialog": {
+    "editTask": "编辑任务",
+    "taskName": "任务名称",
+    "enterTaskName": "请输入任务名称",
+    "dueDate": "截止日期",
+    "pickDate": "选择日期",
+    "assignTo": "分配给",
+    "selectAssignee": "选择负责人",
+    "cancel": "取消",
+    "update": "更新",
+    "updating": "更新中...",
+    "nameRequired": "请输入任务名称",
+    "taskUpdated": "任务已更新",
+    "errorUpdatingTask": "更新任务失败"
+  },
+  "FilePreview": {
+    "videoNotSupported": "您的浏览器不支持视频标签。",
+    "downloadFile": "下载文件",
+    "previewFile": "预览文件",
+    "openInNewTab": "在新标签页中打开",
+    "fileNotFound": "未找到文件",
+    "closePreview": "关闭预览"
+  },
+  "Team": {
+    "transferOwner": "转移所有权",
+    "pendingRemoval": "待移除",
+    "undoRemoval": "撤销移除",
+    "undoRoleChange": "撤销角色变更"
   }
 }

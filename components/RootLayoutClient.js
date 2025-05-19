@@ -5,10 +5,11 @@ import { Providers } from '@/app/providers';
 import { Header } from './Header';
 import { PricingHeader } from './PricingHeader';
 import { usePathname } from 'next/navigation';
+import SubscriptionLimitModal from './SubscriptionLimitModal';
 
 export function RootLayoutClient({ children, locale, messages }) {
   const pathname = usePathname();
-  const isPricingPage = pathname.includes('/pricing') || pathname.includes('/payment') || pathname.includes('/landing');
+  const isPricingPage = pathname.includes('/pricing') || pathname.includes('/payment') || pathname.includes('/landing') || pathname.includes('/contactUs');
   const isAuthPage = pathname.includes('/auth') || pathname.includes('/login') || pathname.includes('/signup') || pathname.includes('/reset-password') || pathname.includes('/forgot-password');
   const isProjectPage = pathname.includes('/projects/');
 
@@ -20,6 +21,7 @@ export function RootLayoutClient({ children, locale, messages }) {
           <main className={`flex-1 w-full ${!isAuthPage && !isPricingPage ? 'pl-16' : ''}`}>
             {children}
           </main>
+          <SubscriptionLimitModal />
         </div>
       </Providers>
     </NextIntlClientProvider>

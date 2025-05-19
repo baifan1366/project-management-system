@@ -3,12 +3,23 @@
 import { useContext, useEffect, useState, useRef } from 'react';
 import { WorkflowContext } from './TaskWorkflow';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchTasksBySectionId } from '@/lib/redux/features/taskSlice';
-import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice';
-import { fetchAllTags } from '@/lib/redux/features/tagSlice';
+import { fetchTasksBySectionId, updateTask, fetchTaskById, createTask, deleteTask } from '@/lib/redux/features/taskSlice';
+import { getSectionByTeamId, createSection, updateTaskIds } from '@/lib/redux/features/sectionSlice';
+import { fetchAllTags, getTagByName } from '@/lib/redux/features/tagSlice';
 import { getTags } from '@/lib/redux/features/teamCFSlice';
-import { Plus } from 'lucide-react';
+import { Plus, Edit, Check, X, CheckCircle2, Circle, Trash } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
+import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useConfirm } from '@/hooks/use-confirm';
+import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { parseSingleSelectValue, generateColorFromLabel, renderStatusBadge } from './helpers';
+import { supabase } from '@/lib/supabase';
 
 // 使用唯一键记录全局请求状态，避免重复请求
 const requestCache = {
@@ -22,19 +33,313 @@ const findTagById = (tagId, tags) => {
   return tags.find(tag => tag.id === parseInt(tagId) || tag.id === tagId || tag.id.toString() === tagId);
 };
 
+// 状态选项列表
+const statusOptions = [
+  { label: 'Pending', value: 'pending', color: '#f59e0b' },
+  { label: 'In Progress', value: 'in_progress', color: '#3b82f6' },
+  { label: 'Completed', value: 'completed', color: '#10b981' },
+  { label: 'Cancelled', value: 'cancelled', color: '#ef4444' },
+];
+
+// 状态选择器组件，与TagConfig.js中的renderSingleSelectCell完全一致
+const StatusSelector = ({ value, onChange, options }) => {
+    const t = useTranslations('CreateTask');
+    const [open, setOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
+    const [newOption, setNewOption] = useState({ label: '', color: '#10b981' });
+    const [editingOption, setEditingOption] = useState(null);
+    
+    // 解析当前选择的值
+    const selectedOption = parseSingleSelectValue(value);
+    
+    // 过滤选项
+    const filteredOptions = options.filter(option => 
+        option.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    // 处理选项选择
+    const handleSelect = (option) => {
+        if (onChange) {
+            onChange(option);
+        }
+        setOpen(false);
+        setSearchTerm('');
+    };
+    
+    // 创建新选项
+    const handleCreateOption = () => {
+        if (newOption.label.trim()) {
+            const optionToAdd = {
+                ...newOption,
+                value: newOption.value || newOption.label.toLowerCase().replace(/\s+/g, '_')
+            };
+            
+            // 自动添加到选中项
+            handleSelect(optionToAdd);
+            
+            setNewOption({ label: '', color: '#10b981' });
+            setIsCreating(false);
+        }
+    };
+    
+    // 编辑选项
+    const handleEditOption = () => {
+        if (editingOption) {
+            // 如果编辑的是当前选中选项，更新选中值
+            if (selectedOption && selectedOption.value === editingOption.value) {
+                onChange(editingOption);
+            }
+            
+            setEditingOption(null);
+        }
+    };
+    
+    // 删除选项
+    const handleDeleteOption = (option, e) => {
+        e.stopPropagation();
+        // 如果删除的是当前选中选项，清除选中值
+        if (selectedOption && selectedOption.value === option.value) {
+            onChange(null);
+        }
+    };
+    
+    // 开始编辑选项
+    const startEditOption = (option, e) => {
+        e.stopPropagation();
+        setEditingOption({...option});
+    };
+    
+    // 生成随机颜色
+    const generateRandomColor = () => {
+        const colors = [
+            '#ef4444', '#f97316', '#f59e0b', '#84cc16', 
+            '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', 
+            '#d946ef', '#ec4899'
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+    };
+    
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <div className="flex items-center gap-2 hover:bg-accent p-1 rounded-md transition-colors cursor-pointer">
+                    {selectedOption ? (
+                        <div className="flex items-center gap-2">
+                            <div 
+                                className="w-3 h-3 rounded-full flex-shrink-0" 
+                                style={{ backgroundColor: selectedOption.color || '#e5e5e5' }}
+                            ></div>
+                            <span className="text-sm truncate">{selectedOption.label}</span>
+                        </div>
+                    ) : (
+                        <span className="text-sm text-muted-foreground">{t('selectStatus')}</span>
+                    )}
+                </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-0" align="start">
+                <div className="p-2">
+                    {/* 搜索输入框 */}
+                    <div className="mb-2">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder={t('searchOptions')}
+                            className="w-full p-2 border rounded text-sm"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                    
+                    {/* 选项列表 */}
+                    <div className="max-h-40 overflow-y-auto">
+                        {filteredOptions.length > 0 ? (
+                            filteredOptions.map((option, index) => (
+                                <div 
+                                    key={index} 
+                                    className={`flex items-center justify-between p-2 hover:bg-accent/50 rounded-md cursor-pointer ${
+                                        selectedOption && selectedOption.value === option.value ? 'bg-accent' : ''
+                                    }`}
+                                    onClick={() => handleSelect(option)}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div 
+                                            className="w-3 h-3 rounded-full" 
+                                            style={{ backgroundColor: option.color || '#e5e5e5' }}
+                                        ></div>
+                                        <span className="text-sm">{option.label}</span>
+                                    </div>
+                                    
+                                    {/* 选项编辑按钮 */}
+                                    <div className="flex items-center">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0"
+                                            onClick={(e) => startEditOption(option, e)}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                            onClick={(e) => handleDeleteOption(option, e)}
+                                        >
+                                            <Trash size={16} />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-sm text-muted-foreground text-center py-2">
+                                {searchTerm ? t('noMatchingOptions') : t('noOptions')}
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* 添加新选项按钮 */}
+                    <div className="mt-2 border-t pt-2">
+                        {isCreating ? (
+                            <div className="space-y-2">
+                                <input
+                                    type="text"
+                                    value={newOption.label}
+                                    onChange={(e) => setNewOption({...newOption, label: e.target.value})}
+                                    placeholder={t('newOptionName')}
+                                    className="w-full p-2 border rounded text-sm"
+                                />
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1">
+                                        <input
+                                            type="color"
+                                            value={newOption.color}
+                                            onChange={(e) => setNewOption({...newOption, color: e.target.value})}
+                                            className="w-full h-8"
+                                        />
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setNewOption({...newOption, color: generateRandomColor()})}
+                                        className="h-8"
+                                    >
+                                        🎲
+                                    </Button>
+                                </div>
+                                <div className="flex justify-between">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setIsCreating(false);
+                                            setNewOption({ label: '', color: '#10b981' });
+                                        }}
+                                    >
+                                        {t('cancel')}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleCreateOption}
+                                        disabled={!newOption.label.trim()}
+                                    >
+                                        {t('create')}
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => setIsCreating(true)}
+                            >
+                                <Plus size={16} className="mr-1" />
+                                {t('addOption')}
+                            </Button>
+                        )}
+                    </div>
+                    
+                    {/* 编辑选项界面 */}
+                    {editingOption && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingOption(null)}>
+                            <div className="bg-background p-4 rounded-lg shadow-lg w-72" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-lg font-medium mb-4">{t('editOption')}</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">{t('optionName')}</label>
+                                        <input
+                                            type="text"
+                                            value={editingOption.label}
+                                            onChange={(e) => setEditingOption({...editingOption, label: e.target.value})}
+                                            className="w-full p-2 border rounded"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">{t('optionColor')}</label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                value={editingOption.color}
+                                                onChange={(e) => setEditingOption({...editingOption, color: e.target.value})}
+                                                className="w-full h-8"
+                                            />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setEditingOption({...editingOption, color: generateRandomColor()})}
+                                                className="h-8"
+                                            >
+                                                🎲
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between pt-2">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setEditingOption(null)}
+                                        >
+                                            {t('cancel')}
+                                        </Button>
+                                        <Button
+                                            onClick={handleEditOption}
+                                            disabled={!editingOption.label.trim()}
+                                        >
+                                            {t('save')}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+};
+
 export default function BodyContent() {
     const dispatch = useDispatch();
     const t = useTranslations('CreateTask');
     const allTags = useSelector(state => state.tags.tags);
     const teamCFTags = useSelector(state => state.teamCF.tags);
-    
+    const { user } = useGetUser()
+    const userId = user?.id;
+    const { confirm } = useConfirm();
     const { 
         selectedTaskId, 
         setSelectedTaskId,
         projectId,
         teamId,
         teamCFId,
-        setWorkflowData
+        setWorkflowData,
+        editableTask,
+        setEditableTask,
+        refreshWorkflow,
+        workflowData
     } = useContext(WorkflowContext);
     
     const [sections, setSections] = useState([]);
@@ -49,6 +354,31 @@ export default function BodyContent() {
       teamTagsFetched: false,
       sectionsFetched: false
     });
+
+    // 动态标签ID状态
+    const [assigneeTagId, setAssigneeTagId] = useState(null);
+    const [nameTagId, setNameTagId] = useState(null);
+    const [descriptionTagId, setDescriptionTagId] = useState(null);
+    const [statusTagId, setStatusTagId] = useState(null);
+    const [dueDateTagId, setDueDateTagId] = useState(null);
+
+    // 编辑任务相关状态
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingTask, setEditingTask] = useState(null);
+    const [editingValues, setEditingValues] = useState({});
+
+    // 新增添加任务状态
+    const [isCreating, setIsCreating] = useState(false);
+    const [newTaskValues, setNewTaskValues] = useState({
+        name: '',
+        description: '',
+        status: null,
+        assignee: '',
+        dueDate: ''
+    });
+
+    // 获取今天的日期，格式为YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
 
     // 获取所有通用标签
     useEffect(() => {
@@ -88,7 +418,18 @@ export default function BodyContent() {
       
       async function fetchData() {
         try {
-          if (!requestCache.sections[teamId] && !localRequestTracker.current.sectionsFetched) {
+          // 检查 workflowData 是否为空，如果为空则强制重新获取数据
+          const shouldRefetch = 
+            !requestCache.sections[teamId] || 
+            !localRequestTracker.current.sectionsFetched ||
+            (workflowData && workflowData.nodes && workflowData.nodes.length === 0);
+          
+          if (shouldRefetch) {
+            console.log('BodyContent - 强制重新获取任务数据');
+            // 重置请求缓存状态
+            requestCache.sections[teamId] = false;
+            localRequestTracker.current.sectionsFetched = false;
+            
             const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
             if (!isMounted) return;
             
@@ -122,44 +463,160 @@ export default function BodyContent() {
       return () => {
         isMounted = false;
       };
-    }, [teamId, dispatch]);
+    }, [teamId, dispatch, workflowData]);
 
-    // 从任务标签值中提取任务信息
+    // 获取标签IDs
+    useEffect(() => {
+      const fetchTagIds = async () => {
+        try {
+          // 获取常用标签的ID
+          const [nameTag, descriptionTag, statusTag, dueDateTag, assigneeTag] = await Promise.all([
+            dispatch(getTagByName(t('name'))).unwrap(),
+            dispatch(getTagByName(t('description'))).unwrap(),
+            dispatch(getTagByName(t('status'))).unwrap(),
+            dispatch(getTagByName(t('dueDate'))).unwrap(),
+            dispatch(getTagByName(t('assignee'))).unwrap()
+          ]);
+          
+          setNameTagId(nameTag);
+          setDescriptionTagId(descriptionTag);
+          setStatusTagId(statusTag);
+          setDueDateTagId(dueDateTag);
+          setAssigneeTagId(assigneeTag);
+          
+          console.log('标签IDs已加载:', {
+            nameTag,
+            descriptionTag,
+            statusTag,
+            dueDateTag,
+            assigneeTag
+          });
+        } catch (error) {
+          console.error('获取标签ID失败:', error);
+        }
+      };
+      
+      fetchTagIds();
+    }, [dispatch]);
+
+    // 修改extractTaskInfo函数
     const extractTaskInfo = (task) => {
       const tagValues = task.tag_values || {};
       let taskInfo = {
         id: task.id,
         name: `${t('task')} #${task.id}`,
         description: '',
-        status: t('pending'),
+        status: '-',
         assignee: '',
         dueDate: '',
         originalTask: task
       };
       
-      Object.entries(tagValues).forEach(([tagId, value]) => {
-        const tag = findTagById(tagId, tags);
-        if (tag) {
-          switch (tag.name) {
-            case 'Name':
-              taskInfo.name = String(value || '');
-              break;
-            case 'Description':
-              taskInfo.description = String(value || '');
-              break;
-            case 'Status':
-              taskInfo.status = String(value || t('pending'));
-              break;
-            case 'Assignee':
-              taskInfo.assignee = String(value || '');
-              break;
-            case 'Due Date':
-            case 'DueDate':
-              taskInfo.dueDate = value ? String(value).split('T')[0] : '';
-              break;
-          }
+      // 通过标签ID获取值
+      // Name 标签
+      if (nameTagId && tagValues[nameTagId]) {
+        taskInfo.name = String(tagValues[nameTagId] || '');
+      }
+      
+      // Description 标签
+      if (descriptionTagId && tagValues[descriptionTagId]) {
+        taskInfo.description = String(tagValues[descriptionTagId] || '');
+      }
+      
+      // Status 标签
+      if (statusTagId && tagValues[statusTagId]) {
+        const statusValue = tagValues[statusTagId];
+        // 保存原始状态值，便于编辑
+        taskInfo.rawStatus = statusValue;
+        // 使用helpers.js中的解析函数处理状态值
+        const parsedStatus = parseSingleSelectValue(statusValue);
+        
+        if (parsedStatus) {
+          taskInfo.statusData = parsedStatus;
+          taskInfo.status = parsedStatus.label || String(statusValue);
+        } else {
+          taskInfo.status = String(statusValue || '');
         }
-      });
+      }
+      
+      // Assignee 标签 - 使用动态获取的ID
+      if (assigneeTagId && tagValues[assigneeTagId]) {
+        const value = tagValues[assigneeTagId];
+        // 处理Assignee可能是数组的情况
+        if (Array.isArray(value)) {
+          // 如果是数组，显示多个指派人的数量
+          taskInfo.assignee = `${value.length} ${t('assignees')}`;
+          // 保存原始数组以便需要时使用
+          taskInfo.assigneeData = value;
+        } else {
+          // 单个指派人情况
+          taskInfo.assignee = String(value || '');
+        }
+      }
+      
+      // Due Date 标签
+      if (dueDateTagId && tagValues[dueDateTagId]) {
+        const dueDateValue = tagValues[dueDateTagId];
+        taskInfo.dueDate = dueDateValue ? String(dueDateValue).split('T')[0] : '';
+      }
+      
+      // 保持对老数据的兼容性，使用基于标签名称的处理
+      if (!nameTagId || !descriptionTagId || !statusTagId || !assigneeTagId || !dueDateTagId) {
+        Object.entries(tagValues).forEach(([tagId, value]) => {
+          const tag = findTagById(tagId, tags);
+          if (tag) {
+            switch (tag.name) {
+              case t('name'):
+                if (!taskInfo.name || taskInfo.name === `${t('task')} #${task.id}`) {
+                  taskInfo.name = String(value || '');
+                }
+                break;
+              case t('description'):
+                if (!taskInfo.description) {
+                  taskInfo.description = String(value || '');
+                }
+                break;
+              case t('status'):
+                if (!taskInfo.status || taskInfo.status === '-') {
+                  // 保存原始状态值
+                  taskInfo.rawStatus = value;
+                  // 使用helpers.js中的解析函数处理状态值
+                  const parsedStatus = parseSingleSelectValue(value);
+                  
+                  if (parsedStatus) {
+                    taskInfo.statusData = parsedStatus;
+                    taskInfo.status = parsedStatus.label || String(value);
+                  } else {
+                    taskInfo.status = String(value || '');
+                  }
+                }
+                break;
+              case t('assignee'):
+                if (!taskInfo.assignee) {
+                  // 处理Assignee可能是数组的情况
+                  if (Array.isArray(value)) {
+                    // 如果是数组，显示多个指派人的数量
+                    taskInfo.assignee = `${value.length} ${t('assignees')}`;
+                    // 保存原始数组以便需要时使用
+                    taskInfo.assigneeData = value;
+                  } else {
+                    // 单个指派人情况
+                    taskInfo.assignee = String(value || '');
+                  }
+                }
+                break;
+              case t('dueDate'):
+              case 'Due Date': // 保留兼容旧格式
+              case 'DueDate': // 保留兼容旧格式
+                if (!taskInfo.dueDate) {
+                  const dueDateValue = value;
+                  taskInfo.dueDate = dueDateValue ? String(dueDateValue).split('T')[0] : '';
+                }
+                break;
+            }
+          }
+        });
+      }
       
       return taskInfo;
     };
@@ -241,26 +698,838 @@ export default function BodyContent() {
     // 获取当前选中任务的详细信息
     const selectedTask = processedTasks.find(task => task.id === selectedTaskId);
 
+    // 处理任务编辑 - 使用从 WorkflowContext 提供的 editableTask
+    useEffect(() => {
+        if (editableTask) {
+            setIsEditing(true);
+            setEditingTask(editableTask);
+            
+            // 初始化编辑值
+            const initialValues = {
+                name: editableTask.name,
+                description: editableTask.description,
+                status: editableTask.status,
+                assignee: editableTask.assignee,
+                dueDate: editableTask.dueDate
+            };
+            
+            setEditingValues(initialValues);
+            
+            // 清除 WorkflowContext 中的 editableTask
+            setEditableTask(null);
+        }
+    }, [editableTask, setEditableTask]);
+
+    // 处理取消编辑
+    const handleCancelEdit = () => {
+        setIsEditing(false);
+        setEditingTask(null);
+        setEditingValues({});
+    };
+
+    // 处理输入变化
+    const handleInputChange = (field, value) => {
+        // 如果是任务名称字段，限制最大长度为100个字符
+        if (field === 'name') {
+            // 限制长度
+            if (value.length > 100) {
+                value = value.slice(0, 100);
+            }
+        }
+        // 如果是描述字段，限制最大长度为100个字符
+        else if (field === 'description') {
+            if (value.length > 100) {
+                value = value.slice(0, 100);
+            }
+        }
+        
+        setEditingValues(prev => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+
+    // 处理输入框失焦，自动去除前后空格
+    const handleFieldBlur = (field, isNewTask) => {
+        if (isNewTask) {
+            // 新任务表单
+            if (field === 'name' || field === 'description') {
+                const currentValue = newTaskValues[field] || '';
+                const trimmedValue = currentValue.trim();
+                
+                if (trimmedValue !== currentValue) {
+                    setNewTaskValues(prev => ({
+                        ...prev,
+                        [field]: trimmedValue
+                    }));
+                }
+            }
+        } else {
+            // 编辑任务表单
+            if (field === 'name' || field === 'description') {
+                const currentValue = editingValues[field] || '';
+                const trimmedValue = currentValue.trim();
+                
+                if (trimmedValue !== currentValue) {
+                    setEditingValues(prev => ({
+                        ...prev,
+                        [field]: trimmedValue
+                    }));
+                }
+            }
+        }
+    };
+
+    // 确保在保存时去除前后空格
+    const handleSaveTask = async () => {
+        try {
+            setLoading(true);
+            
+            // 去除名称和描述前后空格并更新状态
+            const trimmedName = editingValues.name ? editingValues.name.trim() : '';
+            const trimmedDescription = editingValues.description ? editingValues.description.trim() : '';
+            
+            setEditingValues(prev => ({
+                ...prev,
+                name: trimmedName,
+                description: trimmedDescription
+            }));
+            
+            // 验证任务名称不能为空或只包含空格
+            if (!trimmedName) {
+                toast.error(t('nameRequired'));
+                setLoading(false);
+                return;
+            }
+            
+            // 获取原始任务数据
+            const originalTask = editingTask.originalTask;
+            if (!originalTask || !originalTask.id) {
+                toast.error(t('taskNotFound'));
+                return;
+            }
+            
+            // 准备要更新的tag_values
+            const tagValues = {...originalTask.tag_values || {}};
+            
+            // 更新各字段
+            if (nameTagId) {
+                tagValues[nameTagId] = editingValues.name;
+            }
+            
+            if (descriptionTagId) {
+                tagValues[descriptionTagId] = editingValues.description;
+            }
+            
+            if (statusTagId && editingValues.status) {
+                // 处理状态字段 - 确保以JSON对象格式保存
+                if (typeof editingValues.status === 'object') {
+                    // 确保对象有必要的属性
+                    const statusObj = {
+                        label: editingValues.status.label || '',
+                        value: editingValues.status.value || editingValues.status.label?.toLowerCase()?.replace(/\s+/g, '_') || '',
+                        color: editingValues.status.color || generateColorFromLabel(editingValues.status.label || '')
+                    };
+                    
+                    // 根据API需求，可能需要将对象转为JSON字符串
+                    // 如果后端需要保存为JSON字符串
+                    tagValues[statusTagId] = JSON.stringify(statusObj);
+                    // 如果后端可以直接保存对象
+                    // tagValues[statusTagId] = statusObj;
+                } else {
+                    // 如果是字符串，创建一个标准格式的状态对象
+                    const statusText = String(editingValues.status);
+                    const statusObj = {
+                        label: statusText,
+                        value: statusText.toLowerCase().replace(/\s+/g, '_'),
+                        color: generateColorFromLabel(statusText)
+                    };
+                    
+                    // 同样，根据API需求决定是对象还是JSON字符串
+                    tagValues[statusTagId] = JSON.stringify(statusObj);
+                    // tagValues[statusTagId] = statusObj;
+                }
+            }
+            
+            if (dueDateTagId && editingValues.dueDate) {
+                tagValues[dueDateTagId] = editingValues.dueDate;
+            }
+            
+            if (assigneeTagId && editingValues.assignee) {
+                tagValues[assigneeTagId] = editingValues.assignee;
+            }
+            
+            // 调用更新API
+            await dispatch(updateTask({
+                taskId: originalTask.id,
+                taskData: {
+                    tag_values: tagValues
+                },
+                oldTask: originalTask
+            })).unwrap();
+            
+            // 更新成功后重新获取任务
+            const updatedTask = await dispatch(fetchTaskById(originalTask.id)).unwrap();
+            
+            // 更新本地任务列表
+            setAllTasks(prev => {
+                const updatedTasks = [...prev];
+                const taskIndex = updatedTasks.findIndex(t => t.id === originalTask.id);
+                
+                if (taskIndex !== -1) {
+                    updatedTasks[taskIndex] = updatedTask;
+                }
+                
+                return updatedTasks;
+            });
+            
+            toast.success(t('taskUpdated'));
+            
+            // 重置编辑状态
+            setIsEditing(false);
+            setEditingTask(null);
+            setEditingValues({});
+            
+            // 确保处理后的任务列表是最新的并刷新工作流
+            const updatedProcessedTasks = processedTasks.map(task => {
+                if (task.id === originalTask.id) {
+                    // 重新提取任务信息
+                    return extractTaskInfo(updatedTask);
+                }
+                return task;
+            });
+            
+            // 更新本地处理后的任务列表
+            setProcessedTasks(updatedProcessedTasks);
+            
+            // 刷新工作流图
+            if (refreshWorkflow) {
+                refreshWorkflow(updatedProcessedTasks);
+            }
+            
+        } catch (error) {
+            console.error('更新任务失败:', error);
+            toast.error(t('updateTaskFailed'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 处理本地编辑任务
+    const handleEditTask = (task) => {
+        // 检查任务对象是否有效
+        if (!task || !task.id) {
+            console.error('无法编辑任务: 缺少任务对象或任务ID');
+            toast.error(t('editTaskFailed'));
+            return;
+        }
+        
+        // 如果正在创建任务，先关闭创建表单
+        if (isCreating) {
+            setIsCreating(false);
+            setNewTaskValues({
+                name: '',
+                description: '',
+                status: null,
+                assignee: '',
+                dueDate: ''
+            });
+        }
+        
+        setIsEditing(true);
+        setEditingTask({...task}); // 确保完整复制任务对象
+        
+        // 初始化编辑值
+        const initialValues = {
+            id: task.id, // 确保ID也包含在编辑值中
+            name: task.name,
+            description: task.description,
+            status: task.status,
+            assignee: task.assignee,
+            dueDate: task.dueDate
+        };
+        
+        setEditingValues(initialValues);
+    };
+
+    // 渲染编辑表单
+    const renderEditForm = () => {
+        if (!selectedTask || !isEditing) return null;
+        
+        // 检查任务名称是否有效（不为空且不只包含空格）
+        const isNameValid = editingValues.name && editingValues.name.trim() !== '';
+        
+        return (
+            <div className="mb-6 p-4 border rounded-lg">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-lg font-medium text-gray-700">{t('editTask')}</h3>
+                    <button 
+                        className="p-1 rounded-full hover:bg-gray-100"
+                        onClick={handleCancelEdit}
+                    >
+                        <X className="w-4 h-4 text-gray-500 hover:text-black" />
+                    </button>
+                </div>
+                
+                <div className="space-y-3">
+                    <div className="flex flex-col">
+                        <label className="font-medium mb-1">{t('name')}:</label>
+                        <input
+                            type="text"
+                            value={editingValues.name || ''}
+                            onChange={(e) => handleInputChange('name', e.target.value)}
+                            onBlur={(e) => handleFieldBlur('name', false)}
+                            className="p-2 border rounded text-sm w-full focus:ring-1 focus:ring-primary focus:outline-none"
+                            maxLength={100}
+                        />
+                        <div className="text-xs text-gray-500 mt-1 text-right">
+                            {(editingValues.name || '').length}/100
+                        </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                        <label className="font-medium mb-1">{t('status')}:</label>
+                        <StatusSelector 
+                            value={editingValues.status}
+                            onChange={(option) => handleInputChange('status', option)}
+                            options={statusOptions}
+                        />
+                    </div>
+                    <div className="flex flex-col">
+                        <label className="font-medium mb-1">{t('description')}:</label>
+                        <textarea
+                            value={editingValues.description || ''}
+                            onChange={(e) => handleInputChange('description', e.target.value.slice(0, 100))}
+                            onBlur={(e) => handleFieldBlur('description', false)}
+                            className="p-2 border rounded text-sm min-h-[80px] focus:ring-1 focus:ring-primary focus:outline-none"
+                            maxLength={100}
+                        />
+                        <div className="text-xs text-gray-500 mt-1 text-right">
+                            {editingValues.description?.length || 0}/100
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col">
+                            <label className="font-medium mb-1">{t('assignee')}:</label>
+                            <input
+                                type="text"
+                                value={editingValues.assignee || ''}
+                                onChange={(e) => handleInputChange('assignee', e.target.value)}
+                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
+                            />
+                        </div>
+                        <div className="flex flex-col">
+                            <label className="font-medium mb-1">{t('dueDate')}:</label>
+                            <input
+                                type="date"
+                                value={editingValues.dueDate || ''}
+                                onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
+                                min={today}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-4 mt-3 border-t">
+                        <button 
+                            className="flex items-center text-sm text-red-500 hover:text-red-600 py-2 px-3 rounded hover:bg-gray-50 transition-colors"
+                            onClick={() => {
+                                // 直接使用selectedTask，它是完整的任务对象
+                                if (selectedTask && selectedTask.id) {
+                                    console.log('删除任务ID:', selectedTask.id);
+                                    handleCancelEdit(); // 先关闭编辑表单
+                                    handleDeleteTask(selectedTask); 
+                                } else {
+                                    toast.error(t('deleteTaskFailed'));
+                                    console.error('无法删除任务: 缺少任务ID', {selectedTask});
+                                }
+                            }}
+                            type="button"
+                        >
+                            <Trash className="w-4 h-4 mr-1" />
+                            {t('delete')}
+                        </button>
+                        
+                        <button 
+                            className="flex items-center text-sm text-green-500 hover:text-green-600 py-2 px-3 rounded hover:bg-gray-50 transition-colors"
+                            onClick={handleSaveTask}
+                            disabled={!isNameValid}
+                            type="button"
+                        >
+                            <Check className={`w-4 h-4 mr-1 ${!isNameValid ? 'text-gray-300' : ''}`} />
+                            {t('save')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // 处理新任务值变更
+    const handleNewTaskInputChange = (field, value) => {
+        // 如果是任务名称字段，限制最大长度为100个字符
+        if (field === 'name') {
+            // 限制长度
+            if (value.length > 100) {
+                value = value.slice(0, 100);
+            }
+        }
+        // 如果是描述字段，限制最大长度为100个字符
+        else if (field === 'description') {
+            if (value.length > 100) {
+                value = value.slice(0, 100);
+            }
+        }
+        
+        setNewTaskValues(prev => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+    
+    // 取消创建任务
+    const handleCancelCreate = () => {
+        setIsCreating(false);
+        setNewTaskValues({
+            name: '',
+            description: '',
+            status: null,
+            assignee: '',
+            dueDate: ''
+        });
+    };
+    
+    // 确保在创建任务时去除前后空格
+    const handleCreateTask = async () => {
+        try {
+            setLoading(true);
+            
+            // 去除名称和描述前后空格并更新状态
+            const trimmedName = newTaskValues.name ? newTaskValues.name.trim() : '';
+            const trimmedDescription = newTaskValues.description ? newTaskValues.description.trim() : '';
+            
+            setNewTaskValues(prev => ({
+                ...prev,
+                name: trimmedName,
+                description: trimmedDescription
+            }));
+            
+            // 验证必填字段 - 使用trim()确保不能只包含空格
+            if (!trimmedName) {
+                toast.error(t('nameRequired'));
+                setLoading(false);
+                return;
+            }
+            
+            // 准备任务数据和标签值
+            const tagValues = {};
+            
+            if (nameTagId) {
+                tagValues[nameTagId] = newTaskValues.name;
+            }
+            
+            if (descriptionTagId && newTaskValues.description) {
+                tagValues[descriptionTagId] = newTaskValues.description;
+            }
+            
+            if (statusTagId && newTaskValues.status) {
+                // 处理状态字段 - 确保以JSON对象格式保存
+                if (typeof newTaskValues.status === 'object') {
+                    const statusObj = {
+                        label: newTaskValues.status.label || '',
+                        value: newTaskValues.status.value || newTaskValues.status.label?.toLowerCase()?.replace(/\s+/g, '_') || '',
+                        color: newTaskValues.status.color || generateColorFromLabel(newTaskValues.status.label || '')
+                    };
+                    
+                    tagValues[statusTagId] = JSON.stringify(statusObj);
+                } else if (newTaskValues.status) {
+                    const statusText = String(newTaskValues.status);
+                    const statusObj = {
+                        label: statusText,
+                        value: statusText.toLowerCase().replace(/\s+/g, '_'),
+                        color: generateColorFromLabel(statusText)
+                    };
+                    
+                    tagValues[statusTagId] = JSON.stringify(statusObj);
+                }
+            }
+            
+            if (dueDateTagId && newTaskValues.dueDate) {
+                tagValues[dueDateTagId] = newTaskValues.dueDate;
+            }
+            
+            if (assigneeTagId && newTaskValues.assignee) {
+                tagValues[assigneeTagId] = newTaskValues.assignee;
+            }
+            
+            // 创建任务基础数据
+            const taskData = {
+                tag_values: tagValues,
+                created_by: userId,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+            
+            // 创建任务
+            const createdTask = await dispatch(createTask(taskData)).unwrap();
+            
+            // 可选: 创建Notion页面并关联到任务
+            if (createdTask && createdTask.id) {
+                try {
+                    // 创建notion_page并关联到任务
+                    const { data: notionPageData, error: notionPageError } = await supabase
+                        .from('notion_page')
+                        .insert({
+                            created_by: userId,
+                            last_edited_by: userId
+                        })
+                        .select()
+                        .single();
+                    
+                    if (notionPageData && notionPageData.id) {
+                        // 更新任务的page_id
+                        const { data: updatedTaskData, error: taskUpdateError } = await supabase
+                            .from('task')
+                            .update({
+                                page_id: notionPageData.id
+                            })
+                            .eq('id', createdTask.id)
+                            .select();
+                            
+                        if (taskUpdateError) {
+                            console.error('更新任务页面关联失败:', taskUpdateError);
+                        }
+                    }
+                } catch (error) {
+                    console.error('创建Notion页面关联失败:', error);
+                    // 继续流程, 这只是一个可选步骤
+                }
+            }
+            
+            // 检查是否需要创建部分或更新部分的任务ID列表
+            let sectionToUse = null;
+            
+            // 尝试获取当前团队的部分
+            const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
+            
+            if (sectionsData && sectionsData.length > 0) {
+                // 使用第一个部分
+                sectionToUse = sectionsData[0];
+                
+                // 更新部分的任务ID列表
+                const existingTaskIds = sectionToUse.task_ids || [];
+                const updatedTaskIds = [...existingTaskIds, createdTask.id];
+                
+                await dispatch(updateTaskIds({
+                    sectionId: sectionToUse.id,
+                    teamId: teamId,
+                    newTaskIds: updatedTaskIds
+                })).unwrap();
+            } else {
+                // 没有找到部分，需要创建一个新的
+                const sectionData = {
+                    teamId,
+                    sectionName: "New Section",
+                    createdBy: userId
+                };
+                
+                const newSection = await dispatch(createSection({
+                    teamId, 
+                    sectionData
+                })).unwrap();
+                
+                // 更新新部分的任务ID列表
+                await dispatch(updateTaskIds({
+                    sectionId: newSection.id,
+                    teamId: teamId,
+                    newTaskIds: [createdTask.id]
+                })).unwrap();
+                
+                // 更新本地部分数据
+                setSections([newSection]);
+            }
+            
+            // 提示创建成功
+            toast.success(t('taskCreated'));
+            
+            // 获取最新任务信息
+            const updatedTask = await dispatch(fetchTaskById(createdTask.id)).unwrap();
+            
+            // 更新本地任务列表
+            const newProcessedTask = extractTaskInfo(updatedTask);
+            setAllTasks(prev => [...prev, updatedTask]);
+            setProcessedTasks(prev => [...prev, newProcessedTask]);
+            
+            // 更新工作流数据
+            const updatedTasks = [...processedTasks, newProcessedTask];
+            updateWorkflowData(updatedTasks);
+            
+            // 刷新工作流图
+            if (refreshWorkflow) {
+                refreshWorkflow(updatedTasks);
+            }
+            
+            // 重置并关闭创建表单
+            setIsCreating(false);
+            setNewTaskValues({
+                name: '',
+                description: '',
+                status: null,
+                assignee: '',
+                dueDate: ''
+            });
+            
+            // 设置新创建的任务为选中任务
+            setSelectedTaskId(createdTask.id);
+            
+        } catch (error) {
+            console.error('创建任务失败:', error);
+            toast.error(t('createTaskFailed'));
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    // 渲染创建任务表单
+    const renderCreateForm = () => {
+        if (!isCreating) return null;
+        
+        // 检查任务名称是否有效（不为空且不只包含空格）
+        const isNameValid = newTaskValues.name && newTaskValues.name.trim() !== '';
+        
+        return (
+            <div className="mb-6 p-4 border rounded-lg">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-lg font-medium text-gray-700">{t('createTask')}</h3>
+                    <button 
+                        className="p-1 rounded-full hover:bg-gray-100"
+                        onClick={handleCancelCreate}
+                    >
+                        <X className="w-4 h-4 text-gray-500 hover:text-black" />
+                    </button>
+                </div>
+                
+                <div className="space-y-3">
+                    <div className="flex flex-col">
+                        <label className="font-medium mb-1">{t('name')}:</label>
+                        <input
+                            type="text"
+                            value={newTaskValues.name}
+                            onChange={(e) => handleNewTaskInputChange('name', e.target.value)}
+                            onBlur={(e) => handleFieldBlur('name', true)}
+                            placeholder={t('taskName')}
+                            className="p-2 border rounded text-sm w-full focus:ring-1 focus:ring-primary focus:outline-none"
+                            autoFocus
+                            maxLength={100}
+                        />
+                        <div className="text-xs text-gray-500 mt-1 text-right">
+                            {newTaskValues.name.length}/100
+                        </div>
+                    </div>
+                    
+                    <div className="flex flex-col">
+                        <label className="font-medium mb-1">{t('status')}:</label>
+                        <StatusSelector 
+                            value={newTaskValues.status}
+                            onChange={(option) => handleNewTaskInputChange('status', option)}
+                            options={statusOptions}
+                        />
+                    </div>
+                    <div className="flex flex-col">
+                        <label className="font-medium mb-1">{t('description')}:</label>
+                        <textarea
+                            value={newTaskValues.description}
+                            onChange={(e) => handleNewTaskInputChange('description', e.target.value.slice(0, 100))}
+                            onBlur={(e) => handleFieldBlur('description', true)}
+                            placeholder={t('taskDescription')}
+                            className="p-2 border rounded text-sm min-h-[80px] focus:ring-1 focus:ring-primary focus:outline-none"
+                            maxLength={100}
+                        />
+                        <div className="text-xs text-gray-500 mt-1 text-right">
+                            {newTaskValues.description?.length || 0}/100
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col">
+                            <label className="font-medium mb-1">{t('assignee')}:</label>
+                            <input
+                                type="text"
+                                value={newTaskValues.assignee}
+                                onChange={(e) => handleNewTaskInputChange('assignee', e.target.value)}
+                                placeholder={t('assigneePlaceholder')}
+                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
+                            />
+                        </div>
+                        <div className="flex flex-col">
+                            <label className="font-medium mb-1">{t('dueDate')}:</label>
+                            <input
+                                type="date"
+                                value={newTaskValues.dueDate}
+                                onChange={(e) => handleNewTaskInputChange('dueDate', e.target.value)}
+                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
+                                min={today}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="flex justify-end items-center pt-4 mt-3 border-t">
+                        <button 
+                            className="flex items-center text-sm text-green-500 hover:text-green-600 py-2 px-3 rounded hover:bg-gray-50 transition-colors"
+                            onClick={handleCreateTask}
+                            disabled={!isNameValid}
+                            type="button"
+                        >
+                            <Check className={`w-4 h-4 mr-1 ${!isNameValid ? 'text-gray-300' : ''}`} />
+                            <span className={`${!isNameValid ? 'text-gray-300' : ''}`}>{t('create')}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // 打开创建任务表单
+    const handleOpenCreateTask = () => {
+        // 如果正在编辑任务，先关闭编辑表单
+        if (isEditing) {
+            setIsEditing(false);
+            setEditingTask(null);
+            setEditingValues({});
+        }
+        
+        setIsCreating(true);
+    };
+
+    // 处理删除任务
+    const handleDeleteTask = (task) => {
+        console.log('handleDeleteTask被调用，传入的任务对象:', task);
+        
+        // 检查任务对象是否有效
+        if (!task) {
+            console.error('删除任务失败: 任务对象为空');
+            toast.error(t('deleteTaskFailed'));
+            return;
+        }
+        
+        // 检查任务ID是否有效
+        if (!task.id) {
+            console.error('删除任务失败: 任务ID为空');
+            toast.error(t('deleteTaskFailed'));
+            return;
+        }
+        
+        const taskId = task.id; // 保存任务ID以确保一致性
+        console.log('任务ID有效，将显示确认对话框，任务ID:', taskId);
+        
+        confirm({
+            title: t('deleteTaskTitle'),
+            description: t('deleteTaskDescription'),
+            variant: "error",
+            onConfirm: async () => {
+                try {
+                    setLoading(true);
+                    console.log('用户确认删除，开始删除任务，任务ID:', taskId);
+                    
+                    // 获取任务所在的部分
+                    const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
+                    const sectionWithTask = sectionsData.find(section => 
+                        section.task_ids && section.task_ids.includes(taskId)
+                    );
+                    
+                    if (sectionWithTask) {
+                        // 从部分的任务ID列表中移除该任务
+                        const updatedTaskIds = sectionWithTask.task_ids.filter(id => id !== taskId);
+                        
+                        // 准备删除任务的参数
+                        const deleteParams = {
+                            taskId,
+                            teamId,
+                            sectionId: sectionWithTask.id,
+                            userId // 添加用户ID到参数中
+                        };
+                        console.log('调用deleteTask，参数:', deleteParams);
+                        
+                        // 删除任务
+                        await dispatch(deleteTask(deleteParams)).unwrap();
+                        
+                        // 更新部分的任务ID列表
+                        await dispatch(updateTaskIds({
+                            sectionId: sectionWithTask.id,
+                            teamId: teamId,
+                            newTaskIds: updatedTaskIds
+                        })).unwrap();
+                        
+                        // 更新本地任务列表
+                        setAllTasks(prev => prev.filter(t => t.id !== taskId));
+                        setProcessedTasks(prev => prev.filter(t => t.id !== taskId));
+                        
+                        // 如果删除的是当前选中的任务，选择其他任务
+                        if (selectedTaskId === taskId) {
+                            const otherTask = processedTasks.find(t => t.id !== taskId);
+                            setSelectedTaskId(otherTask ? otherTask.id : null);
+                        }
+                        
+                        // 更新工作流数据
+                        const updatedTasks = processedTasks.filter(t => t.id !== taskId);
+                        updateWorkflowData(updatedTasks);
+                        
+                        // 刷新工作流图
+                        if (refreshWorkflow) {
+                            refreshWorkflow(updatedTasks);
+                        }
+                        
+                        toast.success(t('taskDeleted'));
+                    } else {
+                        // 即使找不到部分，也尝试删除任务
+                        const deleteParams = {
+                            taskId,
+                            teamId,
+                            userId // 添加用户ID到参数中
+                        };
+                        console.log('找不到部分，仍调用deleteTask，参数:', deleteParams);
+                        
+                        // 删除任务
+                        await dispatch(deleteTask(deleteParams)).unwrap();
+                        
+                        // 更新本地任务列表
+                        setAllTasks(prev => prev.filter(t => t.id !== taskId));
+                        setProcessedTasks(prev => prev.filter(t => t.id !== taskId));
+                        
+                        toast.success(t('taskDeleted'));
+                    }
+                } catch (error) {
+                    console.error('删除任务失败:', error);
+                    toast.error(t('deleteTaskFailed'));
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
+    };
+
     if (loading) {
       return <div className="p-4 text-center">{t('loading')}</div>;
     }
 
     return (
         <div className="p-1">
-            {selectedTask && (
+            {selectedTask && !isEditing && (
                 <div className="mb-6 p-4 border rounded-lg">
-                    <h3 className="text-lg font-semibold border-b pb-2 mb-3">{selectedTask.name}</h3>
+                    <div className="flex justify-between items-center border-b pb-2 mb-3">
+                        <h3 className="text-lg max-w-[80%] break-words font-semibold">{selectedTask.name}</h3>
+                        <div className="flex items-center space-x-2">
+                            <button 
+                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                                onClick={() => handleEditTask(selectedTask)}
+                            >
+                                <Edit className="w-4 h-4 text-gray-500" />
+                            </button>
+                        </div>
+                    </div>
                     <div className="space-y-2">
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
                             <span className="font-medium">{t('status')}:</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                                selectedTask.status === t('completed') ? 'bg-green-100 text-green-800' :
-                                selectedTask.status === t('inProgress') ? 'bg-blue-100 text-blue-800' :
-                                selectedTask.status === t('pending') ? 'bg-yellow-100 text-yellow-800' :
-                                'text-gray-800'
-                            }`}>
-                                {selectedTask.status}
-                            </span>
+                            {renderStatusBadge(selectedTask.status)}
                         </div>
                         <div>
                             <span className="font-medium">{t('description')}:</span>
@@ -280,6 +1549,8 @@ export default function BodyContent() {
                 </div>
             )}
 
+            {renderEditForm()}
+
             <div className="grid grid-cols-1 gap-4">
                 {processedTasks.length > 0 ? processedTasks.map((item) => (
                     <div 
@@ -293,19 +1564,12 @@ export default function BodyContent() {
                         onClick={() => setSelectedTaskId(item.id)}
                     >
                         <div className="flex justify-between items-center">
-                            <h3 className="font-semibold">{item.name}</h3>
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                                item.status === t('completed') ? 'bg-green-100 text-green-800' :
-                                item.status === t('inProgress') ? 'bg-blue-100 text-blue-800' :
-                                item.status === t('pending') ? 'bg-yellow-100 text-yellow-800' :
-                                'text-gray-800'
-                            }`}>
-                                {item.status}
-                            </span>
+                            <h3 className="font-semibold break-words max-w-[80%]">{item.name}</h3>
+                            {item.status ? renderStatusBadge(item.status) : renderStatusBadge(null)}
                         </div>
                         <p className="text-gray-600 text-sm mt-1">{item.description || '-'}</p>
                         <div className="mt-2 text-sm text-gray-500 flex justify-between">
-                            <span>{t('assignee')}: {item.assignee || '-'}</span>
+                            <span className="mr-2">{t('assignee')}: {item.assignee || '-'}</span>
                             <span>{t('dueDate')}: {item.dueDate || '-'}</span>
                         </div>
                     </div>
@@ -315,11 +1579,16 @@ export default function BodyContent() {
                     </div>
                 )}
             </div>
+            {renderCreateForm()}
 
-            {/* add task */}
+            {/* add task button */}
             <div className="mt-4">
-              <div className="p-4 border rounded-md cursor-pointer hover:bg-accent flex items-center justify-center">
-                <Plus className="w-4 h-4 text-gray-500"/>
+              <div 
+                className="p-4 border rounded-md cursor-pointer hover:bg-accent flex items-center justify-center"
+                onClick={handleOpenCreateTask}
+              >
+                <Plus className="w-4 h-4 mr-2 text-gray-500"/>
+                <span className="text-sm text-gray-600">{t('addTask')}</span>
               </div>
             </div>
         </div>

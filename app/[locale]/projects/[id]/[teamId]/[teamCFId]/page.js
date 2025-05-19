@@ -25,6 +25,12 @@ import TaskOverview from '@/components/team/overview/TaskOverview';
 import TaskTimeline from '@/components/team/timeline/TaskTimeline';
 import TaskNotion from '@/components/team/notion/TaskNotion';
 import TaskCalendar from '@/components/team/calendar/TaskCalendar';
+//agile
+import TaskAgile from '@/components/team/agile/TaskAgile';
+//posts
+import TaskPosts from '@/components/team/posts/TaskPosts';
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
 
 // 创建记忆化的选择器
 const selectTeams = state => state.teams.teams;
@@ -38,7 +44,14 @@ const selectTeamById = createSelector(
   }
 );
 
-export default function TeamCustomFieldPage() {
+// 新增：记忆化选择器，避免 useSelector 返回新数组
+const selectTeamUsers = createSelector(
+  state => state.teamUsers.teamUsers,
+  (_, teamId) => teamId,
+  (teamUsers, teamId) => teamUsers[teamId] || []
+);
+
+const TeamCustomFieldPage = () => {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const params = useParams();
@@ -54,6 +67,8 @@ export default function TeamCustomFieldPage() {
   const { user } = useGetUser();
   const { confirm } = useConfirm();
   const { currentItem, status: cfStatus, error: cfError } = useSelector((state) => state.teamCF);
+  // 替换为记忆化选择器
+  const teamUsers = useSelector(state => selectTeamUsers(state, teamId));
   const [isLoading, setIsLoading] = useState(false);
   const [currentView, setCurrentView] = useState('list');
   const [open, setOpen] = useState(false);
@@ -63,7 +78,46 @@ export default function TeamCustomFieldPage() {
   const [onClose, setOnClose] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
-  const isStarred = selectedTeam?.star || false;  
+  const isStarred = selectedTeam?.star || false;
+  
+  // 添加一个新状态用于控制团队不存在的警告对话框
+  const [showTeamNotFound, setShowTeamNotFound] = useState(false);
+  
+  // 添加新状态，防止重复加载
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [teamCFLoaded, setTeamCFLoaded] = useState(false);
+  const [teamUsersLoaded, setTeamUsersLoaded] = useState(false);
+  
+  // 检查当前用户是否为团队所有者
+  const isCurrentUserOwner = () => {
+    if (!teamUsers || !user?.id) return false;
+    const currentUserTeamMember = teamUsers.find(tu => String(tu.user.id) === String(user.id));
+    return currentUserTeamMember?.role === 'OWNER';
+  };
+  
+  // 检查当前用户是否为团队成员
+  const isCurrentUserTeamMember = () => {
+    if (!teamUsers || !user?.id) return false;
+    // 这里有问题：当teamUsers为空数组时，即使用户是成员也会返回false
+    // 确保在数据加载完成前不进行限制检查
+    if (teamUsers.length === 0 && isLoading) return true;
+    return teamUsers.some(tu => String(tu.user.id) === String(user.id));
+  };
+  
+  // 当视图切换时，触发refreshKey更新
+  const handleViewChange = (newView) => {
+    setCurrentView(newView);
+    // 增加refreshKey强制重新加载数据
+    setRefreshKey(prev => prev + 1);
+  };
+
+  // 添加刷新内容的函数，传递给TaskTab组件
+  const handleRefreshContent = () => {
+    // 增加refreshKey强制重新加载数据
+    setRefreshKey(prev => prev + 1);
+    // 可以在这里添加其他需要刷新的逻辑
+    return Promise.resolve(); // 返回一个成功的Promise
+  };
   
   // 定义团队状态及对应颜色
   const statusColors = {
@@ -114,11 +168,10 @@ export default function TeamCustomFieldPage() {
   };
 
   useEffect(() => {
-    let unsubscribe = null;
     let isMounted = true;
     
     const loadData = async () => {
-      if (!projectId || !teamId || !teamCFId) return;
+      if (!projectId || !teamId || !teamCFId || dataLoaded) return;
 
       try {
         setIsLoading(true);
@@ -136,43 +189,12 @@ export default function TeamCustomFieldPage() {
           await dispatch(fetchProjectTeams(projectId)).unwrap();
         }
 
-        // 检查Redux状态中是否已加载完成所有团队的自定义字段
-        const teamCustomFieldsStatus = (state) => state.teams.status;
-        const status = teamCustomFieldsStatus(store.getState());
-        
-        // 只有在所有团队的自定义字段加载完成后，才加载特定字段
-        if (status === 'succeeded') {
-          if (isMounted) {
-            await dispatch(fetchTeamCustomFieldById({
-              teamId,
-              teamCFId
-            })).unwrap();
-            
-            // 数据加载完成后，更新刷新键以触发customFieldContent重新渲染
-            setRefreshKey(prev => prev + 1);
-          }
-        } else {
-          // 如果未加载完成，则监听状态变化
-          unsubscribe = store.subscribe(() => {
-            const currentStatus = teamCustomFieldsStatus(store.getState());
-            if (currentStatus === 'succeeded' && isMounted) {
-              dispatch(fetchTeamCustomFieldById({
-                teamId,
-                teamCFId
-              })).then(() => {
-                // 数据加载完成后，更新刷新键以触发重新渲染
-                setRefreshKey(prev => prev + 1);
-              });
-              
-              if (unsubscribe) {
-                unsubscribe();
-                unsubscribe = null;
-              }
-            }
-          });
+        // 标记数据已加载
+        if (isMounted) {
+          setDataLoaded(true);
         }
       } catch (error) {
-        console.error('Error loading data:', error);
+        console.error('Error loading team data:', error);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -182,17 +204,63 @@ export default function TeamCustomFieldPage() {
 
     loadData();
     
-    // 清理函数
     return () => {
       isMounted = false;
-      setIsLoading(false);
+    };
+  }, [dispatch, projectId, teamId, teamCFId, dataLoaded]);
+
+  // 单独的useEffect加载团队成员数据
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadTeamUsers = async () => {
+      if (!teamId || teamUsersLoaded || !dataLoaded) return;
       
-      // 如果存在订阅，则取消订阅
-      if (unsubscribe) {
-        unsubscribe();
+      try {
+        await dispatch(fetchTeamUsers(teamId)).unwrap();
+        if (isMounted) {
+          setTeamUsersLoaded(true);
+        }
+      } catch (error) {
+        console.error('Error loading team users:', error);
       }
     };
-  }, [dispatch, projectId, teamId, teamCFId]);
+    
+    loadTeamUsers();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch, teamId, teamUsersLoaded, dataLoaded]);
+
+  // 单独的useEffect加载自定义字段数据
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadTeamCF = async () => {
+      if (!teamId || !teamCFId || teamCFLoaded || !dataLoaded) return;
+      
+      try {
+        await dispatch(fetchTeamCustomFieldById({
+          teamId,
+          teamCFId
+        })).unwrap();
+        
+        if (isMounted) {
+          setTeamCFLoaded(true);
+          setRefreshKey(prev => prev + 1);
+        }
+      } catch (error) {
+        console.error('Error loading team custom field:', error);
+      }
+    };
+    
+    loadTeamCF();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [dispatch, teamId, teamCFId, teamCFLoaded, dataLoaded]);
 
   useEffect(() => {
     // 如果团队已归档，立即跳转到项目主页
@@ -201,9 +269,34 @@ export default function TeamCustomFieldPage() {
       router.replace(`/projects/${projectId}`);
       return;
     }
-    // 只要团队数据变化就刷新页面（可选，通常只需依赖 selectedTeam.archive）
-    // router.replace(router.asPath); // 如果你想强制刷新页面，可以取消注释
   }, [selectedTeam, projectId, router]);
+
+  // 修改验证逻辑，彻底修复所有者/成员无法访问的问题
+  useEffect(() => {
+    // 只有在数据和团队成员都已加载完成后才验证
+    if (dataLoaded && teamUsersLoaded && !isLoading) {
+      // 首先检查团队是否存在
+      if (!selectedTeam) {
+        setShowTeamNotFound(true);
+        return;
+      }
+      
+      // 如果用户数据和团队成员数据都已加载
+      if (user?.id && teamUsers.length > 0) {
+        // 明确检查用户是否为团队成员
+        const isMember = teamUsers.some(tu => String(tu.user.id) === String(user.id));
+        if (!isMember) {
+          console.log("用户不是团队成员，显示错误提示");
+          setShowTeamNotFound(true);
+        }
+      }
+    }
+  }, [dataLoaded, teamUsersLoaded, isLoading, selectedTeam, teamUsers, user]);
+
+  const handleCloseTeamNotFound = () => {
+    setShowTeamNotFound(false);
+    router.replace(`/projects/${projectId}`);
+  };
 
   // 使用 useMemo 缓存自定义字段内容渲染结果
   const customFieldContent = useMemo(() => {
@@ -246,6 +339,12 @@ export default function TeamCustomFieldPage() {
     if (fieldType === 'NOTE') {
       return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
     }
+    if (fieldType === 'AGILE') {
+      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+    }
+    if (fieldType === 'POSTS') {
+      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+    }
     return <div>暂不支持的字段类型: {fieldType}</div>;
   }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey]);
 
@@ -269,14 +368,14 @@ export default function TeamCustomFieldPage() {
     );
   }
 
-  // 处理团队不存在的情况
-  if (!selectedTeam && !isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Team not found</div>
-      </div>
-    );
-  }
+  // 移除原有的团队不存在检测，现在使用弹窗代替
+  // if (!selectedTeam && !isLoading) {
+  //   return (
+  //     <div className="flex items-center justify-center h-screen">
+  //       <div className="text-lg">Team not found</div>
+  //     </div>
+  //   );
+  // }
 
   const handleStarClick = async () => {
     const newStarStatus = !selectedTeam.star;
@@ -337,14 +436,38 @@ export default function TeamCustomFieldPage() {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="max-w-none border-0 bg-background text-foreground flex flex-col flex-grow">
+      {/* 添加团队不存在警告对话框 */}
+      <AlertDialog open={showTeamNotFound} onOpenChange={setShowTeamNotFound}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('teamNotFound')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('noAccessToTeam')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleCloseTeamNotFound}>
+              {t('close')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <div className="max-w-full border-0 bg-background text-foreground flex flex-col flex-grow">
         <div>
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-1">
-              <h2 className="text-xl font-semibold">{selectedTeam?.name}</h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 gap-2">
+            <div className="flex flex-wrap items-center gap-1 max-w-full">
+              <div 
+                className="group relative"
+                title={selectedTeam?.name}
+              >
+                <h2 className="text-xl font-semibold truncate sm:truncate md:text-clip md:overflow-visible md:whitespace-normal max-w-[180px] sm:max-w-[220px] md:max-w-none mr-1">{selectedTeam?.name}</h2>
+              </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -380,81 +503,116 @@ export default function TeamCustomFieldPage() {
                     {t('editTeamAccess')}
                   </DropdownMenuItem>
                   <hr className="my-1" />
-                  <DropdownMenuItem 
-                    className="text-red-500 flex items-center px-3 py-2 text-sm focus:text-red-500"
-                    onClick={handleArchiveTeam}
-                    onClose={() => onClose(false)}
-                  >
-                    <Archive className="h-4 w-4 mr-2" />
-                    {t('archiveTeam')}
-                  </DropdownMenuItem>
+                  {/* if owner, can archive, else cursor-not-allow */}
+                  {isCurrentUserOwner() ? (
+                    <DropdownMenuItem 
+                      className="text-red-500 flex items-center px-3 py-2 text-sm focus:text-red-500"
+                      onClick={handleArchiveTeam}
+                      onClose={() => onClose(false)}
+                    >
+                      <Archive className="h-4 w-4 mr-2" />
+                      {t('archiveTeam')}
+                    </DropdownMenuItem>
+                  ) : (
+                    <div className="text-red-500 flex items-center px-3 py-2 text-sm cursor-not-allowed">
+                      <Archive className="h-4 w-4 mr-2" />
+                      {t('archiveTeam')}
+                    </div>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button variant="ghost" size="icon" onClick={handleStarClick}>
-                {isStarred ? <Star className="h-4 w-4" /> : <StarOff className="h-4 w-4" />}
-              </Button>
+              {isCurrentUserOwner() ? (
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleStarClick}>
+                  {isStarred ? <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /> : <Star className="h-4 w-4" />}
+                </Button>
+              ) : (
+                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-not-allowed">
+                  {isStarred ? <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /> : <Star className="h-4 w-4" />}
+                </Button>
+              )}
               
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <div className="flex-shrink-0">
+                {isCurrentUserOwner() ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        size="sm"
+                        className={selectedTeam?.status ? `border-transparent shadow-none flex items-center px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200` : ""}
+                      >
+                        <Circle 
+                          className="h-3 w-3 sm:h-4 sm:w-4" 
+                          style={selectedTeam?.status ? {fill: 'currentColor'} : {}} 
+                        />
+                        <span className="ml-1 truncate max-w-[80px] sm:max-w-full">
+                          {selectedTeam?.status ? t(selectedTeam.status) : t('setStatus')}
+                        </span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-55 p-1">
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.PENDING} ${statusHoverColors.PENDING} transition-colors duration-200 ${statusFocusColors.PENDING}`}
+                        onClick={() => handleStatusChange('PENDING')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('PENDING')}
+                        {selectedTeam?.status === 'PENDING' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.IN_PROGRESS} ${statusHoverColors.IN_PROGRESS} transition-colors duration-200 ${statusFocusColors.IN_PROGRESS}`}
+                        onClick={() => handleStatusChange('IN_PROGRESS')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('IN_PROGRESS')}
+                        {selectedTeam?.status === 'IN_PROGRESS' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.COMPLETED} ${statusHoverColors.COMPLETED} transition-colors duration-200 ${statusFocusColors.COMPLETED}`}
+                        onClick={() => handleStatusChange('COMPLETED')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('COMPLETED')}
+                        {selectedTeam?.status === 'COMPLETED' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.CANCELLED} ${statusHoverColors.CANCELLED} transition-colors duration-200 ${statusFocusColors.CANCELLED}`}
+                        onClick={() => handleStatusChange('CANCELLED')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('CANCELLED')}
+                        {selectedTeam?.status === 'CANCELLED' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.ON_HOLD} ${statusHoverColors.ON_HOLD} transition-colors duration-200 ${statusFocusColors.ON_HOLD}`}
+                        onClick={() => handleStatusChange('ON_HOLD')}
+                      >
+                        <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
+                        {t('ON_HOLD')}
+                        {selectedTeam?.status === 'ON_HOLD' && <Check className="h-4 w-4 ml-auto" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
                   <Button 
                     size="sm"
-                    className={selectedTeam?.status ? `border-transparent shadow-none flex items-center px-3 py-2 text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200` : ""}
+                    className={selectedTeam?.status ? `border-transparent shadow-none flex items-center px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm rounded-sm ${statusBgColors[selectedTeam.status]} ${statusColors[selectedTeam.status]} ${statusTopHoverColors[selectedTeam.status]} transition-colors duration-200 cursor-not-allowed` : "cursor-not-allowed"}
                   >
                     <Circle 
-                      className="h-4 w-4" 
+                      className="h-3 w-3 sm:h-4 sm:w-4" 
                       style={selectedTeam?.status ? {fill: 'currentColor'} : {}} 
                     />
-                    {selectedTeam?.status ? t(selectedTeam.status) : t('setStatus')}
+                    <span className="ml-1 truncate max-w-[80px] sm:max-w-full">
+                      {selectedTeam?.status ? t(selectedTeam.status) : t('setStatus')}
+                    </span>
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-55 p-1">
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.PENDING} ${statusHoverColors.PENDING} transition-colors duration-200 ${statusFocusColors.PENDING}`}
-                    onClick={() => handleStatusChange('PENDING')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('PENDING')}
-                    {selectedTeam?.status === 'PENDING' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.IN_PROGRESS} ${statusHoverColors.IN_PROGRESS} transition-colors duration-200 ${statusFocusColors.IN_PROGRESS}`}
-                    onClick={() => handleStatusChange('IN_PROGRESS')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('IN_PROGRESS')}
-                    {selectedTeam?.status === 'IN_PROGRESS' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.COMPLETED} ${statusHoverColors.COMPLETED} transition-colors duration-200 ${statusFocusColors.COMPLETED}`}
-                    onClick={() => handleStatusChange('COMPLETED')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('COMPLETED')}
-                    {selectedTeam?.status === 'COMPLETED' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.CANCELLED} ${statusHoverColors.CANCELLED} transition-colors duration-200 ${statusFocusColors.CANCELLED}`}
-                    onClick={() => handleStatusChange('CANCELLED')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('CANCELLED')}
-                    {selectedTeam?.status === 'CANCELLED' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className={`flex items-center px-3 py-2 text-sm rounded-sm ${statusColors.ON_HOLD} ${statusHoverColors.ON_HOLD} transition-colors duration-200 ${statusFocusColors.ON_HOLD}`}
-                    onClick={() => handleStatusChange('ON_HOLD')}
-                  >
-                    <Circle className="h-4 w-4" style={{fill: 'currentColor'}} />
-                    {t('ON_HOLD')}
-                    {selectedTeam?.status === 'ON_HOLD' && <Check className="h-4 w-4 ml-auto" />}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
-                <Share2 className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center self-end sm:self-auto gap-2 mt-1 sm:mt-0">
+              {isCurrentUserOwner() && (
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(true)}>
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              )}
               <InvitationDialog
                 open={open}
                 onClose={() => setOpen(false)}
@@ -470,55 +628,60 @@ export default function TeamCustomFieldPage() {
                 display: none;
               }
             `}</style>
-            <TaskTab projectId={projectId} teamId={teamId} onViewChange={setCurrentView} />
+            <TaskTab projectId={projectId} teamId={teamId} onViewChange={handleViewChange} handleRefreshContent={handleRefreshContent} />
           </div>
         </div>
         <div className="w-full p-0">
           <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex">
-                <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
-                  <Plus className="h-4 w-4 mr-1" />
-                  {t(addButtonText)}
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="rounded-l-none rounded-r-md px-1">
-                      <ChevronDown className="h-4 w-4" />
+                {/* if currentItem?.custom_field?.type !== 'FILES' and POSTS */}
+                {currentItem?.custom_field?.type !== 'FILES' && currentItem?.custom_field?.type !== 'POSTS' && (
+                  <>
+                    <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
+                      <Plus className="h-4 w-4 mr-1" />
+                      {t(addButtonText)}
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => setAddButtonText('addTask')} className="flex">
-                      <CircleCheck className="h-4 w-4 mr-1" />
-                      <span className="text-sm">{t('task')}</span>
-                      {addButtonText === 'addTask' && <Check className="h-4 w-4 ml-auto" />}                      
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setAddButtonText('addSection')} className="flex">
-                      <TextQuote className="h-4 w-4 mr-1" />
-                      <span className="text-sm">{t('section')}</span>
-                      {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
-                    </DropdownMenuItem>
-                    {/* <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
-                      <FileUp className="h-4 w-4 mr-1" />
-                      <span className="text-sm">{t('attachment')}</span>
-                      {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
-                    </DropdownMenuItem> */}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="rounded-l-none rounded-r-md px-1">
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => setAddButtonText('addTask')} className="flex">
+                          <CircleCheck className="h-4 w-4 mr-1" />
+                          <span className="text-sm">{t('task')}</span>
+                          {addButtonText === 'addTask' && <Check className="h-4 w-4 ml-auto" />}                      
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAddButtonText('addSection')} className="flex">
+                          <TextQuote className="h-4 w-4 mr-1" />
+                          <span className="text-sm">{t('section')}</span>
+                          {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
+                        </DropdownMenuItem>
+                        {/* <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
+                          <FileUp className="h-4 w-4 mr-1" />
+                          <span className="text-sm">{t('attachment')}</span>
+                          {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
+                        </DropdownMenuItem> */}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm">
                 <Filter className="h-4 w-4 mr-1" />
-                {t('filter')}
+                <span className="hidden md:inline">{t('filter')}</span>
               </Button>
               <Button variant="ghost" size="sm">
                 <SortAsc className="h-4 w-4 mr-1" />
-                {t('sort')}
+                <span className="hidden md:inline">{t('sort')}</span>
               </Button>
               <Button variant="ghost" size="sm">
                 <Grid className="h-4 w-4 mr-1" />
-                {t('group')}
+                <span className="hidden md:inline">{t('group')}</span>
               </Button>
             </div>
           </div>
@@ -538,3 +701,5 @@ export default function TeamCustomFieldPage() {
     </div>
   );
 }
+
+export default TeamCustomFieldPage;

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell } from 'react-icons/fa';
 import { useDispatch, useSelector } from 'react-redux';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -144,10 +145,48 @@ export default function AdminDashboard() {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Skeleton cards for stats */}
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+                <Skeleton className="h-12 w-12 rounded-full" />
+              </div>
+              <div className="mt-4">
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Skeleton for recent activity */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
+          <Skeleton className="h-6 w-48 mb-6" />
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-32 ml-auto" />
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Skeleton for quick actions */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <Skeleton className="h-6 w-32 mb-6" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-12" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -162,79 +201,87 @@ export default function AdminDashboard() {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {hasPermission('view_users') && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.totalUsers}</p>
+            <Link href={`/admin/userManagement`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.totalUsers}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-500 dark:text-blue-300">
+                    <FaUsers />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-500 dark:text-blue-300">
-                  <FaUsers />
+                <div className="mt-4">
+                  <span className="text-sm text-blue-500 dark:text-blue-400">
+                    View all users →
+                  </span>
                 </div>
               </div>
-              <div className="mt-4">
-                <Link href={`/admin/userManagement`} className="text-sm text-blue-500 dark:text-blue-400 hover:underline">
-                  View all users →
-                </Link>
-              </div>
-            </div>
+            </Link>
             )}
             
             {hasPermission('view_subscription_plans') && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Subscriptions</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.activeSubscriptions}</p>
+            <Link href={`/admin/subscriptionManagement`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Subscriptions</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.activeSubscriptions}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-500 dark:text-green-300">
+                    <FaMoneyBillWave />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-500 dark:text-green-300">
-                  <FaMoneyBillWave />
+                <div className="mt-4">
+                  <span className="text-sm text-green-500 dark:text-green-400">
+                    Manage subscriptions →
+                  </span>
                 </div>
               </div>
-              <div className="mt-4">
-                <Link href={`/admin/subscriptionManagement`} className="text-sm text-green-500 dark:text-green-400 hover:underline">
-                  Manage subscriptions →
-                </Link>
-              </div>
-            </div>
+            </Link>
             )}
 
             {hasPermission('view_support_tickets') && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Support</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.pendingSupport}</p>
+            <Link href={`/admin/supportManagement`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Support</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{stats.pendingSupport}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center text-yellow-500 dark:text-yellow-300">
+                    <FaTicketAlt />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center text-yellow-500 dark:text-yellow-300">
-                  <FaTicketAlt />
+                <div className="mt-4">
+                  <span className="text-sm text-yellow-500 dark:text-yellow-400">
+                    View support tickets →
+                  </span>
                 </div>
               </div>
-              <div className="mt-4">
-                <Link href={`/admin/supportManagement`} className="text-sm text-yellow-500 dark:text-yellow-400 hover:underline">
-                  View support tickets →
-                </Link>
-              </div>
-            </div>
+            </Link>
             )}
 
             {hasPermission('view_analytics') && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revenue (This Month)</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(stats.revenueThisMonth)}</p>
+            <Link href={`/admin/analytics`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revenue (This Month)</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(stats.revenueThisMonth)}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
+                    <FaChartLine />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
-                  <FaChartLine />
+                <div className="mt-4">
+                  <span className="text-sm text-purple-500 dark:text-purple-400">
+                    View analytics →
+                  </span>
                 </div>
               </div>
-              <div className="mt-4">
-                <Link href={`/admin/adminAnalytics`} className="text-sm text-purple-500 dark:text-purple-400 hover:underline">
-                  View analytics →
-                </Link>
-              </div>
-            </div>
+            </Link>
             )}
             
             {!hasPermission('view_users') && 

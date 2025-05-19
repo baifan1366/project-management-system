@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,11 +24,13 @@ export default function ProfilePage() {
     phone: '',
     email: ''
   });
+  const [phoneError, setPhoneError] = useState('');
   const [providerData, setProviderData] = useState({
     googleConnected: false,
     githubConnected: false,
     googleProviderId: '',
-    githubProviderId: ''
+    githubProviderId: '',
+    hasCalendarScope: false
   });
 
   useEffect(() => {
@@ -45,13 +47,106 @@ export default function ProfilePage() {
       email: session.email || ''
     });
     
+    const googleConnected = !!session.google_provider_id;
+    
     setProviderData({
-      googleConnected: !!session.google_provider_id,
+      googleConnected,
       githubConnected: !!session.github_provider_id,
       googleProviderId: session.google_provider_id || '',
-      githubProviderId: session.github_provider_id || ''
+      githubProviderId: session.github_provider_id || '',
+      hasCalendarScope: false // Will check this separately
     });
+    
+    // Check calendar scope if Google is connected
+    if (googleConnected) {
+      checkCalendarScope();
+    }
   };
+
+  // Phone validation function
+  const validatePhone = (phone) => {
+    // Allow empty phone numbers (optional field)
+    if (!phone) return { valid: true, message: '' };
+    
+    // Basic phone validation: minimum 7 digits, can contain +, -, (), and spaces
+    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/;
+    
+    if (!phoneRegex.test(phone)) {
+      return { valid: false, message: t('phoneInvalid') || 'Please enter a valid phone number' };
+    }
+    
+    // Check minimum digits (excluding non-numeric characters)
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (digitsOnly.length < 7) {
+      return { valid: false, message: t('phoneMinDigits') || 'Phone number must have at least 7 digits' };
+    }
+    
+    return { valid: true, message: '' };
+  };
+
+  // Move the checkCalendarScope function to useCallback to prevent dependency loops
+  const checkCalendarScope = useCallback(async () => {
+    try {
+      // Check if user has Google connected
+      if (!user?.google_provider_id) {
+        return;
+      }
+      
+      // Get tokens from our tokens API
+      const response = await fetch('/api/users/tokens?provider=google', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to fetch Google tokens');
+        setProviderData(prev => ({
+          ...prev,
+          hasCalendarScope: false
+        }));
+        return;
+      }
+      
+      const tokenData = await response.json();
+      
+      // Check calendar scope with tokens
+      const scopeResponse = await fetch('/api/check-calendar-scope', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token
+        }),
+      });
+      
+      if (!scopeResponse.ok) {
+        console.error('Failed to check calendar scope');
+        setProviderData(prev => ({
+          ...prev,
+          hasCalendarScope: false
+        }));
+        return;
+      }
+      
+      const scopeData = await scopeResponse.json();
+      
+      setProviderData(prev => ({
+        ...prev,
+        hasCalendarScope: scopeData.hasCalendarScope
+      }));
+      
+    } catch (error) {
+      console.error('Error checking calendar scope:', error);
+      setProviderData(prev => ({
+        ...prev,
+        hasCalendarScope: false
+      }));
+    }
+  }, [user, setProviderData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -59,10 +154,35 @@ export default function ProfilePage() {
       ...prev,
       [name]: value
     }));
+    
+    // Clear phone error when typing
+    if (name === 'phone') {
+      setPhoneError('');
+    }
+  };
+
+  // Validate phone on blur
+  const handlePhoneBlur = () => {
+    if (formData.phone) {
+      const { valid, message } = validatePhone(formData.phone);
+      if (!valid) {
+        setPhoneError(message);
+      } else {
+        setPhoneError('');
+      }
+    }
   };
 
   const handleSaveProfile = async () => {
     if (!user) return;
+    
+    // Validate phone before saving
+    const { valid, message } = validatePhone(formData.phone);
+    if (!valid) {
+      setPhoneError(message);
+      return;
+    }
+    
     setLoading(true);
     
     const profileData = {
@@ -253,6 +373,19 @@ export default function ProfilePage() {
     }
   };
 
+  // Add useEffect to check calendar scope when page loads or when URL includes auth completion parameters
+  useEffect(() => {
+    // Check if we just completed an OAuth flow by checking URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const authCompleted = urlParams.get('auth') === 'success';
+    const provider = urlParams.get('provider');
+    
+    if (authCompleted && provider === 'google' && user?.google_provider_id) {
+      // After Google auth is completed, need to check calendar scope
+      checkCalendarScope();
+    }
+  }, [user, checkCalendarScope]);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -328,15 +461,20 @@ export default function ProfilePage() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    placeholder={t('phone')}
+                    onBlur={handlePhoneBlur}
+                    placeholder="+1 (123) 456-7890"
+                    className={phoneError ? 'border-red-500 focus:ring-red-500' : ''}
                   />
+                  {phoneError && (
+                    <p className="text-sm text-red-500 mt-1">{phoneError}</p>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSaveProfile} disabled={loading}>
+          <Button onClick={handleSaveProfile} disabled={loading || !!phoneError}>
             {loading ? t('saving') : t('saveChanges')}
           </Button>
         </CardFooter>
@@ -445,11 +583,11 @@ export default function ProfilePage() {
                 <div>
                   <p className="font-medium">{t('googleCalendar')}</p>
                   <p className="text-sm text-muted-foreground">
-                    {providerData.googleConnected ? t('calendarConnected') : t('calendarNotConnected')}
+                    {providerData.hasCalendarScope ? t('calendarConnected') : t('calendarNotConnected')}
                   </p>
                 </div>
               </div>
-              {providerData.googleConnected ? (
+              {providerData.hasCalendarScope ? (
                 <Button 
                   variant="outline"
                   disabled
