@@ -1680,6 +1680,7 @@
     "noProjects": "No projects found",
     "noTeams": "No teams found",
     "loading": "Loading...",
+    "emailOutput":"Send Email",
     "workflowTypes": {
       "ppt_generation": "PowerPoint Generation",
       "document_generation": "Document Generation",

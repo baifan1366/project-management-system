@@ -119,6 +119,7 @@ const workflowTypes = [
   { id: 'document_generation', name: 'Document Generation', icon: <FileText size={18} /> },
   { id: 'api_request', name: 'API Request', icon: <Code size={18} /> },
   { id: 'data_analysis', name: 'Data Analysis', icon: <BarChart4 size={18} /> },
+  { id: 'email_message', name: 'Email Message', icon: <Mail size={18} /> },
   { id: 'email_template', name: 'Email Template', icon: <Mail size={18} /> },
   { id: 'meeting_summary', name: 'Meeting Summary', icon: <Calendar size={18} /> },
   { id: 'task_automation', name: 'Task Automation', icon: <ListChecks size={18} /> },
@@ -478,6 +479,15 @@ export default function AIWorkflow() {
                 case 'output':
                   nodeData.icon = <FileDown size={20} />;
                   break;
+                case 'task':
+                  nodeData.icon = <CheckCircle size={20} />;
+                  break;
+                case 'chat':
+                  nodeData.icon = <MessageSquare size={20} />;
+                  break;
+                case 'email':
+                  nodeData.icon = <Mail size={20} />;
+                  break;
               }
               
               // Set additional icons based on outputType if available
@@ -736,6 +746,41 @@ export default function AIWorkflow() {
           } else {
             console.warn(`[Debug] No chat sessions selected for chat node ${node.id}`);
           }
+        } else if (outputType === 'email') {
+          // 为 email 节点收集邮件设置
+          console.log(`[Debug] Email node found:`, {
+            id: node.id,
+            emailRecipients: node.data.emailRecipients,
+            emailSubject: node.data.emailSubject,
+            emailTemplate: node.data.emailTemplate,
+            useCustomSmtp: node.data.useCustomSmtp
+          });
+          
+          // Check if email recipients are specified
+          if (node.data.emailRecipients) {
+            outputSettings[node.id] = {
+              type: 'email',
+              recipients: node.data.emailRecipients,
+              subject: node.data.emailSubject || 'Automated email from workflow system',
+              template: node.data.emailTemplate || 'Hello,\n\nThis is an automated email from the workflow system:\n\n{{content}}\n\nRegards,\nWorkflow System',
+              useCustomSmtp: node.data.useCustomSmtp || false
+            };
+            
+            // Add custom SMTP settings if enabled
+            if (node.data.useCustomSmtp) {
+              outputSettings[node.id].smtp = {
+                host: node.data.smtpHost,
+                port: node.data.smtpPort || '587',
+                user: node.data.smtpUser,
+                password: node.data.smtpPassword,
+                from: node.data.smtpFrom
+              };
+            }
+            
+            console.log(`[Debug] Added email settings for node ${node.id}:`, outputSettings[node.id]);
+          } else {
+            console.warn(`[Debug] No recipients specified for email node ${node.id}`);
+          }
         }
       });
       
@@ -913,6 +958,32 @@ export default function AIWorkflow() {
             chatSessionIds: [],
             messageTemplate: 'Hello, this is an automated message from the workflow system:\n\n{{content}}',
             messageFormat: 'text',
+            inputs: {}
+          }
+        };
+        break;
+      case 'email':
+        node = {
+          id,
+          type: 'workflowNode',
+          position: { x: 500, y: 500 },
+          data: { 
+            label: 'Email Output',
+            icon: <Mail size={20} />,
+            nodeType: 'output',
+            outputType: 'email',
+            description: 'Send email with generated content',
+            handleInputChange: handleNodeInputChange,
+            userId: userId,
+            emailRecipients: '',
+            emailSubject: 'Automated email from workflow system',
+            emailTemplate: 'Hello,\n\nThis is an automated email from the workflow system:\n\n{{content}}\n\nRegards,\nWorkflow System',
+            useCustomSmtp: false,
+            smtpHost: '',
+            smtpPort: '587',
+            smtpUser: '',
+            smtpPassword: '',
+            smtpFrom: '',
             inputs: {}
           }
         };
@@ -1282,6 +1353,13 @@ export default function AIWorkflow() {
                         <MessageSquare className="h-4 w-4 mr-2 text-indigo-500" />
                         <span>{t('chatMessage') || 'Chat Message'}</span>
                       </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => addNode('email')} 
+                        className="dark:hover:bg-[#444444] dark:focus:bg-[#444444]"
+                      >
+                        <Mail className="h-4 w-4 mr-2 text-cyan-500" />
+                        <span>{t('emailOutput') || 'Email Output'}</span>
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator className="dark:bg-[#444444]" />
                       <DropdownMenuItem 
                         onClick={() => addNode('ai_model')} 
@@ -1368,6 +1446,40 @@ export default function AIWorkflow() {
                           {response.error && (
                             <div className="mt-2">
                               <p className="text-xs text-red-500 dark:text-red-400">{t('error')}: {response.error}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* API Results - New API data format */}
+                {executionResult.api_results && Object.keys(executionResult.api_results).length > 0 && (
+                  <div className="bg-indigo-50 dark:bg-[#2a2d46] p-4 rounded-md border border-indigo-100 dark:border-[#3a3d55] mt-4">
+                    <h3 className="text-sm font-medium mb-2 dark:text-indigo-300">{t('apiResults') || 'API Results'}</h3>
+                    <div className="space-y-3">
+                      {Object.entries(executionResult.api_results).map(([nodeId, response]) => (
+                        <div key={nodeId} className="p-3 border rounded bg-white dark:bg-[#282828] dark:border-[#383838]">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium dark:text-gray-200">{t('apiNode')}: {nodeId}</h4>
+                            <span className={`px-2 py-1 rounded text-xs ${response.success ? 
+                              'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 dark:border dark:border-green-800' : 
+                              'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 dark:border dark:border-red-800'}`}>
+                              {response.success ? t('success') : t('failure')} {response.status && `(${response.status})`}
+                            </span>
+                          </div>
+                          {response.data && (
+                            <div className="mt-2">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('responseData') || 'Response Data'}:</p>
+                              <pre className="bg-gray-50 dark:bg-[#222222] p-2 rounded text-xs overflow-auto max-h-40 dark:text-gray-300 border dark:border-[#383838]">
+                                {JSON.stringify(response.data, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                          {response.error && (
+                            <div className="mt-2">
+                              <p className="text-xs text-red-500 dark:text-red-400">{t('error') || 'Error'}: {response.error}</p>
                             </div>
                           )}
                         </div>
@@ -1502,6 +1614,49 @@ export default function AIWorkflow() {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Email Sending Results */}
+                {executionResult.email_result && (
+                  <div className="bg-cyan-50 dark:bg-[#203038] p-4 rounded-md border border-cyan-100 dark:border-[#304048]">
+                    <h3 className="text-sm font-medium mb-2 dark:text-cyan-300">{t('emailSendingResults') || 'Email Sending Results'}</h3>
+                    <div className="flex items-center mb-2">
+                      <Mail className="h-5 w-5 text-cyan-500 dark:text-cyan-400 mr-2" />
+                      <span className="font-medium dark:text-cyan-300">
+                        {executionResult.email_result.success 
+                          ? (t('emailsSent', { count: executionResult.email_result.sentCount }) || `Sent ${executionResult.email_result.sentCount} emails successfully`)
+                          : (t('emailSendingFailed') || 'Failed to send emails')}
+                      </span>
+                    </div>
+                    
+                    {executionResult.email_result.success && (
+                      <div className="mt-2 bg-cyan-100/50 dark:bg-[#253840] p-3 rounded-md text-xs border border-cyan-200 dark:border-[#354850]">
+                        <div className="font-medium text-cyan-800 dark:text-cyan-400 mb-1">
+                          {t('emailDetails') || 'Email Details'}
+                        </div>
+                        <ul className="space-y-1 text-gray-600 dark:text-gray-400">
+                          <li>
+                            <span className="font-medium dark:text-gray-300">{t('recipients') || 'Recipients'}:</span> {executionResult.email_result.recipients}
+                          </li>
+                          <li>
+                            <span className="font-medium dark:text-gray-300">{t('subject') || 'Subject'}:</span> {executionResult.email_result.subject}
+                          </li>
+                          <li>
+                            <span className="font-medium dark:text-gray-300">{t('smtpConfig') || 'SMTP Config'}:</span> {executionResult.email_result.usedCustomSmtp ? t('custom') || 'Custom' : t('default') || 'Default (Environment)'}
+                          </li>
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {!executionResult.email_result.success && executionResult.email_result.error && (
+                      <div className="mt-2 bg-red-100/50 dark:bg-[#382830] p-3 rounded-md text-xs border border-red-200 dark:border-[#483840]">
+                        <div className="font-medium text-red-800 dark:text-red-400">
+                          {t('error') || 'Error'}
+                        </div>
+                        <p className="text-red-600 dark:text-red-300">{executionResult.email_result.error}</p>
                       </div>
                     )}
                   </div>

@@ -5,6 +5,7 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import pptxgenjs from 'pptxgenjs';
 import { v4 as uuidv4 } from 'uuid';
+import nodemailer from 'nodemailer';
 
 // Get available AI models
 const getAvailableModels = () => {
@@ -262,7 +263,31 @@ Make sure to generate high-quality, structured data that would be useful for fur
   5. Provide a brief summary of the message 
   6. Include 2-3 suggested replies that recipients might use
   
-  Respond ONLY with the JSON object, nothing else. Do not include explanations, markdown code blocks, or any other text.`
+  Respond ONLY with the JSON object, nothing else. Do not include explanations, markdown code blocks, or any other text.`,
+  
+  // Add the 'email' format to the WORKFLOW_PROMPTS object
+  email: `You are an expert email writer. Your task is to create professional, well-formatted email content based on the user's input.
+
+Please format your response as a JSON object with the following structure:
+{
+  "subject": "Clear and concise email subject line",
+  "greeting": "Appropriate salutation (e.g., 'Dear Team,' or 'Hello,') depending on context",
+  "content": "The main email body with paragraphs separated by newlines",
+  "signature": "Professional sign-off (e.g., 'Best regards,' or 'Sincerely,')",
+  "sender_name": "Name to appear in the signature"
+}
+
+Guidelines:
+1. Create a clear, concise subject line that accurately reflects the email's purpose
+2. The greeting should be appropriate for the intended audience
+3. Write content that is professional, concise, and well-structured
+4. Organize content into logical paragraphs with clear transitions
+5. Include all relevant information from the user's input
+6. Avoid using overly complex language or jargon
+7. Choose an appropriate sign-off based on the email's tone and context
+8. Provide a sender name that matches the context
+
+Respond ONLY with the JSON object, nothing else. Do not include explanations, comments, or markdown formatting.`
 };
 
 // Get workflow by ID
@@ -1199,42 +1224,169 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
     console.log('连接图:', JSON.stringify(connectionMap));
     console.log('使用模型:', models.join(', '));
     
-    // 为每个模型执行处理
+    // STEP 1: 首先处理API节点，它们的结果将用于后续AI处理
+    let apiExecutionResults = {};
+    if (Object.keys(connectionMap).length > 0) {
+      console.log('1. 第一步: 执行API请求');
+      
+      // 查找输出类型为API的节点
+      const apiNodes = [];
+      for (const nodeId in outputSettings) {
+        if (outputSettings[nodeId] && outputSettings[nodeId].type === 'api') {
+          apiNodes.push(nodeId);
+        }
+      }
+      
+      // 检查是否有API节点连接到AI模型节点
+      for (const nodeId of apiNodes) {
+        const apiSettings = outputSettings[nodeId];
+        console.log(`处理API节点 ${nodeId}`);
+        
+        // 查找哪些节点使用了这个API节点的输出
+        const connectedToModelNodes = [];
+        
+        // 在connectionMap中查找连接到此API节点的节点
+        for (const sourceId in connectionMap) {
+          // 如果这个节点的输出连接到了API节点
+          if (connectionMap[sourceId] && connectionMap[sourceId].includes(nodeId)) {
+            // 使用outputSettings来确定节点类型
+            if (outputSettings[sourceId]) {
+              // 推测节点类型 - processNode通常没有特定类型，不在outputSettings中
+              connectedToModelNodes.push(sourceId);
+              console.log(`找到连接到API节点 ${nodeId} 的节点: ${sourceId}`);
+            }
+          }
+        }
+        
+        // 如果有节点连接到此API节点
+        if (connectedToModelNodes.length > 0) {
+          console.log(`API节点 ${nodeId} 连接到了 ${connectedToModelNodes.length} 个节点`);
+          
+          try {
+            // 执行API请求
+            console.log(`执行API请求: ${apiSettings.url}, 方法: ${apiSettings.method}`);
+            
+            // 使用输入作为API请求体
+            const apiResponse = await executeApiRequest(
+              apiSettings.url,
+              apiSettings.method,
+              inputs
+            );
+            
+            // 存储API响应
+            apiResponses[nodeId] = apiResponse;
+            apiExecutionResults[nodeId] = apiResponse.data;
+            
+            console.log(`API请求成功，状态码: ${apiResponse.status}`);
+          } catch (apiError) {
+            console.error(`执行API请求时出错:`, apiError);
+            apiResponses[nodeId] = {
+              success: false, 
+              error: apiError.message || 'API请求失败'
+            };
+          }
+        }
+      }
+    }
+    
+    // STEP 2: 执行AI处理，使用API响应作为输入
+    console.log('2. 第二步: 执行AI处理');
     for (const model of models) {
       console.log(`使用模型 ${model} 处理...`);
       modelResults[model] = {};
       
+      // 收集所有输出节点类型，以便特殊处理Task和Chat节点
+      const formatToNodeMap = {};
+      for (const [nodeId, settings] of Object.entries(outputSettings)) {
+        if (settings.type) {
+          if (!formatToNodeMap[settings.type]) {
+            formatToNodeMap[settings.type] = [];
+          }
+          formatToNodeMap[settings.type].push(nodeId);
+        }
+      }
+      
+      // 收集API数据
+      const apiDataByNodeType = {
+        task: {},
+        chat: {}
+      };
+      
+      // 为Task和Chat节点收集API数据
+      for (const nodeType of ['task', 'chat']) {
+        const nodeIds = formatToNodeMap[nodeType] || [];
+        for (const nodeId of nodeIds) {
+          // 查找连接到这个节点的API节点
+          const connectedApiNodes = [];
+          
+          // 从connectionMap反向查找 - 找到哪些节点有连接到当前节点
+          for (const sourceId in connectionMap) {
+            // 如果源节点连接到当前节点，并且源节点是API类型
+            if (connectionMap[sourceId] && connectionMap[sourceId].includes(nodeId) && 
+                outputSettings[sourceId] && outputSettings[sourceId].type === 'api' && 
+                apiResponses[sourceId]) {
+              connectedApiNodes.push(sourceId);
+              console.log(`找到连接到${nodeType}节点 ${nodeId} 的API节点: ${sourceId}`);
+            }
+          }
+          
+          // 收集连接的API节点数据
+          for (const apiNodeId of connectedApiNodes) {
+            if (apiResponses[apiNodeId]?.data) {
+              apiDataByNodeType[nodeType][apiNodeId] = apiResponses[apiNodeId].data;
+              console.log(`将API节点 ${apiNodeId} 的数据添加到 ${nodeType} 节点 ${nodeId} 的上下文`);
+            }
+          }
+        }
+      }
+      
       // 为每个输出格式执行单独的AI请求
       for (const format of outputFormats) {
+        // 如果是API格式，不需要执行AI
+        if (format === 'api') continue;
+          
         // 获取此格式的合适系统提示
         const formatPrompt = WORKFLOW_PROMPTS[format];
         
         if (!formatPrompt) {
           console.warn(`未找到格式的提示模板: ${format}`);
           
-          // 即使没有特定的提示模板，也使用通用JSON格式
-          // 这样API节点也能够接收数据
-          if (format === 'api') {
-            // API格式不需要实际执行，它只是接收数据的节点
-            continue;
-          } else {
-            // 对于其他未知格式，使用JSON格式的提示
+          // 对于其他未知格式，使用JSON格式的提示
+          if (format !== 'api') {
             console.log(`使用通用JSON格式的提示代替: ${format}`);
             const jsonPrompt = WORKFLOW_PROMPTS['json'];
             
             if (jsonPrompt) {
+              // 特殊处理task和chat格式，添加API数据
+              let apiDataForFormat = {};
+              if (format === 'task' && Object.keys(apiDataByNodeType.task).length > 0) {
+                apiDataForFormat = apiDataByNodeType.task;
+              } else if (format === 'chat' && Object.keys(apiDataByNodeType.chat).length > 0) {
+                apiDataForFormat = apiDataByNodeType.chat;
+              }
+              
               // 执行AI请求使用JSON格式提示
-              const formatResult = await processAIRequest(model, jsonPrompt, userPrompt, format, results);
+              const formatResult = await processAIRequest(model, jsonPrompt, userPrompt, format, results, apiDataForFormat);
               modelResults[model][format] = formatResult;
             }
-            continue;
           }
+          continue;
         }
         
         console.log(`为格式执行AI请求: ${format} 使用模型: ${model}`);
         
-        // 执行AI请求
-        const formatResult = await processAIRequest(model, formatPrompt, userPrompt, format, results);
+        // 特殊处理task和chat格式，添加API数据
+        let apiDataForFormat = {};
+        if (format === 'task' && Object.keys(apiDataByNodeType.task).length > 0) {
+          apiDataForFormat = apiDataByNodeType.task;
+          console.log(`为任务生成添加API数据上下文`);
+        } else if (format === 'chat' && Object.keys(apiDataByNodeType.chat).length > 0) {
+          apiDataForFormat = apiDataByNodeType.chat;
+          console.log(`为聊天消息生成添加API数据上下文`);
+        }
+        
+        // 扩展处理AI请求函数，传入API数据
+        const formatResult = await processAIRequest(model, formatPrompt, userPrompt, format, results, apiDataForFormat);
         modelResults[model][format] = formatResult;
       }
     }
@@ -1249,11 +1401,14 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
       }
     }
     
+    // STEP 3: 处理输出节点
+    console.log('3. 第三步: 处理输出节点');
+    
     // 处理PPT生成
     if (outputFormats.includes('ppt')) {
       console.log('生成PPT文档...');
       try {
-        // 检查是否有有效的PPT内容或错误内容
+        // 使用AI生成的PPT内容，不直接使用API响应
         const pptContent = results['ppt'] || { error: "No valid presentation content generated" };
         const pptUrl = await generatePPTX(pptContent, userId);
         documentUrls['ppt'] = pptUrl;
@@ -1268,32 +1423,8 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
     if (outputFormats.includes('document')) {
       console.log('生成Word文档...');
       try {
-        // Check if there's API response data that should be used for document generation
+        // 使用AI生成的文档内容，不直接使用API响应
         let docContent = results['document'] || { error: "No valid document content generated" };
-        
-        // Check for API response data from connected API nodes
-        if (Object.keys(connectionMap).length > 0) {
-          for (const nodeId in nodeConnections) {
-            const nodeSettings = outputSettings[nodeId];
-            // If this is a document node with API input source
-            if (nodeSettings && nodeSettings.type === 'document') {
-              // Find API nodes that connect to this document node
-              const sourceNodes = Object.keys(connectionMap).filter(id => 
-                connectionMap[id].includes(nodeId) && outputSettings[id]?.type === 'api'
-              );
-              
-              if (sourceNodes.length > 0) {
-                console.log(`Found API source nodes for document ${nodeId}: ${sourceNodes.join(', ')}`);
-                // Use the first API response as document content
-                const apiSourceId = sourceNodes[0];
-                if (apiResponses[apiSourceId] && apiResponses[apiSourceId].data) {
-                  console.log(`Using API response from ${apiSourceId} for document generation`);
-                  docContent = apiResponses[apiSourceId].data;
-                }
-              }
-            }
-          }
-        }
         
         const docUrl = await generateDOCX(docContent, userId);
         documentUrls['document'] = docUrl;
@@ -1308,49 +1439,49 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
     if (outputFormats.includes('task')) {
       console.log('处理任务创建...');
       try {
-        // Check if there's task data in the results
+        // 获取任务数据来源
         const taskContent = results['task'];
-        if (taskContent) {
-          // Get team and project IDs from output settings if available
+        
+        // 获取task节点的设置和API连接情况
+        const taskNodes = Object.entries(outputSettings).filter(([_, settings]) => 
+          settings.type === 'task'
+        );
+        
+        if (taskNodes.length > 0) {
+          const [nodeId, nodeSettings] = taskNodes[0];
+          console.log(`Using task settings from node ${nodeId}`);
+          
+          // 设置任务的团队和项目ID
           let taskTeamId = teamId;
           let taskProjectId = projectId;
           
-          // Find any task nodes in the output settings
-          const taskNodes = Object.entries(outputSettings).filter(([_, settings]) => 
-            settings.type === 'task'
-          );
-          
-          if (taskNodes.length > 0) {
-            const [nodeId, nodeSettings] = taskNodes[0];
-            console.log(`Using task settings from node ${nodeId}`);
-            
-            // Override with node-specific team and project if available
-            if (nodeSettings.teamId) {
-              taskTeamId = nodeSettings.teamId;
-            }
-            
-            if (nodeSettings.projectId) {
-              taskProjectId = nodeSettings.projectId;
-            }
+          // 设置特定节点的团队和项目ID
+          if (nodeSettings.teamId) {
+            taskTeamId = nodeSettings.teamId;
           }
           
-          // Create tasks using the task data with project and team
-          const taskResult = await createTasksFromResult(taskContent, userId, taskTeamId, taskProjectId);
+          if (nodeSettings.projectId) {
+            taskProjectId = nodeSettings.projectId;
+          }
           
-          // Store the task creation result
-          results['task_result'] = taskResult;
-          
-          if (taskResult.success) {
-            console.log(`Successfully created ${taskResult.tasksCreated} tasks`);
+          // 检查是否有任务内容
+          if (taskContent) {
+            // 创建任务
+            const taskResult = await createTasksFromResult(taskContent, userId, taskTeamId, taskProjectId);
+            results['task_result'] = taskResult;
+            
+            if (taskResult.success) {
+              console.log(`Successfully created ${taskResult.tasksCreated} tasks`);
+            } else {
+              console.error(`Failed to create tasks: ${taskResult.error}`);
+            }
           } else {
-            console.error(`Failed to create tasks: ${taskResult.error}`);
+            console.error('No task content available in AI response');
+            results['task_result'] = { 
+              success: false, 
+              error: 'No task content generated by AI' 
+            };
           }
-        } else {
-          console.error('No task content available in AI response');
-          results['task_result'] = { 
-            success: false, 
-            error: 'No task content generated by AI' 
-          };
         }
       } catch (error) {
         console.error('处理任务创建时出错:', error);
@@ -1378,11 +1509,10 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
             const messageFormat = nodeSettings.messageFormat || 'text';
             
             if (chatSessionIds.length > 0) {
-              // Determine the content to use
-              // First, check if there's dedicated chat content in the results
+              // 使用AI生成的聊天内容
               let contentToSend = results['chat'] || results['json'] || results['text'] || { content: 'No content was generated.' };
               
-              // If the content is an object, convert it to string
+              // 转换内容为字符串
               let contentStr = '';
               if (typeof contentToSend === 'object') {
                 // Try to use a 'content' field if it exists
@@ -1396,14 +1526,14 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
                 contentStr = String(contentToSend);
               }
               
-              // Replace {{content}} in the message template with the actual content
+              // 替换模板中的内容占位符
               const finalMessage = messageTemplate.replace('{{content}}', contentStr);
               
-              // Send messages to the selected chat sessions
+              // 发送消息到选择的聊天会话
               console.log(`Sending messages to ${chatSessionIds.length} chat sessions with format ${messageFormat}`);
               const chatResult = await sendChatSessionMessages(chatSessionIds, finalMessage, messageFormat, userId);
               
-              // Store the chat message sending result
+              // 存储结果
               results[`chat_result_${nodeId}`] = chatResult;
             } else {
               console.warn(`No chat sessions selected for node ${nodeId}`);
@@ -1422,17 +1552,66 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
       }
     }
     
-    // 处理节点间的连接关系
+    // 处理邮件发送
+    if (outputFormats.includes('email')) {
+      console.log('处理邮件发送...');
+      try {
+        // Find email nodes in the output settings
+        const emailNodes = Object.entries(outputSettings).filter(([_, settings]) => 
+          settings.type === 'email'
+        );
+        
+        if (emailNodes.length > 0) {
+          // Process each email node
+          for (const [nodeId, nodeSettings] of emailNodes) {
+            console.log(`Processing email node ${nodeId}`);
+            
+            // Check if recipients are specified
+            if (nodeSettings.recipients) {
+              // 使用AI生成的内容
+              let content = results['email'] || results['json'] || results['text'] || results['document'] || results['chat'] || { content: 'No content was generated.' };
+              
+              // 发送邮件
+              console.log(`Sending email to recipients: ${nodeSettings.recipients}`);
+              const emailResult = await sendEmail(nodeSettings, content, userId);
+              
+              // 存储结果
+              results['email_result'] = emailResult;
+              
+              if (emailResult.success) {
+                console.log(`Email sent successfully to ${emailResult.sentCount} recipients`);
+              } else {
+                console.error(`Failed to send email: ${emailResult.error}`);
+              }
+            } else {
+              console.warn(`No recipients specified for email node ${nodeId}`);
+              results['email_result'] = { 
+                success: false, 
+                error: 'No recipients specified' 
+              };
+            }
+          }
+        } else {
+          console.warn('Email output format specified but no email nodes found in settings');
+        }
+      } catch (error) {
+        console.error('发送邮件时出错:', error);
+        results['email_error'] = error.message;
+      }
+    }
+    
+    // 处理节点间的通用连接关系 (除了上面特殊处理过的)
     if (Object.keys(connectionMap).length > 0) {
-      console.log('处理节点间的连接关系');
+      console.log('处理其他节点间的连接关系');
       
       // 检查是否有API节点需要处理
       for (const nodeId in nodeConnections) {
         // 获取节点的输出类型和设置
         const apiSettings = outputSettings[nodeId];
         
-        if (apiSettings && apiSettings.type === 'api') {
-          console.log(`处理API节点 ${nodeId}`);
+        // 跳过已经在上面处理过的API节点
+        if (apiSettings && apiSettings.type === 'api' && !apiResponses[nodeId]) {
+          console.log(`处理其他API节点 ${nodeId}`);
           
           // 获取连接到此API节点的源节点
           const sourceNodes = nodeConnections[nodeId]?.sourceNodes || [];
@@ -1511,6 +1690,23 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
       documentUrls,
       apiResponses
     );
+    
+    // 将API响应添加到结果中，使其在UI中可见
+    if (Object.keys(apiResponses).length > 0) {
+      results.api_results = {};
+      
+      // 处理每个API响应，提取关键信息
+      for (const [nodeId, response] of Object.entries(apiResponses)) {
+        results.api_results[nodeId] = {
+          success: response.success,
+          status: response.status,
+          data: response.data,
+          error: response.error
+        };
+      }
+      
+      console.log('添加API响应到结果中:', Object.keys(results.api_results).length);
+    }
     
     return {
       workflowId,
@@ -1622,7 +1818,7 @@ async function getUserWorkflows(userId) {
 }
 
 // 将AI请求处理逻辑提取为单独的函数
-async function processAIRequest(model, formatPrompt, userPrompt, format, results) {
+async function processAIRequest(model, formatPrompt, userPrompt, format, results, apiData = {}) {
   try {
     // 特殊处理deepseek模型，添加明确的JSON格式要求
     let updatedPrompt = formatPrompt;
@@ -1630,12 +1826,28 @@ async function processAIRequest(model, formatPrompt, userPrompt, format, results
       updatedPrompt = formatPrompt + "\n\nVERY IMPORTANT: Your response MUST be valid JSON only. Do not include any explanation or commentary. Start your response with '{' and end with '}'. Do not include any text before or after the JSON object.";
     }
     
+    // 如果有API数据，将其添加到用户提示中
+    let enhancedUserPrompt = userPrompt;
+    if (Object.keys(apiData).length > 0) {
+      // 准备API数据字符串
+      const apiDataStr = JSON.stringify(apiData, null, 2);
+      enhancedUserPrompt = `
+Here is data from an API response that you should use for this task:
+\`\`\`json
+${apiDataStr}
+\`\`\`
+
+Based on the above API data, please ${userPrompt}`;
+      
+      console.log('使用API数据增强提示');
+    }
+    
     // 创建基本请求配置
     const requestConfig = {
       model: model,
       messages: [
         { role: 'system', content: updatedPrompt },
-        { role: 'user', content: userPrompt }
+        { role: 'user', content: enhancedUserPrompt }
       ],
       temperature: 0.3,
       max_tokens: 5000
@@ -1830,6 +2042,120 @@ async function sendChatSessionMessages(sessionIds, content, format = 'text', use
   }
 }
 
+// Send email with nodemailer
+async function sendEmail(emailSettings, content, userId) {
+  try {
+    console.log('Sending email with settings:', JSON.stringify({
+      recipients: emailSettings.recipients,
+      subject: emailSettings.subject,
+      useCustomSmtp: emailSettings.useCustomSmtp
+    }));
+    
+    // Prepare the email content by replacing the content placeholder
+    let emailContent = emailSettings.template || 'Hello,\n\nThis is an automated email:\n\n{{content}}\n\nRegards,\nWorkflow System';
+    
+    // Convert content to string if it's an object
+    let contentStr = '';
+    if (typeof content === 'object') {
+      try {
+        // Try to extract a 'content' field if it exists
+        if (content.content) {
+          contentStr = content.content;
+        } else {
+          // Otherwise stringify the whole object
+          contentStr = JSON.stringify(content, null, 2);
+        }
+      } catch (error) {
+        contentStr = String(content);
+      }
+    } else {
+      contentStr = String(content);
+    }
+    
+    // Replace placeholder with actual content
+    emailContent = emailContent.replace('{{content}}', contentStr);
+    
+    // Create transporter based on settings
+    let transporter;
+    
+    if (emailSettings.useCustomSmtp && emailSettings.smtp) {
+      // Use custom SMTP settings
+      transporter = nodemailer.createTransport({
+        host: emailSettings.smtp.host,
+        port: emailSettings.smtp.port || 587,
+        secure: (emailSettings.smtp.port === '465'),
+        auth: {
+          user: emailSettings.smtp.user,
+          pass: emailSettings.smtp.password
+        }
+      });
+      
+      console.log(`Using custom SMTP: ${emailSettings.smtp.host}:${emailSettings.smtp.port}`);
+    } else {
+      // Use default SMTP settings from environment variables
+      const defaultHost = process.env.NEXT_PUBLIC_SMTP_HOSTNAME;
+      const defaultPort = process.env.NEXT_PUBLIC_SMTP_PORT || 587;
+      const defaultUser = process.env.NEXT_PUBLIC_SMTP_USERNAME;
+      const defaultPass = process.env.NEXT_PUBLIC_SMTP_PASSWORD;
+      const defaultFrom = process.env.NEXT_PUBLIC_SMTP_FROM;
+      
+      if (!defaultHost || !defaultUser || !defaultPass) {
+        throw new Error('Default SMTP settings are not configured in environment variables');
+      }
+      
+      transporter = nodemailer.createTransport({
+        host: defaultHost,
+        port: defaultPort,
+        secure: (defaultPort === '465'),
+        auth: {
+          user: defaultUser,
+          pass: defaultPass
+        }
+      });
+      
+      console.log(`Using default SMTP: ${defaultHost}:${defaultPort}`);
+    }
+    
+    // Split recipients by comma
+    const recipientsList = emailSettings.recipients.split(',').map(email => email.trim()).filter(Boolean);
+    
+    if (recipientsList.length === 0) {
+      throw new Error('No valid recipients specified');
+    }
+    
+    // Prepare email options
+    const mailOptions = {
+      from: emailSettings.useCustomSmtp && emailSettings.smtp.from 
+        ? emailSettings.smtp.from 
+        : process.env.SMTP_FROM || 'workflow@example.com',
+      to: recipientsList.join(', '),
+      subject: emailSettings.subject || 'Automated email from workflow system',
+      text: emailContent
+    };
+    
+    // Send the email
+    const info = await transporter.sendMail(mailOptions);
+    
+    console.log('Email sent successfully:', info.messageId);
+    
+    // Return success result
+    return {
+      success: true,
+      messageId: info.messageId,
+      sentCount: recipientsList.length,
+      recipients: recipientsList.join(', '),
+      subject: emailSettings.subject,
+      usedCustomSmtp: emailSettings.useCustomSmtp
+    };
+  } catch (error) {
+    console.error('Error sending email:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 // Add the new function to the exports
 export {
   getAvailableModels,
@@ -1839,5 +2165,6 @@ export {
   createWorkflow, 
   updateWorkflow, 
   getUserWorkflows,
-  sendChatSessionMessages 
+  sendChatSessionMessages,
+  sendEmail
 };
