@@ -54,13 +54,13 @@ export default function HandleTask({ teamId }) {
             .single();
             console.log(notionPageData);
             //update the notion_page id into the task table, page_id column
-            const { data: taskData, error: taskError } = await supabase
+            const { data: taskDbData, error: taskError } = await supabase
             .from('task')
             .update({
                 page_id: notionPageData.id
             })
             .eq('id', result.id);
-            console.log(taskData);
+            console.log(taskDbData);
             
             // 如果任务创建成功且有分区ID，则将任务添加到分区的 task_ids 中
             if (result && result.id && taskData.sectionId) {

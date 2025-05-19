@@ -2122,7 +2122,7 @@
     "commentRequired": "Comment cannot be empty",
     "addCommentError": "Error adding comment:",
     "confirmDeleteTitle": "Confirm Delete Post",
-    "confirmDeleteDescription": "This action cannot be undone.",
+    "confirmDeleteDescription": "Are you sure you want to delete this post? This action cannot be undone.",
     "delete": "Delete",
     "cancel": "Cancel",
     "deletePostError": "Error deleting post:",
@@ -2165,7 +2165,16 @@
     "postType": "Post Type",
     "postTypeDescription": "Choose the type of post you want to create",
     "titleLengthError": "Title must be between 2 and 50 characters",
-    "contentLengthError": "Content must be between 10 and 1000 characters"
+    "contentLengthError": "Content must be between 10 and 1000 characters",
+    "unsavedChanges": "Unsaved Changes",
+    "unsavedChangesDescription": "Are you sure you want to leave this page? Your changes will not be saved.",
+    "continueEditing": "Continue Editing",
+    "discardChanges": "Discard Changes",
+    "confirmLeave": "Confirm Leave",
+    "cancelLeave": "Cancel Leave",
+    "save": "Save",
+    "saving": "Saving...",
+    "unsavedEditChangesDescription": "You are editing a post and have unsaved changes. Are you sure you want to leave this page? Your changes will not be saved."
   },
   "Workflow": {
     "title": "Workflow",

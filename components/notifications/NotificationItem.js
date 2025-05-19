@@ -10,8 +10,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
-export default function NotificationItem({ notification, onAction }) {
+export default function NotificationItem({ notification, onAction, formatDateToUserTimezone, formatToUserTimezone }) {
   const t = useTranslations('notifications');
   const tCalendar = useTranslations('Calendar');
   const tNotif = useTranslations('notificationCenter');
@@ -32,9 +33,19 @@ export default function NotificationItem({ notification, onAction }) {
     setLocalIsAccepted(data && data.accepted);
   }, [notification]);
   
+  // Format using relative time (e.g. "2 hours ago")
   const formatDate = (date) => {
     const d = new Date(date);
     return formatDistanceToNow(d, { addSuffix: true });
+  };
+
+  // Format exact date and time using user's timezone
+  const formatExactTime = (date) => {
+    if (!formatDateToUserTimezone) {
+      // Fallback if timezone formatting function isn't available
+      return new Date(date).toLocaleString();
+    }
+    return formatDateToUserTimezone(date);
   };
 
   const handleMarkAsRead = async (e) => {
@@ -163,8 +174,12 @@ export default function NotificationItem({ notification, onAction }) {
   };
 
   // Accept meeting invitation
-  const handleAcceptMeeting = async (id, meetData) => {
+  const handleAcceptMeeting = async (e, id, meetData) => {
+    e.stopPropagation();
     try {
+      setIsActioning(true);
+      
+      // Mark as read
       await handleMarkAsRead(e);
       
       // Update notification status to accepted
@@ -196,12 +211,16 @@ export default function NotificationItem({ notification, onAction }) {
     } catch (error) {
       console.error('Failed to accept meeting invitation:', error);
       toast.error(t('actionFailed'));
+    } finally {
+      setTimeout(() => setIsActioning(false), 500);
     }
   };
 
   // Decline meeting invitation
-  const handleDeclineMeeting = async (id) => {
+  const handleDeclineMeeting = async (e, id) => {
+    e.stopPropagation();
     try {
+      setIsActioning(true);
       const data = getMeetingData();
       if (!data) return;
 
@@ -231,6 +250,8 @@ export default function NotificationItem({ notification, onAction }) {
     } catch (error) {
       console.error('Failed to decline meeting:', error);
       toast.error(t('actionFailed'));
+    } finally {
+      setTimeout(() => setIsActioning(false), 500);
     }
   };
 
@@ -299,8 +320,7 @@ export default function NotificationItem({ notification, onAction }) {
           variant="default" 
           className="h-7 text-xs"
           onClick={(e) => {
-            e.stopPropagation();
-            handleAcceptMeeting(notification.id, meetingData);
+            handleAcceptMeeting(e, notification.id, meetingData);
           }}
           disabled={isActioning}
         >
@@ -313,8 +333,7 @@ export default function NotificationItem({ notification, onAction }) {
           variant="outline" 
           className="h-7 text-xs"
           onClick={(e) => {
-            e.stopPropagation();
-            handleDeclineMeeting(notification.id);
+            handleDeclineMeeting(e, notification.id);
           }}
           disabled={isActioning}
         >
@@ -393,7 +412,16 @@ export default function NotificationItem({ notification, onAction }) {
             )}
             
             <div className="text-xs text-muted-foreground mt-2">
-              {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>{formatDate(notification.created_at)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {formatExactTime(notification.created_at)}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </div>

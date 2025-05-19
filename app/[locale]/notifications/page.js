@@ -10,26 +10,21 @@ import {
   Bell, 
   BellOff, 
   Settings, 
-  Filter,
   CheckCircle, 
   AlertCircle, 
   Info, 
   Calendar
 } from "lucide-react";
 import useGetUser from '@/lib/hooks/useGetUser';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { useDispatch, useSelector } from 'react-redux';
-import Link from 'next/link';
 import {
-  fetchNotifications,
   markAllNotificationsAsRead,
   markNotificationAsRead,
   deleteNotification,
   selectNotifications,
   selectUnreadCount,
-  selectNotificationsLoading,
-  selectIsSubscribed,
-  unsubscribeFromNotifications,
-  subscribeToNotifications
+  selectNotificationsLoading
 } from '@/lib/redux/features/notificationSlice';
 import NotificationItem from '@/components/notifications/NotificationItem';
 import { useRouter } from 'next/navigation';
@@ -41,53 +36,11 @@ export default function NotificationsPage() {
   const notifications = useSelector(selectNotifications);
   const unreadCount = useSelector(selectUnreadCount);
   const loading = useSelector(selectNotificationsLoading);
-  const isSubscribed = useSelector(selectIsSubscribed);
   const [activeTab, setActiveTab] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const { user, error } = useGetUser();
-  const pageSubscriptionCreatedRef = useRef(false);
   const hasInitiatedFetchRef = useRef(false);
-
-  // useEffect(() => {
-  //   if(!user) return;
-    
-  //   // On mount, first check if already subscribed (likely by Header)
-  //   if (isSubscribed) {
-  //     console.log('NotificationsPage: Found existing subscription, refreshing data');
-      
-  //     // Only fetch if we don't already have notifications data
-  //     if (notifications.length === 0 && !loading && !hasInitiatedFetchRef.current) {
-  //       console.log('NotificationsPage: Initial fetch for subscribed state');
-  //       dispatch(fetchNotifications(user.id));
-  //       hasInitiatedFetchRef.current = true;
-  //     }
-  //     return;
-  //   }
-    
-  //   // Otherwise start own subscription (the Header component might have created one previously)
-  //   console.log('NotificationsPage: Starting realtime subscription');
-  //   dispatch(subscribeToNotifications(user.id));
-    
-  //   // Also perform initial fetch when starting our own subscription
-  //   if (!hasInitiatedFetchRef.current) {
-  //     console.log('NotificationsPage: Initial fetch with new subscription');
-  //     dispatch(fetchNotifications(user.id));
-  //     hasInitiatedFetchRef.current = true;
-  //   }
-    
-  //   pageSubscriptionCreatedRef.current = true;
-
-  //   // Cleanup subscription on unmount, but only if this page created it
-  //   return () => {
-  //     if (pageSubscriptionCreatedRef.current) {
-  //       console.log('NotificationsPage: Cleaning up subscription created by this page');
-  //       dispatch(unsubscribeFromNotifications());
-  //       pageSubscriptionCreatedRef.current = false;
-  //     } else {
-  //       console.log('NotificationsPage: Unmounted, but not cleaning up subscription created elsewhere');
-  //     }
-  //   };
-  // }, [dispatch, user, isSubscribed, notifications.length, loading]);
+  const { formatDateToUserTimezone, formatToUserTimezone } = useUserTimezone();
 
   // Reset fetch flag on component mount
   useEffect(() => {
@@ -294,6 +247,8 @@ export default function NotificationsPage() {
                   loading={loading}
                   onAction={handleNotificationAction}
                   t={t}
+                  formatDateToUserTimezone={formatDateToUserTimezone}
+                  formatToUserTimezone={formatToUserTimezone}
                 />
               </div>
             </CardContent>
@@ -304,7 +259,7 @@ export default function NotificationsPage() {
   );
 }
 
-function NotificationList({ notifications, loading, onAction, t }) {
+function NotificationList({ notifications, loading, onAction, t, formatDateToUserTimezone, formatToUserTimezone }) {
   if (loading) {
     return (
       <div className="py-10 text-center">
@@ -331,6 +286,8 @@ function NotificationList({ notifications, loading, onAction, t }) {
             key={notification.id}
             notification={notification}
             onAction={onAction}
+            formatDateToUserTimezone={formatDateToUserTimezone}
+            formatToUserTimezone={formatToUserTimezone}
           />
         ))}
       </div>
