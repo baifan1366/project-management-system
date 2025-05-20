@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import CheckoutForm from '@/components/CheckoutForm'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 //react redux
 import { useSelector, useDispatch } from 'react-redux'
@@ -19,6 +19,8 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
 export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const params = useParams();
+  const locale = params.locale || 'en';
   const [loading, setLoading] = useState(true);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
 
@@ -50,15 +52,15 @@ export default function PaymentPage() {
 
   useEffect(() => {
     // 简单验证必要参数
-    if (!planId || !userId) {
-      console.error('Missing required parameters:', { planId, userId });
+    if (!planId) {
+      console.error('Missing plan ID parameter');
       router.push('/pricing');
       return;
     }
 
     console.log('Received parameters:', { planId, userId });
     setLoading(false);
-  }, [planId, userId, router]);
+  }, [planId, router]);
 
   useEffect(() => {
     const fetchUserEmail = async () => {
@@ -85,16 +87,32 @@ export default function PaymentPage() {
 
   useEffect(() => {
     const fetchPlanDetails = async () => {
-      if (!planId){
+      if (!planId) {
         console.error('No plan ID provided');
         setLoading(false);
         return;
       }
 
       try {
-        // Use the user from component-level hook
-        if (!user) {
-          router.push('/login?redirect=payment&plan_id=' + planId);
+        // Wait for user state to be determined
+        if (!isAuthenticated) {
+          console.log('User authentication state is being checked...');
+          return;
+        }
+
+        // Only redirect if we're sure the user is not authenticated
+        if (isAuthenticated === false) {
+          console.log('User is not authenticated, redirecting to login...');
+          router.push(`/${locale}/login?redirect=payment&plan_id=${planId}`);
+          return;
+        }
+
+        // Set userId from authenticated user if not provided in URL
+        if (!userId && user?.id) {
+          console.log('Setting userId from authenticated user');
+          const params = new URLSearchParams(window.location.search);
+          params.set('user_id', user.id);
+          router.push(`${window.location.pathname}?${params.toString()}`);
           return;
         }
 
@@ -118,7 +136,7 @@ export default function PaymentPage() {
     };
 
     fetchPlanDetails();
-  }, [planId, router, user]);
+  }, [planId, router, user, isAuthenticated, userId, locale]);
 
   useEffect(() => {
     const initializePayment = async () => {
