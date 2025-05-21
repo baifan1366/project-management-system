@@ -6,18 +6,35 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchPaymentStatus, setPaymentMetadata } from '@/lib/redux/features/paymentSlice';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function PaymentSuccess() {
   const dispatch = useDispatch();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState(null);
+  const [isOrderIdExpanded, setIsOrderIdExpanded] = useState(false);
   
   const { paymentDetails, metadata, status, error } = useSelector(state => state.payment);
 
   // Format amount helper
   const formatAmount = (amount) => {
     return `$${(amount / 100).toFixed(2)}`;
+  };
+
+  // Copy to clipboard helper
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
+  };
+
+  // Format Order ID helper
+  const formatOrderId = (orderId) => {
+    if (!orderId) return 'N/A';
+    return isOrderIdExpanded ? orderId : `${orderId.substring(0, 8)}...`;
   };
 
   // 获取用户邮箱
@@ -54,7 +71,7 @@ export default function PaymentSuccess() {
           orderDetails: {
             planName: orderDetails.planName,
             amount: orderDetails.amount,
-            orderId: orderDetails.id,
+            orderId: orderDetails.orderId,
             userId: orderDetails.userId
           }
         }),
@@ -76,7 +93,7 @@ export default function PaymentSuccess() {
       console.log('Updating user subscription:', { userId, planId });
       
       // Get current date for start_date
-      const startDate = new Date();
+      const startDate = new Date().toISOString();
       
       // Calculate end_date based on plan details
       const { data: planData, error: planError } = await supabase
@@ -88,7 +105,7 @@ export default function PaymentSuccess() {
       if (planError) throw planError;
       
       // Calculate end date based on billing interval
-      const endDate = new Date(startDate);
+      const endDate = new Date();
       if (planData.billing_interval === 'MONTHLY') {
         endDate.setMonth(endDate.getMonth() + 1);
       } else if (planData.billing_interval === 'YEARLY') {
@@ -105,16 +122,25 @@ export default function PaymentSuccess() {
       if (checkError) throw checkError;
       
       let result;
+      const now = new Date().toISOString();
       
       if (existingData) {
         // Update existing record
         result = await supabase
           .from('user_subscription_plan')
           .update({ 
-            plan_id: planId, 
+            plan_id: planId,
+            status: 'ACTIVE',
             start_date: startDate,
-            end_date: endDate,
-            updated_at: new Date()
+            end_date: endDate.toISOString(),
+            current_projects: 0,
+            current_teams: 0,
+            current_members: 0,
+            current_ai_chat: 0,
+            current_ai_task: 0,
+            current_ai_workflow: 0,
+            current_storage: 0,
+            updated_at: now
           })
           .eq('user_id', userId);
       } else {
@@ -122,18 +148,20 @@ export default function PaymentSuccess() {
         result = await supabase
           .from('user_subscription_plan')
           .insert({ 
-            user_id: userId, 
+            user_id: userId,
             plan_id: planId,
-            // TODO: add status: active, inactive, cancelled
+            status: 'ACTIVE',
             start_date: startDate,
-            end_date: endDate,
-            current_users: 0,
-            current_ai_agents: 0,
-            current_automation_flows: 0,
-            current_tasks_this_month: 0,
+            end_date: endDate.toISOString(),
             current_projects: 0,
-            created_at: new Date(),
-            updated_at: new Date()
+            current_teams: 0,
+            current_members: 0,
+            current_ai_chat: 0,
+            current_ai_task: 0,
+            current_ai_workflow: 0,
+            current_storage: 0,
+            created_at: now,
+            updated_at: now
           });
       }
       
@@ -152,9 +180,20 @@ export default function PaymentSuccess() {
     try {
       console.log('Creating payment record:', paymentData);
       
+      // Get orderId from the metadata
+      const orderId = paymentData.metadata?.orderId || metadata?.orderId;
+      console.log('Order ID from metadata:', orderId);
+      console.log('Full payment data:', paymentData);
+      console.log('Full metadata:', metadata);
+      
+      if (!orderId) {
+        throw new Error('No order ID found in payment metadata');
+      }
+      
       // 构建支付记录数据
       const paymentRecord = {
-        user_id: paymentData.userId,
+        user_id: paymentData.metadata?.userId || paymentData.userId,
+        order_id: orderId,
         amount: paymentData.amount / 100, // Stripe金额是以分为单位，转换为元
         currency: paymentData.currency || 'USD',
         payment_method: paymentData.metadata?.payment_method || 'stripe',
@@ -167,23 +206,24 @@ export default function PaymentSuccess() {
         metadata: {
           planId: paymentData.metadata?.planId,
           planName: paymentData.metadata?.planName,
-        },
-        created_at: new Date(),
-        updated_at: new Date()
+        }
       };
       
-      // 插入支付记录
+      // 插入支付记录并返回创建的记录
       const { data, error } = await supabase
         .from('payment')
-        .insert(paymentRecord);
+        .insert(paymentRecord)
+        .select('*')  // Add this to get the inserted record
+        .single();    // Add this to get a single record
         
       if (error) throw error;
       
-      console.log('Payment record created successfully');
-      return true;
+      console.log('Payment record created successfully:', data);
+      
+      return data;
     } catch (err) {
       console.error('Error creating payment record:', err);
-      return false;
+      return null;
     }
   };
 
@@ -196,10 +236,13 @@ export default function PaymentSuccess() {
         }
 
         const result = await dispatch(fetchPaymentStatus(paymentIntent)).unwrap();
+        console.log('Payment status result:', result);
         
         if (result.metadata) {
+          // Update Redux metadata with all payment details
           dispatch(setPaymentMetadata({
             ...result.metadata,
+            orderId: result.metadata.orderId,
             amount: result.amount
           }));
         }
@@ -214,14 +257,20 @@ export default function PaymentSuccess() {
           }
           
           // 创建支付记录
-          await createPaymentRecord({
+          const paymentRecord = await createPaymentRecord({
             ...result,
             userId: result.metadata.userId
           });
+
+          // Update payment details in Redux after creating the record
+          if (paymentRecord) {
+            dispatch(fetchPaymentStatus.fulfilled(paymentRecord, 'payment/fetchPaymentStatus', paymentRecord.id));
+          }
           
           if (email) {
             await sendEmail(email, {
-              id: paymentIntent,
+              id: result.metadata.orderId,
+              orderId: result.metadata.orderId,
               planName: result.metadata.planName,
               amount: result.amount,
               userId: result.metadata.userId
@@ -322,6 +371,31 @@ export default function PaymentSuccess() {
             <div className="text-left">
               <h3 className="font-medium text-gray-900">Order Summary</h3>
               <dl className="mt-4 space-y-4">
+                <div className="flex justify-between items-center">
+                  <dt className="text-gray-600">Order ID</dt>
+                  <dd className="text-gray-900 font-mono flex items-center gap-2">
+                    <span>{formatOrderId(metadata?.orderId || paymentDetails?.order_id || 'N/A')}</span>
+                    {(metadata?.orderId || paymentDetails?.order_id) && (
+                      <>
+                        <button
+                          onClick={() => setIsOrderIdExpanded(!isOrderIdExpanded)}
+                          className="text-indigo-600 hover:text-indigo-700 text-sm"
+                        >
+                          {isOrderIdExpanded ? 'Show Less' : 'Show More'}
+                        </button>
+                        <button
+                          onClick={() => copyToClipboard(metadata?.orderId || paymentDetails?.order_id)}
+                          className="text-indigo-600 hover:text-indigo-700"
+                          title="Copy to clipboard"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </dd>
+                </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-600">Plan</dt>
                   <dd className="text-gray-900">{metadata.planName}</dd>

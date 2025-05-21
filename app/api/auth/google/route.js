@@ -17,13 +17,8 @@ export async function GET(request) {
     const callbackParams = new URLSearchParams();
     callbackParams.append('provider', 'google');
     
-    // Add plan_id and redirect params if they exist
-    if (redirect === 'payment' && planId) {
-      callbackParams.append('redirect', 'payment');
-      callbackParams.append('plan_id', planId);
-    } 
     // 处理团队邀请页面的重定向
-    else if (redirect && redirect.includes('teamInvitation')) {
+    if (redirect && redirect.includes('teamInvitation')) {
       callbackParams.append('redirect', redirect);
     }
     

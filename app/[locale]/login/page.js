@@ -96,10 +96,7 @@ export default function LoginPage() {
       console.log('检测到用户已登录，检查重定向参数:', { redirect });
       // 添加小延迟确保页面完全加载
       const timer = setTimeout(() => {
-        if (redirect === 'payment' && planId) {
-          console.log('重定向到支付页面，计划ID:', planId);
-          router.push(`/${locale}/payment?plan_id=${planId}`);
-        } else if (redirect && redirect.includes('teamInvitation')) {
+        if (redirect && redirect.includes('teamInvitation')) {
           // 如果是团队邀请页面，重定向回邀请页面
           // 确保路径格式正确（添加前导斜杠如果没有）
           const redirectPath = redirect.startsWith('/') ? redirect : `/${redirect}`;
@@ -121,11 +118,7 @@ export default function LoginPage() {
     
     console.log('处理重定向，redirect值:', redirect);
     
-    // 如果有重定向参数，并且是支付页面，且有计划ID
-    if (redirect === 'payment' && planId) {
-      console.log('重定向到支付页面，计划ID:', planId);
-      router.push(`/${locale}/payment?plan_id=${planId}`);
-    } else if (redirect && redirect.includes('teamInvitation')) {
+    if (redirect && redirect.includes('teamInvitation')) {
       // 如果是团队邀请页面，重定向回邀请页面
       // 确保路径格式正确（添加前导斜杠如果没有）
       const redirectPath = redirect.startsWith('/') ? redirect : `/${redirect}`;
