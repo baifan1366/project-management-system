@@ -548,27 +548,29 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                   {isCurrentUserOwner() && (
                     <Button 
                       variant={themeColor} 
+                      size="icon"
                       onClick={
                         () => {
                           setShowInviteDialog(true);
                           onClose();
                         }
                       }
-                      className="flex items-center"
+                      className="items-center"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      {t('inviteMembers')}
+                      <Plus size={16} />
+                      {/* {t('inviteMembers')} */}
                     </Button>
                   )}
                 </div>
-                <div className="text-sm text-muted-foreground mb-5">
+                <div className="text-sm text-muted-foreground mb-4">
                   {isCurrentUserOwner() 
                     ? t('membersManagementDescription')
                     : t('membersViewDescription') || '查看团队成员列表。只有团队所有者可以管理成员权限。'}
+                  
                 </div>
                 
                 {/* 成员列表 */}
-                <div className="border rounded-md p-2 space-y-1 max-h-[300px] overflow-y-auto">
+                <div className="border rounded-md p-2 space-y-1 max-h-[200px] overflow-y-auto">
                   {renderMemberList()}
                 </div>
               </div>
