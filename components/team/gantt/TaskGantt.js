@@ -9,6 +9,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useTranslations } from 'next-intl';
 import AddTaskDialog from './AddTaskDialog';
 import EditTaskDialog from './EditTaskDialog';
+import CreateSectionDialog from './CreateSectionDialog';
 import { Plus } from 'lucide-react';
 import { initZoom, setZoom as applyZoom, handleZoomChange as changeZoom } from './GanttTools';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -103,6 +104,8 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showCreateSection, setShowCreateSection] = useState(false);
+  const [shouldReopenTaskForm, setShouldReopenTaskForm] = useState(false);
   const [refreshFlag, setRefreshFlag] = useState(0);
   const [editTask, setEditTask] = useState({
     id: null,
@@ -333,7 +336,29 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     });
   };
 
-  // Toolbar component
+  // 修改setShowTaskForm处理函数，确保对话框互斥
+  const handleShowTaskForm = (show) => {
+    if (show) {
+      setShowCreateSection(false); // 如果打开任务表单，关闭创建部分对话框
+    }
+    setShowTaskForm(show);
+  };
+
+  // 修改setShowCreateSection处理函数，确保对话框互斥
+  const handleShowCreateSection = (show) => {
+    if (show) {
+      // 如果当前任务表单是打开的，记录这个状态，以便后续重新打开
+      setShouldReopenTaskForm(showTaskForm);
+      setShowTaskForm(false); // 如果打开创建部分对话框，关闭任务表单
+    } else if (shouldReopenTaskForm) {
+      // 如果关闭创建部分对话框，且之前有打开的任务表单，则重新打开任务表单
+      setShowTaskForm(true);
+      setShouldReopenTaskForm(false);
+    }
+    setShowCreateSection(show);
+  };
+  
+  // 修改Toolbar组件使用新的处理函数
   const Toolbar = () => {
     return (
       <div className="flex justify-between pl-1">
@@ -341,7 +366,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
           <h2 className="font-medium">{currentDate}</h2>
           <Button 
             variant="outline"
-            onClick={() => setShowTaskForm(true)}
+            onClick={() => handleShowTaskForm(true)}
             className="border-none ml-2 p-1"
           >
             <Plus size={16} />
@@ -451,7 +476,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     
     // Override the default task addition
     gantt.attachEvent("onTaskCreated", function(task) {
-      setShowTaskForm(true);
+      handleShowTaskForm(true);
       return false; // Prevent default behavior
     });
 
@@ -466,6 +491,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
         progress: task.progress || 0
       });
       setShowEditForm(true);
+      handleShowCreateSection(false); // 确保关闭创建部分对话框
       return false; // Prevent default behavior
     });
 
@@ -675,6 +701,15 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     }
   };
 
+  // 在创建新部分后刷新部分列表
+  const handleSectionCreated = (newSection) => {
+    // 强制刷新数据
+    setRefreshFlag(prev => prev + 1);
+    // 在成功创建部分后关闭创建部分对话框
+    handleShowCreateSection(false);
+    // 可以在这里添加其他逻辑，如选择新创建的部分
+  };
+
   return (
     <div className={`w-full h-full overflow-hidden`}>
       <style dangerouslySetInnerHTML={{
@@ -718,8 +753,9 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
         teamId={teamId}
         taskColor={taskColor}
         showTaskForm={showTaskForm}
-        setShowTaskForm={setShowTaskForm}
+        setShowTaskForm={handleShowTaskForm}
         onTaskAdd={handleTaskAdd}
+        setShowCreateSection={handleShowCreateSection}
       />
       <EditTaskDialog
         taskColor={taskColor}
@@ -730,6 +766,13 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
         handleUpdateTask={handleUpdateTask}
         handleDeleteTask={handleDeleteTask}
         teamId={teamId}
+      />
+      <CreateSectionDialog
+        taskColor={taskColor}
+        teamId={teamId}
+        showCreateSection={showCreateSection}
+        setShowCreateSection={handleShowCreateSection}
+        onSectionCreated={handleSectionCreated}
       />
       <div 
         ref={ganttContainer}

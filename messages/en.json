@@ -620,6 +620,9 @@
     "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
   },
   "CreateTask": {
+    "createNewSection": "New Section",
+    "createSection": "New Section",
+    "sectionName": "Section Name",
     "selectSection": "Select Section",
     "createTaskDescription": "Description for creating a task",
     "addingTask": "Adding task...",

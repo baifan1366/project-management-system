@@ -86,7 +86,7 @@ function formatGanttDate(date) {
   }
 }
 
-export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShowTaskForm, onTaskAdd }) {
+export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShowTaskForm, onTaskAdd, setShowCreateSection }) {
   const t = useTranslations('CreateTask');
   const tValidation = useTranslations('validationRules');
   const [newTask, setNewTask] = useState({
@@ -339,6 +339,31 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
     }
   }, [showTaskForm, form, selectedSection]);
 
+  // 处理"创建新部分"选项点击
+  const handleCreateSectionClick = () => {
+    // 先关闭选择器
+    form.setValue('section', '');
+    // 打开创建部分对话框
+    setShowCreateSection(true);
+  };
+  
+  // 在创建新部分后刷新部分列表
+  const handleSectionCreated = (newSection) => {
+    // 重新获取部分列表
+    dispatch(getSectionByTeamId(teamId)).unwrap()
+      .then(sectionsData => {
+        setSections(sectionsData || []);
+        // 选择新创建的部分
+        if (newSection && newSection.id) {
+          form.setValue('section', newSection.id.toString());
+          setSelectedSection(newSection.id);
+        }
+      })
+      .catch(error => {
+        console.error("获取部分数据失败:", error);
+      });
+  };
+
   return (
     <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
       <DialogContent 
@@ -364,7 +389,16 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
                     <span className="text-red-500">*</span>                    
                   </FormLabel>
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => {
+                      if (value === "create-new") {
+                        // 打开创建部分对话框
+                        setShowCreateSection(true);
+                        // 不更新字段值，保持当前选择
+                      } else {
+                        // 正常更新字段值
+                        field.onChange(value);
+                      }
+                    }}
                     defaultValue={field.value}
                     value={field.value}
                   >
@@ -388,6 +422,13 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
                           {section.name || `部分 ${section.id}`}
                         </SelectItem>
                       ))}
+                      <SelectItem 
+                        key="create-new" 
+                        value="create-new"
+                        className="items-center w-full justify-center text-center border-t mt-1 pt-1"
+                      >
+                        +  {t('createNewSection')}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
