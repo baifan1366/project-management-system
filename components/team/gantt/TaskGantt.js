@@ -349,12 +349,6 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
         </div>
         <div className="flex justify-end gap-1 items-end py-1 pr-1">
           <Button 
-            variant={currentZoom === 'Hours' ? taskColor : 'outline'}
-            onClick={() => handleZoomChange('Hours')}
-          >
-            {t('Hours')}
-          </Button>
-          <Button 
             variant={currentZoom === 'Days' ? taskColor : 'outline'}
             onClick={() => handleZoomChange('Days')}
           >
@@ -394,7 +388,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     gantt.config.date_format = "%Y-%m-%d %H:%i";
     gantt.config.xml_date = "%Y-%m-%d %H:%i";
     gantt.config.show_grid = true;
-    gantt.config.grid_width = 400;
+    gantt.config.grid_width = 300;
     gantt.config.grid_height = 200;
     gantt.config.grid_cell_width = 40;
     gantt.config.grid_cell_height = 20;
@@ -521,10 +515,9 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     
     // Add toolbar functionality
     gantt.config.columns = [
-      {name: "text", label: "Task name", width: "*", tree: true},
-      {name: "start_date", label: "Start time", align: "center"},
-      {name: "duration", label: "Duration", align: "center"},
-      {name: "add", label: "", width: 44}
+      {name: "text", label: "Task", width: "*", tree: true},
+      {name: "start_date", label: "Start Date", align: "center"},
+      {name: "duration", label: "Duration", align: "center"}
     ];
     
     // 默认数据 - 仅在没有任务数据时使用
@@ -736,6 +729,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
         setEditTask={setEditTask}
         handleUpdateTask={handleUpdateTask}
         handleDeleteTask={handleDeleteTask}
+        teamId={teamId}
       />
       <div 
         ref={ganttContainer}

@@ -349,12 +349,6 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
         </div>
         <div className="flex justify-end gap-1 items-end py-1 pr-1">
           <Button 
-            variant={currentZoom === 'Hours' ? taskColor : 'outline'}
-            onClick={() => handleZoomChange('Hours')}
-          >
-            {t('Hours')}
-          </Button>
-          <Button 
             variant={currentZoom === 'Days' ? taskColor : 'outline'}
             onClick={() => handleZoomChange('Days')}
           >

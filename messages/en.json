@@ -620,6 +620,8 @@
     "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
   },
   "CreateTask": {
+    "selectSection": "Select Section",
+    "createTaskDescription": "Description for creating a task",
     "addingTask": "Adding task...",
     "taskAdded": "Task added",
     "taskAddFailed": "Failed to add task",
@@ -1560,17 +1562,23 @@
     "reminder": "Reminder"
   },
   "EditTask": {
+    "editTaskDescription": "Description for editing a task",
     "editTask": "Edit Task",
-    "modifyTaskInformationOrAdjustCompletionProgress": "Modify task information or adjust completion progress",
+    "modifyTaskInformationOrAdjustCompletionProgress": "Modify task information or adjust completion progress.",
     "taskName": "Task Name",
     "startDate": "Start Date",
     "duration": "Duration",
+    "progress": "Progress",
+    "section": "Section",
+    "selectSection": "Select Section",
+    "deleteTask": "Delete Task",    
     "completionProgress": "Completion Progress",
     "delete": "Delete",
     "cancel": "Cancel",
     "save": "Save",
     "enterTaskName": "Enter task name",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "onlyProgressAndDurationEditable": "The task has already started. Only progress and duration can be modified."
   },
   "AI_Workflow": {
     "title": "AI Workflow",

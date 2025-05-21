@@ -431,7 +431,12 @@
   },
   "CreateTask": {
     "createTask": "创建任务",
+    "createTaskDescription": "填写以下信息以创建新任务",
     "taskName": "任务名称",
+    "startDate": "开始日期",
+    "duration": "持续时间",
+    "section": "部分",
+    "selectSection": "选择部分",
     "cancel": "取消",
     "create": "创建",
     "taskNameMin": "任务名称至少需要2个字符",
@@ -1226,6 +1231,20 @@
     "nameRequired": "请输入任务名称",
     "taskUpdated": "任务已更新",
     "errorUpdatingTask": "更新任务失败"
+  },
+  "EditTask": {
+    "editTask": "编辑任务",
+    "editTaskDescription": "修改任务信息或调整完成进度",
+    "taskName": "任务名称",
+    "startDate": "开始日期",
+    "duration": "持续时间",
+    "progress": "完成进度",
+    "section": "部分",
+    "selectSection": "选择部分",
+    "deleteTask": "删除任务",
+    "cancel": "取消",
+    "save": "保存",
+    "saving": "保存中..."
   },
   "FilePreview": {
     "videoNotSupported": "您的浏览器不支持视频标签。",

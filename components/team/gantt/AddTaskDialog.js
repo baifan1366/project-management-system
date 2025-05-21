@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -97,8 +98,32 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [sections, setSections] = useState([]);
+  const [selectedSection, setSelectedSection] = useState(null);
   const { user } = useGetUser();
   const dispatch = useDispatch();
+  
+  // 获取部分数据
+  useEffect(() => {
+    async function fetchSections() {
+      if (teamId && showTaskForm) {
+        try {
+          const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
+          setSections(sectionsData || []);
+          
+          // 如果有部分，默认选择第一个
+          if (sectionsData && sectionsData.length > 0) {
+            setSelectedSection(sectionsData[0].id);
+            form.setValue('section', sectionsData[0].id.toString());
+          }
+        } catch (error) {
+          console.error("获取部分数据失败:", error);
+        }
+      }
+    }
+    
+    fetchSections();
+  }, [dispatch, teamId, showTaskForm]);
   
   const validateForm = (data) => {
     if (!validationSchema) return { isValid: true, errors: {} };
@@ -114,7 +139,8 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
     defaultValues: {
       taskName: newTask.text || '',
       startDate: newTask.start_date || new Date(),
-      duration: newTask.duration || 1
+      duration: newTask.duration || 1,
+      section: ''
     },
     mode: 'onChange'
   });  
@@ -124,6 +150,7 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
     const taskName = form.getValues('taskName') || '';
     const startDate = form.getValues('startDate');
     const duration = form.getValues('duration');
+    const section = form.getValues('section');
     
     // 任务名称检查 (2-100字符)
     const isTaskNameValid = taskName.trim().length >= 2 && taskName.trim().length <= 100;
@@ -144,7 +171,10 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
     const durationValue = parseInt(duration);
     const isDurationValid = !isNaN(durationValue) && durationValue >= 1 && durationValue <= 999;
     
-    return isTaskNameValid && isStartDateValid && isDurationValid;
+    // 部分检查
+    const isSectionValid = !!section;
+    
+    return isTaskNameValid && isStartDateValid && isDurationValid && isSectionValid;
   };
 
   const onSubmit = async (data) => {
@@ -209,118 +239,172 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
         .eq('id', result.id);
       console.log(newTaskData);
 
-      //updateTaskIds
-      //check whether this team has section or not
-      //if has, update the task_ids at the first section.id table detected
-      //if not, create a new section and update the task_ids at the new section.id table
-      const sectionId = await dispatch(getSectionByTeamId(teamId)).unwrap();
-      if (sectionId != null && sectionId.length > 0) {
-        //select the first section.id
-        const firstSectionId = sectionId[0].id;
-        // 获取当前的task_ids列表，然后将新任务ID追加到现有列表中
-        const currentSection = sectionId[0];
-        const existingTaskIds = currentSection.task_ids || [];
-        const updatedTaskIds = [...existingTaskIds, result.id];
+      // 更新任务所属的部分
+      if (data.section) {
+        const sectionId = parseInt(data.section);
+        const targetSection = sections.find(section => section.id === sectionId);
         
-        await dispatch(updateTaskIds({
-          sectionId: firstSectionId,
-          teamId: teamId,
-          newTaskIds: updatedTaskIds // 使用包含所有任务ID的更新列表
-        })).unwrap();
+        if (targetSection) {
+          const existingTaskIds = targetSection.task_ids || [];
+          const updatedTaskIds = [...existingTaskIds, result.id];
+          
+          await dispatch(updateTaskIds({
+            sectionId: sectionId,
+            teamId: teamId,
+            newTaskIds: updatedTaskIds
+          })).unwrap();
+        }
       } else {
-        //create a new section
-        const sectionData = {
-          teamId,
-          sectionName: "New Section",
-          createdBy: userId
-        };
-        const newSection = await dispatch(createSection({teamId, sectionData})).unwrap();
-        await dispatch(updateTaskIds({
-          sectionId: newSection.id,
-          teamId: teamId,
-          newTaskIds: [result.id]
-        })).unwrap();
+        // 如果没有选择部分，但有部分存在，使用第一个部分
+        if (sections.length > 0) {
+          const firstSectionId = sections[0].id;
+          const currentSection = sections[0];
+          const existingTaskIds = currentSection.task_ids || [];
+          const updatedTaskIds = [...existingTaskIds, result.id];
+          
+          await dispatch(updateTaskIds({
+            sectionId: firstSectionId,
+            teamId: teamId,
+            newTaskIds: updatedTaskIds
+          })).unwrap();
+        } else {
+          // 如果没有部分，创建一个新部分
+          const sectionData = {
+            teamId,
+            sectionName: "新部分",
+            createdBy: userId
+          };
+          const newSection = await dispatch(createSection({teamId, sectionData})).unwrap();
+          await dispatch(updateTaskIds({
+            sectionId: newSection.id,
+            teamId: teamId,
+            newTaskIds: [result.id]
+          })).unwrap();
+        }
       }
 
       setNewTask(updatedTask);
       handleAddTask(updatedTask);
-      form.reset();
+      form.reset({
+        taskName: '',
+        startDate: new Date(),
+        duration: 1,
+        section: sections.length > 0 ? sections[0].id.toString() : ''
+      });
       setIsLoading(false);
       setIsSubmitting(false);
       setShowTaskForm(false);
-
     } catch (error) {
-      console.error(`taskDialog出错`, error);
+      console.error(`创建任务出错`, error);
       setIsLoading(false);
       setIsSubmitting(false);
     }
-  }  
-
-  const handleAddTask = (task) => {
-    try {
-      onTaskAdd(task);
-      
-      setNewTask({
-        text: '',
-        start_date: formatGanttDate(new Date()),
-        duration: 1
-      });
-    } catch (error) {
-      console.error("添加任务时出错:", error);
-    }
   }
 
+  const handleCancel = () => {
+    form.reset();
+    setNewTask({
+      text: '',
+      start_date: new Date().toISOString().split('T')[0] + ' 00:00',
+      duration: 1
+    });
+    setShowTaskForm(false);
+  }
+
+  const handleAddTask = (task) => {
+    if (onTaskAdd) {
+      onTaskAdd({ 
+        taskName: task.Name, 
+        startDate: task["Start Date"], 
+        duration: task.Duration 
+      });
+    }
+  }
+  
+  // 加载验证架构
   useEffect(() => {
     setValidationSchema(createTaskValidationSchema(tValidation));
   }, [tValidation]);
 
+  // 当对话框打开时，重置表单状态
   useEffect(() => {
-    if(showTaskForm) {
+    if (showTaskForm) {
       form.reset({
-        taskName: newTask.text || '',
-        startDate: newTask.start_date || new Date(),
-        duration: newTask.duration || 1
+        taskName: '',
+        startDate: new Date(),
+        duration: 1,
+        section: selectedSection ? selectedSection.toString() : ''
       });
       setFormErrors({});
     }
-  }, [showTaskForm]);
-
-  // 监听表单变化以验证表单
-  useEffect(() => {
-    const subscription = form.watch(() => {
-      form.trigger();
-    });
-    return () => subscription.unsubscribe();
-  }, [form]);
-
+  }, [showTaskForm, form, selectedSection]);
 
   return (
     <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
       <DialogContent 
-        className="max-w-md"
+        className="sm:max-w-[600px]"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold">{t('addNewTask')}</DialogTitle>
+          <DialogTitle>{t('createTask')}</DialogTitle>
           <DialogDescription>
             {t('pleaseFillInTheFollowingInformationToCreateANewTask')}
           </DialogDescription>
         </DialogHeader>
-        
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="section"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('section')}
+                    <span className="text-red-500">*</span>                    
+                  </FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue 
+                          className="truncate whitespace-nowrap max-w-xs overflow-hidden"
+                          placeholder={t('selectSection')} 
+                        />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent
+                      className="w-full truncate"
+                    >
+                      {sections.map(section => (
+                        <SelectItem 
+                          key={section.id} 
+                          value={section.id.toString()}
+                          className="truncate whitespace-nowrap overflow-hidden"
+                        >
+                          {section.name || `部分 ${section.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="taskName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
+                  <FormLabel>
                     {t('taskName')}
                     <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
-                    <Input 
+                  <Input 
                       {...field} 
                       placeholder={t('enterTaskName')} 
                       aria-label={t('taskName')}
@@ -330,28 +414,26 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
                       onChange={(e) => {
                         field.onChange(e);
                       }}
-                    />                    
-                  </FormControl>  
+                    /> 
+                  </FormControl>
                   <FormMessage className="flex justify-end">
                     <span className="text-gray-500 text-xs ml-2">
                       {field.value ? `${field.value.trim().length}/100` : "0/100"}
                     </span>
-                  </FormMessage>                
+                  </FormMessage>
                 </FormItem>
               )}
             />
-            
-            <div className="flex space-x-4">
+            <div className="flex items-end gap-x-2">
               <FormField
                 control={form.control}
                 name="startDate"
                 render={({ field }) => (
-                  <FormItem className="flex-[2]">
-                    <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
-                      {t('startDate')}
-                    </FormLabel>
+                  <FormItem className="w-38">
+                    <FormLabel>{t('startDate')}</FormLabel>
                     <FormControl>
-                      <Input 
+                    <Input 
+                        className="w-38"
                         type="date" 
                         aria-label={t('startDate')}
                         min={new Date().toISOString().split('T')[0]}
@@ -365,20 +447,18 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
                         }}
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-              
               <FormField
                 control={form.control}
                 name="duration"
                 render={({ field }) => (
-                  <FormItem className="flex-[3]">
-                    <FormLabel className="block text-sm font-medium mb-1 text-gray-800 dark:text-gray-200">
-                      {t('duration')}
-                    </FormLabel>
+                  <FormItem className="flex-1 w-full">
+                    <FormLabel>{t('duration')}</FormLabel>
                     <FormControl>
-                      <Input 
+                    <Input 
                         type="number" 
                         min="1"
                         max="999"
@@ -400,15 +480,16 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
                         }}
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
             
-            <DialogFooter className="flex justify-end gap-2 pt-4">
+            <DialogFooter className="flex justify-end gap-2">
               <Button 
-                type="button"
-                variant="outline"
+                type="button" 
+                variant="outline" 
                 onClick={() => setShowTaskForm(false)}
                 disabled={isLoading}
               >
