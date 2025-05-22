@@ -632,11 +632,14 @@ const TeamCustomFieldPage = () => {
           </div>
         </div>
         <div className="w-full p-0">
-          <div className="w-full border-b py-2 flex items-center justify-between">
+          { currentItem?.custom_field?.type !== 'AGILE' && (
+            <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex">
                 {/* if currentItem?.custom_field?.type !== 'FILES' and POSTS */}
-                {currentItem?.custom_field?.type !== 'FILES' && currentItem?.custom_field?.type !== 'POSTS' && (
+                {currentItem?.custom_field?.type !== 'FILES' && 
+                 currentItem?.custom_field?.type !== 'POSTS' && 
+                 currentItem?.custom_field?.type !== 'OVERVIEW' && (
                   <>
                     <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
                       <Plus className="h-4 w-4 mr-1" />
@@ -685,6 +688,8 @@ const TeamCustomFieldPage = () => {
               </Button>
             </div>
           </div>
+          )}
+          
         </div>
         <div className="overflow-y-auto flex-grow h-0 mb-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0" data-rbd-scroll-container-style="true">
           {customFieldContent}

@@ -46,6 +46,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [saving, setIsSaving] = useState(false);
   const [themeColor, setThemeColor] = useState('#000000');
+  const [projectName, setProjectName] = useState('');
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [membersError, setMembersError] = useState(null);
@@ -72,6 +73,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
   useEffect(() => {
     if (project?.theme_color) {
       setThemeColor(project.theme_color);
+      setProjectName(project.project_name);
     }
   }, [project]);
 
@@ -603,9 +605,9 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                                 {teamAccess === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500" />}
                                 <span>
                                   {teamAccess === 'invite_only' && t('inviteOnly')}
-                                  {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}
-                                  {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}
-                                  {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project.project_name })}
+                                  {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName })}
+                                  {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName })}
+                                  {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })}
                                 </span>
                               </div>
                             </div>
@@ -630,7 +632,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                           <div className="flex items-center w-full">
                             <Pencil className="w-5 h-5 mr-3 text-gray-500" />
                             <div className="flex-1">
-                              <div className="font-medium">{t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}</div>
+                              <div className="font-medium">{t('everyoneAt{projectName}CanEdit', { projectName })}</div>
                               <div className="text-xs text-gray-500 mt-0.5">
                                 {t('everyoneCanEditDescription')}
                               </div>
@@ -641,7 +643,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                           <div className="flex items-center w-full">
                             <Eye className="w-5 h-5 mr-3 text-gray-500" />
                             <div className="flex-1">
-                              <div className="font-medium">{t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}</div>
+                              <div className="font-medium">{t('everyoneAt{projectName}CanCheck', { projectName })}</div>
                               <div className="text-xs text-gray-500 mt-0.5">
                                 {t('everyoneCanCheckDescription')}
                               </div>
@@ -652,7 +654,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                           <div className="flex items-center w-full">
                             <Unlock className="w-5 h-5 mr-3 text-gray-500" />
                             <div className="flex-1">
-                              <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName: project.project_name })}</div>
+                              <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName })}</div>
                               <div className="text-xs text-gray-500 mt-0.5">
                                 {t('everyoneCanViewDescription')}
                               </div>
@@ -670,9 +672,9 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                         {teamAccess === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
                         <span>
                           {teamAccess === 'invite_only' && t('inviteOnly')}
-                          {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}
-                          {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}
-                          {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project.project_name })}
+                          {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName })}
+                          {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName })}
+                          {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })}
                         </span>
                       </div>
                     </div>
