@@ -12,6 +12,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { createPaymentIntent, setPaymentMetadata, setFinalTotal } from '@/lib/redux/features/paymentSlice'
 import useGetUser from '@/lib/hooks/useGetUser';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
 
 // Initialize Stripe outside the component
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -114,6 +115,55 @@ export default function PaymentPage() {
           params.set('user_id', user.id);
           router.push(`${window.location.pathname}?${params.toString()}`);
           return;
+        }
+
+        // Check if user already has this plan and it's still active
+        const { data: currentSubscription, error: subscriptionError } = await supabase
+          .from('user_subscription_plan')
+          .select('*')
+          .eq('user_id', userId || user?.id)
+          .eq('status', 'ACTIVE')
+          .single();
+
+        if (subscriptionError && subscriptionError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          console.error('Error checking current subscription:', subscriptionError);
+        } else if (currentSubscription) {
+          // Check if trying to purchase the same plan
+          if (parseInt(currentSubscription.plan_id) === parseInt(planId)) {
+            // Check if the plan is still active
+            const currentDate = new Date();
+            const endDate = new Date(currentSubscription.end_date);
+            
+            if (currentDate < endDate) {
+              let countdown = 3;
+              
+              // Show initial toast with 3 seconds
+              const toastId = toast.warning("You already have this plan active", {
+                description: `You cannot purchase the same plan while it's still active. Redirecting in ${countdown} seconds...`,
+                duration: 3000,
+              });
+
+              // Update the toast message every second
+              const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                  toast.warning("You already have this plan active", {
+                    id: toastId,
+                    description: `You cannot purchase the same plan while it's still active. Redirecting in ${countdown} seconds...`,
+                    duration: 1000,
+                  });
+                }
+              }, 1000);
+
+              // Redirect after 3 seconds and clear the interval
+              setTimeout(() => {
+                clearInterval(countdownInterval);
+                router.push(`/${locale}/pricing`);
+              }, 3000);
+              
+              return;
+            }
+          }
         }
 
         // 获取计划详情
