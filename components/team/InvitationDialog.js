@@ -477,7 +477,7 @@ export default function InvitationDialog({ open, onClose }) {
 
           <div className="mt-6">
             <h4 className="text-sm font-medium mb-3">{t('teamMembers')}</h4>
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-y-auto max-h-[200px]">
               {renderMemberList()}
             </div>
           </div>

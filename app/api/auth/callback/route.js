@@ -199,7 +199,20 @@ export async function GET(request) {
     
     console.log('OAuth回调参数:', { provider, finalRedirect, redirectParam, planId });
     
-        // 构建重定向URL    let redirectUrl = '/projects'; // 默认重定向到项目页面        if (finalRedirect) {      // 优先使用final_redirect      redirectUrl = finalRedirect;    } else if (redirectParam && redirectParam.includes('teamInvitation')) {      // 团队邀请页面重定向      redirectUrl = redirectParam;    }
+    // 构建重定向URL    
+    let redirectUrl = '/projects'; // 默认重定向到项目页面
+    
+    // if (finalRedirect) {
+    //    优先使用final_redirect
+    //   redirectUrl = finalRedirect;
+    // } else if (redirectParam === 'payment' && planId) {
+    //    支付页面重定向
+    //   redirectUrl = `/payment?plan_id=${planId}`;
+    // } else 
+    if (redirectParam && redirectParam.includes('teamInvitation')) {
+      // 团队邀请页面重定向
+      redirectUrl = redirectParam;
+    }
     
     console.log('最终重定向URL:', redirectUrl);
     

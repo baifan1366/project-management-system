@@ -1,379 +1,160 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Project Management System
+
+A comprehensive, full-featured project management application built with Next.js, React, and Supabase.
+
+## Features
+
+- **Project Dashboard**: Visualize and manage project progress, tasks, and timelines.
+- **Task Management**: Create, assign, and track tasks with deadlines and priorities.
+- **Team Collaboration**: Manage team members, roles, and permissions.
+- **Calendar Integration**: Schedule meetings, deadlines, and events.
+- **Chat Functionality**: Real-time communication between team members.
+- **Gantt Charts**: Visualize project timelines and dependencies.
+- **Internationalization**: Multi-language support for global teams.
+- **Document Management**: Store and share project-related documents.
+- **Activity Tracking**: Monitor project activity and user contributions.
+- **Subscription Management**: Different subscription tiers with varying features.
+- **Admin Dashboard**: Comprehensive admin controls for managing the platform.
+
+## Tech Stack
+
+- **Frontend**: Next.js, React 19, TailwindCSS
+- **Backend**: Next.js API routes, Supabase
+- **Database**: PostgreSQL (via Supabase)
+- **Authentication**: Supabase Auth
+- **State Management**: Redux Toolkit
+- **UI Components**: Radix UI, Shadcn/UI
+- **Styling**: TailwindCSS
+- **Payments**: Stripe
+- **File Storage**: Supabase Storage
+- **Rich Text Editing**: Tiptap
+- **Charts**: Chart.js, React-Chartjs-2
+- **Drag and Drop**: @hello-pangea/dnd
+- **Internationalization**: next-intl
+- **Form Handling**: react-hook-form with Zod validation
+- **Date Handling**: date-fns
+- **AI Integration**: OpenAI, HuggingFace
+- **3D Visualization**: Three.js, React Three Fiber
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Node.js (v18 or later)
+- npm or yarn
+- Supabase account
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/project-management-system.git
+   cd project-management-system
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-## UI Components with shadcn/ui
+3. Set up environment variables:
+   Create a `.env.local` file in the root directory with the following variables:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+   NEXT_PUBLIC_SITE_URL=your_site_url
+   STRIPE_SECRET_KEY=your_stripe_secret_key
+   STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+   OPENAI_API_KEY=your_openai_api_key
+   HUGGINGFACE_API_KEY=your_huggingface_api_key
+   ```
 
-This project uses [shadcn/ui](https://ui.shadcn.com/) for beautifully designed components. To add new components, use the following command:
+4. Set up the database:
+   - Run the SQL scripts in the `db` directory to set up your Supabase database schema
+   - Start with `supabasev2.sql`, then run additional migration scripts as needed
 
-```bash
-npx shadcn@latest add <component-name>
-```
+5. Run the development server:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
 
-For example, to add a button component:
-```bash
-npx shadcn@latest add button
-```
+6. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-Available components can be found in the [shadcn/ui components](https://ui.shadcn.com/docs/components) documentation.
+## Database Structure
 
-## Live Demo
+The application uses Supabase (PostgreSQL) with the following main tables:
+- Users
+- Projects
+- Tasks
+- Teams
+- Comments
+- Calendar Events
+- Notifications
+- Activity Logs
+- Subscriptions
+- Documents
 
-The project is deployed and accessible at: [https://team-sync-system.vercel.app/](https://team-sync-system.vercel.app/)
+Database migration scripts are available in the `db/migrations` directory.
 
-## Environment Setup
+## Internationalization
 
-To run this project locally, you need to set up the following environment variables in a `.env` file:
+The application supports multiple languages through next-intl. Language files are located in the `messages` directory.
 
-```env
-# Database Configuration
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-```
-
-> Note: Never commit the actual `.env` file to version control. The above is just a template of required variables.
-
-## Supabase Setup
-
-### Supabase CLI Installation and Setup
-
-1. Install Scoop (Windows Package Manager):
-```powershell
-# Run in PowerShell
-Set-ExecutionPolicy RemoveRestricted -Scope CurrentUser -Force
-irm get.scoop.sh | iex
-```
-
-2. Install Docker Desktop:
-- Visit [Docker Desktop](https://www.docker.com/products/docker-desktop/) to download and install
-- Launch Docker Desktop after installation
-
-3. Install Supabase CLI via Scoop:
-```bash
-scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-scoop install supabase
-```
-
-4. Set up Supabase Access Token:
-- Visit [Supabase Dashboard](https://app.supabase.com)
-- Click profile picture in top right -> Account
-- Generate new token in Access Tokens section
-- Set environment variable:
-```bash
-supabase login
-# Enter your access token
-```
-
-5. Initialize Supabase project:
-```bash
-# Run in project root directory
-supabase init
-```
-
-6. Start local development environment:
-```bash
-supabase start
-```
-
-7. Link to remote project:
-```bash
-supabase link --project-ref your-project-ref
-# project-ref can be found in Supabase project settings
-```
-
-8. Database migrations:
-```bash
-# Create new migration
-supabase migration new your_migration_name
-
-# Apply migrations
-supabase db push
-
-# Reset database
-supabase db reset
-```
-
-This project uses Supabase as the backend database and authentication service. To set up Supabase:
-
-1. Install Supabase client:
-```bash
-npm install @supabase/supabase-js
-```
-
-2. Import and use Supabase client in your components:
-```javascript
-import { supabase } from '@/lib/supabase'
-
-// Example query
-const { data, error } = await supabase
-  .from('your_table')
-  .select('*')
-```
-
-3. Available Database Tables:
-   - `users` - User profiles and authentication
-   - `projects` - Project information
-   - `tasks` - Task management
-   - `comments` - User comments and feedback
-
-For more information about using Supabase, check out the [Supabase documentation](https://supabase.com/docs).
-
-## Redux Setup
-
-This project uses Redux Toolkit for state management. To set up Redux:
-
-1. Install Redux Toolkit and React-Redux:
-```bash
-npm install @reduxjs/toolkit react-redux
-```
-
-2. Create a slice (example):
-```javascript
-import { createSlice } from '@reduxjs/toolkit'
-
-export const projectSlice = createSlice({
-  name: 'projects',
-  initialState: {
-    projects: [],
-    loading: false,
-  },
-  reducers: {
-    setProjects: (state, action) => {
-      state.projects = action.payload
-    },
-    setLoading: (state, action) => {
-      state.loading = action.payload
-    },
-  },
-})
-```
-
-3. Use Redux in components:
-```javascript
-import { useSelector, useDispatch } from 'react-redux'
-import { setProjects } from './projectSlice'
-
-// In your component
-const projects = useSelector((state) => state.projects.projects)
-const dispatch = useDispatch()
-
-// Update state
-dispatch(setProjects(newProjects))
-```
-
-For more information about Redux Toolkit, visit the [official documentation](https://redux-toolkit.js.org/).
-
-## Internationalization (i18n)
-
-This project uses `next-intl` for internationalization. Currently supported languages:
+Currently supported languages:
 - English (en)
 - Chinese (zh)
+- Malay (my)
 
-### Usage in Components
+## API Endpoints
 
-```javascript
-import { useTranslations } from 'next-intl';
+The application provides various API endpoints for:
+- User authentication and management
+- Project and task operations
+- Team management
+- Calendar events
+- Notifications
+- Activity tracking
+- Subscription handling
 
-export default function MyComponent() {
-  const t = useTranslations();
-  
-  return (
-    <div>
-      <h1>{t('projects.title')}</h1>
-      <button>{t('common.save')}</button>
-    </div>
-  );
-}
-```
+API routes are defined in the `app/api` directory.
 
-### Adding New Languages
+## Deployment
 
-1. Create a new JSON file in the `messages` directory (e.g., `messages/ja.json`)
-2. Add the locale to the supported locales list in `middleware.js`
-3. Add the locale to `generateStaticParams` in `app/[locale]/layout.js`
+The application can be deployed to various platforms:
 
-### Language Switching
-
-The `LanguageSwitcher` component is available to switch between languages:
-
-```javascript
-import LanguageSwitcher from '@/components/LanguageSwitcher';
-
-// Use in your layout or component
-<LanguageSwitcher />
-```
-
-## API Routes
-
-The project includes the following API endpoints:
-
-### Projects
-
+### Vercel
 ```bash
-GET /api/projects
-# Returns list of all projects
-
-POST /api/projects
-# Create a new project
-# Body: { title: string, description: string }
+vercel
 ```
 
-### Tasks
-
+### Netlify
 ```bash
-GET /api/tasks
-# Returns all tasks
-# Optional query param: ?projectId=123
-
-POST /api/tasks
-# Create a new task
-# Body: { title: string, description: string, project_id: number, status: string }
+netlify deploy
 ```
 
-Example usage with the API helper:
+## Contributing
 
-```javascript
-import { api } from '@/lib/api'
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-// Fetch projects
-const projects = await api.projects.list()
+## License
 
-// Create a new task
-const newTask = await api.tasks.create({
-  title: 'New Task',
-  description: 'Task description',
-  project_id: 1,
-  status: 'pending'
-})
-```
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Drag and Drop
+## Acknowledgments
 
-This project implements drag and drop functionality using [@hello-pangea/dnd](https://github.com/hello-pangea/dnd) (based on react-beautiful-dnd).
+- Next.js Team
+- Supabase Team
+- Tailwind CSS Team
+- All open-source libraries used in this project
 
-1. Install dependency:
-```bash
-npm install @hello-pangea/dnd
-```
-
-2. Usage in components:
-```javascript
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-
-function TaskList() {
-  const onDragEnd = (result) => {
-    // Handle logic after drag ends
-  };
-
-  return (
-    <DragDropContext onDragEnd={onDragEnd}>
-      <Droppable droppableId="tasks">
-        {(provided) => (
-          <div {...provided.droppableProps} ref={provided.innerRef}>
-            {/* Draggable items */}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
-    </DragDropContext>
-  );
-}
-```
-
-## Gantt Chart
-
-This project uses [DHTMLX Gantt](https://dhtmlx.com/docs/products/dhtmlxGantt/) for project timeline visualization.
-
-1. Install dependency:
-```bash
-npm install dhtmlx-gantt
-```
-
-2. Basic usage example:
-```javascript
-import { Gantt } from 'dhtmlx-gantt';
-
-function ProjectTimeline() {
-  useEffect(() => {
-    const tasks = [
-      {
-        id: 1,
-        text: 'Task 1',
-        start_date: '2024-03-01',
-        end_date: '2024-03-05',
-        progress: 0.2
-      }
-    ];
-
-    gantt.init("gantt");
-    gantt.parse({ data: tasks });
-  }, []);
-
-  return <div id="gantt" style={{ width: "100%", height: "500px" }}></div>;
-}
-```
-
-## Edge Functions Setup
-
-After setting up the Supabase CLI, follow these steps to work with Edge Functions:
-
-1. Create a new Edge Function:
-```bash
-supabase functions new my-function-name
-```
-
-2. Set required environment variables:
-```bash
-supabase secrets set SUPABASE_URL="你的supabase项目URL"
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY="你的service_role密钥"
-```
-
-3. Develop your function in `supabase/functions/my-function-name/index.ts`:
-```typescript
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
-serve(async (req) => {
-  const { name } = await req.json()
-  const data = { message: `Hello ${name}!` }
-  return new Response(JSON.stringify(data), {
-    headers: { 'Content-Type': 'application/json' },
-  })
-})
-```
-
-4. Test locally:
-```bash
-supabase functions serve my-function-name
-```
-
-5. Deploy your function:
-```bash
-supabase functions deploy my-function-name
-```
-
-6. Invoke the function in your code:
-```javascript
-const { data, error } = await supabase.functions.invoke('my-function-name', {
-  body: { name: 'world' }
-})
-```
-
-For more information about Edge Functions, visit the [Supabase Edge Functions documentation](https://supabase.com/docs/guides/functions).
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/baifan1366/project-management-system)

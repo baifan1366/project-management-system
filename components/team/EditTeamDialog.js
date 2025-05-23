@@ -46,6 +46,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [saving, setIsSaving] = useState(false);
   const [themeColor, setThemeColor] = useState('#000000');
+  const [projectName, setProjectName] = useState('');
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [membersError, setMembersError] = useState(null);
@@ -72,6 +73,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
   useEffect(() => {
     if (project?.theme_color) {
       setThemeColor(project.theme_color);
+      setProjectName(project.project_name);
     }
   }, [project]);
 
@@ -548,27 +550,29 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                   {isCurrentUserOwner() && (
                     <Button 
                       variant={themeColor} 
+                      size="icon"
                       onClick={
                         () => {
                           setShowInviteDialog(true);
                           onClose();
                         }
                       }
-                      className="flex items-center"
+                      className="items-center"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      {t('inviteMembers')}
+                      <Plus size={16} />
+                      {/* {t('inviteMembers')} */}
                     </Button>
                   )}
                 </div>
-                <div className="text-sm text-muted-foreground mb-5">
+                <div className="text-sm text-muted-foreground mb-4">
                   {isCurrentUserOwner() 
                     ? t('membersManagementDescription')
                     : t('membersViewDescription') || '查看团队成员列表。只有团队所有者可以管理成员权限。'}
+                  
                 </div>
                 
                 {/* 成员列表 */}
-                <div className="border rounded-md p-2 space-y-1 max-h-[300px] overflow-y-auto">
+                <div className="border rounded-md p-2 space-y-1 max-h-[200px] overflow-y-auto">
                   {renderMemberList()}
                 </div>
               </div>
@@ -601,9 +605,9 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                                 {teamAccess === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500" />}
                                 <span>
                                   {teamAccess === 'invite_only' && t('inviteOnly')}
-                                  {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}
-                                  {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}
-                                  {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project.project_name })}
+                                  {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName })}
+                                  {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName })}
+                                  {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })}
                                 </span>
                               </div>
                             </div>
@@ -628,7 +632,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                           <div className="flex items-center w-full">
                             <Pencil className="w-5 h-5 mr-3 text-gray-500" />
                             <div className="flex-1">
-                              <div className="font-medium">{t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}</div>
+                              <div className="font-medium">{t('everyoneAt{projectName}CanEdit', { projectName })}</div>
                               <div className="text-xs text-gray-500 mt-0.5">
                                 {t('everyoneCanEditDescription')}
                               </div>
@@ -639,7 +643,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                           <div className="flex items-center w-full">
                             <Eye className="w-5 h-5 mr-3 text-gray-500" />
                             <div className="flex-1">
-                              <div className="font-medium">{t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}</div>
+                              <div className="font-medium">{t('everyoneAt{projectName}CanCheck', { projectName })}</div>
                               <div className="text-xs text-gray-500 mt-0.5">
                                 {t('everyoneCanCheckDescription')}
                               </div>
@@ -650,7 +654,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                           <div className="flex items-center w-full">
                             <Unlock className="w-5 h-5 mr-3 text-gray-500" />
                             <div className="flex-1">
-                              <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName: project.project_name })}</div>
+                              <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName })}</div>
                               <div className="text-xs text-gray-500 mt-0.5">
                                 {t('everyoneCanViewDescription')}
                               </div>
@@ -668,9 +672,9 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                         {teamAccess === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
                         <span>
                           {teamAccess === 'invite_only' && t('inviteOnly')}
-                          {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}
-                          {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}
-                          {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project.project_name })}
+                          {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName })}
+                          {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName })}
+                          {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })}
                         </span>
                       </div>
                     </div>

@@ -9,10 +9,11 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useTranslations } from 'next-intl';
 import AddTaskDialog from './AddTaskDialog';
 import EditTaskDialog from './EditTaskDialog';
+import CreateSectionDialog from './CreateSectionDialog';
 import { Plus } from 'lucide-react';
 import { initZoom, setZoom as applyZoom, handleZoomChange as changeZoom } from './GanttTools';
 import { useConfirm } from '@/hooks/use-confirm';
-import { useGanttData, formatDateForGantt } from './BodyContent';  
+import { useGanttData, formatDateForGantt } from './BodyContent';
 import { updateTask, fetchTaskById, deleteTask } from '@/lib/redux/features/taskSlice';
 import { getTagByName } from '@/lib/redux/features/tagSlice';
 import { createTaskLink, deleteTaskLink } from '@/lib/redux/features/taskLinksSlice';
@@ -103,6 +104,8 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
   const [currentZoom, setCurrentZoom] = useState(zoom);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showCreateSection, setShowCreateSection] = useState(false);
+  const [shouldReopenTaskForm, setShouldReopenTaskForm] = useState(false);
   const [refreshFlag, setRefreshFlag] = useState(0);
   const [editTask, setEditTask] = useState({
     id: null,
@@ -111,7 +114,32 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     duration: 1,
     progress: 0
   });
+  
+  // 颜色名称到颜色代码的映射，与button.jsx中的颜色一致
+  const colorMap = {
+    red: '#c72c41',
+    orange: '#d76d2b',
+    green: '#008000',
+    blue: '#3b6dbf',
+    purple: '#5c4b8a',
+    pink: '#d83c5e',
+    black: '#000000',
+    white: '#ffffff',
+    lightGreen: '#bbf7d0',
+    lightYellow: '#fefcbf',
+    lightCoral: '#f08080',
+    lightOrange: '#ffedd5',
+    peach: '#ffcccb',
+    lightCyan: '#e0ffff',
+  };
+  
+  // 获取颜色代码，如果是已知的颜色名称则使用映射，否则直接返回原值
+  const getColorCode = (colorName) => {
+    return colorMap[colorName] || colorName;
+  };
+  
   const taskColor = project?.theme_color;
+  const taskColorCode = getColorCode(taskColor);
   
   // 初始化gantt对象，避免循环依赖
   const [ganttObj, setGanttObj] = useState(null);
@@ -308,7 +336,29 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     });
   };
 
-  // Toolbar component
+  // 修改setShowTaskForm处理函数，确保对话框互斥
+  const handleShowTaskForm = (show) => {
+    if (show) {
+      setShowCreateSection(false); // 如果打开任务表单，关闭创建部分对话框
+    }
+    setShowTaskForm(show);
+  };
+
+  // 修改setShowCreateSection处理函数，确保对话框互斥
+  const handleShowCreateSection = (show) => {
+    if (show) {
+      // 如果当前任务表单是打开的，记录这个状态，以便后续重新打开
+      setShouldReopenTaskForm(showTaskForm);
+      setShowTaskForm(false); // 如果打开创建部分对话框，关闭任务表单
+    } else if (shouldReopenTaskForm) {
+      // 如果关闭创建部分对话框，且之前有打开的任务表单，则重新打开任务表单
+      setShowTaskForm(true);
+      setShouldReopenTaskForm(false);
+    }
+    setShowCreateSection(show);
+  };
+  
+  // 修改Toolbar组件使用新的处理函数
   const Toolbar = () => {
     return (
       <div className="flex justify-between pl-1">
@@ -316,19 +366,13 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
           <h2 className="font-medium">{currentDate}</h2>
           <Button 
             variant="outline"
-            onClick={() => setShowTaskForm(true)}
+            onClick={() => handleShowTaskForm(true)}
             className="border-none ml-2 p-1"
           >
             <Plus size={16} />
           </Button>
         </div>
         <div className="flex justify-end gap-1 items-end py-1 pr-1">
-          <Button 
-            variant={currentZoom === 'Hours' ? taskColor : 'outline'}
-            onClick={() => handleZoomChange('Hours')}
-          >
-            {t('Hours')}
-          </Button>
           <Button 
             variant={currentZoom === 'Days' ? taskColor : 'outline'}
             onClick={() => handleZoomChange('Days')}
@@ -368,7 +412,24 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     // Configure gantt
     gantt.config.date_format = "%Y-%m-%d %H:%i";
     gantt.config.xml_date = "%Y-%m-%d %H:%i";
-    gantt.config.show_grid = false;
+    gantt.config.show_grid = true;
+    gantt.config.grid_width = 300;
+    gantt.config.grid_height = 200;
+    gantt.config.grid_cell_width = 40;
+    gantt.config.grid_cell_height = 20;
+    // gantt.exportToPDF();
+    
+    // 配置甘特图主题适配
+    gantt.config.scale_height = 60; // 适当调整高度，使周和日期显示更清晰
+    
+    // 自定义周和日期的背景和前景色
+    gantt.templates.scale_cell_class = function(date) {
+      return "custom-scale-cell";
+    };
+    
+    gantt.templates.timeline_cell_class = function(item, date) {
+      return "timeline-cell";
+    };
     
     // 配置链接类型 - 链接类型配置
     gantt.config.links = {
@@ -395,8 +456,13 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     // Customize task color
     gantt.templates.task_class = () => `custom-task-color`;
     
-    // Set task color CSS variable
-    document.documentElement.style.setProperty('--task-color', taskColor);
+    // 使用颜色代码而非颜色名称
+    gantt.templates.task_color = () => taskColorCode;
+    gantt.templates.progress_color = () => taskColorCode;
+    
+    // 设置链接颜色
+    gantt.templates.link_color = () => taskColorCode;
+    gantt.templates.link_arrow_color = () => taskColorCode;
     
     // Disable default lightbox
     gantt.config.lightbox.sections = [];
@@ -410,7 +476,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     
     // Override the default task addition
     gantt.attachEvent("onTaskCreated", function(task) {
-      setShowTaskForm(true);
+      handleShowTaskForm(true);
       return false; // Prevent default behavior
     });
 
@@ -425,6 +491,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
         progress: task.progress || 0
       });
       setShowEditForm(true);
+      handleShowCreateSection(false); // 确保关闭创建部分对话框
       return false; // Prevent default behavior
     });
 
@@ -474,10 +541,9 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     
     // Add toolbar functionality
     gantt.config.columns = [
-      {name: "text", label: "Task name", width: "*", tree: true},
-      {name: "start_date", label: "Start time", align: "center"},
-      {name: "duration", label: "Duration", align: "center"},
-      {name: "add", label: "", width: 44}
+      {name: "text", label: "Task", width: "*", tree: true},
+      {name: "start_date", label: "Start Date", align: "center"},
+      {name: "duration", label: "Duration", align: "center"}
     ];
     
     // 默认数据 - 仅在没有任务数据时使用
@@ -567,6 +633,12 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
   useEffect(() => {
     if (!ganttObj) return;
     
+    // 确保设置正确的任务颜色
+    ganttObj.templates.task_color = () => taskColorCode;
+    ganttObj.templates.progress_color = () => taskColorCode;
+    ganttObj.templates.link_color = () => taskColorCode;
+    ganttObj.templates.link_arrow_color = () => taskColorCode;
+    
     // 当任务数据或缩放级别更新时，更新Gantt图表
     if (ganttTasks.length > 0) {
       ganttObj.clearAll();
@@ -584,7 +656,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
       });
       setZoom(currentZoom);
     }
-  }, [ganttObj, ganttTasks, links, currentZoom, refreshKey]); 
+  }, [ganttObj, ganttTasks, links, currentZoom, refreshKey, taskColorCode]); 
 
   // 添加一个新函数用于更新数据库
   const updateTaskInDatabase = async (taskData) => {
@@ -629,20 +701,61 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     }
   };
 
+  // 在创建新部分后刷新部分列表
+  const handleSectionCreated = (newSection) => {
+    // 强制刷新数据
+    setRefreshFlag(prev => prev + 1);
+    // 在成功创建部分后关闭创建部分对话框
+    handleShowCreateSection(false);
+    // 可以在这里添加其他逻辑，如选择新创建的部分
+  };
+
   return (
     <div className={`w-full h-full overflow-hidden`}>
-      <style jsx>{`
-        :root {
-          --task-color: ${taskColor};
-        }
-      `}</style>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .gantt_task_line {
+            background-color: ${taskColorCode} !important;
+            border-color: ${taskColorCode} !important;
+          }
+          .gantt_task_progress {
+            background-color: ${taskColorCode} !important;
+          }
+          .gantt_link_arrow {
+            border-color: ${taskColorCode} !important;
+          }
+          .gantt_task_link .gantt_line_wrapper div {
+            background-color: ${taskColorCode} !important;
+          }
+          
+          /* 确保周和日期区域背景色与主题一致 */
+          .gantt_task_scale, 
+          .gantt_task_scale .gantt_scale_cell,
+          .gantt_scale_line {
+            background-color: hsl(var(--background)) !important;
+            color: hsl(var(--foreground)) !important;
+            border-color: hsl(var(--border)) !important;
+          }
+          
+          /* 确保日期单元格边框是透明的以避免出现白线 */
+          .gantt_scale_cell {
+            border-right: none !important;
+          }
+          
+          /* 周号单元格样式 */
+          .gantt_scale_cell:first-child {
+            font-weight: 600;
+          }
+        `
+      }} />
       <Toolbar />
       <AddTaskDialog
         teamId={teamId}
         taskColor={taskColor}
         showTaskForm={showTaskForm}
-        setShowTaskForm={setShowTaskForm}
+        setShowTaskForm={handleShowTaskForm}
         onTaskAdd={handleTaskAdd}
+        setShowCreateSection={handleShowCreateSection}
       />
       <EditTaskDialog
         taskColor={taskColor}
@@ -652,6 +765,14 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
         setEditTask={setEditTask}
         handleUpdateTask={handleUpdateTask}
         handleDeleteTask={handleDeleteTask}
+        teamId={teamId}
+      />
+      <CreateSectionDialog
+        taskColor={taskColor}
+        teamId={teamId}
+        showCreateSection={showCreateSection}
+        setShowCreateSection={handleShowCreateSection}
+        onSectionCreated={handleSectionCreated}
       />
       <div 
         ref={ganttContainer}
