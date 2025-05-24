@@ -90,27 +90,46 @@ export default function PaymentSuccess() {
   // 更新用户订阅计划
   const updateUserSubscription = async (userId, planId) => {
     try {
-      console.log('Updating user subscription:', { userId, planId });
-      
       // Get current date for start_date
       const startDate = new Date().toISOString();
       
-      // Calculate end_date based on plan details
+      // Get plan details
       const { data: planData, error: planError } = await supabase
         .from('subscription_plan')
-        .select('billing_interval')
+        .select('billing_interval, type')
         .eq('id', planId)
         .single();
       
       if (planError) throw planError;
       
       // Calculate end date based on billing interval
-      const endDate = new Date();
-      if (planData.billing_interval === 'MONTHLY') {
-        endDate.setMonth(endDate.getMonth() + 1);
-      } else if (planData.billing_interval === 'YEARLY') {
-        endDate.setFullYear(endDate.getFullYear() + 1);
+      let endDate = null;
+      if (planData.type !== 'FREE') {  // 只有非免费计划才设置结束日期
+        endDate = new Date();
+        if (planData.billing_interval === 'MONTHLY') {
+          endDate.setMonth(endDate.getMonth() + 1);
+        } else if (planData.billing_interval === 'YEARLY') {
+          endDate.setFullYear(endDate.getFullYear() + 1);
+        }
+        endDate = endDate.toISOString();
       }
+      
+      // Update subscription
+      const updateData = {
+        user_id: userId,
+        plan_id: planId,
+        status: 'ACTIVE',
+        start_date: startDate,
+        end_date: endDate,  // 可以为 null
+        current_projects: 0,
+        current_teams: 0,
+        current_members: 0,
+        current_ai_chat: 0,
+        current_ai_task: 0,
+        current_ai_workflow: 0,
+        current_storage: 0,
+        updated_at: new Date().toISOString()
+      };
       
       // First, check if a record already exists
       const { data: existingData, error: checkError } = await supabase
@@ -128,50 +147,22 @@ export default function PaymentSuccess() {
         // Update existing record
         result = await supabase
           .from('user_subscription_plan')
-          .update({ 
-            plan_id: planId,
-            status: 'ACTIVE',
-            start_date: startDate,
-            end_date: endDate.toISOString(),
-            current_projects: 0,
-            current_teams: 0,
-            current_members: 0,
-            current_ai_chat: 0,
-            current_ai_task: 0,
-            current_ai_workflow: 0,
-            current_storage: 0,
-            updated_at: now
-          })
+          .update(updateData)
           .eq('user_id', userId);
       } else {
         // Insert new record
         result = await supabase
           .from('user_subscription_plan')
-          .insert({ 
-            user_id: userId,
-            plan_id: planId,
-            status: 'ACTIVE',
-            start_date: startDate,
-            end_date: endDate.toISOString(),
-            current_projects: 0,
-            current_teams: 0,
-            current_members: 0,
-            current_ai_chat: 0,
-            current_ai_task: 0,
-            current_ai_workflow: 0,
-            current_storage: 0,
-            created_at: now,
-            updated_at: now
-          });
+          .insert(updateData);
       }
       
       if (result.error) throw result.error;
       
       console.log('User subscription updated successfully');
       return true;
-    } catch (err) {
-      console.error('Error updating user subscription:', err);
-      return false;
+    } catch (error) {
+      console.error('Error updating subscription:', error);
+      throw error;
     }
   };
 

@@ -169,8 +169,17 @@ export default function PricingPage() {
     </div>
   }
 
-  // 根据选择的时间间隔获取当前计划
-  const currentPlans = plans[selectedInterval] || []
+  // 修改获取当前计划的逻辑
+  const currentPlans = plans[selectedInterval] || [];
+
+  // 创建一个新数组进行排序，而不是直接修改 currentPlans
+  const sortedPlans = [...currentPlans].sort((a, b) => {
+    // 确保 FREE 计划始终在最前面
+    if (a.type === 'FREE') return -1;
+    if (b.type === 'FREE') return 1;
+    // 其他计划按价格排序
+    return a.price - b.price;
+  });
 
   return (
     <div className="container mx-auto px-4 py-16">
@@ -218,7 +227,7 @@ export default function PricingPage() {
 
       {/* 计划网格 */}
       <div className="grid md:grid-cols-3 gap-8">
-        {currentPlans.map((plan) => (
+        {sortedPlans.map((plan) => (
           <div 
             key={plan.id}
             className="transform transition-all duration-300 hover:scale-105 cursor-pointer"
@@ -234,7 +243,7 @@ export default function PricingPage() {
                 <div className="text-4xl font-bold mb-6">
                   ${plan.price}
                   <span className="text-lg text-gray-500">
-                    /{selectedInterval === 'monthly' ? 'mo' : 'yr'}
+                    {plan.type === 'FREE' ? '' : `/${selectedInterval === 'monthly' ? 'mo' : 'yr'}`}
                   </span>
                 </div>
                 

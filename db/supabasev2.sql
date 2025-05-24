@@ -428,7 +428,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
     "name" VARCHAR(50) NOT NULL,
     "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
     "price" DECIMAL(10, 2) NOT NULL,
-    "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
+    "billing_interval" TEXT CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY') OR "billing_interval" IS NULL),
     "description" TEXT,
     "features" JSONB NOT NULL, -- 存储计划包含的功能列表
     "max_projects" INT NOT NULL, -- 最大项目数

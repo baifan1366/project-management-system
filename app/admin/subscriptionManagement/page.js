@@ -2006,14 +2006,13 @@ export default function AdminSubscriptions() {
                     <select
                       id='add-billing'
                       name='billing_interval'
-                      required
                       value={planBilling}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                       onChange={(e) => setPlanBilling(e.target.value)}
                     >
-                      <option value=''>Select billing interval</option>
+                      <option value=''>None (Free Plan)</option>
                       <option value='MONTHLY'>Monthly</option>
                       <option value='YEARLY'>Yearly</option>
                     </select>
