@@ -8,6 +8,7 @@ import { clsx } from 'clsx';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns'; // 用于格式化时间
 
 export default function AdminSubscriptions() {
   const router = useRouter();
@@ -69,6 +70,20 @@ export default function AdminSubscriptions() {
   const [isCodeToDelete, setIsCodeToDelete] = useState(null);
   const [planMaxTeams, setPlanMaxTeams] = useState('0');
   const [isPlanToDelete, setIsPlanToDelete] = useState(null);
+  const [subscriptionStats, setSubscriptionStats] = useState({
+    distribution: {
+      FREE: { count: 0, percentage: 0 },
+      PRO: { count: 0, percentage: 0 },
+      ENTERPRISE: { count: 0, percentage: 0 }
+    },
+    stats: {
+      totalActive: 0,
+      totalRevenue: 0,
+      monthly: 0,
+      yearly: 0
+    },
+    recentActivity: []
+  });
   
   // initialize the page
   useEffect(() => {
@@ -777,6 +792,132 @@ export default function AdminSubscriptions() {
     }
   };
 
+  // 获取订阅分布数据
+  const fetchSubscriptionDistribution = async () => {
+    try {
+      const { data: subscriptions, error } = await supabase
+        .from('user_subscription_plan')
+        .select(`
+          id,
+          plan:subscription_plan (
+            type
+          )
+        `)
+        .eq('status', 'ACTIVE');
+
+      if (error) throw error;
+
+      const distribution = {
+        FREE: { count: 0, percentage: 0 },
+        PRO: { count: 0, percentage: 0 },
+        ENTERPRISE: { count: 0, percentage: 0 }
+      };
+
+      // 计算每种类型的数量
+      subscriptions.forEach(sub => {
+        const planType = sub.plan?.type || 'FREE';
+        distribution[planType].count++;
+      });
+
+      // 计算百分比
+      const total = subscriptions.length;
+      Object.keys(distribution).forEach(type => {
+        distribution[type].percentage = (distribution[type].count / total * 100).toFixed(1);
+      });
+
+      return distribution;
+    } catch (error) {
+      console.error('Error fetching subscription distribution:', error);
+      return null;
+    }
+  };
+
+  // 获取订阅统计数据
+  const fetchSubscriptionStats = async () => {
+    try {
+      // 获取活跃订阅数量
+      const { data: activeSubscriptions, error: activeError } = await supabase
+        .from('user_subscription_plan')
+        .select('id, plan:subscription_plan(billing_interval)')
+        .eq('status', 'ACTIVE');
+
+      if (activeError) throw activeError;
+
+      // 获取支付总额
+      const { data: payments, error: paymentsError } = await supabase
+        .from('payment')
+        .select('amount')
+        .eq('status', 'COMPLETED');
+
+      if (paymentsError) throw paymentsError;
+
+      // 计算统计数据
+      const stats = {
+        totalActive: activeSubscriptions.length,
+        totalRevenue: payments.reduce((sum, payment) => sum + payment.amount, 0),
+        monthly: activeSubscriptions.filter(sub => sub.plan?.billing_interval === 'MONTHLY').length,
+        yearly: activeSubscriptions.filter(sub => sub.plan?.billing_interval === 'YEARLY').length
+      };
+
+      return stats;
+    } catch (error) {
+      console.error('Error fetching subscription stats:', error);
+      return null;
+    }
+  };
+
+  // 获取最近活动
+  const fetchRecentActivity = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('payment')
+        .select(`
+          id,
+          created_at,
+          amount,
+          status,
+          user:user_id (name, email),
+          plan:metadata->planId (name, type)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+
+      return data.map(activity => ({
+        id: activity.id,
+        type: activity.status === 'COMPLETED' ? 'payment' : 'cancellation',
+        userName: activity.user?.name || activity.user?.email || 'Unknown User',
+        planName: activity.plan?.name || 'Unknown Plan',
+        amount: activity.amount,
+        timestamp: activity.created_at
+      }));
+    } catch (error) {
+      console.error('Error fetching recent activity:', error);
+      return [];
+    }
+  };
+
+  // 更新所有统计数据
+  const updateSubscriptionAnalytics = async () => {
+    const [distribution, stats, activity] = await Promise.all([
+      fetchSubscriptionDistribution(),
+      fetchSubscriptionStats(),
+      fetchRecentActivity()
+    ]);
+
+    setSubscriptionStats({
+      distribution: distribution || subscriptionStats.distribution,
+      stats: stats || subscriptionStats.stats,
+      recentActivity: activity || subscriptionStats.recentActivity
+    });
+  };
+
+  // 在组件加载和数据更新时获取统计数据
+  useEffect(() => {
+    updateSubscriptionAnalytics();
+  }, [userSubscriptions]); // 当订阅列表更新时重新获取统计数据
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -1313,7 +1454,8 @@ export default function AdminSubscriptions() {
                               onClick={() => openSubscriptionDetailsModal(subscription)}
                             >
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
+                                <div className="flex items-center gap-2">
+                                  {/* //TODO: CHANGE TO AVATAR */}
                                   <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
                                     {(subscription.user?.name?.charAt(0) || subscription.user?.email?.charAt(0) || '?').toUpperCase()}
                                   </div>
@@ -1547,105 +1689,61 @@ export default function AdminSubscriptions() {
               
               {/* Subscription Analytics */}
               <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Distribution Card */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                  <h4 className="text-base font-medium text-gray-800 dark:text-white mb-4">Subscription Distribution</h4>
+                  <h4 className="text-base font-medium text-gray-800 dark:text-white mb-4">
+                    Subscription Distribution
+                  </h4>
                   <div className="flex flex-col space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Free</span>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">45%</span>
+                    {Object.entries(subscriptionStats.distribution).map(([type, data]) => (
+                      <div key={type}>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">{type}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">{data.percentage}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full ${
+                              type === 'FREE' ? 'bg-gray-500' :
+                              type === 'PRO' ? 'bg-blue-500' : 'bg-purple-500'
+                            }`} 
+                            style={{ width: `${data.percentage}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div className="bg-gray-500 dark:bg-gray-500 h-2 rounded-full" style={{ width: '45%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Pro</span>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">35%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div className="bg-blue-500 dark:bg-blue-500 h-2 rounded-full" style={{ width: '35%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Enterprise</span>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">20%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div className="bg-purple-500 dark:bg-purple-500 h-2 rounded-full" style={{ width: '20%' }}></div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
-                
+
+                {/* Stats Card */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                  <h4 className="text-base font-medium text-gray-800 dark:text-white mb-4">Subscription Stats</h4>
+                  <h4 className="text-base font-medium text-gray-800 dark:text-white mb-4">
+                    Subscription Stats
+                  </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Total Active</p>
-                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">243</p>
+                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">
+                        {subscriptionStats.stats.totalActive}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Total Revenue</p>
-                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">$12,540</p>
+                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">
+                        ${subscriptionStats.stats.totalRevenue.toLocaleString()}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Monthly</p>
-                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">167</p>
+                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">
+                        {subscriptionStats.stats.monthly}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Yearly</p>
-                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">76</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                  <h4 className="text-base font-medium text-gray-800 dark:text-white mb-4">Recent Activity</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-start">
-                      <div className="flex-shrink-0">
-                        <span className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                          <span className="text-green-600 dark:text-green-400">
-                            <FaCheck className="h-4 w-4" />
-                          </span>
-                        </span>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">New subscription</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Alice Smith upgraded to Enterprise</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">2 hours ago</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start">
-                      <div className="flex-shrink-0">
-                        <span className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
-                          <span className="text-red-600 dark:text-red-400">
-                            <FaTimes className="h-4 w-4" />
-                          </span>
-                        </span>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">Subscription canceled</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Bob Johnson canceled Pro plan</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">5 hours ago</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start">
-                      <div className="flex-shrink-0">
-                        <span className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                          <span className="text-blue-600 dark:text-blue-400">
-                            <FaMoneyBillWave className="h-4 w-4" />
-                          </span>
-                        </span>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">Payment processed</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">John Doe renewed Pro plan</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">1 day ago</p>
-                      </div>
+                      <p className="text-2xl font-semibold text-gray-800 dark:text-white">
+                        {subscriptionStats.stats.yearly}
+                      </p>
                     </div>
                   </div>
                 </div>
