@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import clsx from 'clsx'
 import useGetUser from '@/lib/hooks/useGetUser'
+import { toast } from 'sonner'
 
 export default function PricingPage() {
   const t = useTranslations('Pricing')
@@ -65,8 +66,35 @@ export default function PricingPage() {
           return;
         }
         
-        console.log('用户已登录，重定向到支付页面');
-        // 只传递必要的参数：plan_id 和 user_id
+        // 新增: 检查是否是免费计划
+        if (plan.price === 0) {
+          try {
+            // 直接更新用户订阅
+            const { data, error } = await supabase
+              .from('user_subscription_plan')
+              .upsert({
+                user_id: user.id,
+                plan_id: plan.id,
+                status: 'ACTIVE',
+                start_date: new Date().toISOString(),
+                end_date: null, // 免费计划通常没有结束日期
+              });
+
+            if (error) throw error;
+            
+            // 显示成功消息
+            toast.success('Successfully switched to new plan');
+            // 重定向到仪表板
+            router.push(`/${locale}/dashboard`);
+            return;
+          } catch (err) {
+            console.error('Error updating subscription:', err);
+            toast.error('Failed to switch plan. Please try again.');
+            return;
+          }
+        }
+        
+        // 如果不是免费计划，继续原有的支付流程
         const paymentParams = new URLSearchParams({
           plan_id: plan.id.toString(),
           user_id: user.id
@@ -81,13 +109,8 @@ export default function PricingPage() {
         router.push(`/${locale}/login?${loginParams}`);
       }
     } catch (err) {
-      console.error('检查认证状态时出错:', err);
-      // 出错时默认跳转到登录页面
-      const loginParams = new URLSearchParams({
-        plan_id: plan.id.toString(),
-        redirect: 'payment'
-      }).toString();
-      router.push(`/${locale}/login?${loginParams}`);
+      console.error('Error handling plan selection:', err);
+      toast.error('An error occurred. Please try again.');
     }
   }
 
@@ -243,7 +266,7 @@ export default function PricingPage() {
                 <div className="text-4xl font-bold mb-6">
                   ${plan.price}
                   <span className="text-lg text-gray-500">
-                    {plan.type === 'FREE' ? '' : `/${selectedInterval === 'monthly' ? 'mo' : 'yr'}`}
+                    {plan.billing_interval ? `/${selectedInterval === 'monthly' ? 'mo' : 'yr'}` : ''}
                   </span>
                 </div>
                 

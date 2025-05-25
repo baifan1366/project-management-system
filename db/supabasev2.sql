@@ -450,15 +450,15 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
     "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
     "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
     "start_date" TIMESTAMP NOT NULL,
-    "end_date" TIMESTAMP NOT NULL,
+    "end_date" TIMESTAMP,
     -- 使用统计
-    "current_projects" INT DEFAULT 0,
-    "current_teams" INT DEFAULT 0,
-    "current_members" INT DEFAULT 0,
-    "current_ai_chat" INT DEFAULT 0,
-    "current_ai_task" INT DEFAULT 0,
-    "current_ai_workflow" INT DEFAULT 0,
-    "current_storage" INT DEFAULT 0,
+    "current_projects" INT DEFAULT 0 NULL,
+    "current_teams" INT DEFAULT 0 NULL,
+    "current_members" INT DEFAULT 0 NULL,
+    "current_ai_chat" INT DEFAULT 0 NULL,
+    "current_ai_task" INT DEFAULT 0 NULL,
+    "current_ai_workflow" INT DEFAULT 0 NULL,
+    "current_storage" INT DEFAULT 0 NULL,
     -- 时间戳
     "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
