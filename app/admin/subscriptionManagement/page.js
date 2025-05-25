@@ -1273,7 +1273,10 @@ export default function AdminSubscriptions() {
                             User
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                            Plan
+                            Plan Name
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Plan Type
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Date Range
@@ -1325,12 +1328,17 @@ export default function AdminSubscriptions() {
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white">
+                                  {subscription.plan?.name || 'Unknown'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                   ${subscription.plan?.type === 'FREE' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : 
                                     subscription.plan?.type === 'PRO' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
                                     'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}
                                 >
-                                  {subscription.plan?.name || subscription.plan?.type || 'Unknown'}
+                                  {subscription.plan?.type || 'Unknown'}
                                 </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -1339,109 +1347,99 @@ export default function AdminSubscriptions() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_projects} / {subscription.plan?.max_projects === -1 ? '∞' : subscription.plan?.max_projects}
+                                    {subscription.current_projects} / {subscription.plan?.max_projects === 0 || subscription.plan?.max_projects === -1 ? '∞' : subscription.plan?.max_projects}
                                   </span>
-                                  {subscription.plan?.max_projects !== -1 && (
-                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                      <div 
-                                        className={`h-2 rounded-full ${
-                                          subscription.current_projects / subscription.plan?.max_projects > 0.8 
-                                            ? 'bg-red-500' 
-                                            : subscription.current_projects / subscription.plan?.max_projects > 0.5 
-                                            ? 'bg-yellow-500' 
-                                            : 'bg-green-500'
-                                        }`} 
-                                        style={{ width: `${Math.min(100, (subscription.current_projects / subscription.plan?.max_projects * 100))}%` }}
-                                      />
-                                    </div>
-                                  )}
+                                  <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div 
+                                      className={`h-2 rounded-full ${
+                                        subscription.current_projects / subscription.plan?.max_projects > 0.8 
+                                          ? 'bg-red-500' 
+                                          : subscription.current_projects / subscription.plan?.max_projects > 0.5 
+                                          ? 'bg-yellow-500' 
+                                          : 'bg-green-500'
+                                      }`} 
+                                      style={{ width: subscription.plan?.max_projects === 0 || subscription.plan?.max_projects === -1 ? '0%' : `${Math.min(100, (subscription.current_projects / subscription.plan?.max_projects * 100))}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_members} / {subscription.plan?.max_members === -1 ? '∞' : subscription.plan?.max_members}
+                                    {subscription.current_members} / {subscription.plan?.max_members === 0 || subscription.plan?.max_members === -1 ? '∞' : subscription.plan?.max_members}
                                   </span>
-                                  {subscription.plan?.max_members !== -1 && (
-                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                      <div 
-                                        className={`h-2 rounded-full ${
-                                          subscription.current_members / subscription.plan?.max_members > 0.8 
-                                            ? 'bg-red-500' 
-                                            : subscription.current_members / subscription.plan?.max_members > 0.5 
-                                            ? 'bg-yellow-500' 
-                                            : 'bg-green-500'
-                                        }`} 
-                                        style={{ width: `${Math.min(100, (subscription.current_members / subscription.plan?.max_members * 100))}%` }}
-                                      />
-                                    </div>
-                                  )}
+                                  <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div 
+                                      className={`h-2 rounded-full ${
+                                        subscription.current_members / subscription.plan?.max_members > 0.8 
+                                          ? 'bg-red-500' 
+                                          : subscription.current_members / subscription.plan?.max_members > 0.5 
+                                          ? 'bg-yellow-500' 
+                                          : 'bg-green-500'
+                                      }`} 
+                                      style={{ width: subscription.plan?.max_members === 0 || subscription.plan?.max_members === -1 ? '0%' : `${Math.min(100, (subscription.current_members / subscription.plan?.max_members * 100))}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </td>
                               {/* AI Chat Usage */}
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_ai_chat || 0} / {subscription.plan?.max_ai_chat === -1 ? '∞' : subscription.plan?.max_ai_chat}
+                                    {subscription.current_ai_chat || 0} / {subscription.plan?.max_ai_chat === 0 || subscription.plan?.max_ai_chat === -1 ? '∞' : subscription.plan?.max_ai_chat}
                                   </span>
-                                  {subscription.plan?.max_ai_chat !== -1 && (
-                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                      <div 
-                                        className={`h-2 rounded-full ${
-                                          (subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat > 0.8 
-                                            ? 'bg-red-500' 
-                                            : (subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat > 0.5 
-                                            ? 'bg-yellow-500' 
-                                            : 'bg-green-500'
-                                        }`} 
-                                        style={{ width: `${Math.min(100, ((subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat * 100))}%` }}
-                                      />
-                                    </div>
-                                  )}
+                                  <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div 
+                                      className={`h-2 rounded-full ${
+                                        (subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat > 0.8 
+                                          ? 'bg-red-500' 
+                                          : (subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat > 0.5 
+                                          ? 'bg-yellow-500' 
+                                          : 'bg-green-500'
+                                      }`} 
+                                      style={{ width: subscription.plan?.max_ai_chat === 0 || subscription.plan?.max_ai_chat === -1 ? '0%' : `${Math.min(100, ((subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat * 100))}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </td>
                               {/* AI Task Usage */}
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_ai_task || 0} / {subscription.plan?.max_ai_task === -1 ? '∞' : subscription.plan?.max_ai_task}
+                                    {subscription.current_ai_task || 0} / {subscription.plan?.max_ai_task === 0 || subscription.plan?.max_ai_task === -1 ? '∞' : subscription.plan?.max_ai_task}
                                   </span>
-                                  {subscription.plan?.max_ai_task !== -1 && (
-                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                      <div 
-                                        className={`h-2 rounded-full ${
-                                          (subscription.current_ai_task || 0) / subscription.plan?.max_ai_task > 0.8 
-                                            ? 'bg-red-500' 
-                                            : (subscription.current_ai_task || 0) / subscription.plan?.max_ai_task > 0.5 
-                                            ? 'bg-yellow-500' 
-                                            : 'bg-green-500'
-                                        }`} 
-                                        style={{ width: `${Math.min(100, ((subscription.current_ai_task || 0) / subscription.plan?.max_ai_task * 100))}%` }}
-                                      />
-                                    </div>
-                                  )}
+                                  <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div 
+                                      className={`h-2 rounded-full ${
+                                        (subscription.current_ai_task || 0) / subscription.plan?.max_ai_task > 0.8 
+                                          ? 'bg-red-500' 
+                                          : (subscription.current_ai_task || 0) / subscription.plan?.max_ai_task > 0.5 
+                                          ? 'bg-yellow-500' 
+                                          : 'bg-green-500'
+                                      }`} 
+                                      style={{ width: subscription.plan?.max_ai_task === 0 || subscription.plan?.max_ai_task === -1 ? '0%' : `${Math.min(100, ((subscription.current_ai_task || 0) / subscription.plan?.max_ai_task * 100))}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </td>
                               {/* AI Workflow Usage */}
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_ai_workflow || 0} / {subscription.plan?.max_ai_workflow === -1 ? '∞' : subscription.plan?.max_ai_workflow}
+                                    {subscription.current_ai_workflow || 0} / {subscription.plan?.max_ai_workflow === 0 || subscription.plan?.max_ai_workflow === -1 ? '∞' : subscription.plan?.max_ai_workflow}
                                   </span>
-                                  {subscription.plan?.max_ai_workflow !== -1 && (
-                                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                      <div 
-                                        className={`h-2 rounded-full ${
-                                          (subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow > 0.8 
-                                            ? 'bg-red-500' 
-                                            : (subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow > 0.5 
-                                            ? 'bg-yellow-500' 
-                                            : 'bg-green-500'
-                                        }`} 
-                                        style={{ width: `${Math.min(100, ((subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow * 100))}%` }}
-                                      />
-                                    </div>
-                                  )}
+                                  <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div 
+                                      className={`h-2 rounded-full ${
+                                        (subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow > 0.8 
+                                          ? 'bg-red-500' 
+                                          : (subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow > 0.5 
+                                          ? 'bg-yellow-500' 
+                                          : 'bg-green-500'
+                                      }`} 
+                                      style={{ width: subscription.plan?.max_ai_workflow === 0 || subscription.plan?.max_ai_workflow === -1 ? '0%' : `${Math.min(100, ((subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow * 100))}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -3386,14 +3384,22 @@ export default function AdminSubscriptions() {
                 <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Subscription Information</h3>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Plan</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Plan Name</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {selectedSubscriptionDetails.plan?.name || 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Plan Type</p>
                     <div className="flex items-center space-x-2 mt-1">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
                         ${selectedSubscriptionDetails.plan?.type === 'FREE' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : 
                           selectedSubscriptionDetails.plan?.type === 'PRO' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
                           'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}
                       >
-                        {selectedSubscriptionDetails.plan?.name || selectedSubscriptionDetails.plan?.type || 'Unknown'}
+                        {selectedSubscriptionDetails.plan?.type || 'Unknown'}
                       </span>
                     </div>
                   </div>
@@ -3477,23 +3483,21 @@ export default function AdminSubscriptions() {
                     <div className="flex justify-between mb-1">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {selectedSubscriptionDetails.current_projects} / {selectedSubscriptionDetails.plan?.max_projects === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_projects}
+                        {selectedSubscriptionDetails.current_projects} / {selectedSubscriptionDetails.plan?.max_projects === 0 || selectedSubscriptionDetails.plan?.max_projects === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_projects}
                       </p>
                     </div>
-                    {selectedSubscriptionDetails.plan?.max_projects !== -1 && (
-                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
-                        <div 
-                          className={`h-2.5 rounded-full ${
-                            selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.8 
-                              ? 'bg-red-500' 
-                              : selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.5 
-                              ? 'bg-yellow-500' 
-                              : 'bg-green-500'
-                          }`} 
-                          style={{ width: `${Math.min(100, (selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects * 100))}%` }}
-                        ></div>
-                      </div>
-                    )}
+                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                      <div 
+                        className={`h-2.5 rounded-full ${
+                          selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.8 
+                            ? 'bg-red-500' 
+                            : selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects > 0.5 
+                            ? 'bg-yellow-500' 
+                            : 'bg-green-500'
+                        }`} 
+                        style={{ width: selectedSubscriptionDetails.plan?.max_projects === 0 || selectedSubscriptionDetails.plan?.max_projects === -1 ? '0%' : `${Math.min(100, (selectedSubscriptionDetails.current_projects / selectedSubscriptionDetails.plan?.max_projects * 100))}%` }}
+                      ></div>
+                    </div>
                   </div>
                   
                   {/* Members Usage */}
@@ -3501,23 +3505,21 @@ export default function AdminSubscriptions() {
                     <div className="flex justify-between mb-1">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Team Members</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {selectedSubscriptionDetails.current_members} / {selectedSubscriptionDetails.plan?.max_members === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_members}
+                        {selectedSubscriptionDetails.current_members} / {selectedSubscriptionDetails.plan?.max_members === 0 || selectedSubscriptionDetails.plan?.max_members === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_members}
                       </p>
                     </div>
-                    {selectedSubscriptionDetails.plan?.max_members !== -1 && (
-                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
-                        <div 
-                          className={`h-2.5 rounded-full ${
-                            selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.8 
-                              ? 'bg-red-500' 
-                              : selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.5 
-                              ? 'bg-yellow-500' 
-                              : 'bg-green-500'
-                          }`} 
-                          style={{ width: `${Math.min(100, (selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members * 100))}%` }}
-                        ></div>
-                      </div>
-                    )}
+                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                      <div 
+                        className={`h-2.5 rounded-full ${
+                          selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.8 
+                            ? 'bg-red-500' 
+                            : selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members > 0.5 
+                            ? 'bg-yellow-500' 
+                            : 'bg-green-500'
+                        }`} 
+                        style={{ width: selectedSubscriptionDetails.plan?.max_members === 0 || selectedSubscriptionDetails.plan?.max_members === -1 ? '0%' : `${Math.min(100, (selectedSubscriptionDetails.current_members / selectedSubscriptionDetails.plan?.max_members * 100))}%` }}
+                      ></div>
+                    </div>
                   </div>
                   
                   {/* AI Chat Usage */}
@@ -3525,71 +3527,65 @@ export default function AdminSubscriptions() {
                     <div className="flex justify-between mb-1">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Chat</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {selectedSubscriptionDetails.current_ai_chat || 0} / {selectedSubscriptionDetails.plan?.max_ai_chat === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_chat}
+                        {selectedSubscriptionDetails.current_ai_chat || 0} / {selectedSubscriptionDetails.plan?.max_ai_chat === 0 || selectedSubscriptionDetails.plan?.max_ai_chat === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_chat}
                       </p>
                     </div>
-                    {selectedSubscriptionDetails.plan?.max_ai_chat !== -1 && (
-                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
-                        <div 
-                          className={`h-2.5 rounded-full ${
-                            (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.8 
-                              ? 'bg-red-500' 
-                              : (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.5 
-                              ? 'bg-yellow-500' 
-                              : 'bg-green-500'
-                          }`} 
-                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat * 100))}%` }}
-                        ></div>
-                      </div>
-                    )}
+                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                      <div 
+                        className={`h-2.5 rounded-full ${
+                          (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.8 
+                            ? 'bg-red-500' 
+                            : (selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat > 0.5 
+                            ? 'bg-yellow-500' 
+                            : 'bg-green-500'
+                        }`} 
+                        style={{ width: selectedSubscriptionDetails.plan?.max_ai_chat === 0 || selectedSubscriptionDetails.plan?.max_ai_chat === -1 ? '0%' : `${Math.min(100, ((selectedSubscriptionDetails.current_ai_chat || 0) / selectedSubscriptionDetails.plan?.max_ai_chat * 100))}%` }}
+                      ></div>
+                    </div>
                   </div>
-                  
+
                   {/* AI Task Usage */}
                   <div>
                     <div className="flex justify-between mb-1">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Tasks</p>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Task</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {selectedSubscriptionDetails.current_ai_task || 0} / {selectedSubscriptionDetails.plan?.max_ai_task === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_task}
+                        {selectedSubscriptionDetails.current_ai_task || 0} / {selectedSubscriptionDetails.plan?.max_ai_task === 0 || selectedSubscriptionDetails.plan?.max_ai_task === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_task}
                       </p>
                     </div>
-                    {selectedSubscriptionDetails.plan?.max_ai_task !== -1 && (
-                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
-                        <div 
-                          className={`h-2.5 rounded-full ${
-                            (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.8 
-                              ? 'bg-red-500' 
-                              : (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.5 
-                              ? 'bg-yellow-500' 
-                              : 'bg-green-500'
-                          }`} 
-                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task * 100))}%` }}
-                        ></div>
-                      </div>
-                    )}
+                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                      <div 
+                        className={`h-2.5 rounded-full ${
+                          (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.8 
+                            ? 'bg-red-500' 
+                            : (selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task > 0.5 
+                            ? 'bg-yellow-500' 
+                            : 'bg-green-500'
+                        }`} 
+                        style={{ width: selectedSubscriptionDetails.plan?.max_ai_task === 0 || selectedSubscriptionDetails.plan?.max_ai_task === -1 ? '0%' : `${Math.min(100, ((selectedSubscriptionDetails.current_ai_task || 0) / selectedSubscriptionDetails.plan?.max_ai_task * 100))}%` }}
+                      ></div>
+                    </div>
                   </div>
-                  
+
                   {/* AI Workflow Usage */}
                   <div>
                     <div className="flex justify-between mb-1">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Workflows</p>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Workflow</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {selectedSubscriptionDetails.current_ai_workflow || 0} / {selectedSubscriptionDetails.plan?.max_ai_workflow === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_workflow}
+                        {selectedSubscriptionDetails.current_ai_workflow || 0} / {selectedSubscriptionDetails.plan?.max_ai_workflow === 0 || selectedSubscriptionDetails.plan?.max_ai_workflow === -1 ? '∞' : selectedSubscriptionDetails.plan?.max_ai_workflow}
                       </p>
                     </div>
-                    {selectedSubscriptionDetails.plan?.max_ai_workflow !== -1 && (
-                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
-                        <div 
-                          className={`h-2.5 rounded-full ${
-                            (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.8 
-                              ? 'bg-red-500' 
-                              : (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.5 
-                              ? 'bg-yellow-500' 
-                              : 'bg-green-500'
-                          }`} 
-                          style={{ width: `${Math.min(100, ((selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow * 100))}%` }}
-                        ></div>
-                      </div>
-                    )}
+                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                      <div 
+                        className={`h-2.5 rounded-full ${
+                          (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.8 
+                            ? 'bg-red-500' 
+                            : (selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow > 0.5 
+                            ? 'bg-yellow-500' 
+                            : 'bg-green-500'
+                        }`} 
+                        style={{ width: selectedSubscriptionDetails.plan?.max_ai_workflow === 0 || selectedSubscriptionDetails.plan?.max_ai_workflow === -1 ? '0%' : `${Math.min(100, ((selectedSubscriptionDetails.current_ai_workflow || 0) / selectedSubscriptionDetails.plan?.max_ai_workflow * 100))}%` }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               </div>
