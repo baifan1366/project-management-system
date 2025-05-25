@@ -38,6 +38,7 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
     in_progress: [],
     done: []
   });
+  const [nameTagId, setNameTagId] = useState(null);
   
   // 从Redux获取状态
   const { 
@@ -50,97 +51,261 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
     tagsStatus
   } = useSelector(state => state.agiles);
   
-  // 获取当前选中的冲刺详情
+  // 修改获取agile详情的useEffect
   useEffect(() => {
-    if (selectedAgile?.id && (!selectedAgileDetail || selectedAgileDetail.id !== selectedAgile.id)) {
-      dispatch(fetchSelectedTeamAgileById(selectedAgile.id));
+    // 从URL参数或props中获取teamId和type
+    const searchParams = new URLSearchParams(window.location.search);
+    const teamId = searchParams.get('teamId') || sprint?.team_id;
+    const type = searchParams.get('type');
+    
+    console.log("URL参数:", { teamId, type });
+    console.log("当前sprint:", sprint);
+    
+    if (teamId) {
+      // 如果有teamId，优先获取对应团队的agile
+      if ((!selectedAgile || selectedAgile.team_id !== Number(teamId))) {
+        console.log("尝试获取团队agile:", teamId);
+        // 使用teamId获取agile
+        dispatch({ 
+          type: 'agiles/setSelectedAgile', 
+          payload: { 
+            id: sprint?.id, 
+            team_id: Number(teamId) 
+          } 
+        });
+        
+        if (sprint?.id) {
+          dispatch(fetchSelectedTeamAgileById(sprint.id));
+        }
+      }
     }
-  }, [selectedAgile, selectedAgileDetail, dispatch]);
+  }, [sprint, dispatch, selectedAgile]);
   
-  // 获取所有标签
+  // 首先修改获取所有标签的逻辑，确保标签已加载
   useEffect(() => {
-    if (tagsStatus === 'idle') {
+    console.log("检查标签状态:", { tagsStatus, allTags });
+    
+    // 始终尝试加载标签数据
+    if ((!allTags || allTags.length === 0) && tagsStatus !== 'loading') {
+      console.log("主动获取所有标签");
       dispatch(fetchAllTags());
     }
-  }, [tagsStatus, dispatch]);
+  }, [allTags, tagsStatus, dispatch]);
   
-  // 根据task_ids获取任务详情
+  // 新增：当标签列表加载完成后，找到Name标签的ID
   useEffect(() => {
-    if (selectedAgileDetail?.task_ids && Object.keys(selectedAgileDetail.task_ids).length > 0) {
-      // 将task_ids从对象转换为数组
-      const taskIdsObj = selectedAgileDetail.task_ids;
+    if (allTags && allTags.length > 0) {
+      console.log("标签获取成功，总数:", allTags.length);
+      
+      // 打印所有标签便于调试
+      allTags.forEach(tag => {
+        console.log(`标签ID: ${tag.id}, 名称: ${tag.name}`);
+      });
+      
+      // 查找名称为"Name"或"名称"的标签
+      const nameTag = allTags.find(tag => 
+        tag && (tag.name === 'Name' || tag.name === '名称')
+      );
+      
+      if (nameTag) {
+        console.log("找到Name标签，ID:", nameTag.id, "名称:", nameTag.name);
+        setNameTagId(nameTag.id);
+      } else {
+        // 尝试寻找名称中包含"name"的标签
+        const nameRelatedTag = allTags.find(tag => 
+          tag && tag.name && tag.name.toLowerCase().includes('name')
+        );
+        
+        if (nameRelatedTag) {
+          console.log("找到名称相关标签:", nameRelatedTag.name, "ID:", nameRelatedTag.id);
+          setNameTagId(nameRelatedTag.id);
+        } else {
+          console.log("未找到任何名称相关标签");
+        }
+      }
+    }
+  }, [allTags]);
+  
+  // 修改获取任务ID的逻辑，使其在sprint和selectedAgileDetail都可用时工作
+  useEffect(() => {
+    // 优先从sprint对象获取task_ids
+    const taskIdsObj = sprint?.task_ids || selectedAgileDetail?.task_ids;
+    
+    if (taskIdsObj && Object.keys(taskIdsObj).length > 0) {
+      console.log("使用任务ID对象:", taskIdsObj);
       const allTaskIds = [];
       
-      // 提取所有状态下的任务ID
-      Object.keys(taskIdsObj).forEach(status => {
+      // 处理三种可能的状态
+      const statusKeys = ['To Do', 'In Progress', 'Done'];
+      
+      statusKeys.forEach(status => {
         if (taskIdsObj[status]) {
-          // 处理任务ID字符串，可能的格式："173, 174, 175"
-          const idsArray = taskIdsObj[status].split(',').map(id => id.trim());
-          allTaskIds.push(...idsArray);
+          try {
+            // 处理任务ID字符串，兼容多种格式："173, 174, 175" 或 ["173", "174", "175"]
+            let idsArray = [];
+            if (typeof taskIdsObj[status] === 'string') {
+              idsArray = taskIdsObj[status].split(',').map(id => id.trim());
+            } else if (Array.isArray(taskIdsObj[status])) {
+              idsArray = taskIdsObj[status].map(id => id.toString().trim());
+            }
+            console.log(`${status}状态下的任务ID:`, idsArray);
+            allTaskIds.push(...idsArray);
+          } catch (error) {
+            console.error(`解析${status}任务ID出错:`, error);
+          }
         }
       });
       
+      // 去重并过滤空值
+      const uniqueTaskIds = [...new Set(allTaskIds)].filter(id => id && id !== '');
+      
+      console.log("获取到的所有任务ID:", uniqueTaskIds);
+      
       // 获取每个任务的详情
-      allTaskIds.forEach(taskId => {
+      uniqueTaskIds.forEach(taskId => {
         if (taskId && !sprintTasks.some(task => task.id === Number(taskId))) {
+          console.log("获取任务详情:", taskId);
           dispatch(fetchTaskById(taskId));
         }
       });
     }
-  }, [selectedAgileDetail, sprintTasks, dispatch]);
+  }, [sprint, selectedAgileDetail, sprintTasks, dispatch]);
   
   // 获取任务名称
   const getTaskName = (task) => {
-    if (!task || !task.tag_values || !allTags || allTags.length === 0) {
-      return task?.title || '未命名任务';
+    if (!task) return '未命名任务';
+    
+    console.log(`获取任务${task.id}名称`);
+    
+    // 检查是否有标签数据
+    if (!allTags || !Array.isArray(allTags) || allTags.length === 0) {
+      console.log(`标签数据不可用，使用任务标题: ${task.title}`);
+      return task.title || '未命名任务';
     }
     
-    // 查找名称标签ID
-    const nameTag = allTags.find(tag => tag.name === 'Name' || tag.name === '名称');
-    if (!nameTag) return task.title || '未命名任务';
-    
-    // 获取任务名称
-    const nameValue = task.tag_values[nameTag.id];
-    if (nameValue) {
-      return nameValue;
+    // 检查任务是否有tag_values
+    if (!task.tag_values) {
+      console.log(`任务 ${task.id} 没有tag_values，使用标题: ${task.title}`);
+      return task.title || '未命名任务';
     }
     
-    return task.title || '未命名任务';
+    console.log(`任务 ${task.id} 的tag_values:`, task.tag_values);
+    
+    try {
+      // 查找名为"Name"或"名称"的标签
+      const nameTag = allTags.find(tag => 
+        tag && (tag.name === 'Name' || tag.name === '名称')
+      );
+      
+      if (nameTag && nameTag.id && task.tag_values[nameTag.id]) {
+        const nameValue = task.tag_values[nameTag.id];
+        console.log(`使用标签 "${nameTag.name}" (ID: ${nameTag.id}) 找到任务名称: ${nameValue}`);
+        return nameValue;
+      }
+      
+      // 查找名称中包含"name"的任何标签
+      for (let tag of allTags) {
+        if (tag && tag.name && tag.name.toLowerCase().includes('name')) {
+          if (task.tag_values[tag.id]) {
+            const nameValue = task.tag_values[tag.id];
+            console.log(`使用匹配标签 "${tag.name}" (ID: ${tag.id}) 找到任务名称: ${nameValue}`);
+            return nameValue;
+          }
+        }
+      }
+      
+      // 直接查找tag_values中的值
+      for (const tagId in task.tag_values) {
+        const value = task.tag_values[tagId];
+        if (value && typeof value === 'string') {
+          const tag = allTags.find(t => t && t.id && t.id.toString() === tagId.toString());
+          const tagName = tag ? tag.name : '未知标签';
+          console.log(`使用标签 "${tagName}" (ID: ${tagId}) 的值: ${value}`);
+          return value;
+        }
+      }
+      
+      console.log(`无法从tag_values中找到有效名称，使用标题: ${task.title}`);
+      return task.title || '未命名任务';
+    } catch (error) {
+      console.error(`获取任务 ${task.id} 名称时发生错误:`, error);
+      return task.title || '未命名任务';
+    }
   };
   
-  // 任务处理
+  // 修改按状态分类任务的逻辑
   useEffect(() => {
-    if (sprintTasks.length > 0 && selectedAgileDetail?.task_ids) {
-      const taskIds = selectedAgileDetail.task_ids;
+    // 优先从sprint对象获取task_ids
+    const taskIds = sprint?.task_ids || selectedAgileDetail?.task_ids;
+    
+    if (taskIds) {
+      console.log("当前Sprint任务:", sprintTasks);
+      console.log("任务ID对象:", taskIds);
+      
       const newTasksByStatus = {
         todo: [],
         in_progress: [],
         done: []
       };
       
+      // 解析任务ID的通用函数
+      const parseTaskIds = (idString) => {
+        try {
+          if (typeof idString === 'string') {
+            return idString.split(',').map(id => Number(id.trim()));
+          } else if (Array.isArray(idString)) {
+            return idString.map(id => Number(id.toString().trim()));
+          }
+          return [];
+        } catch (e) {
+          console.error("解析任务ID出错:", e);
+          return [];
+        }
+      };
+      
       // 对于每个状态，找到对应的任务
       if (taskIds['To Do']) {
-        const todoIds = taskIds['To Do'].split(',').map(id => Number(id.trim()));
+        const todoIds = parseTaskIds(taskIds['To Do']);
+        console.log("待处理任务IDs:", todoIds);
         newTasksByStatus.todo = sprintTasks.filter(task => todoIds.includes(task.id));
       }
       
       if (taskIds['In Progress']) {
-        const inProgressIds = taskIds['In Progress'].split(',').map(id => Number(id.trim()));
+        const inProgressIds = parseTaskIds(taskIds['In Progress']);
+        console.log("进行中任务IDs:", inProgressIds);
         newTasksByStatus.in_progress = sprintTasks.filter(task => inProgressIds.includes(task.id));
       }
       
       if (taskIds['Done']) {
-        const doneIds = taskIds['Done'].split(',').map(id => Number(id.trim()));
+        const doneIds = parseTaskIds(taskIds['Done']);
+        console.log("已完成任务IDs:", doneIds);
         newTasksByStatus.done = sprintTasks.filter(task => doneIds.includes(task.id));
       }
       
+      console.log("分类后的任务:", newTasksByStatus);
       setTasksByStatus(newTasksByStatus);
     }
-  }, [sprintTasks, selectedAgileDetail]);
+  }, [sprintTasks, selectedAgileDetail, sprint]);
   
-  // 更新任务状态
+  // 在componentDidMount处添加数据检查
+  useEffect(() => {
+    // 组件挂载时检查关键数据
+    console.log("SprintBoard已挂载，sprint:", sprint);
+    console.log("Redux状态:", { 
+      selectedAgile, 
+      selectedAgileDetail, 
+      selectedAgileDetailStatus, 
+      sprintTasks, 
+      sprintTasksStatus,
+      allTags,
+      tagsStatus
+    });
+  }, []);
+  
+  // 修改任务状态更新逻辑
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
+      console.log(`尝试更新任务${taskId}状态为${newStatus}`);
       setLoading(true);
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
@@ -152,23 +317,54 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
         }),
       });
       
-      if (!response.ok) throw new Error('更新任务状态失败');
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("API错误:", errorData);
+        throw new Error('更新任务状态失败');
+      }
+      
+      const updatedTask = await response.json();
+      console.log("API返回的更新后任务:", updatedTask);
       
       // 更新本地状态
-      const updatedTask = sprintTasks.find(t => t.id === taskId);
-      if (updatedTask) {
-        const updatedTasks = sprintTasks.map(t => 
-          t.id === taskId ? { ...t, status: newStatus } : t
-        );
+      const updatedTasks = sprintTasks.map(t => 
+        t.id === taskId ? { ...t, status: newStatus } : t
+      );
+      
+      console.log("更新后的任务列表:", updatedTasks);
+      
+      // 从原列表中移除任务
+      const prevStatus = tasksByStatus.todo.find(t => t.id === taskId) 
+        ? 'todo' 
+        : tasksByStatus.in_progress.find(t => t.id === taskId)
+          ? 'in_progress'
+          : 'done';
+      
+      console.log(`任务${taskId}从${prevStatus}移动到${newStatus}`);
+      
+      // 创建新的任务状态分类
+      const newTasksByStatus = {
+        todo: tasksByStatus.todo.filter(t => t.id !== taskId),
+        in_progress: tasksByStatus.in_progress.filter(t => t.id !== taskId),
+        done: tasksByStatus.done.filter(t => t.id !== taskId)
+      };
+      
+      // 将任务添加到新状态
+      const taskToUpdate = sprintTasks.find(t => t.id === taskId);
+      if (taskToUpdate) {
+        const updatedTaskObj = { ...taskToUpdate, status: newStatus };
         
-        const newTasksByStatus = {
-          todo: updatedTasks.filter(task => task.status === 'todo'),
-          in_progress: updatedTasks.filter(task => task.status === 'in_progress'),
-          done: updatedTasks.filter(task => task.status === 'done')
-        };
-        
-        setTasksByStatus(newTasksByStatus);
+        if (newStatus === 'todo') {
+          newTasksByStatus.todo.push(updatedTaskObj);
+        } else if (newStatus === 'in_progress') {
+          newTasksByStatus.in_progress.push(updatedTaskObj);
+        } else if (newStatus === 'done') {
+          newTasksByStatus.done.push(updatedTaskObj);
+        }
       }
+      
+      console.log("更新后的任务状态分类:", newTasksByStatus);
+      setTasksByStatus(newTasksByStatus);
       
       toast.success(t('taskStatusUpdated'));
     } catch (error) {
@@ -178,6 +374,40 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
       setLoading(false);
     }
   };
+  
+  // 监听sprintTasks变化并更新页面
+  useEffect(() => {
+    console.log("sprintTasks更新:", sprintTasks);
+    if (sprintTasks.length > 0) {
+      // 检查有没有新任务需要加入到tasksByStatus中
+      const currentTaskIds = [
+        ...tasksByStatus.todo.map(t => t.id),
+        ...tasksByStatus.in_progress.map(t => t.id),
+        ...tasksByStatus.done.map(t => t.id)
+      ];
+      
+      const newTasks = sprintTasks.filter(task => !currentTaskIds.includes(task.id));
+      
+      if (newTasks.length > 0) {
+        console.log("发现新任务:", newTasks);
+        
+        // 将新任务加入到对应的状态分组
+        const updatedTasksByStatus = { ...tasksByStatus };
+        
+        newTasks.forEach(task => {
+          if (task.status === 'todo') {
+            updatedTasksByStatus.todo.push(task);
+          } else if (task.status === 'in_progress') {
+            updatedTasksByStatus.in_progress.push(task);
+          } else if (task.status === 'done') {
+            updatedTasksByStatus.done.push(task);
+          }
+        });
+        
+        setTasksByStatus(updatedTasksByStatus);
+      }
+    }
+  }, [sprintTasks]);
   
   // 更新任务分配
   const updateTaskAssignee = async (taskId, userId) => {
@@ -238,89 +468,105 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
   
   // 渲染任务卡片
   const renderTaskCard = (task) => {
-    const memberInfo = getMemberInfo(task.assignee);
-    const taskName = getTaskName(task);
+    if (!task) {
+      console.error("尝试渲染无效任务");
+      return null;
+    }
     
-    return (
-      <div key={task.id} className="p-3 mb-2 bg-white rounded-md shadow-sm border">
-        <div className="font-medium">{taskName}</div>
-        
-        <div className="flex items-center justify-between mt-2">
-          <Badge className={`${priorityColor(task.priority)} text-xs`}>
-            {task.priority || '无优先级'}
-          </Badge>
+    try {
+      const memberInfo = getMemberInfo(task.assignee);
+      const taskName = getTaskName(task);
+      
+      console.log("渲染任务卡片:", task.id, "名称:", taskName);
+      
+      return (
+        <div key={task.id} className="p-3 mb-2 bg-white rounded-md shadow-sm border">
+          <div className="font-medium">{taskName}</div>
           
-          <div className="flex items-center text-xs text-gray-500">
-            <Clock className="w-3 h-3 mr-1" />
-            <span>{task.estimate || '-'}</span>
-          </div>
-        </div>
-        
-        <div className="mt-2">
-          <div className="text-sm text-gray-600">
-            {task.description?.length > 80 
-              ? `${task.description.substring(0, 80)}...` 
-              : task.description}
-          </div>
-          
-          <div className="mt-2 flex justify-between items-center">
-            <Select 
-              value={task.assignee || 'none'} 
-              onValueChange={(value) => updateTaskAssignee(task.id, value)}
-              disabled={loading}
-            >
-              <SelectTrigger className="w-full h-8 text-xs">
-                <SelectValue placeholder={t('assignTo')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t('unassigned')}</SelectItem>
-                {agileMembers.map(member => (
-                  <SelectItem key={member.user_id || member.id} value={member.user_id || member.id}>
-                    {member.name || member.user_id || member.id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center justify-between mt-2">
+            <Badge className={`${priorityColor(task.priority)} text-xs`}>
+              {task.priority || '无优先级'}
+            </Badge>
             
-            {memberInfo && (
-              <Avatar className="w-6 h-6">
-                <AvatarImage src={memberInfo.avatar} />
-                <AvatarFallback>{memberInfo.name?.charAt(0) || 'U'}</AvatarFallback>
-              </Avatar>
+            <div className="flex items-center text-xs text-gray-500">
+              <Clock className="w-3 h-3 mr-1" />
+              <span>{task.estimate || '-'}</span>
+            </div>
+          </div>
+          
+          <div className="mt-2">
+            <div className="text-sm text-gray-600">
+              {task.description?.length > 80 
+                ? `${task.description.substring(0, 80)}...` 
+                : task.description || '无描述'}
+            </div>
+            
+            <div className="mt-2 flex justify-between items-center">
+              <Select 
+                value={task.assignee || 'none'} 
+                onValueChange={(value) => updateTaskAssignee(task.id, value)}
+                disabled={loading}
+              >
+                <SelectTrigger className="w-full h-8 text-xs">
+                  <SelectValue placeholder={t('assignTo')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t('unassigned')}</SelectItem>
+                  {agileMembers.map(member => (
+                    <SelectItem key={member.user_id || member.id} value={member.user_id || member.id}>
+                      {member.name || member.user_id || member.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {memberInfo && (
+                <Avatar className="w-6 h-6">
+                  <AvatarImage src={memberInfo.avatar} />
+                  <AvatarFallback>{memberInfo.name?.charAt(0) || 'U'}</AvatarFallback>
+                </Avatar>
+              )}
+            </div>
+          </div>
+          
+          {/* 状态操作按钮 */}
+          <div className="mt-3 flex justify-end space-x-2">
+            {task.status === 'todo' && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-xs" 
+                onClick={() => updateTaskStatus(task.id, 'in_progress')}
+                disabled={loading}
+              >
+                <ArrowRight className="w-3 h-3 mr-1" />
+                {t('moveToProgress')}
+              </Button>
+            )}
+            
+            {task.status === 'in_progress' && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-xs" 
+                onClick={() => updateTaskStatus(task.id, 'done')}
+                disabled={loading}
+              >
+                <CheckCircle className="w-3 h-3 mr-1" />
+                {t('markAsDone')}
+              </Button>
             )}
           </div>
         </div>
-        
-        {/* 状态操作按钮 */}
-        <div className="mt-3 flex justify-end space-x-2">
-          {task.status === 'todo' && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="text-xs" 
-              onClick={() => updateTaskStatus(task.id, 'in_progress')}
-              disabled={loading}
-            >
-              <ArrowRight className="w-3 h-3 mr-1" />
-              {t('moveToProgress')}
-            </Button>
-          )}
-          
-          {task.status === 'in_progress' && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="text-xs" 
-              onClick={() => updateTaskStatus(task.id, 'done')}
-              disabled={loading}
-            >
-              <CheckCircle className="w-3 h-3 mr-1" />
-              {t('markAsDone')}
-            </Button>
-          )}
+      );
+    } catch (error) {
+      console.error("渲染任务卡片错误:", task?.id, error);
+      return (
+        <div className="p-3 mb-2 bg-red-50 rounded-md shadow-sm border border-red-200">
+          <div className="font-medium text-red-700">任务渲染错误 ID: {task?.id}</div>
         </div>
-      </div>
-    );
+      );
+    }
   };
 
   // 加载状态显示
@@ -334,7 +580,6 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
       <CardHeader>
         <CardTitle>
           {t('sprintBoard')}
-          {selectedAgile && ` - ${selectedAgile.name}`}
         </CardTitle>
       </CardHeader>
       

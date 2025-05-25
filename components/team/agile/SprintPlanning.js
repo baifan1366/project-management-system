@@ -27,7 +27,7 @@ import {
   DialogHeader, 
   DialogTitle 
 } from '@/components/ui/dialog';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,7 @@ import SprintRetrospective from './SprintRetrospective';
 import { Card } from '@/components/ui/card';
 import { useDispatch } from 'react-redux';
 import { fetchAgileRoleById, fetchAgileMembers } from '@/lib/redux/features/agileSlice';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 const SprintPlanning = ({ 
   teamId, 
@@ -54,6 +55,47 @@ const SprintPlanning = ({
 }) => {
     const t = useTranslations('Agile');
     const dispatch = useDispatch();
+    
+  // 辅助函数 - 解析日期
+  const parseDateSafely = (dateString) => {
+    if (!dateString) return null;
+    
+    try {
+      // 尝试将其解析为ISO格式
+      if (typeof dateString === 'string' && dateString.includes('T')) {
+        return parseISO(dateString);
+      }
+      
+      // 尝试处理 "2025-05-24 14:55:10" 这种格式
+      if (typeof dateString === 'string' && dateString.includes(' ')) {
+        // 替换空格为T以便parseISO正确处理
+        return parseISO(dateString.replace(' ', 'T'));
+      }
+      
+      // 处理其他情况
+      return new Date(dateString);
+    } catch (e) {
+      console.error('日期解析错误:', dateString, e);
+      return null;
+    }
+  };
+  
+  // 辅助函数 - 格式化日期
+  const formatDateSafely = (dateValue, formatStr = 'yyyy-MM-dd') => {
+    if (!dateValue) return '-';
+    
+    try {
+      const dateObj = parseDateSafely(dateValue);
+      if (!dateObj || isNaN(dateObj.getTime())) {
+        throw new Error('无效日期');
+      }
+      return format(dateObj, formatStr);
+    } catch (e) {
+      console.error('日期格式化错误:', dateValue, e);
+      return typeof dateValue === 'string' ? dateValue : '-';
+    }
+  };
+
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [backlogTasks, setBacklogTasks] = useState([]);
   const [sprintTasks, setSprintTasks] = useState([]);
@@ -61,19 +103,19 @@ const SprintPlanning = ({
   const [selectedType, setSelectedType] = useState('PENDING');
   const [loading, setLoading] = useState(true);
   const [isSprintInfoExpanded, setIsSprintInfoExpanded] = useState(false);
-  
+  const {user} = useGetUser();
   // 新冲刺表单状态
   const [newSprint, setNewSprint] = useState({
     name: '',
     startDate: null,
     endDate: null,
     duration: '2', // 默认2周
-    goal: ''
+    goal: '',
+    created_by: user?.id
   });
 
   // 根据类型过滤冲刺
   const filteredSprints = sprints.filter(sprint => {
-    console.log("过滤sprint:", sprint, "selectedType:", selectedType);
     if (selectedType === 'PENDING') return sprint.status === 'PENDING';
     if (selectedType === 'PLANNING') return sprint.status === 'PLANNING';
     if (selectedType === 'RETROSPECTIVE') return sprint.status === 'RETROSPECTIVE';
@@ -194,7 +236,6 @@ const SprintPlanning = ({
       setSprintTasks(mockSprintTasks);
       
       // 获取该冲刺的成员数据
-      console.log(`选中冲刺 ${selectedSprint.id}，获取成员数据`);
       dispatch(fetchAgileMembers(selectedSprint.id));
     } else {
       setSprintTasks([]);
@@ -203,26 +244,21 @@ const SprintPlanning = ({
 
   // 自动选中当前类型下的第一个冲刺
   useEffect(() => {
-    console.log('筛选后的sprints变化:', filteredSprints);
     if (
       filteredSprints.length > 0 &&
       (!selectedSprint || !filteredSprints.some(s => s.id === selectedSprint?.id))
     ) {
-      console.log('自动选择第一个冲刺:', filteredSprints[0]);
       setSelectedSprint(filteredSprints[0]);
     } else if (filteredSprints.length === 0) {
-      console.log('没有筛选后的sprints，设置selectedSprint为null');
       setSelectedSprint(null);
     }
   }, [selectedType, filteredSprints]);
 
   // 设置默认选择当前冲刺或最新的冲刺
   useEffect(() => {
-    console.log('sprints或currentSprint变化:', sprints, currentSprint);
     
     if (currentSprint) {
       // 总是优先选择当前冲刺
-      console.log('选择currentSprint:', currentSprint);
       setSelectedSprint(currentSprint);
       setSelectedType(currentSprint.status); // 自动切换到对应的类型标签
     } else if (sprints.length > 0 && !selectedSprint) {
@@ -231,7 +267,6 @@ const SprintPlanning = ({
       // 首先尝试选择PENDING状态的冲刺
       const pendingSprints = sprints.filter(s => s.status === 'PENDING');
       if (pendingSprints.length > 0) {
-        console.log('选择PENDING状态冲刺:', pendingSprints[0]);
         setSelectedSprint(pendingSprints[0]);
         setSelectedType('PENDING');
         return;
@@ -240,14 +275,12 @@ const SprintPlanning = ({
       // 其次尝试选择PLANNING状态的冲刺
       const planningSprints = sprints.filter(s => s.status === 'PLANNING');
       if (planningSprints.length > 0) {
-        console.log('选择PLANNING状态冲刺:', planningSprints[0]);
         setSelectedSprint(planningSprints[0]);
         setSelectedType('PLANNING');
         return;
       }
       
       // 最后选择任意可用的冲刺
-      console.log('选择第一个可用冲刺:', sprints[0]);
       setSelectedSprint(sprints[0]);
       setSelectedType(sprints[0].status);
     }
@@ -256,11 +289,55 @@ const SprintPlanning = ({
   // 计算冲刺结束日期
   const calculateEndDate = (startDate, duration) => {
     if (!startDate) return null;
-    const start = new Date(startDate);
-    const durationInDays = parseInt(duration) * 7; // 将周转换为天数
-    const end = new Date(start);
-    end.setDate(end.getDate() + durationInDays);
-    return end;
+    
+    try {
+      let dateObj;
+      
+      // 如果是字符串类型的日期
+      if (typeof startDate === 'string') {
+        // 处理 "2025-05-24 14:55:10" 格式
+        if (startDate.includes(' ')) {
+          const datePart = startDate.split(' ')[0];
+          dateObj = new Date(datePart);
+        } 
+        // 处理 "2025-05-05T16:00:00" 格式
+        else if (startDate.includes('T')) {
+          dateObj = new Date(startDate);
+        } 
+        // 处理其他字符串格式
+        else {
+          dateObj = new Date(startDate);
+        }
+      } 
+      // 如果是日期对象
+      else if (startDate instanceof Date) {
+        dateObj = new Date(startDate);
+      } 
+      // 其他情况
+      else {
+        console.error('无效的日期格式:', startDate);
+        return null;
+      }
+      
+      // 检查日期是否有效
+      if (isNaN(dateObj.getTime())) {
+        console.error('无效的日期:', startDate);
+        return null;
+      }
+      
+      console.log('有效的日期对象:', dateObj);
+      const durationInDays = parseInt(duration) * 7; // 将周转换为天数
+      console.log('持续天数:', durationInDays);
+      
+      dateObj.setDate(dateObj.getDate() + durationInDays);
+      console.log('计算后的结束日期:', dateObj);
+      console.log('=== calculateEndDate 调试结束 ===');
+      return dateObj;
+    } catch (e) {
+      console.error('计算结束日期时出错:', e);
+      console.log('=== calculateEndDate 调试结束(出错) ===');
+      return null;
+    }
   };
 
   // 处理创建新冲刺
@@ -269,22 +346,53 @@ const SprintPlanning = ({
       return;
     }
     
+    // 确保获取到所有必要参数
+    if (!user?.id) {
+      console.error('创建冲刺失败: 无法获取用户ID');
+      return;
+    }
+    
+    if (!teamId) {
+      console.error('创建冲刺失败: 无法获取团队ID');
+      return;
+    }
+    
     const sprintData = {
       ...newSprint,
-      endDate: calculateEndDate(newSprint.startDate, newSprint.duration)
+      team_id: teamId,
+      project_id: projectId,
+      created_by: user.id, // 确保始终传递用户ID
+      endDate: calculateEndDate(newSprint.startDate, newSprint.duration),
+      status: 'PLANNING', // 设置初始状态
+      task_ids: [] // 初始没有任务
     };
     
-    const createdSprint = onCreateSprint(sprintData);
-    if (createdSprint) {
-      setCreateDialogOpen(false);
-      // 重置表单
-      setNewSprint({
-        name: '',
-        startDate: null,
-        endDate: null,
-        duration: '2',
-        goal: ''
-      });
+    
+    try {
+      const createdSprint = onCreateSprint(sprintData);
+      
+      if (createdSprint) {
+        setCreateDialogOpen(false);
+        // 重置表单
+        setNewSprint({
+          name: '',
+          startDate: null,
+          endDate: null,
+          duration: '2',
+          goal: '',
+          created_by: user?.id
+        });
+        
+        // 显示成功消息
+        
+        // 短暂延迟后刷新页面
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
+      }
+    } catch (error) {
+      console.error('创建冲刺失败:', error);
+      // 可以在这里添加错误处理，如显示错误消息
     }
   };
 
@@ -415,7 +523,6 @@ const SprintPlanning = ({
         !agileRoles.some(role => role && role.id && roleId && role.id.toString() === roleId.toString())
       );
       
-      console.log('需要获取详情的角色IDs:', missingRoleIds);
       
       // 为缺失的角色ID获取详细信息
       missingRoleIds.forEach(roleId => {
@@ -428,7 +535,6 @@ const SprintPlanning = ({
 
   // 自定义成员更新处理函数
   const handleUpdateMembers = () => {
-    console.log('【SprintPlanning】刷新成员信息');
     if (selectedSprint && selectedSprint.id && typeof onUpdateMembers === 'function') {
       onUpdateMembers(selectedSprint.id);
     }
@@ -467,13 +573,16 @@ const SprintPlanning = ({
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {newSprint.startDate ? 
                     (() => {
-                      try {
-                        return format(newSprint.startDate, "yyyy-MM-dd")
-                      } catch(e) {
-                        console.error("Invalid startDate format:", e);
-                        return t('selectDate');
+                      const dateValue = newSprint.startDate;
+                      if (typeof dateValue === 'string') {
+                        if (dateValue.includes(' ')) {
+                          return dateValue.split(' ')[0];
+                        } else if (dateValue.includes('T')) {
+                          return dateValue.split('T')[0];
+                        }
                       }
-                    })() 
+                      return dateValue;
+                    })()
                     : t('selectDate')}
                 </Button>
               </PopoverTrigger>
@@ -518,15 +627,21 @@ const SprintPlanning = ({
             <div className="space-y-2">
               <Label>{t('endDate')}</Label>
               <Input 
-                value={(() => {
-                  try {
+                value={newSprint.startDate && newSprint.duration ? 
+                  (() => {
                     const endDate = calculateEndDate(newSprint.startDate, newSprint.duration);
-                    return endDate ? format(endDate, "yyyy-MM-dd") : "";
-                  } catch(e) {
-                    console.error("Error calculating end date:", e);
-                    return "";
-                  }
-                })()} 
+                    if (typeof endDate === 'string') {
+                      // 如果包含空格，取前面部分
+                      if (endDate.includes(' ')) {
+                        return endDate.split(' ')[0];
+                      }
+                      // 如果包含T，取前面部分
+                      if (endDate.includes('T')) {
+                        return endDate.split('T')[0];
+                      }
+                    }
+                    return endDate;
+                  })() : ""} 
                 readOnly 
               />
             </div>
@@ -560,41 +675,66 @@ const SprintPlanning = ({
 
   // 渲染基于当前选择和状态的内容
   const renderContent = () => {
-    console.log('renderContent - selectedSprint:', selectedSprint, 'sprints:', sprints, 'filteredSprints:', filteredSprints);
-    
     // 处理没有选中sprint的情况
     if (!selectedSprint) {
-      console.log('没有选中的Sprint，sprints长度:', sprints.length);
       return (
         <div className="text-center p-8">
-          {loading ? (
-            <div>{t('loading')}</div>
-          ) : sprints.length === 0 ? (
+          {sprints.length === 0 ? (
             // 如果没有任何Sprint，显示创建Sprint按钮
             <div>
               <p className="mb-4">{t('noSprintsFound')}</p>
-              <Button 
-                onClick={() => setCreateDialogOpen(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                {t('createFirstSprint')}
-              </Button>
             </div>
           ) : (
             // 如果有Sprint但没有选中，可能是因为筛选条件
             <div>
-              <p className="mb-4">{t('noSprintsMatchFilter')}</p>
-              <Button 
-                onClick={() => setCreateDialogOpen(true)}
-                className="mt-4"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                {t('createSprint')}
-              </Button>
+              <p className="mb-4">{t('noSprintsFound')}</p>
             </div>
           )}
         </div>
       );
+    }
+
+    // 调试日期格式
+    if (selectedSprint.startDate) {
+      console.log('--- 日期调试信息 ---');
+      console.log('Sprint ID:', selectedSprint.id);
+      console.log('原始开始日期:', selectedSprint.startDate);
+      console.log('开始日期类型:', typeof selectedSprint.startDate);
+      
+      // 检查开始日期格式
+      let formattedStartDate = selectedSprint.startDate;
+      if (typeof selectedSprint.startDate === 'string') {
+        if (selectedSprint.startDate.includes(' ')) {
+          formattedStartDate = selectedSprint.startDate.split(' ')[0];
+          console.log('空格日期格式，处理后:', formattedStartDate);
+        } else if (selectedSprint.startDate.includes('T')) {
+          formattedStartDate = selectedSprint.startDate.split('T')[0];
+          console.log('ISO日期格式，处理后:', formattedStartDate);
+        } else {
+          console.log('其他字符串格式，保持原样:', formattedStartDate);
+        }
+      }
+      
+      // 打印结束日期信息
+      if (selectedSprint.endDate) {
+        console.log('原始结束日期:', selectedSprint.endDate);
+        console.log('结束日期类型:', typeof selectedSprint.endDate);
+        
+        let formattedEndDate = selectedSprint.endDate;
+        if (typeof selectedSprint.endDate === 'string') {
+          if (selectedSprint.endDate.includes(' ')) {
+            formattedEndDate = selectedSprint.endDate.split(' ')[0];
+            console.log('空格结束日期格式，处理后:', formattedEndDate);
+          } else if (selectedSprint.endDate.includes('T')) {
+            formattedEndDate = selectedSprint.endDate.split('T')[0];
+            console.log('ISO结束日期格式，处理后:', formattedEndDate);
+          } else {
+            console.log('其他字符串格式结束日期，保持原样:', formattedEndDate);
+          }
+        }
+      }
+      
+      console.log('--- 日期调试信息结束 ---');
     }
 
     // 根据所选冲刺状态和类型显示不同组件
@@ -779,31 +919,61 @@ const SprintPlanning = ({
               <div>
                 <p className="text-sm font-medium">{t('startDate')}:</p>
                 <p>
-                  {selectedSprint.startDate ? 
-                    (() => {
-                      try {
-                        return format(new Date(selectedSprint.startDate), "yyyy-MM-dd")
-                      } catch(e) {
-                        console.error("Invalid startDate format:", selectedSprint.startDate)
-                        return selectedSprint.startDate || "-"
+                  {(() => {
+                    // 获取日期字段，兼容start_date和startDate两种命名
+                    const dateValue = selectedSprint.startDate || selectedSprint.start_date;
+                    console.log('开始日期字段:', dateValue);
+                    
+                    if (!dateValue) return "-";
+                    
+                    let formattedDate = dateValue;
+                    
+                    // 处理不同格式的日期字符串
+                    if (typeof dateValue === 'string') {
+                      // 如果包含空格，取前面部分
+                      if (dateValue.includes(' ')) {
+                        formattedDate = dateValue.split(' ')[0];
+                        console.log('渲染：含空格的日期，处理为:', formattedDate);
                       }
-                    })() 
-                    : "-"}
+                      // 如果包含T，取前面部分
+                      else if (dateValue.includes('T')) {
+                        formattedDate = dateValue.split('T')[0];
+                        console.log('渲染：ISO格式的日期，处理为:', formattedDate);
+                      }
+                    }
+                    
+                    return formattedDate;
+                  })()}
                 </p>
               </div>
               <div>
                 <p className="text-sm font-medium">{t('endDate')}:</p>
                 <p>
-                  {selectedSprint.endDate ? 
-                    (() => {
-                      try {
-                        return format(new Date(selectedSprint.endDate), "yyyy-MM-dd")
-                      } catch(e) {
-                        console.error("Invalid endDate format:", selectedSprint.endDate)
-                        return selectedSprint.endDate || "-"
+                  {(() => {
+                    // 获取开始日期和持续时间
+                    const startDateValue = selectedSprint.startDate || selectedSprint.start_date;
+                    const duration = selectedSprint.duration;
+                    
+                    // 如果没有开始日期或持续时间，显示默认值
+                    if (!startDateValue || !duration) return "-";
+                    
+                    // 计算结束日期
+                    const endDate = calculateEndDate(startDateValue, duration);
+                    if (!endDate) return "-";
+                    
+                    // 格式化日期显示
+                    if (endDate instanceof Date) {
+                      return endDate.toISOString().split('T')[0];
+                    } else if (typeof endDate === 'string') {
+                      if (endDate.includes(' ')) {
+                        return endDate.split(' ')[0];
+                      } else if (endDate.includes('T')) {
+                        return endDate.split('T')[0];
                       }
-                    })() 
-                    : "-"}
+                      return endDate;
+                    }
+                    return "-";
+                  })()}
                 </p>
               </div>
               <div>

@@ -32,11 +32,25 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
-import { Plus, Info, Check, Pen, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Info, Check, Pen, Settings, ChevronDown, ChevronUp, Edit, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useDispatch } from 'react-redux';
+import { updateRole, deleteRole } from '@/lib/redux/features/agileSlice';
+import RoleForm from './RoleForm';
 
 // 角色职责简述（保留，因为这些通常是固定的业务规则）
 const ROLE_RESPONSIBILITIES = {
@@ -80,6 +94,7 @@ const ROLE_RESPONSIBILITIES = {
 
 const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], onUpdateMembers }) => {
   const t = useTranslations('Agile');
+  const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
   const [teamMembers, setTeamMembers] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -90,24 +105,30 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleDescription, setNewRoleDescription] = useState('');
   const [error, setError] = useState(null);
-
-  // 组件初始化时记录传入的props数据
+  const {user} = useGetUser();
+  const userId = user?.id;
+  
+  // 添加编辑和删除角色相关的状态
+  const [editRoleDialogOpen, setEditRoleDialogOpen] = useState(false);
+  const [roleToEdit, setRoleToEdit] = useState(null);
+  const [deleteRoleDialogOpen, setDeleteRoleDialogOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState(null);
+  
+  // 专门监听角色列表变化的effect
   useEffect(() => {
-    console.log('agileRoles:', agileRoles);
-    console.log('agileMembers:', agileMembers);
-  }, [agileRoles, agileMembers]);
+    // 当角色列表更新时重新渲染组件
+    setLoading(false);
+  }, [agileRoles]);
 
   // 获取团队成员
   useEffect(() => {
     // 无论agileMembers是否有用户信息，先将其存储起来
-    console.log('agileMembers:', agileMembers);
     
     // 如果agileMembers中包含了足够的用户信息，则不需要再获取teamMembers
     const hasEnrichedMembers = agileMembers.length > 0 && 
       agileMembers.some(member => member.name && member.email);
       
     if (hasEnrichedMembers) {
-      console.log('使用已增强的agileMembers，不需获取teamMembers');
       setLoading(false);
       return;
     }
@@ -119,14 +140,12 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         .then(res => res.json())
         .then(data => {
           setTeamMembers(data);
-          console.log('teamMembers fetched:', data);
           setLoading(false);
         })
         .catch(err => {
           console.error('获取团队成员失败:', err);
           // 即使获取失败，也使用agileMembers数据
           if (agileMembers.length > 0) {
-            console.log('teamMembers获取失败，回退使用agileMembers数据');
           }
           setLoading(false);
         });
@@ -139,7 +158,6 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
     
     // 确保roleId是字符串类型进行比较
     const roleInfo = agileRoles.find(role => role.id && role.id.toString() === roleId.toString());
-    console.log(`查找角色ID: ${roleId}, 结果: `, roleInfo);
     return roleInfo || null;
   };
   
@@ -153,9 +171,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       ((member.user_id && userId && member.user_id.toString() === userId.toString()) || 
        (member.id && userId && member.id.toString() === userId.toString()))
     );
-    
-    console.log(`查找成员角色分配 - 用户ID: ${userId}, 找到分配: `, memberAssignment);
-    
+        
     return memberAssignment ? memberAssignment.role_id : null;
   };
   
@@ -177,6 +193,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
     
     try {
       setError(null);
+      setLoading(true); // 开始加载状态
       // 确保使用正确的ID字段
       const memberId = selectedMember.id || selectedMember.user_id;
       
@@ -192,7 +209,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       
       if (existingAssignment) {
         // 更新角色分配
-        response = await fetch(`/api/teams/agile/members/${existingAssignment.id}`, {
+        response = await fetch(`/api/teams/agile/member/${existingAssignment.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -203,7 +220,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         });
       } else {
         // 创建新的角色分配
-        response = await fetch('/api/teams/agile/members', {
+        response = await fetch('/api/teams/agile/member', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -228,11 +245,13 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       if (typeof onUpdateMembers === 'function') {
         onUpdateMembers();
       }
+      setLoading(false); // 结束加载状态
       
     } catch (error) {
       console.error('角色分配失败:', error);
       setError(error.message);
       toast.error(t('roleAssignmentError'));
+      setLoading(false); // 确保在错误情况下也结束加载状态
     }
   };
   
@@ -241,7 +260,13 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
     if (!newRoleName || !teamId) return;
     
     try {
-      const response = await fetch('/api/teams/agile/roles', {
+      if (!userId) {
+        throw new Error('无法获取当前用户ID');
+      }
+      
+      setLoading(true); // 开始加载状态
+      
+      const response = await fetch('/api/teams/agile/role', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -249,11 +274,31 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         body: JSON.stringify({ 
           team_id: teamId,
           name: newRoleName,
-          description: newRoleDescription
+          description: newRoleDescription,
+          created_by: userId
         }),
       });
       
       if (!response.ok) throw new Error('创建角色失败');
+      
+      const newRoleData = await response.json();
+      
+      // 获取API返回的新角色数据
+      const newRole = newRoleData.data || newRoleData;
+      
+      // 将新创建的角色直接添加到本地角色列表，不等待父组件更新
+      // 创建一个新的角色列表副本，包含新角色
+      const updatedRoles = [...agileRoles];
+      if (newRole && newRole.id) {
+        // 检查角色是否已存在
+        const roleExists = updatedRoles.some(role => role.id === newRole.id);
+        if (!roleExists) {
+          updatedRoles.push(newRole);
+          // 更新页面上显示的角色列表
+          // 注意：这不会更改父组件传入的props，但会在本地显示新角色
+          window.agileRoles = updatedRoles; // 在调试控制台中可见
+        }
+      }
       
       setCreateRoleDialogOpen(false);
       setNewRoleName('');
@@ -261,13 +306,113 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       
       toast.success(t('roleCreatedSuccess'));
       
-      // 重新加载敏捷角色信息
-      // 此处应该由父组件处理更新
+      // 调用父组件的更新函数来重新加载敏捷角色信息
+      try {
+        if (typeof onUpdateMembers === 'function') {
+          onUpdateMembers();
+        } else {
+          console.warn('onUpdateMembers 不是一个有效的函数');
+        }
+        
+        // 无论如何，都确保页面刷新
+        
+        // 使用两种方式尝试刷新，增加成功率
+        setTimeout(() => {
+          try {
+            // 方法1：直接刷新
+            window.location.reload();
+            
+            // 方法2：如果直接刷新失败，尝试替代方式
+            setTimeout(() => {
+              window.location.href = window.location.href;
+            }, 200);
+          } catch (refreshError) {
+            console.error('刷新页面出错:', refreshError);
+            alert('请手动刷新页面以查看新创建的角色');
+          }
+        }, 800); // 延长延迟，确保API操作完成
+      } catch (updateError) {
+        console.error('更新操作失败:', updateError);
+        // 即使更新失败也尝试刷新
+        window.location.reload();
+      }
       
     } catch (error) {
       console.error('创建角色失败:', error);
       toast.error(t('roleCreationError'));
+      setLoading(false);
     }
+  };
+  
+  // 处理编辑角色
+  const handleEditRole = (role) => {
+    setRoleToEdit(role);
+    setEditRoleDialogOpen(true);
+  };
+  
+  // 提交编辑角色
+  const handleUpdateRole = (roleData) => {
+    if (!roleToEdit || !roleToEdit.id || !teamId) return;
+    
+    setLoading(true);
+    
+    dispatch(updateRole({
+      roleId: roleToEdit.id,
+      roleData,
+      teamId
+    }))
+      .unwrap()
+      .then(() => {
+        toast.success(t('roleUpdatedSuccess'));
+        setEditRoleDialogOpen(false);
+        
+        // 如果提供了回调函数，调用它以更新父组件状态
+        if (typeof onUpdateMembers === 'function') {
+          onUpdateMembers();
+        }
+      })
+      .catch((error) => {
+        console.error('更新角色失败:', error);
+        toast.error(t('roleUpdateError'));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+  
+  // 处理删除角色
+  const handleDeleteRole = (role) => {
+    setRoleToDelete(role);
+    setDeleteRoleDialogOpen(true);
+  };
+  
+  // 确认删除角色
+  const confirmDeleteRole = () => {
+    if (!roleToDelete || !roleToDelete.id || !teamId) return;
+    
+    setLoading(true);
+    
+    dispatch(deleteRole({
+      roleId: roleToDelete.id,
+      teamId
+    }))
+      .unwrap()
+      .then(() => {
+        toast.success(t('roleDeletedSuccess'));
+        setDeleteRoleDialogOpen(false);
+        
+        // 如果提供了回调函数，调用它以更新父组件状态
+        if (typeof onUpdateMembers === 'function') {
+          onUpdateMembers();
+        }
+      })
+      .catch((error) => {
+        console.error('删除角色失败:', error);
+        toast.error(t('roleDeleteError'));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   // 渲染角色分配表格
@@ -283,12 +428,8 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       
     // 如果两者都为空且有agileMembers数据，则使用agileMembers作为后备数据
     if (membersToRender.length === 0 && agileMembers.length > 0) {
-      console.log('没有可渲染的成员数据，使用原始agileMembers');
       membersToRender = agileMembers;
     }
-
-    console.log('渲染表格使用的成员数据来源:', hasEnrichedMembers ? 'agileMembers (已增强)' : (teamMembers.length > 0 ? 'teamMembers' : 'agileMembers (后备)'));
-    console.log('成员数据:', membersToRender);
     
     // 如果没有任何成员数据，显示提示
     if (membersToRender.length === 0) {
@@ -328,19 +469,15 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
             
             const roleId = getMemberRole(memberId);
             // 添加调试信息
-            console.log(`Member: ${memberName}, roleId: ${roleId}, type: ${typeof roleId}`);
             
             // 记录agileRoles的状态
-            console.log('可用角色列表:', agileRoles);
             
             // 直接尝试从agileRoles中查找roleId
             let roleInfo = null;
             if (roleId) {
               roleInfo = agileRoles.find(role => role && role.id && roleId && role.id.toString() === roleId.toString());
-              console.log(`尝试直接匹配 - 角色ID: ${roleId}, 找到的角色信息:`, roleInfo);
             }
             
-            console.log(`RoleInfo for ${memberName}:`, roleInfo);
             
             return (
               <TableRow key={`member-${memberId}`}>
@@ -448,6 +585,52 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
     </Dialog>
   );
   
+  // 渲染编辑角色对话框
+  const renderEditRoleDialog = () => (
+    <Dialog open={editRoleDialogOpen} onOpenChange={setEditRoleDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('editRole')}</DialogTitle>
+        </DialogHeader>
+        
+        <div className="">
+          {roleToEdit && (
+            <RoleForm 
+              initialValues={roleToEdit} 
+              onSubmit={handleUpdateRole}
+              loading={loading}
+              teamId={teamId}
+            />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+  
+  // 渲染删除角色确认对话框
+  const renderDeleteRoleDialog = () => (
+    <AlertDialog open={deleteRoleDialogOpen} onOpenChange={setDeleteRoleDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('deleteRoleConfirmTitle')}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t('deleteRoleConfirmDescription')}
+            {roleToDelete && <strong className="block mt-2">{roleToDelete.name}</strong>}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={confirmDeleteRole}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {t('delete')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+  
   // 渲染角色分配对话框
   const renderAssignRoleDialog = () => (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -539,8 +722,28 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {agileRoles.map(role => (
               role && role.id && (
-                <div key={role.id} className="p-2 bg-background border rounded-md">
-                  <h5 className="font-medium">{role.name}</h5>
+                <div key={role.id} className="p-2 bg-background border rounded-md relative">
+                  <div className="absolute top-2 right-2 flex space-x-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8" 
+                      onClick={() => handleEditRole(role)}
+                    >
+                      <Edit className="h-4 w-4" />
+                      <span className="sr-only">{t('edit')}</span>
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-8 w-8 text-red-500 hover:text-red-600" 
+                      onClick={() => handleDeleteRole(role)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">{t('delete')}</span>
+                    </Button>
+                  </div>
+                  <h5 className="font-medium pr-16">{role.name}</h5>
                   <p className="text-sm text-gray-600 mt-1">{role.description}</p>
                 </div>
               )
@@ -559,6 +762,8 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       
       {renderAssignRoleDialog()}
       {renderCreateRoleDialog()}
+      {renderEditRoleDialog()}
+      {renderDeleteRoleDialog()}
     </Card>
   );
 };

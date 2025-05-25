@@ -154,7 +154,8 @@ const TaskAgile = ({ teamId }) => {
           duration: parseInt(sprintData.duration),
           goal: sprintData.goal,
           status: 'PLANNING',
-          task_ids: []
+          task_ids: [],
+          created_by: sprintData.created_by || user.id
         }),
       });
 
