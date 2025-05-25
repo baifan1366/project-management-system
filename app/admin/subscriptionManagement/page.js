@@ -1010,7 +1010,8 @@ export default function AdminSubscriptions() {
                             {formatCurrency(plan.price)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {plan.billing_interval === 'MONTHLY' ? 'Monthly' : 'Yearly'}
+                            {plan.billing_interval === 'MONTHLY' ? 'Monthly' : 
+                             plan.billing_interval === 'YEARLY' ? 'Yearly' : '-'}
                           </td>
 
                           {/* features */}
@@ -1904,7 +1905,7 @@ export default function AdminSubscriptions() {
               e.preventDefault();
               
               // Validate required fields
-              if (!planName || !planType || !planBilling) {
+              if (!planName || !planType) {
                 toast.error('Please fill in all required fields');
                 return;
               }
@@ -1919,7 +1920,7 @@ export default function AdminSubscriptions() {
                 name: planName,
                 type: planType,
                 price: price,
-                billing_interval: planBilling,
+                billing_interval: planBilling === '' ? null : planBilling,
                 description: description || '',
                 features: { features: features },
                 max_members: parseInt(planMaxMembers) || 0,
@@ -2012,7 +2013,7 @@ export default function AdminSubscriptions() {
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                       onChange={(e) => setPlanBilling(e.target.value)}
                     >
-                      <option value=''>None (Free Plan)</option>
+                      <option value=''>None</option>
                       <option value='MONTHLY'>Monthly</option>
                       <option value='YEARLY'>Yearly</option>
                     </select>
@@ -2320,7 +2321,7 @@ export default function AdminSubscriptions() {
               e.preventDefault();
               
               // Validate required fields
-              if (!planName || !planType || !planBilling) {
+              if (!planName || !planType) {
                 toast.error('Please fill in all required fields');
                 return;
               }
@@ -2335,7 +2336,7 @@ export default function AdminSubscriptions() {
                 name: planName,
                 type: planType,
                 price: price,
-                billing_interval: planBilling,
+                billing_interval: planBilling === '' ? null : planBilling,
                 description: description,
                 features: { features: features },
                 max_members: parseInt(planMaxMembers),
@@ -2428,7 +2429,7 @@ export default function AdminSubscriptions() {
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                       onChange={(e) => setPlanBilling(e.target.value)}
                     >
-                      <option value=''>Select billing interval</option>
+                      <option value=''>None</option>
                       <option value='MONTHLY'>Monthly</option>
                       <option value='YEARLY'>Yearly</option>
                     </select>
@@ -3264,7 +3265,8 @@ export default function AdminSubscriptions() {
                   >
                     {subscriptionPlans.map(plan => (
                       <option key={plan.id} value={plan.id}>
-                        {plan.name} ({plan.type}) : {formatCurrency(plan.price)}/{plan.billing_interval.toLowerCase()}
+                        {plan.name} ({plan.type}) : {formatCurrency(plan.price)}
+                        {plan.billing_interval ? `/${plan.billing_interval.toLowerCase()}` : ''}
                       </option>
                     ))}
                   </select>
@@ -3422,9 +3424,11 @@ export default function AdminSubscriptions() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Price</p>
                     <p className="text-gray-700 dark:text-gray-300">
                       {formatCurrency(selectedSubscriptionDetails.plan?.price || 0)}
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-                        /{selectedSubscriptionDetails.plan?.billing_interval?.toLowerCase() || 'month'}
-                      </span>
+                      {selectedSubscriptionDetails.plan?.billing_interval && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                          /{selectedSubscriptionDetails.plan?.billing_interval?.toLowerCase()}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div>
