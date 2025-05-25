@@ -714,6 +714,7 @@ CREATE TABLE "payment" (
   "applied_promo_code" VARCHAR(50),
   "stripe_payment_id" VARCHAR(255),
   "metadata" JSONB,
+  "is_processed" BOOLEAN DEFAULT FALSE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

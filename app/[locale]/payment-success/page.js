@@ -166,7 +166,43 @@ export default function PaymentSuccess() {
     }
   };
 
-  // 创建支付记录
+  // 添加新的检查函数
+  const checkPaymentProcessed = async (paymentIntentId) => {
+    try {
+      const { data, error } = await supabase
+        .from('payment')
+        .select('is_processed, stripe_payment_id')
+        .eq('stripe_payment_id', paymentIntentId)
+        .single();
+
+      if (error) throw error;
+      return data?.is_processed || false;
+    } catch (err) {
+      console.error('Error checking payment processed status:', err);
+      return false;
+    }
+  };
+
+  // 添加更新支付状态的函数
+  const updatePaymentProcessed = async (paymentIntentId) => {
+    try {
+      const { error } = await supabase
+        .from('payment')
+        .update({ 
+          is_processed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('stripe_payment_id', paymentIntentId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating payment processed status:', err);
+      return false;
+    }
+  };
+
+  // 修改现有的 createPaymentRecord 函数
   const createPaymentRecord = async (paymentData) => {
     try {
       console.log('Creating payment record:', paymentData);
@@ -197,7 +233,8 @@ export default function PaymentSuccess() {
         metadata: {
           planId: paymentData.metadata?.planId,
           planName: paymentData.metadata?.planName,
-        }
+        },
+        is_processed: false, // 初始设置为 false
       };
       
       // 插入支付记录并返回创建的记录
@@ -226,11 +263,19 @@ export default function PaymentSuccess() {
           throw new Error('No payment intent ID found');
         }
 
+        // 首先检查支付是否已处理
+        const isAlreadyProcessed = await checkPaymentProcessed(paymentIntent);
+        
+        if (isAlreadyProcessed) {
+          console.log('Payment already processed');
+          setLoading(false);
+          return;
+        }
+
         const result = await dispatch(fetchPaymentStatus(paymentIntent)).unwrap();
         console.log('Payment status result:', result);
         
         if (result.metadata) {
-          // Update Redux metadata with all payment details
           dispatch(setPaymentMetadata({
             ...result.metadata,
             orderId: result.metadata.orderId,
@@ -238,23 +283,22 @@ export default function PaymentSuccess() {
           }));
         }
 
-        // 获取用户邮箱并发送确认邮件
+        // 处理支付成功的逻辑
         if (result.metadata?.userId) {
           const email = await fetchUserEmail(result.metadata.userId);
           
-          // 更新用户的订阅计划
           if (result.metadata?.planId) {
             await updateUserSubscription(result.metadata.userId, result.metadata.planId);
           }
           
-          // 创建支付记录
           const paymentRecord = await createPaymentRecord({
             ...result,
             userId: result.metadata.userId
           });
 
-          // Update payment details in Redux after creating the record
           if (paymentRecord) {
+            // 更新支付处理状态
+            await updatePaymentProcessed(paymentIntent);
             dispatch(fetchPaymentStatus.fulfilled(paymentRecord, 'payment/fetchPaymentStatus', paymentRecord.id));
           }
           
