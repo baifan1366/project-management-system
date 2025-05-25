@@ -69,18 +69,44 @@ export default function PricingPage() {
         // 新增: 检查是否是免费计划
         if (plan.price === 0) {
           try {
-            // 直接更新用户订阅
-            const { data, error } = await supabase
+            let query = supabase.from('user_subscription_plan');
+            
+            // 检查用户是否已有订阅记录
+            const { data: existingSubscription } = await supabase
               .from('user_subscription_plan')
-              .upsert({
-                user_id: user.id,
-                plan_id: plan.id,
-                status: 'ACTIVE',
-                start_date: new Date().toISOString(),
-                end_date: null, // 免费计划通常没有结束日期
-              });
+              .select('*')
+              .eq('user_id', user.id)
+              .single();
 
-            if (error) throw error;
+            if (existingSubscription) {
+              // 如果存在订阅记录，则更新
+              const { data, error } = await supabase
+                .from('user_subscription_plan')
+                .update({
+                  plan_id: plan.id,
+                  status: 'ACTIVE',
+                  start_date: new Date().toISOString(),
+                  end_date: null, // 免费计划通常没有结束日期
+                })
+                .eq('user_id', user.id)
+                .select();
+
+              if (error) throw error;
+            } else {
+              // 如果不存在订阅记录，则创建新记录
+              const { data, error } = await supabase
+                .from('user_subscription_plan')
+                .insert({
+                  user_id: user.id,
+                  plan_id: plan.id,
+                  status: 'ACTIVE',
+                  start_date: new Date().toISOString(),
+                  end_date: null, // 免费计划通常没有结束日期
+                })
+                .select();
+
+              if (error) throw error;
+            }
             
             // 显示成功消息
             toast.success('Successfully switched to new plan');
