@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
@@ -10,6 +10,9 @@ import { useChat } from '@/contexts/ChatContext';
 import { supabase } from '@/lib/supabase';
 import ChatMessage from '@/components/ui/chat-message';
 import useGetUser from '@/lib/hooks/useGetUser';
+import { toast } from 'sonner';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import ChatSearch from '@/components/chat/ChatSearch';
 
 // 移除原SVG组件，改用Image组件
 const PenguinIcon = () => (
@@ -35,6 +38,8 @@ export default function AIChatBot() {
   const [aiSession, setAiSession] = useState(null);
   const { user: currentUser } = useGetUser();
   const chatContainerRef = useRef(null);
+  const { hourFormat, adjustTimeByOffset } = useUserTimezone();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -99,7 +104,9 @@ export default function AIChatBot() {
             role: msg.role,
             content: msg.content,
             timestamp: msg.timestamp,
-            user: msg.user // 包含用户信息
+            user: msg.user, // 包含用户信息
+            id: msg.id, // 添加id字段用于搜索功能
+            created_at: msg.timestamp // 添加created_at字段用于搜索功能
           })));
         }
       } else {
@@ -147,6 +154,12 @@ export default function AIChatBot() {
     e.preventDefault();
     
     if (!input.trim()) return;
+    
+    // 验证字数限制
+    if (input.trim().length > 1000) {
+      toast.error(t('errors.messageTooLong') || '消息过长（最多1000个字符）');
+      return;
+    }
     
     // 添加用户消息
     const userMessage = {
@@ -354,6 +367,28 @@ export default function AIChatBot() {
 
   return (
     <div className="flex flex-col h-full w-full border rounded-lg overflow-hidden bg-background">
+      {/* 搜索按钮 - 放在右上角 */}
+      {messages.length > 0 && (
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            className="p-2 rounded-full hover:bg-accent text-muted-foreground hover:text-foreground bg-background/80"
+            title={t('searchChat')}
+          >
+            <Search className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+
+      {/* ChatSearch 组件 */}
+      <ChatSearch 
+        isOpen={isSearchOpen}
+        onOpenChange={setIsSearchOpen}
+        messages={messages}
+        hourFormat={hourFormat}
+        adjustTimeByOffset={adjustTimeByOffset}
+      />
+      
       {/* 聊天内容区域 */}
       <div className="flex-1 overflow-hidden relative">
         <div className="absolute inset-0 overflow-y-auto p-4" ref={chatContainerRef}>
@@ -383,6 +418,8 @@ export default function AIChatBot() {
                     currentUser={currentUser}
                     t={t}
                     PenguinIcon={PenguinIcon}
+                    hourFormat={hourFormat}
+                    adjustTimeByOffset={adjustTimeByOffset}
                   />
                 ))}
                 
@@ -409,7 +446,7 @@ export default function AIChatBot() {
       <div className="p-4 border-t">
         <form onSubmit={handleSubmit} className="flex items-end gap-2">
           <div className="flex-1 bg-accent rounded-lg">
-            <div className="px-3 pb-2 pt-2">
+            <div className="px-3 pb-2 pt-2 relative">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -424,28 +461,23 @@ export default function AIChatBot() {
                 rows={1}
                 disabled={loading}
               />
+              
+              {/* 字符计数器 - 当接近限制时显示 */}
+              {input.length > 700 && (
+                <div className={`text-xs absolute bottom-2 right-3 ${
+                  input.length > 1000 ? 'text-destructive font-medium' : 'text-muted-foreground'
+                }`}>
+                  {input.length}/1000
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {messages.length > 0 && (
-              <button
-                type="button"
-                onClick={clearChatHistory}
-                className="p-2 hover:bg-accent rounded-lg text-muted-foreground"
-                title={t('clearChat')}
-                disabled={loading}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18"></path>
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                </svg>
-              </button>
-            )}
             <button 
               type="submit" 
               className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-              disabled={!input.trim() || loading}
+              disabled={!input.trim() || loading || input.length > 1000}
+              title={input.length > 1000 ? t('errors.messageTooLong') || '消息过长（最多1000个字符）' : t('send')}
             >
               {loading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />

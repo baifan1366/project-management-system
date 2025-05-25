@@ -10,7 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { format, parse, addHours } from 'date-fns';
+import { format, parse, addHours, isPast, isSameDay, set } from 'date-fns';
 import { CalendarIcon, Clock, Video, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -28,6 +28,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const { user: session } = useGetUser();
+  const [dateError, setDateError] = useState('');
   
   // Debug: Check Google auth status when component mounts
   useEffect(() => {
@@ -115,8 +116,12 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
       setIsLoadingUsers(true);
       
       if (!session) {
-        throw new Error(t('notLoggedIn'));
+        console.error('No user session found');
+        setUsers([]);
+        return;
       }
+
+      console.log('Searching users with query:', query, 'Session user ID:', session.id);
 
       const { data, error } = await supabase
         .from('user')
@@ -126,12 +131,15 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         .limit(10);
       
       if (error) {
+        console.error('Error during user search:', error.message);
         throw error;
       }
       
+      console.log('User search results:', data?.length || 0, 'users found');
       setUsers(data || []);
     } catch (error) {
       console.error('搜索用户失败:', error);
+      toast.error('Failed to search users');
     } finally {
       setIsLoadingUsers(false);
     }
@@ -149,9 +157,82 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     setSelectedUsers(selectedUsers.filter(user => user.id !== userId));
   };
 
+  // 处理日期变化
+  const handleDateChange = (date, name) => {
+    // Clear any previous errors
+    setDateError('');
+    
+    // Validate that date is not in the past for start date
+    if (name === 'startDate') {
+      const now = new Date();
+      // Reset time to midnight for comparison when comparing just dates
+      const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const selectedDateMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      
+      if (selectedDateMidnight < todayDate) {
+        setDateError(t('cannotSelectPastDate') || 'Cannot select a date in the past');
+        return; // Don't update state with invalid date
+      }
+      
+      // If selecting today, also validate the time if a time is already set
+      if (isSameDay(date, now) && formData.startTime) {
+        const timeComponents = formData.startTime.split(':');
+        const selectedDateTime = new Date(
+          date.getFullYear(), 
+          date.getMonth(), 
+          date.getDate(),
+          parseInt(timeComponents[0]), 
+          parseInt(timeComponents[1])
+        );
+        
+        if (isPast(selectedDateTime)) {
+          setDateError(t('cannotSelectPastTime') || 'Cannot select a time in the past');
+          // Still update the date, but show the error for time
+        }
+      }
+    }
+    
+    setFormData((prev) => ({ ...prev, [name]: date }));
+  };
+  
+  // Handle time input changes with validation
+  const handleTimeChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Clear any previous errors
+    setDateError('');
+    
+    // For start time changes, validate if the date is today
+    if (name === 'startTime' && isSameDay(formData.startDate, new Date())) {
+      const now = new Date();
+      const timeComponents = value.split(':');
+      const selectedDateTime = new Date(
+        formData.startDate.getFullYear(), 
+        formData.startDate.getMonth(), 
+        formData.startDate.getDate(),
+        parseInt(timeComponents[0]), 
+        parseInt(timeComponents[1])
+      );
+      
+      if (isPast(selectedDateTime)) {
+        setDateError(t('cannotSelectPastTime') || 'Cannot select a time in the past');
+        // Still update the time value to allow the user to correct it
+      }
+    }
+    
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
   // 处理表单数据变化
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Use specific time handler for time inputs
+    if (name === 'startTime' || name === 'endTime') {
+      handleTimeChange(e);
+      return;
+    }
+    
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -160,17 +241,28 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
-  // 处理日期变化
-  const handleDateChange = (date, name) => {
-    setFormData((prev) => ({ ...prev, [name]: date }));
-  };
-
   // 创建事件
   const handleCreateEvent = async (e) => {
     if (e) e.preventDefault();
     
     try {
       setIsLoading(true);
+      
+      // Validate that event time is not in the past
+      const now = new Date();
+      const startDateTime = formData.isAllDay 
+        ? new Date(format(formData.startDate, 'yyyy-MM-dd') + 'T00:00:00')
+        : new Date(format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00');
+      
+      // Check if the start date/time is in the past
+      if (isPast(startDateTime) && !isSameDay(startDateTime, now)) {
+        throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
+      }
+      
+      // For same-day events, check if the time is in the past
+      if (isSameDay(startDateTime, now) && isPast(startDateTime)) {
+        throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
+      }
       
       if (eventType === 'task') {
         // 创建任务
@@ -423,302 +515,302 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
   
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader>
           <DialogTitle>{t('createEvent')}</DialogTitle>
           <DialogDescription>
             {t('createEventDescription')}
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="task" value={eventType} onValueChange={setEventType} className="mt-4 flex-shrink-0">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="task">{t('task')}</TabsTrigger>
-            <TabsTrigger value="personal">{t('personalCalendar')}</TabsTrigger>
-            <TabsTrigger value="google">Google {t('event')}</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        
-        {eventType === 'google' && !isGoogleConnected && (
-          <div className="my-4 p-3 border rounded-md bg-amber-50 text-amber-800">
-            <p className="text-sm font-medium mb-2">{t('googleAccountNeeded') || 'Connect your Google account to create Google Calendar events'}</p>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => window.location.href = '/api/auth/google?calendar=true&redirectTo=/calendar'}
-              className="flex items-center gap-2 text-xs"
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16">
-                <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="#4285F4"/>
-              </svg>
-              {t('connectGoogleAccount') || 'Connect Google Account'}
-            </Button>
+        <div className="grid gap-4 py-4">
+          <Tabs defaultValue={eventType} onValueChange={setEventType} className="w-full mb-2">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="task">{t('task')}</TabsTrigger>
+              <TabsTrigger value="personal" disabled={!session}>{t('personalCalendar')}</TabsTrigger>
+              <TabsTrigger value="google" disabled={!isGoogleConnected}>{t('googleCalendar')}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="space-y-2">
+            <Label htmlFor="title">{t('title')}</Label>
+            <Input
+              id="title"
+              name="title"
+              value={formData.title}
+              onChange={handleInputChange}
+              placeholder={t('titlePlaceholder')}
+            />
           </div>
-        )}
-        
-        <div className="flex-1 overflow-y-auto pr-2 my-4">
-          <form className="space-y-4" id="eventForm">
+
+          <div className="space-y-2">
+            <Label htmlFor="description">{t('description')}</Label>
+            <Textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              placeholder={t('descriptionPlaceholder')}
+              className="resize-none h-20"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="title">{t('title')}</Label>
-              <Input 
-                id="title" 
-                name="title" 
-                value={formData.title} 
-                onChange={handleInputChange} 
-                placeholder={t('titlePlaceholder')} 
-                required 
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">{t('description')}</Label>
-              <Textarea 
-                id="description" 
-                name="description" 
-                value={formData.description} 
-                onChange={handleInputChange} 
-                placeholder={t('descriptionPlaceholder')} 
-                rows={3} 
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate">{t('startDate')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="startDate"
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.startDate ? format(formData.startDate, 'PPP') : t('pickDate')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.startDate}
-                      onSelect={(date) => handleDateChange(date, 'startDate')}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              
-              {!formData.isAllDay && (
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">{t('startTime')}</Label>
-                  <Input 
-                    id="startTime" 
-                    name="startTime" 
-                    type="time" 
-                    value={formData.startTime} 
-                    onChange={handleInputChange} 
+              <Label htmlFor="startDate">{t('startDate')}</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="startDate"
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      dateError && "border-red-500"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.startDate ? format(formData.startDate, 'PPP') : t('pickDate')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.startDate}
+                    onSelect={(date) => handleDateChange(date, 'startDate')}
+                    disabled={(date) => isPast(new Date(date.getFullYear(), date.getMonth(), date.getDate())) && !isSameDay(date, new Date())}
                   />
-                </div>
-              )}
+                </PopoverContent>
+              </Popover>
+              {dateError && <p className="text-xs text-red-500 mt-1">{dateError}</p>}
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            {!formData.isAllDay && (
               <div className="space-y-2">
-                <Label htmlFor="endDate">{t('endDate')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="endDate"
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.endDate ? format(formData.endDate, 'PPP') : t('pickDate')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.endDate}
-                      onSelect={(date) => handleDateChange(date, 'endDate')}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              
-              {!formData.isAllDay && (
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">{t('endTime')}</Label>
-                  <Input 
-                    id="endTime" 
-                    name="endTime" 
-                    type="time" 
-                    value={formData.endTime} 
-                    onChange={handleInputChange} 
-                  />
-                </div>
-              )}
-            </div>
-            
-            {(eventType === 'google' || eventType === 'personal') && (
-              <div className="space-y-2">
-                <Label htmlFor="location">{t('location')}</Label>
+                <Label htmlFor="startTime">{t('startTime')}</Label>
                 <Input 
-                  id="location" 
-                  name="location" 
-                  value={formData.location} 
+                  id="startTime" 
+                  name="startTime" 
+                  type="time" 
+                  value={formData.startTime} 
                   onChange={handleInputChange} 
-                  placeholder={t('locationPlaceholder')} 
+                  className={cn(dateError && "border-red-500")}
                 />
               </div>
             )}
-            
-            {eventType === 'personal' && (
-              <div className="space-y-2">
-                <Label htmlFor="color">{t('color')}</Label>
-                <div className="flex items-center space-x-2">
-                  <Input 
-                    id="color" 
-                    name="color" 
-                    type="color" 
-                    value={formData.color} 
-                    onChange={handleInputChange} 
-                    className="w-12 h-8 p-1" 
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="endDate">{t('endDate')}</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="endDate"
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.endDate ? format(formData.endDate, 'PPP') : t('pickDate')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.endDate}
+                    onSelect={(date) => handleDateChange(date, 'endDate')}
                   />
-                  <div 
-                    className="h-8 w-8 rounded-md" 
-                    style={{ backgroundColor: formData.color }}
-                  ></div>
-                </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            {!formData.isAllDay && (
+              <div className="space-y-2">
+                <Label htmlFor="endTime">{t('endTime')}</Label>
+                <Input 
+                  id="endTime" 
+                  name="endTime" 
+                  type="time" 
+                  value={formData.endTime} 
+                  onChange={handleInputChange} 
+                />
               </div>
             )}
-            
+          </div>
+          
+          {(eventType === 'google' || eventType === 'personal') && (
+            <div className="space-y-2">
+              <Label htmlFor="location">{t('location')}</Label>
+              <Input 
+                id="location" 
+                name="location" 
+                value={formData.location} 
+                onChange={handleInputChange} 
+                placeholder={t('locationPlaceholder')} 
+              />
+            </div>
+          )}
+          
+          {eventType === 'personal' && (
+            <div className="space-y-2">
+              <Label htmlFor="color">{t('color')}</Label>
+              <div className="flex items-center space-x-2">
+                <Input 
+                  id="color" 
+                  name="color" 
+                  type="color" 
+                  value={formData.color} 
+                  onChange={handleInputChange} 
+                  className="w-12 h-8 p-1" 
+                />
+                <div 
+                  className="h-8 w-8 rounded-md" 
+                  style={{ backgroundColor: formData.color }}
+                ></div>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="isAllDay" 
+              checked={formData.isAllDay} 
+              onCheckedChange={(checked) => handleCheckboxChange('isAllDay', checked)} 
+            />
+            <label htmlFor="isAllDay" className="text-sm font-medium leading-none">
+              {t('allDay')}
+            </label>
+          </div>
+          
+          {eventType === 'google' && isGoogleConnected && (
             <div className="flex items-center space-x-2">
               <Checkbox 
-                id="isAllDay" 
-                checked={formData.isAllDay} 
-                onCheckedChange={(checked) => handleCheckboxChange('isAllDay', checked)} 
+                id="addGoogleMeet" 
+                checked={formData.addGoogleMeet} 
+                onCheckedChange={(checked) => handleCheckboxChange('addGoogleMeet', checked)} 
               />
-              <label htmlFor="isAllDay" className="text-sm font-medium leading-none">
-                {t('allDay')}
+              <label htmlFor="addGoogleMeet" className="text-sm font-medium leading-none flex items-center">
+                <Video className="h-4 w-4 mr-1" /> {t('addGoogleMeet')}
               </label>
             </div>
-            
-            {eventType === 'google' && isGoogleConnected && (
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="addGoogleMeet" 
-                  checked={formData.addGoogleMeet} 
-                  onCheckedChange={(checked) => handleCheckboxChange('addGoogleMeet', checked)} 
-                />
-                <label htmlFor="addGoogleMeet" className="text-sm font-medium leading-none flex items-center">
-                  <Video className="h-4 w-4 mr-1" /> {t('addGoogleMeet')}
-                </label>
-              </div>
-            )}
-            
-            {eventType === 'google' && isGoogleConnected && (
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="inviteParticipants" 
-                  checked={formData.inviteParticipants} 
-                  onCheckedChange={(checked) => handleCheckboxChange('inviteParticipants', checked)} 
-                />
-                <label htmlFor="inviteParticipants" className="text-sm font-medium leading-none flex items-center">
-                  <Users className="h-4 w-4 mr-1" /> {t('inviteParticipants')}
-                </label>
-              </div>
-            )}
-            
-            {eventType === 'google' && formData.inviteParticipants && (
-              <div className="space-y-2">
-                <Label>{t('participants')}</Label>
-                <Command className="border rounded-md">
-                  <CommandInput 
-                    placeholder={t('searchUsers')} 
+          )}
+          
+          {eventType === 'google' && isGoogleConnected && (
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="inviteParticipants" 
+                checked={formData.inviteParticipants} 
+                onCheckedChange={(checked) => handleCheckboxChange('inviteParticipants', checked)} 
+              />
+              <label htmlFor="inviteParticipants" className="text-sm font-medium leading-none flex items-center">
+                <Users className="h-4 w-4 mr-1" /> {t('inviteParticipants')}
+              </label>
+            </div>
+          )}
+          
+          {eventType === 'google' && formData.inviteParticipants && (
+            <div className="space-y-2">
+              <Label>{t('participants')}</Label>
+              
+              <div className="border rounded-md overflow-hidden">
+                <div className="flex items-center border-b p-2">
+                  <input
+                    type="text"
+                    placeholder={t('searchUsers')}
                     value={searchTerm}
-                    onValueChange={setSearchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-transparent focus:outline-none"
                   />
-                  <CommandList className="max-h-[120px] overflow-y-auto">
-                    {isLoadingUsers ? (
-                      <CommandEmpty>{t('loading')}</CommandEmpty>
-                    ) : users.length === 0 ? (
-                      <CommandEmpty>{t('noUsersFound')}</CommandEmpty>
-                    ) : (
-                      <CommandGroup>
+                </div>
+                
+                <div className="max-h-[120px] overflow-y-auto">
+                  {isLoadingUsers ? (
+                    <div className="p-2 text-sm text-center">{t('loading')}</div>
+                  ) : users.length === 0 ? (
+                    <div className="p-2 text-sm text-center">{t('noUsersFound')}</div>
+                  ) : (
+                    <>
+                      <div className="p-1">
                         {users.map((user) => (
-                          <CommandItem
+                          <div
                             key={user.id}
-                            onSelect={() => selectUser(user)}
-                            className="cursor-pointer"
+                            onClick={() => selectUser(user)}
+                            className="flex items-center gap-2 p-2 cursor-pointer hover:bg-accent rounded-md"
                           >
-                            <div className="flex items-center space-x-2">
-                              {user.avatar_url ? (
-                                <img 
-                                  src={user.avatar_url} 
-                                  alt={user.name} 
-                                  className="h-6 w-6 rounded-full"
-                                />
-                              ) : (
-                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                                  {user.name?.charAt(0) || user.email?.charAt(0)}
-                                </div>
-                              )}
-                              <span>{user.name}</span>
+                            {user.avatar_url ? (
+                              <img 
+                                src={user.avatar_url} 
+                                alt={user.name || user.email} 
+                                className="h-6 w-6 rounded-full"
+                              />
+                            ) : (
+                              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                                {(user.name || user.email)?.charAt(0)}
+                              </div>
+                            )}
+                            <div className="flex flex-col text-left">
+                              <span className="font-medium">{user.name || 'Unnamed User'}</span>
                               <span className="text-xs text-muted-foreground">{user.email}</span>
                             </div>
-                          </CommandItem>
+                          </div>
                         ))}
-                      </CommandGroup>
-                    )}
-                  </CommandList>
-                </Command>
-                
-                {selectedUsers.length > 0 && (
-                  <div className="mt-2">
-                    <Label>{t('selectedParticipants')}</Label>
-                    <div className="flex flex-wrap gap-2 mt-1 max-h-[100px] overflow-y-auto p-1">
-                      {selectedUsers.map((user) => (
-                        <div 
-                          key={user.id} 
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10"
+                      </div>
+                      <div className="px-2 py-1 text-xs text-muted-foreground border-t">
+                        {users.length} {users.length === 1 ? 'user' : 'users'} found
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {selectedUsers.length > 0 && (
+                <div className="mt-2">
+                  <Label>{t('selectedParticipants')}</Label>
+                  <div className="flex flex-wrap gap-2 mt-1 max-h-[100px] overflow-y-auto p-1 border rounded-md">
+                    {selectedUsers.map((user) => (
+                      <div 
+                        key={user.id} 
+                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10"
+                      >
+                        {user.name || user.email}
+                        <button 
+                          type="button"
+                          onClick={() => removeUser(user.id)}
+                          className="text-sm text-muted-foreground hover:text-foreground"
+                          aria-label={`Remove ${user.name || user.email}`}
                         >
-                          {user.name}
-                          <button 
-                            type="button"
-                            onClick={() => removeUser(user.id)}
-                            className="text-sm text-muted-foreground hover:text-foreground"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                          ×
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
-            
-            {eventType === 'google' && (
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="reminders" 
-                  checked={formData.reminders} 
-                  onCheckedChange={(checked) => handleCheckboxChange('reminders', checked)} 
-                />
-                <label htmlFor="reminders" className="text-sm font-medium leading-none">
-                  {t('useDefaultReminders')}
-                </label>
-              </div>
-            )}
-          </form>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {eventType === 'google' && (
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="reminders" 
+                checked={formData.reminders} 
+                onCheckedChange={(checked) => handleCheckboxChange('reminders', checked)} 
+              />
+              <label htmlFor="reminders" className="text-sm font-medium leading-none">
+                {t('useDefaultReminders')}
+              </label>
+            </div>
+          )}
         </div>
         
-        <DialogFooter className="flex-shrink-0 pt-2 border-t">
-          <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => setIsOpen(false)} className="w-full sm:w-auto">
             {t('cancel')}
           </Button>
           <Button 
-            onClick={handleCreateEvent} 
-            disabled={isLoading}
+            type="submit" 
+            disabled={isLoading || !formData.title} 
+            onClick={handleCreateEvent}
+            className="w-full sm:w-auto"
           >
             {isLoading ? t('creating') : t('create')}
           </Button>
