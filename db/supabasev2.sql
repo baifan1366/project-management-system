@@ -201,6 +201,42 @@ CREATE TABLE "team_post" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE "agile_role" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "team_agile" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
+  "start_date" TIMESTAMP NOT NULL,
+  "duration" INT DEFAULT 2,
+  "goal" TEXT,
+  "task_ids" JSONB DEFAULT '{}',
+  "status" TEXT NOT NULL CHECK ("status" IN ('PLANNING', 'PENDING', 'RETROSPECTIVE')) DEFAULT 'PENDING',
+  "whatWentWell" JSONB,
+  "toImprove" JSONB,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "agile_member" (
+  "id" SERIAL PRIMARY KEY,
+  "agile_id" INT NOT NULL REFERENCES "team_agile"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "role_id" INT NOT NULL REFERENCES "agile_role"("id") ON DELETE CASCADE,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create indexes for better performance
 CREATE INDEX idx_team_post_team_id ON "team_post"("team_id");
 CREATE INDEX idx_team_post_attachment_id ON "team_post"("attachment_id");

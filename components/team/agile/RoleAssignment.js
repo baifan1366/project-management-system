@@ -34,42 +34,11 @@ import {
 } from '@/components/ui/hover-card';
 import { toast } from 'sonner';
 import { Plus, Info, Check, Pen, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
-// 敏捷角色定义
-const AGILE_ROLES = [
-  {
-    id: 'product_owner',
-    name: '产品负责人',
-    description: '负责确定产品方向，管理产品待办事项，确保团队交付最大价值。'
-  },
-  {
-    id: 'scrum_master',
-    name: 'Scrum 主管',
-    description: '确保Scrum过程被理解和执行，消除障碍，促进团队自组织和高效运作。'
-  },
-  {
-    id: 'dev_team',
-    name: '开发团队',
-    description: '负责在每个冲刺中交付可发布的产品增量。团队成员拥有跨职能技能，能够完成所有开发工作。'
-  },
-  {
-    id: 'qa',
-    name: '质量保证',
-    description: '负责确保产品质量，编写和执行测试用例，识别和报告缺陷。'
-  },
-  {
-    id: 'ux_designer',
-    name: 'UX设计师',
-    description: '负责用户体验和界面设计，确保产品易于使用且符合用户需求。'
-  },
-  {
-    id: 'stakeholder',
-    name: '利益相关者',
-    description: '提供需求和反馈，但不直接参与日常开发过程。'
-  }
-];
-
-// 角色职责简述
+// 角色职责简述（保留，因为这些通常是固定的业务规则）
 const ROLE_RESPONSIBILITIES = {
   'product_owner': [
     '管理产品待办事项（Product Backlog）',
@@ -109,74 +78,375 @@ const ROLE_RESPONSIBILITIES = {
   ]
 };
 
-const RoleAssignment = ({ teamId, projectId }) => {
+const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], onUpdateMembers }) => {
   const t = useTranslations('Agile');
   const [loading, setLoading] = useState(true);
   const [teamMembers, setTeamMembers] = useState([]);
-  const [memberRoles, setMemberRoles] = useState({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
   const [isRoleInfoExpanded, setIsRoleInfoExpanded] = useState(false);
+  const [createRoleDialogOpen, setCreateRoleDialogOpen] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRoleDescription, setNewRoleDescription] = useState('');
+  const [error, setError] = useState(null);
+
+  // 组件初始化时记录传入的props数据
+  useEffect(() => {
+    console.log('agileRoles:', agileRoles);
+    console.log('agileMembers:', agileMembers);
+  }, [agileRoles, agileMembers]);
 
   // 获取团队成员
   useEffect(() => {
-    if (teamId && projectId) {
-      // 这里应该从数据库获取团队成员和角色分配
-      // fetchTeamMembers(teamId, projectId);
+    // 无论agileMembers是否有用户信息，先将其存储起来
+    console.log('agileMembers:', agileMembers);
+    
+    // 如果agileMembers中包含了足够的用户信息，则不需要再获取teamMembers
+    const hasEnrichedMembers = agileMembers.length > 0 && 
+      agileMembers.some(member => member.name && member.email);
       
-      // 模拟数据
-      const mockMembers = [
-        { id: 1, name: '张三', email: 'zhangsan@example.com', avatar: null, role: 'admin' },
-        { id: 2, name: '李四', email: 'lisi@example.com', avatar: null, role: 'member' },
-        { id: 3, name: '王五', email: 'wangwu@example.com', avatar: null, role: 'member' },
-        { id: 4, name: '赵六', email: 'zhaoliu@example.com', avatar: null, role: 'member' },
-        { id: 5, name: '孙七', email: 'sunqi@example.com', avatar: null, role: 'member' }
-      ];
-      
-      // 模拟角色分配
-      const mockRoles = {
-        1: 'product_owner',
-        2: 'scrum_master',
-        3: 'dev_team',
-        4: 'qa',
-        5: 'ux_designer'
-      };
-      
-      setTeamMembers(mockMembers);
-      setMemberRoles(mockRoles);
+    if (hasEnrichedMembers) {
+      console.log('使用已增强的agileMembers，不需获取teamMembers');
       setLoading(false);
+      return;
     }
-  }, [teamId, projectId]);
+    
+    if (teamId) {
+      setLoading(true);
+      // 从API获取团队成员
+      fetch(`/api/teams/${teamId}/members`)
+        .then(res => res.json())
+        .then(data => {
+          setTeamMembers(data);
+          console.log('teamMembers fetched:', data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('获取团队成员失败:', err);
+          // 即使获取失败，也使用agileMembers数据
+          if (agileMembers.length > 0) {
+            console.log('teamMembers获取失败，回退使用agileMembers数据');
+          }
+          setLoading(false);
+        });
+    }
+  }, [teamId, agileMembers]);
 
   // 获取角色信息
   const getRoleInfo = (roleId) => {
-    return AGILE_ROLES.find(role => role.id === roleId) || null;
+    if (!roleId) return null;
+    
+    // 确保roleId是字符串类型进行比较
+    const roleInfo = agileRoles.find(role => role.id && role.id.toString() === roleId.toString());
+    console.log(`查找角色ID: ${roleId}, 结果: `, roleInfo);
+    return roleInfo || null;
+  };
+  
+  // 获取成员角色
+  const getMemberRole = (userId) => {
+    if (!userId || !agileMembers || agileMembers.length === 0) return null;
+    
+    // 确保进行字符串比较
+    const memberAssignment = agileMembers.find(member => 
+      member && 
+      ((member.user_id && userId && member.user_id.toString() === userId.toString()) || 
+       (member.id && userId && member.id.toString() === userId.toString()))
+    );
+    
+    console.log(`查找成员角色分配 - 用户ID: ${userId}, 找到分配: `, memberAssignment);
+    
+    return memberAssignment ? memberAssignment.role_id : null;
   };
   
   // 打开分配角色对话框
-  const openAssignRoleDialog = (member, currentRoleId) => {
-    setSelectedMember(member);
-    setSelectedRole(currentRoleId);
+  const openAssignRoleDialog = (member) => {
+    // 确保统一使用正确的ID
+    const memberId = member.id || member.user_id;
+    setSelectedMember({
+      ...member,
+      id: memberId // 确保无论输入格式如何，都使用统一的id字段
+    });
+    setSelectedRole(getMemberRole(memberId));
     setDialogOpen(true);
   };
   
   // 分配角色
-  const assignRole = () => {
-    if (!selectedMember || !selectedRole) return;
+  const assignRole = async () => {
+    if (!selectedMember || !selectedRole || !agileId) return;
     
-    // 更新角色
-    const newMemberRoles = {
-      ...memberRoles,
-      [selectedMember.id]: selectedRole
-    };
-    
-    setMemberRoles(newMemberRoles);
-    setDialogOpen(false);
-    
-    // 在实际应用中，这里应该调用API保存角色分配
-    toast.success(`${selectedMember.name} ${t('assignedTo')} ${getRoleInfo(selectedRole).name}`);
+    try {
+      setError(null);
+      // 确保使用正确的ID字段
+      const memberId = selectedMember.id || selectedMember.user_id;
+      
+      // 检查是否已经有角色分配
+      const existingAssignment = agileMembers.find(member => 
+        member && 
+        ((member.user_id && selectedMember.id && member.user_id.toString() === selectedMember.id.toString()) || 
+         (member.user_id && selectedMember.user_id && member.user_id.toString() === selectedMember.user_id.toString())) && 
+        member.agile_id === agileId
+      );
+      
+      let response;
+      
+      if (existingAssignment) {
+        // 更新角色分配
+        response = await fetch(`/api/teams/agile/members/${existingAssignment.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            role_id: selectedRole
+          }),
+        });
+      } else {
+        // 创建新的角色分配
+        response = await fetch('/api/teams/agile/members', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            agile_id: agileId,
+            user_id: memberId,
+            role_id: selectedRole,
+          }),
+        });
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || t('roleAssignmentError'));
+      }
+      
+      setDialogOpen(false);
+      toast.success(`${selectedMember.name} ${t('assignedTo')} ${getRoleInfo(selectedRole)?.name || t('unknownRole')}`);
+      
+      // 如果提供了回调函数，调用它以更新父组件状态
+      if (typeof onUpdateMembers === 'function') {
+        onUpdateMembers();
+      }
+      
+    } catch (error) {
+      console.error('角色分配失败:', error);
+      setError(error.message);
+      toast.error(t('roleAssignmentError'));
+    }
   };
+  
+  // 创建新角色
+  const createNewRole = async () => {
+    if (!newRoleName || !teamId) return;
+    
+    try {
+      const response = await fetch('/api/teams/agile/roles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          team_id: teamId,
+          name: newRoleName,
+          description: newRoleDescription
+        }),
+      });
+      
+      if (!response.ok) throw new Error('创建角色失败');
+      
+      setCreateRoleDialogOpen(false);
+      setNewRoleName('');
+      setNewRoleDescription('');
+      
+      toast.success(t('roleCreatedSuccess'));
+      
+      // 重新加载敏捷角色信息
+      // 此处应该由父组件处理更新
+      
+    } catch (error) {
+      console.error('创建角色失败:', error);
+      toast.error(t('roleCreationError'));
+    }
+  };
+
+  // 渲染角色分配表格
+  const renderRoleAssignmentTable = () => {
+    // 如果我们已经有了从API获取的敏捷成员，且敏捷成员已包含用户信息，则直接使用
+    const hasEnrichedMembers = agileMembers.length > 0 && 
+      agileMembers.some(member => member.name && member.email);
+
+    // 用于渲染的成员列表
+    let membersToRender = hasEnrichedMembers 
+      ? agileMembers 
+      : teamMembers;
+      
+    // 如果两者都为空且有agileMembers数据，则使用agileMembers作为后备数据
+    if (membersToRender.length === 0 && agileMembers.length > 0) {
+      console.log('没有可渲染的成员数据，使用原始agileMembers');
+      membersToRender = agileMembers;
+    }
+
+    console.log('渲染表格使用的成员数据来源:', hasEnrichedMembers ? 'agileMembers (已增强)' : (teamMembers.length > 0 ? 'teamMembers' : 'agileMembers (后备)'));
+    console.log('成员数据:', membersToRender);
+    
+    // 如果没有任何成员数据，显示提示
+    if (membersToRender.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p>{t('noTeamMembers')}</p>
+        </div>
+      );
+    }
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('member')}</TableHead>
+            <TableHead>{t('role')}</TableHead>
+            <TableHead className="text-right">{t('actions')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {membersToRender.map((member) => {
+            if (!member) {
+              console.error('Invalid member object (null)');
+              return null; // 跳过无效成员
+            }
+            
+            // 检测成员对象格式并适配
+            const memberId = member.id || member.user_id;
+            const memberName = member.name || '未知用户';
+            const memberEmail = member.email || `ID: ${memberId}`;
+            const memberAvatar = member.avatar || member.avatar_url;
+            
+            if (!memberId) {
+              console.error('Invalid member object (no id):', member);
+              return null; // 跳过无效成员
+            }
+            
+            const roleId = getMemberRole(memberId);
+            // 添加调试信息
+            console.log(`Member: ${memberName}, roleId: ${roleId}, type: ${typeof roleId}`);
+            
+            // 记录agileRoles的状态
+            console.log('可用角色列表:', agileRoles);
+            
+            // 直接尝试从agileRoles中查找roleId
+            let roleInfo = null;
+            if (roleId) {
+              roleInfo = agileRoles.find(role => role && role.id && roleId && role.id.toString() === roleId.toString());
+              console.log(`尝试直接匹配 - 角色ID: ${roleId}, 找到的角色信息:`, roleInfo);
+            }
+            
+            console.log(`RoleInfo for ${memberName}:`, roleInfo);
+            
+            return (
+              <TableRow key={`member-${memberId}`}>
+                <TableCell>
+                  <div className="flex items-center space-x-2">
+                    <Avatar>
+                      {memberAvatar && <AvatarImage src={memberAvatar} alt={memberName} />}
+                      <AvatarFallback>{memberName ? memberName.charAt(0) : '?'}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{memberName}</p>
+                      <p className="text-sm text-gray-500">{memberEmail}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {roleInfo ? (
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <div className="flex items-center cursor-help">
+                          <span>{roleInfo.name}</span>
+                          <Info className="ml-1 w-4 h-4 text-gray-500" />
+                        </div>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80">
+                        <div className="space-y-2">
+                          <h4 className="font-medium">{roleInfo.name}</h4>
+                          <p className="text-sm">{roleInfo.description}</p>
+                          
+                          {ROLE_RESPONSIBILITIES[roleInfo.name?.toLowerCase().replace(/\s/g, '_')] && (
+                            <>
+                              <h5 className="font-medium text-sm">{t('responsibilities')}:</h5>
+                              <ul className="text-sm space-y-1 list-disc pl-4">
+                                {ROLE_RESPONSIBILITIES[roleInfo.name.toLowerCase().replace(/\s/g, '_')].map((resp, idx) => (
+                                  <li key={`resp-${idx}`}>{resp}</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  ) : (
+                    <span className="text-gray-500">{t('noRole')}</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => openAssignRoleDialog(member)}
+                  >
+                    <Pen className="w-4 h-4 mr-1" />
+                    {t('assign')}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    );
+  };
+  
+  // 渲染创建角色对话框
+  const renderCreateRoleDialog = () => (
+    <Dialog open={createRoleDialogOpen} onOpenChange={setCreateRoleDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('createNewRole')}</DialogTitle>
+        </DialogHeader>
+        
+        <div className="py-4 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="roleName">{t('roleName')}</Label>
+            <Input 
+              id="roleName"
+              value={newRoleName} 
+              onChange={(e) => setNewRoleName(e.target.value)}
+              placeholder={t('roleNamePlaceholder')}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="roleDescription">{t('roleDescription')}</Label>
+            <Textarea
+              id="roleDescription"
+              value={newRoleDescription}
+              onChange={(e) => setNewRoleDescription(e.target.value)}
+              placeholder={t('roleDescriptionPlaceholder')}
+              rows={4}
+            />
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCreateRoleDialogOpen(false)}>
+            {t('cancel')}
+          </Button>
+          <Button onClick={createNewRole}>
+            {t('create')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
   
   // 渲染角色分配对话框
   const renderAssignRoleDialog = () => (
@@ -190,47 +460,42 @@ const RoleAssignment = ({ teamId, projectId }) => {
         
         <div className="py-4">
           <Select 
-            value={selectedRole} 
+            value={selectedRole ? selectedRole.toString() : ''} 
             onValueChange={setSelectedRole}
           >
             <SelectTrigger>
               <SelectValue placeholder={t('selectRole')} />
             </SelectTrigger>
             <SelectContent>
-              {AGILE_ROLES.map(role => (
-                <SelectItem key={role.id} value={role.id}>
-                  {(role.name)}
-                </SelectItem>
+              {agileRoles.map(role => (
+                role && role.id && (
+                  <SelectItem key={role.id} value={role.id.toString()}>
+                    {role.name}
+                  </SelectItem>
+                )
               ))}
             </SelectContent>
           </Select>
           
           {selectedRole && (
-            <div className="mt-4 space-y-2">
-              <h4 className="text-sm font-medium">{t('roleResponsibilities')}:</h4>
-              <ul className="text-sm space-y-1">
-                {ROLE_RESPONSIBILITIES[selectedRole].map((resp, index) => (
-                  <li key={index} className="flex items-start">
-                    <Check className="h-4 w-4 mr-2 mt-0.5 text-green-600" />
-                    <span>{(resp)}</span>
-                  </li>
-                ))}
-              </ul>
+            <div className="mt-4 text-sm">
+              <p className="font-medium">{t('roleDescription')}:</p>
+              <p className="mt-1">{getRoleInfo(selectedRole)?.description || ''}</p>
+            </div>
+          )}
+          
+          {error && (
+            <div className="mt-2 text-red-500 text-sm">
+              {error}
             </div>
           )}
         </div>
         
         <DialogFooter>
-          <Button 
-            variant="outline" 
-            onClick={() => setDialogOpen(false)}
-          >
+          <Button variant="outline" onClick={() => setDialogOpen(false)}>
             {t('cancel')}
           </Button>
-          <Button 
-            onClick={assignRole} 
-            disabled={!selectedRole}
-          >
+          <Button onClick={assignRole}>
             {t('assign')}
           </Button>
         </DialogFooter>
@@ -238,123 +503,63 @@ const RoleAssignment = ({ teamId, projectId }) => {
     </Dialog>
   );
   
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Card className="w-full p-6">
-          <p className="text-center">{t('loading')}</p>
-        </Card>
-      </div>
-    );
-  }
-  
   return (
-    <div className="space-y-6">
-      {/* 团队成员角色分配 */}
-      <Card className="p-4">
-        <div className="flex items-center cursor-pointer justify-between" onClick={() => setIsRoleInfoExpanded(!isRoleInfoExpanded)}>
-          <div className="flex items-center justify-normal">
-            <div className="flex items-center">
-                {isRoleInfoExpanded ? (
-                <ChevronUp className="h-5 w-5 mr-2" />
-              ) : (
-                <ChevronDown className="h-5 w-5 mr-2" />
-              )}
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold">{t('roleAssignment')}</h2>
-            </div>
-          </div>
-          <div className="flex">
-            <div className="flex justify-end">
-              <Button variant="outline">
-                <Settings className="w-4 h-4 mr-2" />
-                {t('manageAgileRoles')}
-              </Button>
-            </div>
+    <Card className="p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-base font-medium ml-2">{t('roleAssignment')}</h3>
+        
+        <div className="flex items-center space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setIsRoleInfoExpanded(!isRoleInfoExpanded)}
+          >
+            <Info className="w-4 h-4 mr-1" />
+            {t('roleInfo')}
+            {isRoleInfoExpanded ? (
+              <ChevronUp className="ml-1 w-4 h-4" />
+            ) : (
+              <ChevronDown className="ml-1 w-4 h-4" />
+            )}
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setCreateRoleDialogOpen(true)}
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            {t('createRole')}
+          </Button>
+        </div>
+      </div>
+      
+      {isRoleInfoExpanded && (
+        <div className="mb-4 p-2 bg-slate-50 rounded-md">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {agileRoles.map(role => (
+              role && role.id && (
+                <div key={role.id} className="p-2 bg-background border rounded-md">
+                  <h5 className="font-medium">{role.name}</h5>
+                  <p className="text-sm text-gray-600 mt-1">{role.description}</p>
+                </div>
+              )
+            ))}
           </div>
         </div>
-        {isRoleInfoExpanded && (
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('member')}</TableHead>
-                <TableHead>{t('currentRole')}</TableHead>
-                <TableHead className="text-right">{t('actions')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {teamMembers.map(member => {
-                const roleId = memberRoles[member.id];
-                const role = getRoleInfo(roleId);
-                
-                return (
-                  <TableRow key={member.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar>
-                          {member.avatar && (
-                            <AvatarImage src={member.avatar} />
-                          )}
-                          <AvatarFallback>
-                            {member.name.substring(0, 1)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{member.name}</p>
-                          <p className="text-sm text-muted-foreground">{member.email}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {role ? (
-                        <div className="flex items-center">
-                          <span>{(role.name)}</span>
-                          <HoverCard>
-                            <HoverCardTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 ml-1">
-                                <Info className="h-4 w-4" />
-                              </Button>
-                            </HoverCardTrigger>
-                            <HoverCardContent className="w-80">
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-medium">{(role.name)} {t('responsibilities')}:</h4>
-                                <ul className="text-sm space-y-1">
-                                  {ROLE_RESPONSIBILITIES[role.id].map((resp, index) => (
-                                    <li key={index} className="flex items-start">
-                                      <Check className="h-4 w-4 mr-2 mt-0.5 text-green-600" />
-                                      <span>{(resp)}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </HoverCardContent>
-                          </HoverCard>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">{t('unassigned')}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => openAssignRoleDialog(member, roleId)}
-                      >
-                        {role ? t('change') : t('assign')}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+      )}
+      
+      {loading ? (
+        <div className="flex justify-center items-center h-40">
+          <p>{t('loading')}</p>
+        </div>
+      ) : (
+        renderRoleAssignmentTable()
+      )}
       
       {renderAssignRoleDialog()}
-    </div>
+      {renderCreateRoleDialog()}
+    </Card>
   );
 };
 

@@ -31,27 +31,34 @@ import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Plus, MoveUp, MoveDown, CheckCircle2, ChevronDown, ChevronUp, PlayCircle, ListStartIcon } from 'lucide-react';
+import { CalendarIcon, Plus, MoveUp, MoveDown, CheckCircle2, ChevronDown, ChevronUp, PlayCircle, ListStartIcon, Trash2 } from 'lucide-react';
 import BodyContent from './BodyContent';
 import SprintBoard from './SprintBoard';
 import RoleAssignment from './RoleAssignment';
 import SprintRetrospective from './SprintRetrospective';
+import { Card } from '@/components/ui/card';
+import { useDispatch } from 'react-redux';
+import { fetchAgileRoleById, fetchAgileMembers } from '@/lib/redux/features/agileSlice';
 
 const SprintPlanning = ({ 
   teamId, 
   projectId, 
   sprints, 
   currentSprint, 
+  agileRoles = [],
+  agileMembers = [],
   onCreateSprint, 
   onStartSprint,
-  onCompleteSprint
+  onCompleteSprint,
+  onUpdateMembers
 }) => {
     const t = useTranslations('Agile');
+    const dispatch = useDispatch();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [backlogTasks, setBacklogTasks] = useState([]);
   const [sprintTasks, setSprintTasks] = useState([]);
   const [selectedSprint, setSelectedSprint] = useState(null);
-  const [selectedType, setSelectedType] = useState('pending');
+  const [selectedType, setSelectedType] = useState('PENDING');
   const [loading, setLoading] = useState(true);
   const [isSprintInfoExpanded, setIsSprintInfoExpanded] = useState(false);
   
@@ -66,9 +73,10 @@ const SprintPlanning = ({
 
   // 根据类型过滤冲刺
   const filteredSprints = sprints.filter(sprint => {
-    if (selectedType === 'pending') return sprint.status === 'in_progress';
-    if (selectedType === 'planning') return sprint.status === 'planning';
-    if (selectedType === 'retrospective') return sprint.status === 'completed';
+    console.log("过滤sprint:", sprint, "selectedType:", selectedType);
+    if (selectedType === 'PENDING') return sprint.status === 'PENDING';
+    if (selectedType === 'PLANNING') return sprint.status === 'PLANNING';
+    if (selectedType === 'RETROSPECTIVE') return sprint.status === 'RETROSPECTIVE';
     return false;
   });
 
@@ -78,7 +86,7 @@ const SprintPlanning = ({
       return null;
     }
 
-    if (currentSprint.status === 'in_progress') {
+    if (currentSprint.status === 'PENDING') {
       return (
         <Button 
           variant="outline" //themeColor 
@@ -90,7 +98,7 @@ const SprintPlanning = ({
       );
     }
 
-    if (currentSprint.status === 'planning') {
+    if (currentSprint.status === 'PLANNING') {
       return (
         <Button 
           variant="default" 
@@ -154,9 +162,10 @@ const SprintPlanning = ({
     }
   }, [teamId, projectId]);
 
-  // 选择冲刺时加载该冲刺的任务
+  // 选择冲刺时加载该冲刺的任务和成员
   useEffect(() => {
-    if (selectedSprint) {
+    if (selectedSprint && selectedSprint.id) {
+      // 获取冲刺任务
       // 这里应该从数据库获取冲刺任务
       // fetchSprintTasks(selectedSprint.id);
       
@@ -183,135 +192,246 @@ const SprintPlanning = ({
       ];
       
       setSprintTasks(mockSprintTasks);
+      
+      // 获取该冲刺的成员数据
+      console.log(`选中冲刺 ${selectedSprint.id}，获取成员数据`);
+      dispatch(fetchAgileMembers(selectedSprint.id));
     } else {
       setSprintTasks([]);
     }
-  }, [selectedSprint]);
+  }, [selectedSprint, dispatch]);
 
   // 自动选中当前类型下的第一个冲刺
   useEffect(() => {
+    console.log('筛选后的sprints变化:', filteredSprints);
     if (
       filteredSprints.length > 0 &&
-      (!selectedSprint || !filteredSprints.some(s => s.id === selectedSprint.id))
+      (!selectedSprint || !filteredSprints.some(s => s.id === selectedSprint?.id))
     ) {
+      console.log('自动选择第一个冲刺:', filteredSprints[0]);
       setSelectedSprint(filteredSprints[0]);
     } else if (filteredSprints.length === 0) {
+      console.log('没有筛选后的sprints，设置selectedSprint为null');
       setSelectedSprint(null);
     }
-  }, [selectedType, sprints]);
+  }, [selectedType, filteredSprints]);
 
   // 设置默认选择当前冲刺或最新的冲刺
   useEffect(() => {
+    console.log('sprints或currentSprint变化:', sprints, currentSprint);
+    
     if (currentSprint) {
+      // 总是优先选择当前冲刺
+      console.log('选择currentSprint:', currentSprint);
       setSelectedSprint(currentSprint);
+      setSelectedType(currentSprint.status); // 自动切换到对应的类型标签
     } else if (sprints.length > 0 && !selectedSprint) {
-      // 选择最新的计划中冲刺
-      const planningSprints = sprints.filter(s => s.status === 'planning');
-      if (planningSprints.length > 0) {
-        setSelectedSprint(planningSprints[planningSprints.length - 1]);
-      } else {
-        // 如果没有计划中的冲刺，选择最新的冲刺
-        setSelectedSprint(sprints[sprints.length - 1]);
+      // 如果没有当前冲刺，选择合适的冲刺
+      
+      // 首先尝试选择PENDING状态的冲刺
+      const pendingSprints = sprints.filter(s => s.status === 'PENDING');
+      if (pendingSprints.length > 0) {
+        console.log('选择PENDING状态冲刺:', pendingSprints[0]);
+        setSelectedSprint(pendingSprints[0]);
+        setSelectedType('PENDING');
+        return;
       }
+      
+      // 其次尝试选择PLANNING状态的冲刺
+      const planningSprints = sprints.filter(s => s.status === 'PLANNING');
+      if (planningSprints.length > 0) {
+        console.log('选择PLANNING状态冲刺:', planningSprints[0]);
+        setSelectedSprint(planningSprints[0]);
+        setSelectedType('PLANNING');
+        return;
+      }
+      
+      // 最后选择任意可用的冲刺
+      console.log('选择第一个可用冲刺:', sprints[0]);
+      setSelectedSprint(sprints[0]);
+      setSelectedType(sprints[0].status);
     }
   }, [sprints, currentSprint]);
 
   // 计算冲刺结束日期
   const calculateEndDate = (startDate, duration) => {
     if (!startDate) return null;
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + (parseInt(duration) * 7) - 1); // 减1是因为包括开始日期
-    return endDate;
+    const start = new Date(startDate);
+    const durationInDays = parseInt(duration) * 7; // 将周转换为天数
+    const end = new Date(start);
+    end.setDate(end.getDate() + durationInDays);
+    return end;
   };
 
   // 处理创建新冲刺
   const handleCreateNewSprint = () => {
     if (!newSprint.name || !newSprint.startDate || !newSprint.duration) {
-      return; // 表单验证失败
+      return;
     }
-
-    const endDate = calculateEndDate(newSprint.startDate, newSprint.duration);
     
     const sprintData = {
-      name: newSprint.name,
-      startDate: newSprint.startDate,
-      endDate: endDate,
-      duration: parseInt(newSprint.duration),
-      goal: newSprint.goal
+      ...newSprint,
+      endDate: calculateEndDate(newSprint.startDate, newSprint.duration)
     };
     
     const createdSprint = onCreateSprint(sprintData);
-    setSelectedSprint(createdSprint);
-    setCreateDialogOpen(false);
-    
-    // 重置表单
-    setNewSprint({
-      name: '',
-      startDate: null,
-      endDate: null,
-      duration: '2',
-      goal: ''
-    });
+    if (createdSprint) {
+      setCreateDialogOpen(false);
+      // 重置表单
+      setNewSprint({
+        name: '',
+        startDate: null,
+        endDate: null,
+        duration: '2',
+        goal: ''
+      });
+    }
   };
 
   // 添加任务到冲刺
-  const addTaskToSprint = (taskId) => {
-    if (!selectedSprint || selectedSprint.status !== 'planning') {
-      return; // 只有在计划阶段才能添加任务
-    }
+  const addTaskToSprint = async (taskId) => {
+    if (!selectedSprint) return;
     
-    const task = backlogTasks.find(t => t.id === taskId);
-    if (task) {
-      // 从待办事项中移除
-      setBacklogTasks(prev => prev.filter(t => t.id !== taskId));
-      // 添加到冲刺任务
-      setSprintTasks(prev => [...prev, {...task, status: 'todo'}]);
+    try {
+      // 将任务添加到冲刺
+      const taskIds = selectedSprint.task_ids || [];
+      if (taskIds.includes(taskId)) return; // 避免重复添加
       
-      // 在实际应用中，这里应该调用API保存到数据库
+      const updatedTaskIds = [...taskIds, taskId];
+      
+      const response = await fetch(`/api/teams/agile/sprint/${selectedSprint.id}/tasks`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ taskIds: updatedTaskIds }),
+      });
+      
+      if (!response.ok) throw new Error('添加任务到冲刺失败');
+      
+      // 更新本地状态
+      const updatedSprint = await response.json();
+      setSelectedSprint(updatedSprint);
+      
+      // 添加到当前显示的冲刺任务中
+      const taskDetails = backlogTasks.find(task => task.id === taskId);
+      if (taskDetails) {
+        setSprintTasks([...sprintTasks, taskDetails]);
+      }
+    } catch (error) {
+      console.error('添加任务到冲刺失败:', error);
     }
   };
 
   // 从冲刺中移除任务
-  const removeTaskFromSprint = (taskId) => {
-    if (!selectedSprint || selectedSprint.status !== 'planning') {
-      return; // 只有在计划阶段才能移除任务
-    }
+  const removeTaskFromSprint = async (taskId) => {
+    if (!selectedSprint) return;
     
-    const task = sprintTasks.find(t => t.id === taskId);
-    if (task) {
-      // 从冲刺任务中移除
-      setSprintTasks(prev => prev.filter(t => t.id !== taskId));
-      // 添加回待办事项
-      setBacklogTasks(prev => [...prev, {...task, assignee: null}]);
+    try {
+      // 从冲刺中移除任务
+      const taskIds = selectedSprint.task_ids || [];
+      const updatedTaskIds = taskIds.filter(id => id !== taskId);
       
-      // 在实际应用中，这里应该调用API保存到数据库
+      const response = await fetch(`/api/teams/agile/sprint/${selectedSprint.id}/tasks`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ taskIds: updatedTaskIds }),
+      });
+      
+      if (!response.ok) throw new Error('从冲刺中移除任务失败');
+      
+      // 更新本地状态
+      const updatedSprint = await response.json();
+      setSelectedSprint(updatedSprint);
+      
+      // 从当前显示的冲刺任务中移除
+      setSprintTasks(sprintTasks.filter(task => task.id !== taskId));
+    } catch (error) {
+      console.error('从冲刺中移除任务失败:', error);
     }
   };
 
   // 更新任务优先级
-  const moveTaskPriority = (taskId, direction) => {
-    const tasks = [...backlogTasks];
-    const taskIndex = tasks.findIndex(t => t.id === taskId);
-    
-    if (taskIndex === -1) return; // 任务不存在
-    if (
-      (direction === 'up' && taskIndex === 0) || 
-      (direction === 'down' && taskIndex === tasks.length - 1)
-    ) {
-      return; // 已经是最高或最低优先级
+  const moveTaskPriority = async (taskId, direction) => {
+    if (!selectedSprint) return;
+
+    try {
+      // 获取当前任务顺序
+      const taskIds = [...(selectedSprint.task_ids || [])];
+      const currentIndex = taskIds.indexOf(taskId);
+      
+      if (currentIndex === -1) return; // 任务不在冲刺中
+      
+      let newIndex;
+      if (direction === 'up' && currentIndex > 0) {
+        newIndex = currentIndex - 1;
+      } else if (direction === 'down' && currentIndex < taskIds.length - 1) {
+        newIndex = currentIndex + 1;
+      } else {
+        return; // 无法移动
+      }
+      
+      // 更改顺序
+      taskIds.splice(currentIndex, 1);
+      taskIds.splice(newIndex, 0, taskId);
+      
+      const response = await fetch(`/api/teams/agile/sprint/${selectedSprint.id}/tasks`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ taskIds }),
+      });
+      
+      if (!response.ok) throw new Error('调整任务优先级失败');
+      
+      // 更新本地状态
+      const updatedSprint = await response.json();
+      setSelectedSprint(updatedSprint);
+      
+      // 重新排序当前显示的任务
+      const orderedTasks = [];
+      for (const id of taskIds) {
+        const task = sprintTasks.find(t => t.id === id);
+        if (task) orderedTasks.push(task);
+      }
+      setSprintTasks(orderedTasks);
+    } catch (error) {
+      console.error('调整任务优先级失败:', error);
+      toast.error(t('moveTaskError'));
     }
-    
-    const newIndex = direction === 'up' ? taskIndex - 1 : taskIndex + 1;
-    const task = tasks[taskIndex];
-    
-    // 移除任务
-    tasks.splice(taskIndex, 1);
-    // 在新位置插入任务
-    tasks.splice(newIndex, 0, task);
-    
-    setBacklogTasks(tasks);
-    
-    // 在实际应用中，这里应该调用API保存到数据库
+  };
+
+  // 检查agileMembers中的角色ID并获取详细信息
+  useEffect(() => {
+    if (agileMembers.length > 0 && agileRoles.length > 0) {
+      // 收集所有角色ID
+      const roleIds = [...new Set(agileMembers.map(member => member.role_id).filter(Boolean))];
+      
+      // 检查哪些角色ID在agileRoles中找不到对应信息
+      const missingRoleIds = roleIds.filter(roleId => 
+        !agileRoles.some(role => role && role.id && roleId && role.id.toString() === roleId.toString())
+      );
+      
+      console.log('需要获取详情的角色IDs:', missingRoleIds);
+      
+      // 为缺失的角色ID获取详细信息
+      missingRoleIds.forEach(roleId => {
+        if (roleId) {
+          dispatch(fetchAgileRoleById(roleId));
+        }
+      });
+    }
+  }, [agileMembers, agileRoles, dispatch]);
+
+  // 自定义成员更新处理函数
+  const handleUpdateMembers = () => {
+    console.log('【SprintPlanning】刷新成员信息');
+    if (selectedSprint && selectedSprint.id && typeof onUpdateMembers === 'function') {
+      onUpdateMembers(selectedSprint.id);
+    }
   };
 
   // 渲染创建冲刺对话框
@@ -345,7 +465,16 @@ const SprintPlanning = ({
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {newSprint.startDate ? format(newSprint.startDate, "yyyy-MM-dd") : t('selectDate')}
+                  {newSprint.startDate ? 
+                    (() => {
+                      try {
+                        return format(newSprint.startDate, "yyyy-MM-dd")
+                      } catch(e) {
+                        console.error("Invalid startDate format:", e);
+                        return t('selectDate');
+                      }
+                    })() 
+                    : t('selectDate')}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -389,7 +518,15 @@ const SprintPlanning = ({
             <div className="space-y-2">
               <Label>{t('endDate')}</Label>
               <Input 
-                value={format(calculateEndDate(newSprint.startDate, newSprint.duration), "yyyy-MM-dd")} 
+                value={(() => {
+                  try {
+                    const endDate = calculateEndDate(newSprint.startDate, newSprint.duration);
+                    return endDate ? format(endDate, "yyyy-MM-dd") : "";
+                  } catch(e) {
+                    console.error("Error calculating end date:", e);
+                    return "";
+                  }
+                })()} 
                 readOnly 
               />
             </div>
@@ -421,6 +558,75 @@ const SprintPlanning = ({
     </Dialog>
   );
 
+  // 渲染基于当前选择和状态的内容
+  const renderContent = () => {
+    console.log('renderContent - selectedSprint:', selectedSprint, 'sprints:', sprints, 'filteredSprints:', filteredSprints);
+    
+    // 处理没有选中sprint的情况
+    if (!selectedSprint) {
+      console.log('没有选中的Sprint，sprints长度:', sprints.length);
+      return (
+        <div className="text-center p-8">
+          {loading ? (
+            <div>{t('loading')}</div>
+          ) : sprints.length === 0 ? (
+            // 如果没有任何Sprint，显示创建Sprint按钮
+            <div>
+              <p className="mb-4">{t('noSprintsFound')}</p>
+              <Button 
+                onClick={() => setCreateDialogOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {t('createFirstSprint')}
+              </Button>
+            </div>
+          ) : (
+            // 如果有Sprint但没有选中，可能是因为筛选条件
+            <div>
+              <p className="mb-4">{t('noSprintsMatchFilter')}</p>
+              <Button 
+                onClick={() => setCreateDialogOpen(true)}
+                className="mt-4"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {t('createSprint')}
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 根据所选冲刺状态和类型显示不同组件
+    if (selectedType === 'RETROSPECTIVE') {
+      return (
+        <SprintRetrospective 
+          sprint={selectedSprint} 
+          agileMembers={agileMembers}
+        />
+      );
+    } else if (selectedType === 'PENDING' || selectedType === 'PLANNING') {
+      return (
+        <>
+          <RoleAssignment 
+            teamId={teamId}
+            agileId={selectedSprint.id}
+            agileRoles={Array.isArray(agileRoles) ? agileRoles : []}
+            agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
+            onUpdateMembers={handleUpdateMembers}
+          />
+          <SprintBoard 
+            sprint={selectedSprint} 
+            tasks={sprintTasks}
+            agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
+          />
+        </>
+      );
+    }
+    
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       {/* 冲刺选择和操作区 */}
@@ -428,7 +634,7 @@ const SprintPlanning = ({
         <div className="flex items-center space-x-2">
           <Label className="text-sm font-medium">{t('type')}:</Label>
           <Select 
-              value={selectedType ? selectedType : 'pending'} 
+              value={selectedType ? selectedType : 'PENDING'} 
               onValueChange={(value) => {
                 setSelectedType(value)
               }}
@@ -437,13 +643,13 @@ const SprintPlanning = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem key="pending" value="pending">
+                <SelectItem key="PENDING" value="PENDING">
                   {t('pending')}
                 </SelectItem>
-                <SelectItem key="planning" value="planning">
+                <SelectItem key="PLANNING" value="PLANNING">
                   {t('planning')}
                 </SelectItem>
-                <SelectItem key="retrospective" value="retrospective">
+                <SelectItem key="RETROSPECTIVE" value="RETROSPECTIVE">
                   {t('retrospective')}
                 </SelectItem>
               </SelectContent>
@@ -460,53 +666,47 @@ const SprintPlanning = ({
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder={t('selectSprintPlan')} />
             </SelectTrigger>
-            {selectedType === 'pending' && (
+            {selectedType === 'PENDING' && (
               <SelectContent>
-
                 {/* only can display inProgress sprint */}
                 {sprints.map(sprint  => (
-                  sprint.status === 'in_progress' && (
+                  sprint.status === 'PENDING' && (
                     <SelectItem key={sprint.id} value={sprint.id.toString() }>
                       {sprint.name} 
                     </SelectItem>
                   )
                 ))}
-              
               </SelectContent>
             )}
-             {selectedType === 'planning' && (
+             {selectedType === 'PLANNING' && (
               <SelectContent>
-
                 {/* only can display planning sprint */}
                 {sprints.map(sprint  => (
-                  (sprint.status === 'planning') && (
+                  (sprint.status === 'PLANNING') && (
                     <SelectItem key={sprint.id} value={sprint.id.toString() }>
                       {sprint.name} 
                     </SelectItem>
                   )
                 ))}
-              
               </SelectContent>
             )}
-            {selectedType === 'retrospective' && (
+            {selectedType === 'RETROSPECTIVE' && (
               <SelectContent>
-
                 {/* only can display completed sprint */}
                 {sprints.map(sprint  => (
-                  sprint.status === 'completed' && (
+                  sprint.status === 'RETROSPECTIVE' && (
                     <SelectItem key={sprint.id} value={sprint.id.toString() }>
                       {sprint.name} 
                     </SelectItem>
                   )
                 ))}
-              
               </SelectContent>
             )}
           </Select>
         </div>
         
         <div className="flex space-x-2">
-          {selectedType === 'planning' && !selectedSprint && (
+          {selectedType === 'PLANNING' && !selectedSprint && (
             <Button 
               variant="outline" 
               onClick={() => setCreateDialogOpen(true)}
@@ -515,7 +715,7 @@ const SprintPlanning = ({
               {t('createSprint')}
             </Button>
           )}
-          {selectedSprint && (selectedSprint.status === 'planning') && (
+          {selectedSprint && (selectedSprint.status === 'PLANNING') && (
             <>
               <Button 
                 variant="outline" 
@@ -547,9 +747,15 @@ const SprintPlanning = ({
               </div>
             </div>
 
-            {selectedSprint && (selectedSprint.status === 'in_progress') && (
+            {selectedSprint && (selectedSprint.status === 'PENDING') && (
               <div>
-                {renderSprintActionButton()}
+                <Button 
+                  variant="outline" //themeColor 
+                  onClick={() => onCompleteSprint(selectedSprint.id)}
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  {t('completeSprint')}
+                </Button>
               </div>
             )}
                 
@@ -564,19 +770,41 @@ const SprintPlanning = ({
               <div>
                 <p className="text-sm font-medium">{t('status')}:</p>
                 <p>
-                  {selectedSprint.status === 'planning' && t('planning')}
-                  {selectedSprint.status === 'in_progress' && t('inProgress')}
-                  {selectedSprint.status === 'completed' && t('completed')}
+                  {selectedSprint.status === 'PLANNING' && t('planning')}
+                  {selectedSprint.status === 'PENDING' && t('inProgress')}
+                  {selectedSprint.status === 'RETROSPECTIVE' && t('completed')}
                 </p>
               </div>
               
               <div>
                 <p className="text-sm font-medium">{t('startDate')}:</p>
-                <p>{format(new Date(selectedSprint.startDate), "yyyy-MM-dd")}</p>
+                <p>
+                  {selectedSprint.startDate ? 
+                    (() => {
+                      try {
+                        return format(new Date(selectedSprint.startDate), "yyyy-MM-dd")
+                      } catch(e) {
+                        console.error("Invalid startDate format:", selectedSprint.startDate)
+                        return selectedSprint.startDate || "-"
+                      }
+                    })() 
+                    : "-"}
+                </p>
               </div>
               <div>
                 <p className="text-sm font-medium">{t('endDate')}:</p>
-                <p>{format(new Date(selectedSprint.endDate), "yyyy-MM-dd")}</p>
+                <p>
+                  {selectedSprint.endDate ? 
+                    (() => {
+                      try {
+                        return format(new Date(selectedSprint.endDate), "yyyy-MM-dd")
+                      } catch(e) {
+                        console.error("Invalid endDate format:", selectedSprint.endDate)
+                        return selectedSprint.endDate || "-"
+                      }
+                    })() 
+                    : "-"}
+                </p>
               </div>
               <div>
                 <p className="text-sm font-medium">{t('duration')}:</p>
@@ -592,31 +820,10 @@ const SprintPlanning = ({
           )}
         </BodyContent>
       )}
-      {(selectedType === 'pending' || selectedType === 'planning') && (
-        <>
-          <RoleAssignment 
-            teamId={teamId}
-            projectId={projectId}
-          />
-          {(selectedSprint) && (
-            <SprintBoard 
-              teamId={teamId}
-              projectId={projectId}
-              currentSprint={currentSprint}
-              sprints={sprints}
-            />
-          )}
-        </>
-      )}
-      {selectedType === 'retrospective' && (
-        <>
-          <SprintRetrospective 
-            teamId={teamId}
-            projectId={projectId}
-            sprints={sprints.filter(s => s.status === 'completed')}
-          />
-        </>
-      )}      
+      
+      {/* 主要内容区域 */}
+      {renderContent()}
+      
       {renderCreateSprintDialog()}
     </div>
   );

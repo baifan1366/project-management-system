@@ -2331,6 +2331,27 @@
     "sprintPlan": "Sprint Plan",
     "selectSprintPlan": "Select Sprint Plan",
     "retrospective": "Retrospective",
-    "board": "Board"  
+    "board": "Board",
+    "backlog": "Backlog",
+    "noBacklogTasks": "No Backlog Tasks",
+    "roleInfo": "Role Information",
+    "createRole": "Create Role",
+    "createNewRole": "Create New Role",
+    "roleName": "Role Name",
+    "roleNamePlaceholder": "e.g., Scrum Manager",
+    "roleDescription": "Role Description",
+    "roleDescriptionPlaceholder": "e.g., Responsible for managing the sprint and tasks",
+    "sprintBoard": "Sprint Board",
+    "assignTo": "Assign To",
+    "moveToProgress": "Move to Progress",
+    "markAsDone": "Mark as Done",
+    "enterWhatWentWell": "Enter what went well",
+    "noItemsYet": "No items yet",
+    "enterToImprove": "Emter to improve",
+    "noRole": "No role",
+    "role": "Role",
+    "availableRoles": "Available Roles",
+    "noTeamMembers": "No team members",
+    "updating": "Updating..." 
   }
 }

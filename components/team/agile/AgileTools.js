@@ -43,7 +43,7 @@ const AgileTools = ({ currentSprint, onStartSprint, onCompleteSprint }) => {
       return null;
     }
 
-    if (currentSprint.status === 'in_progress') {
+    if (currentSprint.status === 'PENDING') {
       return (
         <Button 
           variant="default" 
@@ -57,7 +57,7 @@ const AgileTools = ({ currentSprint, onStartSprint, onCompleteSprint }) => {
       );
     }
 
-    if (currentSprint.status === 'planning') {
+    if (currentSprint.status === 'PLANNING') {
       return (
         <Button 
           variant="default" 
