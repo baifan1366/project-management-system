@@ -876,6 +876,7 @@
     "newPrivateChat": "New Private Chat",
     "newGroupChat": "New Group Chat",
     "noMessages": "No messages yet",
+    "noRecentMessages": "No recent messages",
     "inputPlaceholder": "Type a message here...",
     "send": "Send",
     "attachFile": "Attach file",
@@ -964,7 +965,8 @@
       "recentSearches": "Recent searches",
       "clearAll": "Clear all",
       "searching": "Searching...",
-      "matchesFound": "matching message(s)"
+      "matchesFound": "matching message(s)",
+      "resultsFilteredByCleared": "Some results may be filtered by cleared history"
     },
     "confirmDelete": "Delete Message",
     "confirmDeleteDesc": "Are you sure you want to withdraw this message? This action cannot be undone and both parties will see that the message was withdrawn.",
@@ -988,7 +990,10 @@
     "activeChats": "Active chats",
     "unhide": "Unhide",
     "chatUnhidden": "Chat is now visible",
-    "errors": {
+    "allHiddenChats": "All Hidden Chats",
+    "show": "Show",
+     "hide": "Hide",
+     "errors": {
       "deleteFailed": "Failed to hide chat",
       "notLoggedIn": "You need to be logged in",
       "muteFailed": "Failed to update notification settings",
@@ -1284,7 +1289,9 @@
     "viewTaskDescription": "Description for viewing a task",
     "cannotEditPastTask": "Cannot edit past tasks",
     "cannotDeletePastTask": "Cannot delete past tasks",
-    "close": "Close"
+    "close": "Close",
+    "cantCreateEventInPast": "Can't create events in the past",
+    "showEvents": "Show Events"
   },
   "CreateTag": {
     "createTag": "Create New Field",
@@ -1687,10 +1694,12 @@
     "loading": "Loading...",
     "emailOutput": "Send Email",
     "workflowTypes": {
-      "ppt_generation": "PowerPoint Generation",
-      "document_generation": "Document Generation",
       "api_request": "API Request",
-      "data_analysis": "Data Analysis"
+      "data_analysis": "Data Analysis",
+      "document_generation": "Document Generation",
+      "email_message": "Email Message",
+      "learning_content": "Learning Content",
+      "ppt_generation": "PowerPoint Generation"
     },
     "failedToLoadModels": "Failed to load AI models",
     "userNotAuthenticated": "User not authenticated",
@@ -1700,7 +1709,28 @@
     "failedToDeleteWorkflow": "Failed to delete workflow",
     "failedToExecuteWorkflow": "Failed to execute workflow",
     "nodeConnected": "Nodes connected",
-    "running": "Running..."
+    "running": "Running...",
+    "generationError": "Generation Error",
+    "taskCreationResults": "Task Creation Results",
+    "createdTasks": "Created Tasks:",
+    "emailSendingResults": "Email Sending Results",
+    "emailSendingFailed": "Failed to send emails",
+    "emailDetails": "Email Details",
+    "smtpConfig": "SMTP Config",
+    "custom": "Custom",
+    "default": "Default (Environment)",
+    "recipients": "Recipients",
+    "subject": "Subject",
+    "smtp": "SMTP",
+    "smtpHost": "SMTP Host",
+    "smtpPort": "SMTP Port",
+    "smtpUser": "SMTP User",
+    "smtpPassword": "SMTP Password",
+    "smtpFrom": "From Email",
+    "emailTemplate": "Email Template",
+    "useCustomSmtp": "Use custom SMTP settings",
+    "emailSettings": "Email Settings",
+    "sendEmail": "Send Email"
   },
   "TeamOverview": {
     "teamDescription": "Team Description",
@@ -2371,6 +2401,17 @@
     "deleteRoleConfirmTitle": "Confirm Delete Role",
     "deleteRoleConfirmDescription": "Are you sure you want to delete this role? This action cannot be undone.",
     "edit": "Edit",
-    "moveTaskError": "Move Task Error"
+    "moveTaskError": "Move Task Error",
+    "mustHaveOwner": "Must have owner",
+    "ownerDescription": "Team owner. Can manage team members and access settings.",
+    "deleteTaskTitle": "Confirm Delete Task",
+    "deleteTaskDescription": "Are you sure you want to delete this task? This action cannot be undone.",
+    "taskDeleted": "Task has been successfully deleted",
+    "close": "Close",
+    "deleteTaskFailed": "Failed to delete task",
+    "teamNotFound": "TEAM NOT FOUND",
+    "noAccessToTeam": "You do not have access to this team. You may not be a team member or team owner.",
+    "deleteTabTitle": "Delete View",
+    "deleteTabConfirm": "Are you sure you want to delete this view? This action cannot be undone."
   }
 }

@@ -552,16 +552,10 @@ export function ChatProvider({ children }) {
       return;
     }
 
-    // Get user metadata for cleared chat history
-    let clearedTimestamp = null;
-    try {
-      // Get cleared history timestamp from localStorage
-      const clearedHistory = JSON.parse(localStorage.getItem('cleared_chat_history') || '{}');
-      clearedTimestamp = clearedHistory[sessionId];
-    } catch (error) {
-      console.error('Error fetching cleared history data:', error);
-    }
+    // 清空消息状态以避免显示旧消息
+    setMessages([]);
 
+    // 获取所有消息
     const { data, error } = await supabase
       .from('chat_message')
       .select(`
@@ -598,15 +592,8 @@ export function ChatProvider({ children }) {
       return;
     }
 
-    // Filter messages based on cleared history timestamp if it exists
-    let filteredMessages = data;
-    if (clearedTimestamp) {
-      filteredMessages = data.filter(msg => 
-        new Date(msg.created_at) > new Date(clearedTimestamp)
-      );
-    }
-
-    setMessages(filteredMessages.map(msg => ({
+    // Set all messages with proper avatar processing
+    setMessages(data.map(msg => ({
       ...msg,
       user: processAvatarUrl(msg.user),
       replied_message: msg.replied_message ? {
@@ -823,7 +810,7 @@ export function ChatProvider({ children }) {
     // 记录已发送的消息ID，用于防止重复添加
     sentMessageIds.add(data.id);
     
-    // 将消息添加到本地状态
+    // Add message to the UI
     setMessages(prev => [...prev, { 
       ...data, 
       user: processAvatarUrl(data.user),
@@ -832,6 +819,22 @@ export function ChatProvider({ children }) {
         user: processAvatarUrl(data.replied_message.user)
       } : null
     }]);
+    
+    // 同时更新会话的最后一条消息
+    setSessions(prev => {
+      return prev.map(session => {
+        if (session.id === sessionId) {
+          return {
+            ...session,
+            lastMessage: {
+              ...data,
+              user: processAvatarUrl(data.user)
+            }
+          };
+        }
+        return session;
+      });
+    });
     
     // 如果发送的消息可能关联有附件（通过FileUploader组件上传的），
     // 可能需要等待一小段时间再重新获取完整的消息数据（包括附件信息）
@@ -884,6 +887,22 @@ export function ChatProvider({ children }) {
                 } 
               : msg
           );
+        });
+        
+        // Also update the session's last message
+        setSessions(prev => {
+          return prev.map(session => {
+            if (session.id === sessionId) {
+              return {
+                ...session,
+                lastMessage: {
+                  ...refreshedData,
+                  user: processAvatarUrl(refreshedData.user)
+                }
+              };
+            }
+            return session;
+          });
         });
       }
     }, 500); // 等待500ms确保附件处理完成
@@ -1001,7 +1020,8 @@ export function ChatProvider({ children }) {
           console.error('Error fetching complete message data:', error);
           return;
         }
-
+        
+        // Always add new messages to the UI without filtering
         setMessages(prev => {
           // 检查消息是否已经存在
           const messageExists = prev.some(msg => msg.id === messageData.id);
@@ -1018,7 +1038,8 @@ export function ChatProvider({ children }) {
           }];
         });
         
-        // 更新会话列表中的最后一条消息
+        // Always update the session's last message regardless of cleared history status
+        // This ensures the chat list shows the latest message
         setSessions(prev => {
           return prev.map(session => {
             if (session.id === payload.new.session_id) {
@@ -1148,10 +1169,6 @@ export function ChatProvider({ children }) {
           return;
         }
         
-        // 检查消息是否需要标记为未读（如果发送者不是当前用户，且不是当前打开的会话）
-        const isFromOtherUser = messageData.user_id !== authSession.id;
-        const isNotCurrentSession = currentSession?.id !== payload.new.session_id;
-        
         // 获取用户元数据，检查该会话是否被隐藏
         let isHiddenSession = false;
         try {
@@ -1161,6 +1178,10 @@ export function ChatProvider({ children }) {
         } catch (err) {
           console.error('Error checking hidden sessions:', err);
         }
+
+        // 检查消息是否需要标记为未读（如果发送者不是当前用户，且不是当前打开的会话）
+        const isFromOtherUser = messageData.user_id !== authSession.id;
+        const isNotCurrentSession = currentSession?.id !== payload.new.session_id;
         
         // 更新会话列表中的最后一条消息和未读计数
         setSessions(prev => {
@@ -1177,8 +1198,10 @@ export function ChatProvider({ children }) {
           
           // 如果会话存在，更新它
           if (sessionIndex !== -1) {
-            // 如果是其他用户发送的消息，且不是当前打开的会话，增加未读计数
-            const newUnreadCount = isFromOtherUser && isNotCurrentSession 
+            // 如果是其他用户发送的消息，且不是当前打开的会话，则增加未读计数
+            const shouldIncrementUnread = isFromOtherUser && isNotCurrentSession;
+            
+            const newUnreadCount = shouldIncrementUnread
               ? (newSessions[sessionIndex].unreadCount || 0) + 1 
               : newSessions[sessionIndex].unreadCount || 0;
               

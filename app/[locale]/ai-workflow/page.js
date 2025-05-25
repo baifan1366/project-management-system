@@ -250,7 +250,7 @@ export default function AIWorkflow() {
       setEdges((eds) => addEdge(newEdge, eds));
       
       // 提示用户连接已创建
-      toast.success('节点已连接');
+      toast.success('Node connected successfully');
     },
     [setEdges]
   );
@@ -989,10 +989,15 @@ export default function AIWorkflow() {
         };
         break;
       case 'ai_model':
+        // Find existing process nodes to calculate new position
+        const processNodes = nodes.filter(n => n.data.nodeType === 'process');
+        const xOffset = processNodes.length * 50 + 250; // Offset x position based on number of existing process nodes
+        const yPosition = 200; // Keep y position the same
+        
         node = {
           id,
           type: 'workflowNode',
-          position: { x: 400, y: 200 },
+          position: { x: xOffset, y: yPosition },
           data: { 
             label: 'AI Processing',
             icon: <Settings size={20} />,
@@ -1026,7 +1031,7 @@ export default function AIWorkflow() {
   };
   
   return (
-    <div className="flex flex-col h-screen bg-[#f5f5f5] dark:bg-[#1f1f1f]">
+    <div className="flex flex-col h-screen bg-[#f5f5f5] dark:bg-[#000000]">
       <div className="grid grid-cols-12 gap-4 p-4 h-full">
         {/* Left panel - Workflow List */}
         <div className={`${isPanelCollapsed ? 'col-span-1' : 'col-span-3'} bg-white dark:bg-[#282828] rounded-lg shadow-sm border border-gray-100 dark:border-[#333333] overflow-hidden transition-all duration-300`}>
@@ -1513,22 +1518,8 @@ export default function AIWorkflow() {
                         </div>
                       )}
                       
-                      {/* Document Information */}
-                      {executionResult.documentInfo && (
-                        <div className="mt-2 bg-green-50 dark:bg-[#223a30] p-3 rounded-md text-xs border border-green-100 dark:border-[#2a4a3d]">
-                          <div className="font-medium text-green-600 dark:text-green-400 mb-1">
-                            {executionResult.documentInfo.type}
-                          </div>
-                          <ul className="list-disc pl-4 text-gray-600 dark:text-gray-400">
-                            {executionResult.documentInfo.features.map((feature, index) => (
-                              <li key={index}>{feature}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      
                       {/* PowerPoint Presentation */}
-                      {(executionResult.ppt || executionResult.pptxUrl) && (
+                      {(executionResult.ppt || executionResult.pptxUrl) ? (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <PresentationIcon className="h-5 w-5 text-blue-500 dark:text-blue-400 mr-2" />
@@ -1545,6 +1536,21 @@ export default function AIWorkflow() {
                             {t('download')}
                           </a>
                         </div>
+                      ) : (
+                        executionResult.results && executionResult.results.ppt && executionResult.ppt_error && (
+                          <div className="flex flex-col">
+                            <div className="flex items-center">
+                              <PresentationIcon className="h-5 w-5 text-orange-500 dark:text-orange-400 mr-2" />
+                              <span className="dark:text-gray-200">{t('powerPointPresentation')}</span>
+                              <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full dark:bg-orange-900/30 dark:text-orange-300">
+                                {t('generationError') || 'Generation Error'}
+                              </span>
+                            </div>
+                            <div className="mt-2 bg-orange-50 dark:bg-[#382820] p-2 rounded-md text-xs border border-orange-100 dark:border-[#483830]">
+                              <p className="text-orange-700 dark:text-orange-300">{executionResult.ppt_error}</p>
+                            </div>
+                          </div>
+                        )
                       )}
                     </div>
                   </div>
