@@ -616,6 +616,28 @@ export default function PaymentPage() {
     }
   };
 
+  // 添加一个格式化价格和计费周期的函数
+  const formatPlanPriceAndInterval = (plan) => {
+    if (!plan) return 'US$0.00';
+
+    const formattedPrice = `US$${plan.price.toFixed(2)}`;
+
+    // 如果没有计费周期（比如免费计划）
+    if (!plan.billing_interval) {
+      return plan.type === 'FREE' ? 'Free' : formattedPrice;
+    }
+
+    // 根据计费周期显示不同文案
+    switch (plan.billing_interval) {
+      case 'MONTHLY':
+        return `${formattedPrice} per month`;
+      case 'YEARLY':
+        return `${formattedPrice} per month, billed annually`;
+      default:
+        return formattedPrice;
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -650,13 +672,13 @@ export default function PaymentPage() {
             {planDetails ? `Subscribe to ${planDetails.name}` : 'Subscribe to Team Sync'}
           </h1>
           <div className="text-4xl font-bold mb-2">
-            {planDetails ? formatPrice(planDetails.price) : '$0.00'}
+            {planDetails ? formatPlanPriceAndInterval(planDetails) : '$0.00'}
             <span className="text-sm">
               {getBillingText()}
             </span>
           </div>
           <div className="text-gray-400">
-            {planDetails ? `US$${planDetails.price.toFixed(2)} per month, billed annually` : 'US$10.00 per month, billed annually'}
+            {planDetails ? formatPlanPriceAndInterval(planDetails) : 'US$10.00 per month, billed annually'}
           </div>
         </div>
 
@@ -664,7 +686,7 @@ export default function PaymentPage() {
         <div className="space-y-6">
           <div className="flex justify-between">
             <span>{planDetails ? planDetails.name : 'Team Sync'}</span>
-            <span>{planDetails ? formatPrice(planDetails.price) : '$0.00'}</span>
+            <span>{planDetails ? formatPlanPriceAndInterval(planDetails) : '$0.00'}</span>
           </div>
 
           <div className="text-sm text-gray-400">
@@ -764,20 +786,20 @@ export default function PaymentPage() {
 
           <div className="flex justify-between border-t border-gray-800 pt-4">
             <span>Today's Subtotal</span>
-            <span>{formatPrice(calculateSubTotal())}</span>
+            <span>{formatPlanPriceAndInterval(planDetails)}</span>
           </div>
 
           {validPromo && discount > 0 && (
             <div className="flex justify-between text-green-400 pt-2">
               <span>Discount ({appliedPromoCode})</span>
-              <span>-{formatPrice(discount)}</span>
+              <span>-{formatPlanPriceAndInterval(planDetails)}</span>
             </div>
           )}
 
           {validPromo && (
             <div className="flex justify-between border-t border-gray-800 pt-4 font-bold">
               <span>Total</span>
-              <span>{formatPrice(calculateFinalTotal())}</span>
+              <span>{formatPlanPriceAndInterval(planDetails)}</span>
             </div>
           )}
         </div>
