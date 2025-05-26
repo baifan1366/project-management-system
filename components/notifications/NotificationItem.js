@@ -35,8 +35,20 @@ export default function NotificationItem({ notification, onAction, formatDateToU
   
   // Format using relative time (e.g. "2 hours ago")
   const formatDate = (date) => {
-    const d = new Date(date);
-    return formatDistanceToNow(d, { addSuffix: true });
+    if (!date) return '';
+    
+    try {
+      // First adjust the timestamp according to user timezone
+      // This ensures the relative time is calculated from the user's perspective
+      const adjustedDate = formatDateToUserTimezone 
+        ? new Date(formatDateToUserTimezone(date, { dateStyle: undefined, timeStyle: undefined })) 
+        : new Date(date);
+      
+      return formatDistanceToNow(adjustedDate, { addSuffix: true });
+    } catch (error) {
+      console.error('Error formatting relative time:', error);
+      return formatDistanceToNow(new Date(date), { addSuffix: true });
+    }
   };
 
   // Format exact date and time using user's timezone
