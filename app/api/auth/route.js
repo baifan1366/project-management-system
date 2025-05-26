@@ -95,9 +95,18 @@ async function handleLogin(data) {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     
     if (!isMatch) {
+      console.log(`Failed login attempt for user: ${user.email} - Invalid password`);
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
+      );
+    }
+
+    // Check if the account is verified
+    if (user.email_verified === false) {
+      return NextResponse.json(
+        { error: 'Please verify your email address before logging in', needVerification: true },
+        { status: 403 }
       );
     }
 
@@ -139,16 +148,18 @@ async function handleLogin(data) {
     };
     
     try {
-      await cookies().set('auth_token', token, cookieOptions);
+      // Create cookies store once and reuse it
+      const cookieStore = cookies();
+      await cookieStore.set('auth_token', token, cookieOptions);
       
       // For client-side detection of login state (non-sensitive)
-      await cookies().set('user_logged_in', 'true', {
+      await cookieStore.set('user_logged_in', 'true', {
         ...cookieOptions,
         httpOnly: false // Allow JavaScript to read this cookie
       });
       
       // Log all cookies for debugging
-      const allCookies = await cookies().getAll();
+      const allCookies = await cookieStore.getAll();
       console.log('All cookies:', Object.fromEntries(allCookies.map(c => [c.name, c.value])));
     } catch (cookieError) {
       console.error('Error setting cookies:', cookieError);
@@ -331,11 +342,12 @@ async function handleSignup(data) {
 async function handleLogout() {
   try {
     // Clear the auth cookie
-    await cookies().delete('auth_token');
-    await cookies().delete('user_logged_in');
+    const cookieStore = cookies();
+    await cookieStore.delete('auth_token');
+    await cookieStore.delete('user_logged_in');
     
     // Log cookies after clearing
-    const remainingCookies = await cookies().getAll();
+    const remainingCookies = await cookieStore.getAll();
     console.log('Cookies after logout:', Object.fromEntries(remainingCookies.map(c => [c.name, c.value])));
 
     return NextResponse.json({

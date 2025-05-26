@@ -1485,8 +1485,13 @@
         "description": "We've sent a verification link to",
         "spam": "Didn't receive the email? Check your spam folder or",
         "resend": "click here to resend",
-        "resending": "sending..."
+        "resending": "sending...",
+        "loading": "Verifying your email..."
       }
+    },
+    "emailVerification": {
+      "title": "Email Verification",
+      "loading": "Verifying your email..."
     },
     "signup": {
       "title": "Sign up",
@@ -1533,7 +1538,7 @@
       "newPassword": "New Password",
       "confirmPassword": "Confirm Password",
       "button": "Reset Password",
-      "resetting": "Resetting...",
+      "processing": "Resetting...",
       "successTitle": "Password Reset Successfully",
       "successMessage": "Your password has been reset successfully.",
       "redirecting": "Redirecting to login page...",
@@ -1541,7 +1546,12 @@
       "missingToken": "Missing password reset token",
       "invalidToken": "Invalid token format",
       "requestNewLink": "Request a new reset link",
-      "passwordMismatch": "Passwords do not match"
+      "passwordMismatch": "Passwords do not match",
+      "remembered": "Remember your password?",
+      "login": "Login",
+      "tokenExpired": "Your password reset token has expired",
+      "verifying": "Verifying token...",
+      "refreshing": "Refreshing token..."
     }
   },
   "notificationType": {

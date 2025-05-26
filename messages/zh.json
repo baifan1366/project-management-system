@@ -1266,5 +1266,28 @@
     "pendingRemoval": "待移除",
     "undoRemoval": "撤销移除",
     "undoRoleChange": "撤销角色变更"
+  },
+  "auth": {
+    "resetPassword": {
+      "title": "重置密码",
+      "subtitle": "请为您的账户创建新密码。",
+      "newPassword": "新密码",
+      "confirmPassword": "确认密码",
+      "button": "重置密码",
+      "processing": "正在重置...",
+      "successTitle": "密码重置成功",
+      "successMessage": "您的密码已成功重置。",
+      "redirecting": "正在跳转到登录页面...",
+      "error": "重置错误",
+      "missingToken": "缺少密码重置令牌",
+      "invalidToken": "无效的令牌格式",
+      "requestNewLink": "申请新的重置链接",
+      "passwordMismatch": "两次输入的密码不匹配",
+      "remembered": "想起密码了？",
+      "login": "登录",
+      "tokenExpired": "您的密码重置令牌已过期",
+      "verifying": "正在验证令牌...",
+      "refreshing": "正在刷新令牌..."
+    }
   }
 }

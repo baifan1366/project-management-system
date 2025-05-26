@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaEye, FaEyeSlash, FaQuestionCircle, FaCheckCircle, FaTimesCircle, FaSpinner } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaQuestionCircle, FaCheckCircle, FaTimesCircle, FaSpinner, FaCheck, FaTimes } from 'react-icons/fa';
 import LogoImage from '../../../public/logo.png';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -32,34 +32,156 @@ export default function ResetPasswordPage() {
   const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
   const [tokenValidated, setTokenValidated] = useState(false);
   const [tokenError, setTokenError] = useState('');
+  const [verifyingToken, setVerifyingToken] = useState(true);
+  const [refreshingToken, setRefreshingToken] = useState(false);
+  const [passwordRequirements, setPasswordRequirements] = useState({
+    minLength: false,
+    uppercase: false,
+    lowercase: false,
+    number: false,
+    special: false,
+  });
+  
+  // Check requirements whenever password changes
+  useEffect(() => {
+    if (formData.password) {
+      setPasswordRequirements({
+        minLength: formData.password.length >= 8,
+        uppercase: /[A-Z]/.test(formData.password),
+        lowercase: /[a-z]/.test(formData.password),
+        number: /[0-9]/.test(formData.password),
+        special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(formData.password),
+      });
+    } else {
+      setPasswordRequirements({
+        minLength: false,
+        uppercase: false,
+        lowercase: false,
+        number: false,
+        special: false,
+      });
+    }
+  }, [formData.password]);
   
   // Check if token exists and validate it
   useEffect(() => {
     if (!token) {
       setTokenError('Missing password reset token');
+      setVerifyingToken(false);
       return;
     }
     
-    // Validate token format (this is a basic check, the server will do the full validation)
+    // Validate token format (basic check)
     try {
       const tokenParts = token.split('.');
       if (tokenParts.length !== 3) {
         throw new Error('Invalid token format');
       }
       
-      // If token has correct format, mark as validated
-      setTokenValidated(true);
+      // Verify token with server
+      const verifyToken = async () => {
+        try {
+          console.log('Verifying reset password token with server...');
+          setVerifyingToken(true);
+          const response = await fetch('/api/auth/verify/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token, type: 'reset' })
+          });
+          
+          const data = await response.json();
+          console.log('Token verification response:', data);
+          
+          if (response.ok && data.valid) {
+            console.log('Token validation successful');
+            setTokenValidated(true);
+          } else {
+            console.error('Token validation failed:', data.error);
+            
+            // Handle token expiration specifically
+            if (data.error && (data.error.includes('expired') || data.error.includes('Expired'))) {
+              console.log('Token expired - attempting to refresh token...');
+              setRefreshingToken(true);
+              
+              // Try refreshing the token through our refresh endpoint
+              try {
+                const refreshResponse = await fetch('/api/auth/refresh/token', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ token, type: 'reset' })
+                });
+                
+                const refreshData = await refreshResponse.json();
+                console.log('Token refresh response:', refreshData);
+                
+                if (refreshResponse.ok && refreshData.success) {
+                  console.log('Token refreshed successfully, new token received');
+                  // Use the new token if provided
+                  if (refreshData.token) {
+                    // Redirect to reset page with new token
+                    console.log('Redirecting with new token...');
+                    const currentPath = window.location.pathname;
+                    const baseResetPath = currentPath.split('?')[0];
+                    router.push(`${baseResetPath}?token=${refreshData.token}`);
+                    return;
+                  } else {
+                    // If no new token but success is true, proceed with current token
+                    console.log('No new token but refresh successful, proceeding with current token');
+                    setTokenValidated(true);
+                    setRefreshingToken(false);
+                    return;
+                  }
+                } else {
+                  console.error('Failed to refresh token:', refreshData.error);
+                  setTokenError(refreshData.error || 'Could not refresh expired token');
+                }
+              } catch (refreshError) {
+                console.error('Error during token refresh:', refreshError);
+                setTokenError('Network error during token refresh');
+              } finally {
+                setRefreshingToken(false);
+              }
+            } else {
+              // Not an expiration error
+              setTokenError(data.error || 'Token validation failed');
+            }
+            
+            setTokenValidated(false);
+          }
+        } catch (error) {
+          console.error('Token verification error:', error);
+          // On network error - proceed with client-side validation
+          setTokenValidated(true);
+        } finally {
+          setVerifyingToken(false);
+        }
+      };
+      
+      // Actually perform server validation
+      verifyToken();
+      
     } catch (error) {
       console.error('Token validation error:', error);
       setTokenError('Invalid token format');
+      setVerifyingToken(false);
     }
-  }, [token]);
+  }, [token, router]);
   
   // Handle auth status changes
   useEffect(() => {
     if (authStatus === 'failed' && authError) {
       setError(authError);
       setLoading(false);
+      
+      // Special handling for expired token
+      if (authError.includes('expired') || authError.includes('Invalid')) {
+        setTokenValidated(false);
+        setTokenError(authError);
+      }
     } else if (passwordResetSuccess) {
       setSuccess(true);
       setLoading(false);
@@ -102,6 +224,26 @@ export default function ResetPasswordPage() {
       return;
     }
     
+    // Validate password requirements
+    const allRequirementsMet = Object.values(passwordRequirements).every(req => req === true);
+    if (!allRequirementsMet) {
+      let errorMessage = '';
+      if (!passwordRequirements.minLength) {
+        errorMessage = t('password.minLength');
+      } else if (!passwordRequirements.uppercase) {
+        errorMessage = t('password.uppercase');
+      } else if (!passwordRequirements.lowercase) {
+        errorMessage = t('password.lowercase');
+      } else if (!passwordRequirements.number) {
+        errorMessage = t('password.number');
+      } else if (!passwordRequirements.special) {
+        errorMessage = t('password.special');
+      }
+      setError(errorMessage);
+      setLoading(false);
+      return;
+    }
+    
     // Reset password using our auth hook
     await resetPassword({
       token,
@@ -109,6 +251,35 @@ export default function ResetPasswordPage() {
       confirmPassword: formData.confirmPassword,
     });
   };
+  
+  // If token is being verified, show loading state
+  if (verifyingToken || refreshingToken) {
+    return (
+      <div className="min-h-screen min-w-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 dotted-bg">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+            <div className="text-center">
+              <Image
+                src={LogoImage}
+                alt="Logo"
+                width={64}
+                height={64}
+                className="mx-auto mb-6"
+                priority
+              />
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                {refreshingToken ? t('resetPassword.refreshing') : t('resetPassword.verifying')}
+              </h2>
+              
+              <div className="flex justify-center py-4">
+                <FaSpinner className="h-12 w-12 animate-spin text-pink-500" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   // If token is missing or invalid, show error
   if (!tokenValidated) {
@@ -132,7 +303,8 @@ export default function ResetPasswordPage() {
               <div className="text-center py-4">
                 <FaTimesCircle className="h-12 w-12 mx-auto text-red-500" />
                 <p className="mt-4 text-red-600 dark:text-red-400 font-semibold">
-                  {tokenError === 'Missing password reset token' ? t('resetPassword.missingToken') : 
+                  {tokenError.includes('expired') ? t('resetPassword.tokenExpired') :
+                   tokenError === 'Missing password reset token' ? t('resetPassword.missingToken') : 
                    tokenError === 'Invalid token format' ? t('resetPassword.invalidToken') : 
                    tokenError}
                 </p>
@@ -257,6 +429,65 @@ export default function ResetPasswordPage() {
                 </div>
               </div>
             </div>
+            
+            {/* Password requirements visualization */}
+            {formData.password.length > 0 && (
+              <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 space-y-1">
+                <p className="font-semibold">{t('password.requirementsTitle')}</p>
+                <ul className="space-y-1">
+                  <li className="flex items-center">
+                    {passwordRequirements.minLength ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.minLength ? "text-green-500" : "text-red-500"}>
+                      {t('password.minLength')}
+                    </span>
+                  </li>
+                  <li className="flex items-center">
+                    {passwordRequirements.uppercase ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.uppercase ? "text-green-500" : "text-red-500"}>
+                      {t('password.uppercase')}
+                    </span>
+                  </li>
+                  <li className="flex items-center">
+                    {passwordRequirements.lowercase ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.lowercase ? "text-green-500" : "text-red-500"}>
+                      {t('password.lowercase')}
+                    </span>
+                  </li>
+                  <li className="flex items-center">
+                    {passwordRequirements.number ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.number ? "text-green-500" : "text-red-500"}>
+                      {t('password.number')}
+                    </span>
+                  </li>
+                  <li className="flex items-center">
+                    {passwordRequirements.special ? (
+                      <FaCheck className="h-4 w-4 text-green-500 mr-2" />
+                    ) : (
+                      <FaTimes className="h-4 w-4 text-red-500 mr-2" />
+                    )}
+                    <span className={passwordRequirements.special ? "text-green-500" : "text-red-500"}>
+                      {t('password.special')}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            )}
 
             <div className="relative">
               <input
