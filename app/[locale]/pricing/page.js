@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchPlans, setSelectedInterval, fetchCurrentUserPlan } from '@/lib/redux/features/planSlice'
+import { setPaymentValidation, clearPaymentValidation } from '@/lib/redux/features/paymentSlice'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import clsx from 'clsx'
@@ -100,7 +101,10 @@ export default function PricingPage() {
         }
       }
 
-      // 付费计划只传递 plan_id
+      // 设置支付验证状态
+      dispatch(setPaymentValidation(plan.id));
+      
+      // 付费计划跳转到支付页面
       router.push(`/${locale}/payment?plan_id=${plan.id}`);
     } catch (err) {
       console.error('Error handling plan selection:', err);
