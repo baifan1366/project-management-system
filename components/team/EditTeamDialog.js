@@ -379,31 +379,16 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                             {currentRole === 'CAN_VIEW' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
                             {currentRole === 'CAN_EDIT' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
                             {currentRole === 'CAN_CHECK' && <CheckCircle className="w-4 h-4 mr-2 text-gray-500" />}
-                            {currentRole === 'OWNER' && <Lock className="w-4 h-4 mr-2 text-orange-500" />}
-                            {currentRole === 'TRANSFER_OWNER' && <Lock className="w-4 h-4 mr-2 text-orange-500" />}
                             <span className="truncate">
                               {currentRole === 'CAN_VIEW' && t('viewer')}
                               {currentRole === 'CAN_EDIT' && t('editor')}
                               {currentRole === 'CAN_CHECK' && t('checker')}
-                              {currentRole === 'OWNER' && t('owner')}
-                              {currentRole === 'TRANSFER_OWNER' && t('transferOwner')}
                             </span>
                           </div>
                         )}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="OWNER">
-                        <div className="flex items-center w-full">
-                          <Lock className="w-5 h-5 mr-3 text-orange-500" />
-                          <div className="flex-1">
-                            <div className="font-medium text-orange-500">{t('owner')}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {t('ownerDescription') || "可以完全控制团队并管理所有成员权限"}
-                            </div>
-                          </div>
-                        </div>
-                      </SelectItem>
                       <SelectItem value="CAN_EDIT">
                         <div className="flex items-center w-full">
                           <Pencil className="w-5 h-5 mr-3 text-gray-500" />
