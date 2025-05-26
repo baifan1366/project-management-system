@@ -140,7 +140,7 @@ async function handleLogin(data) {
 
     // Set cookie with improved settings
     const cookieOptions = {
-      httpOnly: true, // Better security by not allowing JavaScript access
+      httpOnly: false, // Better security by not allowing JavaScript access
       secure: process.env.NODE_ENV === 'production',
       maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
       path: '/',
