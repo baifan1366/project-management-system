@@ -35,13 +35,9 @@ export default function PricingPage() {
 
   // 处理计划选择
   const handlePlanSelection = async (plan) => {
-    console.log('选择了计划:', plan);
-
     try {
-      // Use the user from the hook called at component level
-      if (userError) {
-        console.error('获取会话错误:', userError);
-        // 创建登录重定向参数
+      if (!user) {
+        console.log('用户未登录，重定向到登录页面');
         const loginParams = new URLSearchParams({
           plan_id: plan.id.toString(),
           redirect: 'payment'
@@ -49,91 +45,63 @@ export default function PricingPage() {
         router.push(`/${locale}/login?${loginParams}`);
         return;
       }
-      
-      // 检查会话是否存在且有用户
-      if (user) {
-        // 检查是否是当前计划
-        if (currentUserPlan && currentUserPlan.plan_id === plan.id) {
-          console.log('用户点击了当前计划，重定向到仪表盘');
+
+      // 如果是免费计划，保持原有逻辑
+      if (plan.price === 0) {
+        try {
+          let query = supabase.from('user_subscription_plan');
+          
+          // 检查用户是否已有订阅记录
+          const { data: existingSubscription } = await supabase
+            .from('user_subscription_plan')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+          if (existingSubscription) {
+            // 如果存在订阅记录，则更新
+            const { data, error } = await supabase
+              .from('user_subscription_plan')
+              .update({
+                plan_id: plan.id,
+                status: 'ACTIVE',
+                start_date: new Date().toISOString(),
+                end_date: null, // 免费计划通常没有结束日期
+              })
+              .eq('user_id', user.id)
+              .select();
+
+            if (error) throw error;
+          } else {
+            // 如果不存在订阅记录，则创建新记录
+            const { data, error } = await supabase
+              .from('user_subscription_plan')
+              .insert({
+                user_id: user.id,
+                plan_id: plan.id,
+                status: 'ACTIVE',
+                start_date: new Date().toISOString(),
+                end_date: null, // 免费计划通常没有结束日期
+              })
+              .select();
+
+            if (error) throw error;
+          }
+          
+          // 显示成功消息
+          toast.success('Successfully switched to new plan');
+          // 重定向到仪表板
           router.push(`/${locale}/dashboard`);
           return;
-        }
-
-        // 检查是否是降级操作
-        if (currentUserPlan && currentUserPlan.plan_id > plan.id) {
-          console.log('用户尝试降级，重定向到联系我们页面');
-          router.push(`/${locale}/contact-us?reason=downgrade&from=${currentUserPlan.plan_id}&to=${plan.id}`);
+        } catch (err) {
+          console.error('Error updating subscription:', err);
+          toast.error('Failed to switch plan. Please try again.');
           return;
         }
-        
-        // 新增: 检查是否是免费计划
-        if (plan.price === 0) {
-          try {
-            let query = supabase.from('user_subscription_plan');
-            
-            // 检查用户是否已有订阅记录
-            const { data: existingSubscription } = await supabase
-              .from('user_subscription_plan')
-              .select('*')
-              .eq('user_id', user.id)
-              .single();
-
-            if (existingSubscription) {
-              // 如果存在订阅记录，则更新
-              const { data, error } = await supabase
-                .from('user_subscription_plan')
-                .update({
-                  plan_id: plan.id,
-                  status: 'ACTIVE',
-                  start_date: new Date().toISOString(),
-                  end_date: null, // 免费计划通常没有结束日期
-                })
-                .eq('user_id', user.id)
-                .select();
-
-              if (error) throw error;
-            } else {
-              // 如果不存在订阅记录，则创建新记录
-              const { data, error } = await supabase
-                .from('user_subscription_plan')
-                .insert({
-                  user_id: user.id,
-                  plan_id: plan.id,
-                  status: 'ACTIVE',
-                  start_date: new Date().toISOString(),
-                  end_date: null, // 免费计划通常没有结束日期
-                })
-                .select();
-
-              if (error) throw error;
-            }
-            
-            // 显示成功消息
-            toast.success('Successfully switched to new plan');
-            // 重定向到仪表板
-            router.push(`/${locale}/dashboard`);
-            return;
-          } catch (err) {
-            console.error('Error updating subscription:', err);
-            toast.error('Failed to switch plan. Please try again.');
-            return;
-          }
-        }
-        
-        // 如果不是免费计划，继续原有的支付流程
-        const paymentParams = new URLSearchParams({
-          plan_id: plan.id.toString(),
-          user_id: user.id
-        }).toString();
-        router.push(`/${locale}/payment?${paymentParams}`);
-      } else {
-        console.log('用户未登录，重定向到登录页面');
-        const loginParams = new URLSearchParams({
-          plan_id: plan.id.toString(),
-          redirect: 'payment'
-        }).toString();
-        router.push(`/${locale}/login?${loginParams}`);
       }
+
+      // 付费计划只传递 plan_id
+      router.push(`/${locale}/payment?plan_id=${plan.id}`);
     } catch (err) {
       console.error('Error handling plan selection:', err);
       toast.error('An error occurred. Please try again.');

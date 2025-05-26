@@ -25,12 +25,11 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
 
-  // Call useGetUser at component level
+  // 使用 useGetUser hook 获取用户信息
   const { user, isAuthenticated } = useGetUser();
 
-  // 获取 URL 参数
+  // 只保留 planId 参数
   const planId = searchParams.get('plan_id');
-  const userId = searchParams.get('user_id');
 
   const [planDetails, setPlanDetails] = useState(null)
   const [showPromoInput, setShowPromoInput] = useState(false)
@@ -59,18 +58,18 @@ export default function PaymentPage() {
       return;
     }
 
-    console.log('Received parameters:', { planId, userId });
+    console.log('Received parameters:', { planId });
     setLoading(false);
   }, [planId, router]);
 
   useEffect(() => {
     const fetchUserEmail = async () => {
-      if (!userId) return;
+      if (!user?.id) return;
       
       const { data, error } = await supabase
         .from('user')
         .select('email')
-        .eq('id', userId)
+        .eq('id', user.id)
         .single();
         
       if (error) {
@@ -84,7 +83,7 @@ export default function PaymentPage() {
     };
 
     fetchUserEmail();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const fetchPlanDetails = async () => {
@@ -95,33 +94,24 @@ export default function PaymentPage() {
       }
 
       try {
-        // Wait for user state to be determined
+        // 等待用户认证状态确定
         if (!isAuthenticated) {
           console.log('User authentication state is being checked...');
           return;
         }
 
-        // Only redirect if we're sure the user is not authenticated
+        // 如果用户未认证，重定向到登录页面
         if (isAuthenticated === false) {
           console.log('User is not authenticated, redirecting to login...');
           router.push(`/${locale}/login?redirect=payment&plan_id=${planId}`);
           return;
         }
 
-        // Set userId from authenticated user if not provided in URL
-        if (!userId && user?.id) {
-          console.log('Setting userId from authenticated user');
-          const params = new URLSearchParams(window.location.search);
-          params.set('user_id', user.id);
-          router.push(`${window.location.pathname}?${params.toString()}`);
-          return;
-        }
-
-        // Check if user already has this plan and it's still active
+        // 检查用户是否已经有这个计划且仍然有效
         const { data: currentSubscription, error: subscriptionError } = await supabase
           .from('user_subscription_plan')
           .select('*')
-          .eq('user_id', userId || user?.id)
+          .eq('user_id', user.id)
           .eq('status', 'ACTIVE')
           .single();
 
@@ -186,15 +176,21 @@ export default function PaymentPage() {
     };
 
     fetchPlanDetails();
-  }, [planId, router, user, isAuthenticated, userId, locale]);
+  }, [planId, router, user, isAuthenticated, locale]);
 
   useEffect(() => {
     const initializePayment = async () => {
       try {
+        // 验证所需参数
+        if (!planId || !user?.id) {
+          console.error('Missing required parameters');
+          return;
+        }
+
         // Log the current values of all required parameters
         console.log('Payment initialization parameters:', { 
           planId, 
-          userId, 
+          userId: user.id,
           planPrice: planDetails?.price,
           discount,
           finalAmount: calculateFinalTotal()
@@ -206,7 +202,7 @@ export default function PaymentPage() {
           return;
         }
         
-        if (!userId) {
+        if (!user?.id) {
           console.error('Missing userId');
           return;
         }
@@ -228,7 +224,7 @@ export default function PaymentPage() {
         // 设置支付元数据
         const paymentMetadata = {
           planId,
-          userId,
+          userId: user.id,
           orderId,
           planName: planDetails?.name,
           amount: finalAmount, // Use finalAmount here
@@ -244,11 +240,11 @@ export default function PaymentPage() {
         // 创建支付意向 - Make sure to use finalAmount
         const result = await dispatch(createPaymentIntent({
           amount: finalAmount, // Use finalAmount here
-          userId: userId,
+          userId: user.id,
           planId: planId,
           metadata: {
             orderId,
-            userId: userId,
+            userId: user.id,
             planId: planId,
             planName: planDetails?.name,
             promoCode: appliedPromoCode,
@@ -270,11 +266,10 @@ export default function PaymentPage() {
       }
     };
 
-    // 只有当所有必需的数据都可用时才初始化支付
-    if (planDetails && planId && userId) {
+    if (planDetails && planId && user?.id) {
       initializePayment();
     }
-  }, [dispatch, planId, userId, planDetails, discount]);
+  }, [dispatch, planId, user, planDetails, discount]);
 
   // Stripe appearance configuration
   const appearance = {
@@ -303,8 +298,8 @@ export default function PaymentPage() {
   // Update the handlePayment function
   const handlePayment = async () => {
     // First verify that we have the userId and planId
-    if (!userId || !planId) {
-      console.error('Missing required parameters:', { userId, planId });
+    if (!user?.id || !planId) {
+      console.error('Missing required parameters:', { userId: user?.id, planId });
       return;
     }
 
@@ -321,11 +316,11 @@ export default function PaymentPage() {
     // Ensure we have all required metadata
     const paymentData = {
       amount: finalAmount, // Use the calculated final amount
-      userId: userId,
+      userId: user.id,
       planId: planId,
       metadata: {
         orderId: orderId,
-        userId: userId,
+        userId: user.id,
         planId: planId,
         planName: planDetails?.name,
         promoCode: appliedPromoCode,
@@ -378,7 +373,7 @@ export default function PaymentPage() {
   };
 
   const handleAlipayPayment = async () => {
-    if (!planDetails || !planDetails.price || !planDetails.name || !userId) {
+    if (!planDetails || !planDetails.price || !planDetails.name || !user?.id) {
       console.log('Missing required details for payment');
       return;
     }
@@ -402,7 +397,7 @@ export default function PaymentPage() {
           price: finalAmount, // Use the final amount here
           quantity: 1,
           email: email,
-          userId: userId,
+          userId: user.id,
           planId: planId,
           promoCode: appliedPromoCode,
           discount: discount,
@@ -599,7 +594,7 @@ export default function PaymentPage() {
   const handlePaymentButtonClick = async () => {
     // First, log the current state
     console.log('Payment button clicked with method:', selectedPaymentMethod);
-    console.log('Current userId:', userId);
+    console.log('Current userId:', user?.id);
     console.log('Current planId:', planId);
     console.log('Current metadata:', metadata);
     
