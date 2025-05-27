@@ -60,20 +60,33 @@ export default function AdminAnalytics() {
 
   // initialize the page
   useEffect(() => {
+    let isSubscribed = true;  // For cleanup
+
     const initAdminAnalytics = async () => {
+      if (!isSubscribed) return;
+      
       try {
         setLoading(true);
         await fetchAnalyticsData(dateRange);
       } catch (error) {
         console.error('Error in fetching analytics data:', error);
-        router.replace(`/admin/adminLogin`);
+        if (isSubscribed) {
+          router.replace(`/admin/adminLogin`);
+        }
       } finally {
-        setLoading(false);
+        if (isSubscribed) {
+          setLoading(false);
+        }
       }
     };
     
     initAdminAnalytics();
-  }, [dateRange]);
+
+    // Cleanup function
+    return () => {
+      isSubscribed = false;
+    };
+  }, [dateRange, router]); // Add router to dependencies
 
   // Add function to verify permission access TODO: 模块化这个代码
   const hasPermission = (permissionName) => {
@@ -126,6 +139,7 @@ export default function AdminAnalytics() {
       toast.dismiss(loadingToastId);
       toast.success('Analytics updated', {
         description: `Successfully loaded data for the last ${days} days`,
+        duration: 3000, // 3 seconds
       });
       
     } catch (error) {
@@ -134,6 +148,7 @@ export default function AdminAnalytics() {
       toast.dismiss(loadingToastId);
       toast.error('Failed to update analytics', {
         description: 'There was an error fetching the analytics data',
+        duration: 5000, // 5 seconds for error messages
       });
     } finally {
       setLoading(false);
