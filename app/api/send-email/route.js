@@ -183,7 +183,7 @@ export async function POST(request) {
             "
           >
             <div style="margin-bottom: 10px">
-              Order ID: ${orderDetails.id || 'N/A'}
+              Order ID: ${orderDetails.orderId || 'N/A'}
             </div>
             <div style="margin-bottom: 10px">
               Plan: ${orderDetails.planName || 'Subscription Plan'}

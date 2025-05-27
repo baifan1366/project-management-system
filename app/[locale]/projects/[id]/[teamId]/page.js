@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
+import { useSelector } from 'react-redux';
 
 export default function Team() {
   const { id: projectId, teamId, locale } = useParams();
@@ -14,14 +15,28 @@ export default function Team() {
   const [hasPermission, setHasPermission] = useState(false);
   const [permissionChecked, setPermissionChecked] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [showArchivedDialog, setShowArchivedDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [teamExists, setTeamExists] = useState(true);
+  
+  // 从Redux获取项目数据
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
 
   // 检查用户是否有权限访问此项目，并且验证团队是否存在
   useEffect(() => {
     async function checkProjectPermission() {
       try {
         if (!user?.id || !projectId) return;
+
+        // 检查项目是否已归档
+        if (project && project.archived) {
+          setShowArchivedDialog(true);
+          setPermissionChecked(true);
+          setIsLoading(false);
+          return;
+        }
 
         // 先检查团队是否存在
         try {
@@ -65,9 +80,18 @@ export default function Team() {
           // 继续检查其他权限
         }
 
-        // 检查用户是否是项目创建者
+        // 检查项目是否是项目创建者
         const projectResponse = await fetch(`/api/projects?projectId=${projectId}`);
         const projectData = await projectResponse.json();
+        
+        // 再次检查项目是否已归档（通过API获取的项目数据）
+        if (projectData.length > 0 && projectData[0].archived) {
+          setShowArchivedDialog(true);
+          setPermissionChecked(true);
+          setIsLoading(false);
+          return;
+        }
+        
         if (projectData.length > 0 && projectData[0].created_by === user.id) {
           setHasPermission(true);
           setPermissionChecked(true);
@@ -98,11 +122,17 @@ export default function Team() {
     }
     
     checkProjectPermission();
-  }, [user, projectId, teamId, locale, router]);
+  }, [user, projectId, teamId, locale, router, project]);
 
   // 处理权限对话框关闭
   const handlePermissionDialogClose = () => {
     setShowPermissionDialog(false);
+    router.push(`/${locale}/projects`);
+  };
+  
+  // 处理归档项目对话框关闭
+  const handleArchivedDialogClose = () => {
+    setShowArchivedDialog(false);
     router.push(`/${locale}/projects`);
   };
 
@@ -115,6 +145,25 @@ export default function Team() {
           <p>{t('loading')}</p>
         </div>
       </div>
+    );
+  }
+  
+  // 如果项目已归档，显示归档警告对话框
+  if (showArchivedDialog) {
+    return (
+      <AlertDialog open={showArchivedDialog} onOpenChange={setShowArchivedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('projectArchived')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('projectArchivedDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleArchivedDialogClose}>{t('close')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     );
   }
 

@@ -42,6 +42,7 @@ export default function Home({ params }) {
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const [permissionChecked, setPermissionChecked] = useState(false);
+  const [showArchivedDialog, setShowArchivedDialog] = useState(false);
 
   // 使用Redux获取任务数据
   const dispatch = useDispatch();
@@ -71,11 +72,18 @@ export default function Home({ params }) {
     getCurrentUser();
   }, [user]);
 
-  // 检查用户是否有权限访问此项目
+  // 检查用户是否有权限访问此项目以及项目是否已归档
   useEffect(() => {
     async function checkProjectPermission() {
       try {
         if (!userId || !projectId) return;
+
+        // 检查项目是否已归档
+        if (project && project.archived) {
+          setShowArchivedDialog(true);
+          setPermissionChecked(true);
+          return;
+        }
 
         // 检查用户是否是项目创建者
         if (project && project.created_by === userId) {
@@ -110,6 +118,12 @@ export default function Home({ params }) {
   // 处理权限对话框关闭
   const handlePermissionDialogClose = () => {
     setShowPermissionDialog(false);
+    router.push(`/${locale}/projects`);
+  };
+
+  // 处理归档项目对话框关闭
+  const handleArchivedDialogClose = () => {
+    setShowArchivedDialog(false);
     router.push(`/${locale}/projects`);
   };
 
@@ -187,6 +201,25 @@ export default function Home({ params }) {
           <p>{t('loading')}</p>
         </div>
       </div>
+    );
+  }
+
+  // 如果项目已归档，显示归档警告对话框
+  if (showArchivedDialog) {
+    return (
+      <AlertDialog open={showArchivedDialog} onOpenChange={setShowArchivedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('projectArchived')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('projectArchivedDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleArchivedDialogClose}>{t('close')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     );
   }
 

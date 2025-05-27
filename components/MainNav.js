@@ -28,6 +28,9 @@ export function MainNav() {
   const { user , error } = useGetUser();
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
 
+  // 过滤未归档的项目
+  const activeProjects = projects.filter(project => !project.archived);
+
   useEffect(() => {
     const fetchProjects = async () => {
       try {
@@ -156,7 +159,7 @@ export function MainNav() {
         </nav>
         <div className="mt-4 px-2">
           <div className="space-y-1">
-            {status === 'loading' ?(
+            {status === 'loading' ? (
               <div className="flex items-center justify-center p-2">
                 <Loader className="w-5 h-5 animate-spin text-muted-foreground" />
               </div>
@@ -164,7 +167,7 @@ export function MainNav() {
               <div className="text-sm text-red-500 px-2">error...</div>
             ): (
               <>
-                {projects.filter(project => project.id && project.project_name)
+                {activeProjects.filter(project => project.id && project.project_name)
                   .slice(0, 3)
                   .map((project) => (
                   <Tooltip key={`project-${project.id}`}>

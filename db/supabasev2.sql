@@ -54,6 +54,7 @@ CREATE TABLE "project" (
   "description" TEXT,
   "visibility" VARCHAR(20) NOT NULL,
   "theme_color" VARCHAR(20) DEFAULT 'white',
+  "archived" BOOL DEFAULT FALSE,
   "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD')) DEFAULT 'PENDING',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -108,7 +109,8 @@ CREATE TABLE "section" (
   "task_ids" INT[] DEFAULT '{}',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "order_index" INT DEFAULT 0
 );
 
 -- 任务表
@@ -195,6 +197,42 @@ CREATE TABLE "team_post" (
   "is_pinned" BOOLEAN DEFAULT FALSE,
   "reactions" JSONB DEFAULT '{}', -- Store reactions as {emoji: [user_ids]} format
   "comment_id" INT[] DEFAULT '{}', -- Array of comments associated with the post
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "agile_role" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "team_agile" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
+  "start_date" TIMESTAMP NOT NULL,
+  "duration" INT DEFAULT 2,
+  "goal" TEXT,
+  "task_ids" JSONB DEFAULT '{}',
+  "status" TEXT NOT NULL CHECK ("status" IN ('PLANNING', 'PENDING', 'RETROSPECTIVE')) DEFAULT 'PENDING',
+  "whatWentWell" JSONB,
+  "toImprove" JSONB,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "agile_member" (
+  "id" SERIAL PRIMARY KEY,
+  "agile_id" INT NOT NULL REFERENCES "team_agile"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "role_id" INT NOT NULL REFERENCES "agile_role"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -701,6 +739,7 @@ CREATE INDEX idx_landing_page_content_sort ON "landing_page_content"("sort_order
 -- Payment table for Stripe integration
 CREATE TABLE "payment" (
   "id" SERIAL PRIMARY KEY,
+  "order_id" UUID NOT NULL UNIQUE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "amount" DECIMAL(10, 2) NOT NULL,
   "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
@@ -715,6 +754,9 @@ CREATE TABLE "payment" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Create index for order_id
+CREATE INDEX idx_payment_order_id ON "payment"("order_id");
 
 -- For better performance when querying payment by user
 CREATE INDEX idx_payment_user_id ON "payment"("user_id");

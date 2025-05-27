@@ -73,15 +73,18 @@ export async function POST(request) {
 // PUT /api/projects - Update a project or project order
 export async function PUT(request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get('projectId')
+
     const body = await request.json()
     console.log('Update data:', body)
     
-    if (body.id) {
+    if (projectId) {
       // 更新单个项目
       const { data, error } = await supabase
         .from('project')
         .update(body)
-        .eq('id', body.id)
+        .eq('id', projectId)
         .select()
 
       if (error) {

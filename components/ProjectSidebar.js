@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useParams, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useTranslations } from 'use-intl'
+import { useTranslations } from 'next-intl'
 import CreateTeamDialog from './team/TeamDialog'
 import { updateTeamOrder, fetchUserTeams, fetchTeamCustomFieldForTeam } from '@/lib/redux/features/teamSlice'
 import { useDispatch, useSelector } from 'react-redux'
@@ -13,7 +13,10 @@ import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { createSelector } from '@reduxjs/toolkit';
-import { fetchProjectById } from '@/lib/redux/features/projectSlice'
+import { fetchProjectById, archiveProject } from '@/lib/redux/features/projectSlice'
+import ManageProject from '@/components/ManageProject';
+import { api } from '@/lib/api';
+import { useConfirm } from '@/hooks/use-confirm';
 
 // 获取团队自定义字段
 const selectTeamCustomFields = state => state?.teams?.teamCustomFields ?? [];
@@ -33,7 +36,11 @@ const selectTeamFirstCFIds = createSelector(
 export default function ProjectSidebar({ projectId }) {
   const t = useTranslations('Projects');
   const pathname = usePathname();
+  const params = useParams();
+  const locale = params.locale || 'en'; // 获取当前语言环境，如果不存在则默认为'en'
   const dispatch = useDispatch();
+  const router = useRouter();
+  const { confirm } = useConfirm();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -44,8 +51,11 @@ export default function ProjectSidebar({ projectId }) {
   const teamDeletedStatus = useSelector(state => state.teams.teamDeletedStatus);
   const teamUpdatedStatus = useSelector(state => state.teams.teamUpdatedStatus);
   const [projectName, setProjectName] = useState('');
-  const [themeColor, setThemeColor] = useState('');
+  const [themeColor, setThemeColor] = useState('#ff6c00');
   const { user } = useGetUser();
+  const [isManageProjectOpen, setIsManageProjectOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("general");
+  const [projectData, setProjectData] = useState(null);
 
   // 项目名称下拉菜单
   useEffect(() => {
@@ -219,6 +229,53 @@ export default function ProjectSidebar({ projectId }) {
     </Tooltip>
   );
 
+  // 加载项目数据
+  const fetchProjectData = async () => {
+    try {
+      if (projectId) {
+        const project = await api.projects.getById(projectId);
+        setProjectData(project);
+      }
+    } catch (error) {
+      console.error("获取项目数据失败:", error);
+    }
+  };
+
+  // 当项目数据更新后，同步更新侧边栏显示的项目名称和主题颜色
+  useEffect(() => {
+    if (projectData && projectData.length > 0) {
+      const project = projectData[0];
+      setProjectName(project.project_name || '项目');
+      setThemeColor(project.theme_color || '#64748b');
+    }
+  }, [projectData]);
+
+  // 在Edit或Members链接点击时加载项目数据
+  const handleManageProjectOpen = (tab) => {
+    setActiveTab(tab);
+    setIsManageProjectOpen(true);
+    setDropdownOpen(false);
+    fetchProjectData();
+  };
+
+  // 处理归档项目
+  const handleArchiveProject = async () => {
+    confirm({
+      title: t('archiveProjectConfirmTitle'),
+      description: t('archiveProjectConfirmDescription'),
+      variant: "error",
+      onConfirm: async () => {
+        try {
+          await dispatch(archiveProject(projectId)).unwrap();
+          router.push(`/${locale}/projects`);
+        } catch (error) {
+          console.error('项目归档失败:', error);
+        }
+      }
+    });
+    setDropdownOpen(false);
+  };
+
   return (
     <TooltipProvider>
       <div className="w-64 h-screen bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r border-border">
@@ -246,31 +303,36 @@ export default function ProjectSidebar({ projectId }) {
               "absolute left-0 right-0 mt-1 py-1 bg-popover border border-border rounded-md shadow-lg z-10",
               isDropdownOpen ? 'block' : 'hidden'
             )}>
-              <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
+              <Link href={`/${locale}/settings/subscription`} className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
                 <Zap size={16} className="text-yellow-500" />
                 <span>{t('upgrade')}</span>
               </Link>
-              <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
+              <div 
+                onClick={() => handleManageProjectOpen("general")} 
+                className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors cursor-pointer"
+              >
                 <Edit size={16} className="text-muted-foreground" />
                 <span>{t('edit')}</span>
-              </Link>
-              <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
+              </div>
+              <div 
+                onClick={() => handleManageProjectOpen("members")} 
+                className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors cursor-pointer"
+              >
                 <Users size={16} className="text-muted-foreground" />
                 <span>{t('members')}</span>
-              </Link>
-              <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
-                <Bell size={16} className="text-muted-foreground" />
-                <span>{t('notifications')}</span>
-              </Link>
+              </div>
               <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
                 <Settings size={16} className="text-muted-foreground" />
                 <span>{t('settings')}</span>
               </Link>
               <div className="my-1 border-t border-border"></div>
-              <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-red-500 hover:text-red-600 transition-colors">
+              <div 
+                onClick={handleArchiveProject} 
+                className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-red-500 hover:text-red-600 transition-colors cursor-pointer"
+              >
                 <Archive size={16} className="text-red-500 hover:text-red-600" />
                 <span>{t('archiveProject')}</span>
-              </Link>
+              </div>
             </div>
           </div>
 
@@ -390,6 +452,18 @@ export default function ProjectSidebar({ projectId }) {
             fetchTeams();
           }} 
           projectId={projectId}
+        />
+
+        <ManageProject 
+          isOpen={isManageProjectOpen} 
+          onClose={() => {
+            setIsManageProjectOpen(false);
+          }} 
+          projectId={projectId}
+          activeTab={activeTab}
+          setActiveTab={(tab) => setActiveTab(tab)}
+          projectData={projectData}
+          setProjectData={(data) => setProjectData(data)}
         />
       </div>
     </TooltipProvider>

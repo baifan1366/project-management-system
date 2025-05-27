@@ -9,7 +9,9 @@ import { useTranslations } from 'next-intl';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip';
 import { updateTaskOrder } from '@/lib/redux/features/sectionSlice'
+import { updateSectionOrder } from '@/lib/redux/features/sectionSlice'
 import { fetchTaskById } from '@/lib/redux/features/taskSlice';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 import BodyContent from './BodyContent';
 import HandleSection from './HandleSection';
 import LikeTask from './LikeTask';
@@ -18,6 +20,7 @@ import HandleTask from './HandleTask';
 export default function TaskKanban({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
+  const { user } = useGetUser();
   // 将BodyContent作为组件使用，获取返回的数据
   const { initialColumns, initialTasks, initialColumnOrder, loadData, assigneeTagId } = BodyContent({ projectId, teamId, teamCFId });
   const { CreateSection, UpdateSection, DeleteSection } = HandleSection({ 
@@ -113,7 +116,31 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
       newColumnOrder.splice(source.index, 1);
       newColumnOrder.splice(destination.index, 0, draggableId);
 
+      // 更新UI状态
       setColumnOrder(newColumnOrder);
+      
+      // 获取每个列的真实sectionId
+      const sectionIds = newColumnOrder.map(colId => {
+        const column = columns[colId];
+        // 使用originalId（如果存在）否则使用colId
+        return column.originalId || colId;
+      });
+      
+      try {
+        // 调用API更新分区顺序
+        await dispatch(updateSectionOrder({
+          teamId,
+          sectionIds,
+          userId: user.id
+        })).unwrap();
+        
+        console.log('分区顺序更新成功:', sectionIds);
+      } catch (error) {
+        console.error('更新分区顺序失败:', error);
+        // 如果发生错误，可以刷新看板恢复状态
+        loadData(true);
+      }
+      
       return;
     }
 
