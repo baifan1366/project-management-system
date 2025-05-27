@@ -33,7 +33,7 @@
     "edit": "编辑",
     "loading": "加载中...",
     "error": "发生错误",
-    "create": "新建",
+    "create": "创建",
     "notifications": "通知",
     "profile": "个人资料",
     "success": "成功",
@@ -64,7 +64,8 @@
       "successDesc": "您的操作已成功完成。是否继续下一步？",
       "question": "问题",
       "questionDesc": "您想保存当前更改吗？"
-    }
+    },
+    "retry": "重试"
   },
   "profile": {
     "title": "设置",
@@ -1010,11 +1011,11 @@
   },
   "myTasks": {
     "title": "我的任务",
-    "results": "结果",
+    "results": "个结果",
     "type": {
       "label": "类型",
       "pastDue": "已过期",
-      "today": "今天",
+      "today": "今日",
       "upcoming": "即将到来",
       "noDate": "无日期"
     },
@@ -1026,12 +1027,12 @@
     "workspaceTeams": {
       "label": "工作区和团队",
       "all": "全部",
-      "shared": "与我共享",
+      "shared": "共享",
       "workspace": "工作区"
     },
     "dueDate": {
       "label": "截止日期",
-      "createdBy": "由我创建"
+      "createdBy": "我创建的"
     },
     "filters": {
       "all": "所有任务",
@@ -1046,13 +1047,13 @@
       "done": "已完成",
       "in_review": "审核中"
     },
-    "noTasks": "没有任务",
-    "noTitle": "无标题任务",
+    "noTasks": "此状态下没有任务",
+    "noTitle": "无标题",
     "section": "分区",
     "createdBy": "创建者",
     "assignee": "负责人",
     "loading": "正在加载任务...",
-    "invalidDate": "无效日期",
+    "invalidDate": "日期无效",
     "priority": {
       "label": "优先级",
       "low": "低",
@@ -1079,10 +1080,19 @@
       "markAsIncomplete": "标记为未完成"
     },
     "errors": {
-      "loadingFailed": "加载任务失败",
-      "updateFailed": "更新任务失败",
-      "missingSection": "缺少分区ID",
-      "notFound": "未找到任务"
+      "loadingFailed": "加载任务失败"
+    },
+    "newTask": {
+      "title": "创建新任务",
+      "description": "添加一个新任务到您的个人任务列表",
+      "taskTitle": "任务标题",
+      "titlePlaceholder": "输入任务标题...",
+      "taskDescription": "任务描述",
+      "descriptionPlaceholder": "描述需要完成的工作...",
+      "status": "状态",
+      "selectStatus": "选择状态",
+      "dueDate": "截止日期",
+      "selectDate": "选择日期"
     }
   },
   "Errors": {

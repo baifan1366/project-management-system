@@ -795,3 +795,21 @@ CREATE TABLE task_links (
     FOREIGN KEY (source_task_id) REFERENCES task(id) ON DELETE CASCADE,
     FOREIGN KEY (target_task_id) REFERENCES task(id) ON DELETE CASCADE
 );
+
+-- Create mytasks table for user's personal task tracking
+CREATE TABLE "mytasks" (
+  "id" SERIAL PRIMARY KEY,
+  "task_id" INT REFERENCES "task"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
+  "expected_completion_date" TIMESTAMP,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for mytasks table
+CREATE INDEX idx_mytasks_task_id ON "mytasks"("task_id");
+CREATE INDEX idx_mytasks_user_id ON "mytasks"("user_id");
+CREATE INDEX idx_mytasks_status ON "mytasks"("status");

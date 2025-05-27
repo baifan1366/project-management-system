@@ -265,27 +265,47 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
       }
       
       if (eventType === 'task') {
-        // 创建任务
-        const taskData = {
-          title: formData.title,
-          description: formData.description,
-          due_date: formData.isAllDay 
-            ? format(formData.startDate, 'yyyy-MM-dd')
-            : format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00',
-          // 添加其他必要的任务数据，如 project_id, team_id 等
-        };
-        
-        const response = await fetch('/api/tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(taskData),
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create task');
+        try {
+          // 直接创建 mytasks 记录，不需要先创建任务
+          if (session) {
+            // 准备 mytasks 数据
+            const dueDate = formData.isAllDay 
+              ? format(formData.startDate, 'yyyy-MM-dd')
+              : format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00';
+            
+            // 检查 user_id 是否是有效的 UUID 格式
+            const userId = session.id;
+            if (!userId) {
+              console.error('Missing user ID:', userId);
+              toast.error(t('missingUserId') || 'User ID not found. Please try signing in again.');
+              return;
+            }
+            
+            // 临时测试生成日志
+            console.log('Current user session:', session);
+            
+            // 插入 mytasks 记录
+            const { data, error } = await supabase.from('mytasks').insert({
+              user_id: userId,
+              title: formData.title,
+              description: formData.description || '',
+              status: 'TODO',
+              expected_completion_date: dueDate
+            }).select();
+            
+            if (error) {
+              console.error('Error details:', error);
+              throw new Error(error.message || 'Failed to create mytask');
+            }
+            
+            console.log('Task successfully added to mytasks:', data);
+          } else {
+            throw new Error(t('notLoggedIn') || 'Not logged in');
+          }
+        } catch (error) {
+          console.error('Error creating mytask:', error);
+          toast.error(error.message || t('eventCreationFailed'));
+          return; // Stop execution if there's an error
         }
       } else if (eventType === 'personal') {
         // 创建个人日历事件

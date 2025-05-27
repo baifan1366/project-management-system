@@ -37,7 +37,8 @@
     "edit": "Edit",
     "loading": "Loading...",
     "error": "An error occurred",
-    "create": "Create New",
+    "create": "Create",
+    "creating": "Creating...",
     "notifications": "Notifications",
     "profile": "Profile",
     "success": "Success",
@@ -434,13 +435,26 @@
   },
   "myTasks": {
     "title": "My Tasks",
+    "searchPlaceholder": "Search tasks...",
     "results": "results",
+    "noTasks": "No tasks in this status",
+    "noTitle": "No title",
+    "invalidDate": "Invalid date",
+    "errors": {
+      "loadingFailed": "Failed to load tasks"
+    },
+    "status": {
+      "todo": "To Do",
+      "in_progress": "In Progress",
+      "in_review": "In Review",
+      "done": "Done"
+    },
     "type": {
       "label": "TYPE",
-      "pastDue": "Past Due",
+      "pastDue": "Past due",
       "today": "Today",
       "upcoming": "Upcoming",
-      "noDate": "No Date"
+      "noDate": "No date"
     },
     "assignedTo": {
       "label": "ASSIGNED TO",
@@ -450,63 +464,24 @@
     "workspaceTeams": {
       "label": "WORKSPACE & TEAMS",
       "all": "All",
-      "shared": "Shared with me",
+      "shared": "Shared",
       "workspace": "Workspace"
     },
     "dueDate": {
-      "label": "DUE DATE",
+      "label": "DUE DATE", 
       "createdBy": "Created by me"
     },
-    "filters": {
-      "all": "All Tasks",
-      "assignedToMe": "Assigned to Me",
-      "createdByMe": "Created by Me",
-      "completed": "Completed"
-    },
-    "searchPlaceholder": "Search tasks...",
-    "status": {
-      "todo": "To Do",
-      "in_progress": "In Progress",
-      "done": "Done",
-      "in_review": "In Review"
-    },
-    "noTasks": "No tasks",
-    "noTitle": "Untitled Task",
-    "section": "Section",
-    "createdBy": "Created by",
-    "assignee": "Assignee",
-    "loading": "Loading tasks...",
-    "invalidDate": "Invalid date",
-    "priority": {
-      "label": "Priority",
-      "low": "Low",
-      "medium": "Medium",
-      "high": "High",
-      "urgent": "Urgent"
-    },
-    "tagValues": {
-      "title": "Title",
-      "description": "Description",
+    "newTask": {
+      "title": "Create New Task",
+      "description": "Add a new task to your personal task list",
+      "taskTitle": "Task Title",
+      "titlePlaceholder": "Enter task title...",
+      "taskDescription": "Description",
+      "descriptionPlaceholder": "Describe what needs to be done...",
       "status": "Status",
-      "assignee": "Assignee",
-      "priority": "Priority",
+      "selectStatus": "Select a status",
       "dueDate": "Due Date",
-      "section": "Section",
-      "project": "Project"
-    },
-    "actions": {
-      "edit": "Edit Task",
-      "delete": "Delete Task",
-      "assign": "Assign to me",
-      "unassign": "Unassign",
-      "markAsComplete": "Mark as complete",
-      "markAsIncomplete": "Mark as incomplete"
-    },
-    "errors": {
-      "loadingFailed": "Failed to load tasks",
-      "updateFailed": "Failed to update task",
-      "missingSection": "Missing section ID",
-      "notFound": "Task not found"
+      "selectDate": "Select a date"
     }
   },
   "notifications": {
