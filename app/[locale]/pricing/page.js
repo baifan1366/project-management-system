@@ -3,10 +3,12 @@ import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchPlans, setSelectedInterval, fetchCurrentUserPlan } from '@/lib/redux/features/planSlice'
+import { setPaymentValidation, clearPaymentValidation } from '@/lib/redux/features/paymentSlice'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import clsx from 'clsx'
 import useGetUser from '@/lib/hooks/useGetUser'
+import { toast } from 'sonner'
 
 export default function PricingPage() {
   const t = useTranslations('Pricing')
@@ -34,13 +36,9 @@ export default function PricingPage() {
 
   // 处理计划选择
   const handlePlanSelection = async (plan) => {
-    console.log('选择了计划:', plan);
-
     try {
-      // Use the user from the hook called at component level
-      if (userError) {
-        console.error('获取会话错误:', userError);
-        // 创建登录重定向参数
+      if (!user) {
+        console.log('用户未登录，重定向到登录页面');
         const loginParams = new URLSearchParams({
           plan_id: plan.id.toString(),
           redirect: 'payment'
@@ -48,46 +46,69 @@ export default function PricingPage() {
         router.push(`/${locale}/login?${loginParams}`);
         return;
       }
-      
-      // 检查会话是否存在且有用户
-      if (user) {
-        // 检查是否是当前计划
-        if (currentUserPlan && currentUserPlan.plan_id === plan.id) {
-          console.log('用户点击了当前计划，重定向到仪表盘');
+
+      // 如果是免费计划，保持原有逻辑
+      if (plan.price === 0) {
+        try {
+          let query = supabase.from('user_subscription_plan');
+          
+          // 检查用户是否已有订阅记录
+          const { data: existingSubscription } = await supabase
+            .from('user_subscription_plan')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+          if (existingSubscription) {
+            // 如果存在订阅记录，则更新
+            const { data, error } = await supabase
+              .from('user_subscription_plan')
+              .update({
+                plan_id: plan.id,
+                status: 'ACTIVE',
+                start_date: new Date().toISOString(),
+                end_date: null, // 免费计划通常没有结束日期
+              })
+              .eq('user_id', user.id)
+              .select();
+
+            if (error) throw error;
+          } else {
+            // 如果不存在订阅记录，则创建新记录
+            const { data, error } = await supabase
+              .from('user_subscription_plan')
+              .insert({
+                user_id: user.id,
+                plan_id: plan.id,
+                status: 'ACTIVE',
+                start_date: new Date().toISOString(),
+                end_date: null, // 免费计划通常没有结束日期
+              })
+              .select();
+
+            if (error) throw error;
+          }
+          
+          // 显示成功消息
+          toast.success('Successfully switched to new plan');
+          // 重定向到仪表板
           router.push(`/${locale}/dashboard`);
           return;
-        }
-
-        // 检查是否是降级操作
-        if (currentUserPlan && currentUserPlan.plan_id > plan.id) {
-          console.log('用户尝试降级，重定向到联系我们页面');
-          router.push(`/${locale}/contact-us?reason=downgrade&from=${currentUserPlan.plan_id}&to=${plan.id}`);
+        } catch (err) {
+          console.error('Error updating subscription:', err);
+          toast.error('Failed to switch plan. Please try again.');
           return;
         }
-        
-        console.log('用户已登录，重定向到支付页面');
-        // 只传递必要的参数：plan_id 和 user_id
-        const paymentParams = new URLSearchParams({
-          plan_id: plan.id.toString(),
-          user_id: user.id
-        }).toString();
-        router.push(`/${locale}/payment?${paymentParams}`);
-      } else {
-        console.log('用户未登录，重定向到登录页面');
-        const loginParams = new URLSearchParams({
-          plan_id: plan.id.toString(),
-          redirect: 'payment'
-        }).toString();
-        router.push(`/${locale}/login?${loginParams}`);
       }
+
+      // 设置支付验证状态
+      dispatch(setPaymentValidation(plan.id));
+      
+      // 付费计划跳转到支付页面
+      router.push(`/${locale}/payment?plan_id=${plan.id}`);
     } catch (err) {
-      console.error('检查认证状态时出错:', err);
-      // 出错时默认跳转到登录页面
-      const loginParams = new URLSearchParams({
-        plan_id: plan.id.toString(),
-        redirect: 'payment'
-      }).toString();
-      router.push(`/${locale}/login?${loginParams}`);
+      console.error('Error handling plan selection:', err);
+      toast.error('An error occurred. Please try again.');
     }
   }
 
@@ -169,8 +190,17 @@ export default function PricingPage() {
     </div>
   }
 
-  // 根据选择的时间间隔获取当前计划
-  const currentPlans = plans[selectedInterval] || []
+  // 修改获取当前计划的逻辑
+  const currentPlans = plans[selectedInterval] || [];
+
+  // 创建一个新数组进行排序，而不是直接修改 currentPlans
+  const sortedPlans = [...currentPlans].sort((a, b) => {
+    // 确保 FREE 计划始终在最前面
+    if (a.type === 'FREE') return -1;
+    if (b.type === 'FREE') return 1;
+    // 其他计划按价格排序
+    return a.price - b.price;
+  });
 
   return (
     <div className="container mx-auto px-4 py-16">
@@ -218,7 +248,7 @@ export default function PricingPage() {
 
       {/* 计划网格 */}
       <div className="grid md:grid-cols-3 gap-8">
-        {currentPlans.map((plan) => (
+        {sortedPlans.map((plan) => (
           <div 
             key={plan.id}
             className="transform transition-all duration-300 hover:scale-105 cursor-pointer"
@@ -234,7 +264,7 @@ export default function PricingPage() {
                 <div className="text-4xl font-bold mb-6">
                   ${plan.price}
                   <span className="text-lg text-gray-500">
-                    /{selectedInterval === 'monthly' ? 'mo' : 'yr'}
+                    {plan.billing_interval ? `/${selectedInterval === 'monthly' ? 'mo' : 'yr'}` : ''}
                   </span>
                 </div>
                 

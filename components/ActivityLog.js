@@ -143,6 +143,12 @@ export default function ActivityLog() {
   const formatTime = (timestamp) => {
     try {
       const dateLocale = locale === 'zh' ? zhCN : enUS;
+      
+      // Get user's timezone-adjusted date if available through props
+      // This would require adding a formatDateToUserTimezone prop to ActivityLog
+      // For now, we'll use the raw timestamp which will show server time
+      // In a future PR, we should pass the timezone utilities to this component
+      
       return formatDistanceToNow(new Date(timestamp), { 
         addSuffix: true,
         locale: dateLocale

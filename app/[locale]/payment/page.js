@@ -12,6 +12,8 @@ import { useSelector, useDispatch } from 'react-redux'
 import { createPaymentIntent, setPaymentMetadata, setFinalTotal } from '@/lib/redux/features/paymentSlice'
 import useGetUser from '@/lib/hooks/useGetUser';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
+import PaymentValidation from './PaymentValidation'
 
 // Initialize Stripe outside the component
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -24,12 +26,11 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
 
-  // Call useGetUser at component level
+  // 使用 useGetUser hook 获取用户信息
   const { user, isAuthenticated } = useGetUser();
 
-  // 获取 URL 参数
+  // 只保留 planId 参数
   const planId = searchParams.get('plan_id');
-  const userId = searchParams.get('user_id');
 
   const [planDetails, setPlanDetails] = useState(null)
   const [showPromoInput, setShowPromoInput] = useState(false)
@@ -58,18 +59,18 @@ export default function PaymentPage() {
       return;
     }
 
-    console.log('Received parameters:', { planId, userId });
+    console.log('Received parameters:', { planId });
     setLoading(false);
   }, [planId, router]);
 
   useEffect(() => {
     const fetchUserEmail = async () => {
-      if (!userId) return;
+      if (!user?.id) return;
       
       const { data, error } = await supabase
         .from('user')
         .select('email')
-        .eq('id', userId)
+        .eq('id', user.id)
         .single();
         
       if (error) {
@@ -83,7 +84,7 @@ export default function PaymentPage() {
     };
 
     fetchUserEmail();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const fetchPlanDetails = async () => {
@@ -94,25 +95,16 @@ export default function PaymentPage() {
       }
 
       try {
-        // Wait for user state to be determined
+        // 等待用户认证状态确定
         if (!isAuthenticated) {
           console.log('User authentication state is being checked...');
           return;
         }
 
-        // Only redirect if we're sure the user is not authenticated
+        // 如果用户未认证，重定向到登录页面
         if (isAuthenticated === false) {
           console.log('User is not authenticated, redirecting to login...');
           router.push(`/${locale}/login?redirect=payment&plan_id=${planId}`);
-          return;
-        }
-
-        // Set userId from authenticated user if not provided in URL
-        if (!userId && user?.id) {
-          console.log('Setting userId from authenticated user');
-          const params = new URLSearchParams(window.location.search);
-          params.set('user_id', user.id);
-          router.push(`${window.location.pathname}?${params.toString()}`);
           return;
         }
 
@@ -136,15 +128,21 @@ export default function PaymentPage() {
     };
 
     fetchPlanDetails();
-  }, [planId, router, user, isAuthenticated, userId, locale]);
+  }, [planId, router, user, isAuthenticated, locale]);
 
   useEffect(() => {
     const initializePayment = async () => {
       try {
+        // 验证所需参数
+        if (!planId || !user?.id) {
+          console.error('Missing required parameters');
+          return;
+        }
+
         // Log the current values of all required parameters
         console.log('Payment initialization parameters:', { 
           planId, 
-          userId, 
+          userId: user.id,
           planPrice: planDetails?.price,
           discount,
           finalAmount: calculateFinalTotal()
@@ -156,7 +154,7 @@ export default function PaymentPage() {
           return;
         }
         
-        if (!userId) {
+        if (!user?.id) {
           console.error('Missing userId');
           return;
         }
@@ -178,7 +176,7 @@ export default function PaymentPage() {
         // 设置支付元数据
         const paymentMetadata = {
           planId,
-          userId,
+          userId: user.id,
           orderId,
           planName: planDetails?.name,
           amount: finalAmount, // Use finalAmount here
@@ -194,11 +192,11 @@ export default function PaymentPage() {
         // 创建支付意向 - Make sure to use finalAmount
         const result = await dispatch(createPaymentIntent({
           amount: finalAmount, // Use finalAmount here
-          userId: userId,
+          userId: user.id,
           planId: planId,
           metadata: {
             orderId,
-            userId: userId,
+            userId: user.id,
             planId: planId,
             planName: planDetails?.name,
             promoCode: appliedPromoCode,
@@ -220,11 +218,10 @@ export default function PaymentPage() {
       }
     };
 
-    // 只有当所有必需的数据都可用时才初始化支付
-    if (planDetails && planId && userId) {
+    if (planDetails && planId && user?.id) {
       initializePayment();
     }
-  }, [dispatch, planId, userId, planDetails, discount]);
+  }, [dispatch, planId, user, planDetails, discount]);
 
   // Stripe appearance configuration
   const appearance = {
@@ -253,8 +250,8 @@ export default function PaymentPage() {
   // Update the handlePayment function
   const handlePayment = async () => {
     // First verify that we have the userId and planId
-    if (!userId || !planId) {
-      console.error('Missing required parameters:', { userId, planId });
+    if (!user?.id || !planId) {
+      console.error('Missing required parameters:', { userId: user?.id, planId });
       return;
     }
 
@@ -271,11 +268,11 @@ export default function PaymentPage() {
     // Ensure we have all required metadata
     const paymentData = {
       amount: finalAmount, // Use the calculated final amount
-      userId: userId,
+      userId: user.id,
       planId: planId,
       metadata: {
         orderId: orderId,
-        userId: userId,
+        userId: user.id,
         planId: planId,
         planName: planDetails?.name,
         promoCode: appliedPromoCode,
@@ -328,7 +325,7 @@ export default function PaymentPage() {
   };
 
   const handleAlipayPayment = async () => {
-    if (!planDetails || !planDetails.price || !planDetails.name || !userId) {
+    if (!planDetails || !planDetails.price || !planDetails.name || !user?.id) {
       console.log('Missing required details for payment');
       return;
     }
@@ -352,7 +349,7 @@ export default function PaymentPage() {
           price: finalAmount, // Use the final amount here
           quantity: 1,
           email: email,
-          userId: userId,
+          userId: user.id,
           planId: planId,
           promoCode: appliedPromoCode,
           discount: discount,
@@ -549,7 +546,7 @@ export default function PaymentPage() {
   const handlePaymentButtonClick = async () => {
     // First, log the current state
     console.log('Payment button clicked with method:', selectedPaymentMethod);
-    console.log('Current userId:', userId);
+    console.log('Current userId:', user?.id);
     console.log('Current planId:', planId);
     console.log('Current metadata:', metadata);
     
@@ -566,303 +563,332 @@ export default function PaymentPage() {
     }
   };
 
+  // 添加一个格式化价格和计费周期的函数
+  const formatPlanPriceAndInterval = (plan) => {
+    if (!plan) return 'US$0.00';
+
+    const formattedPrice = `US$${plan.price.toFixed(2)}`;
+
+    // 如果没有计费周期（比如免费计划）
+    if (!plan.billing_interval) {
+      return plan.type === 'FREE' ? 'Free' : formattedPrice;
+    }
+
+    // 根据计费周期显示不同文案
+    switch (plan.billing_interval) {
+      case 'MONTHLY':
+        return `${formattedPrice} per month`;
+      case 'YEARLY':
+        return `${formattedPrice} per month, billed annually`;
+      default:
+        return formattedPrice;
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
 
   return (
-    <div className="min-h-screen flex">
-
-      {/* 加载状态 */}
-      {status === 'loading' && (
-        <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-4 text-gray-700">Processing payment...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Left Side - Dark Background */}
-      <div className="w-1/2 bg-black text-white p-8">
-        <div className="flex items-center gap-3 mb-8">
-          <Image 
-            src="/logo.png" 
-            alt="Team Sync" 
-            width={32} 
-            height={32} 
-          />
-          <span className="text-lg">Team Sync</span>
-        </div>
-
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            {planDetails ? `Subscribe to ${planDetails.name}` : 'Subscribe to Team Sync'}
-          </h1>
-          <div className="text-4xl font-bold mb-2">
-            {planDetails ? formatPrice(planDetails.price) : '$0.00'}
-            <span className="text-sm">
-              {getBillingText()}
-            </span>
-          </div>
-          <div className="text-gray-400">
-            {planDetails ? `US$${planDetails.price.toFixed(2)} per month, billed annually` : 'US$10.00 per month, billed annually'}
-          </div>
-        </div>
-
-        {/* 计划详情 */}
-        <div className="space-y-6">
-          <div className="flex justify-between">
-            <span>{planDetails ? planDetails.name : 'Team Sync'}</span>
-            <span>{planDetails ? formatPrice(planDetails.price) : '$0.00'}</span>
-          </div>
-
-          <div className="text-sm text-gray-400">
-            {planDetails ? planDetails.description : 'Team Sync is a team collaboration tool that helps you manage your team and projects.'}
-          </div>
-
-          <div className="flex justify-end">
-            <span>{planDetails ? planDetails.billing_interval : 'Annually'}</span>
-          </div>
-
-          <div className="border-t border-gray-800 pt-4">
-            <div className="flex w-full">
-              {!showPromoInput ? (
-                <div className="w-full">
-                  {validPromo && appliedPromoCode ? (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <span className="text-green-400 mr-2">✓</span>
-                        <span className="text-green-400">Applied Code: {appliedPromoCode}</span>
-                      </div>
-                      <button 
-                        onClick={async () => {
-                          // Keep track of the code being removed
-                          const codeToRemove = appliedPromoCode;
-                          
-                          // Reset the UI state first
-                          setValidPromo(false);
-                          setDiscount(0);
-                          setAppliedPromoCode('');
-                          setPromoCode('');
-                          setShowPromoInput(true);
-                          
-                          // Then decrease the usage count
-                          if (codeToRemove) {
-                            await decreasePromoCodeUsage(codeToRemove);
-                          }
-                        }}
-                        className="text-gray-400 text-sm hover:text-white"
-                      >
-                        Change
-                      </button>
-                    </div>
-                  ) : (
-                    <button 
-                      onClick={() => setShowPromoInput(true)}
-                      className="transition-all duration-300 ease-in-out bg-gray-800 w-1/4 text-gray-400 py-2 hover:bg-gray-700 rounded"
-                    >
-                      Add Promo Code
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex w-full flex-col">
-                  <div className="flex w-full">
-                    <input
-                      type="text"
-                      value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value)}
-                      placeholder="Add Promo Code"
-                      className="flex-1 bg-white text-gray-900 px-3 py-2 focus:outline-none rounded-l transition-all duration-300 ease-in-out"
-                      autoFocus
-                      disabled={isPromoLoading}
-                      onBlur={(e) => {
-                        if (!promoCode.trim()) {
-                          setShowPromoInput(false);
-                        }
-                      }}
-                    />
-                    <button 
-                      onClick={handleApplyPromoCode}
-                      disabled={isPromoLoading}
-                      className={`px-4 py-2 rounded-r transition-colors duration-300 flex items-center justify-center ${
-                        isPromoLoading 
-                          ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                      }`}
-                    >
-                      {isPromoLoading ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : 'Apply'}
-                    </button>
-                  </div>
-                  
-                  {promoMessage && (
-                    <div className={`mt-2 p-2 text-sm rounded ${
-                      messageType === 'success' 
-                        ? 'bg-green-900 text-green-300' 
-                        : 'bg-red-900 text-red-300'
-                    }`}>
-                      {promoMessage}
-                    </div>
-                  )}
-                </div>
-              )}
+    <PaymentValidation>
+      <div className="min-h-screen relative">
+        {/* 加载状态 */}
+        {status === 'loading' && (
+          <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+              <p className="mt-4 text-gray-700">Processing payment...</p>
             </div>
           </div>
-
-          <div className="flex justify-between border-t border-gray-800 pt-4">
-            <span>Today's Subtotal</span>
-            <span>{formatPrice(calculateSubTotal())}</span>
-          </div>
-
-          {validPromo && discount > 0 && (
-            <div className="flex justify-between text-green-400 pt-2">
-              <span>Discount ({appliedPromoCode})</span>
-              <span>-{formatPrice(discount)}</span>
-            </div>
-          )}
-
-          {validPromo && (
-            <div className="flex justify-between border-t border-gray-800 pt-4 font-bold">
-              <span>Total</span>
-              <span>{formatPrice(calculateFinalTotal())}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Right Side - Light Background */}
-      <div className="w-1/2 bg-white p-8">
-        <h2 className="text-xl mb-6">Contact Information</h2>
+        )}
         
-        <div className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-            <div className="relative">
-              <input 
-                type="email" 
-                value={email}
-                disabled
-                className="w-full p-3 rounded-md bg-gray-50 text-gray-700"
-              />
-            </div>
-            <p className="mt-1 text-sm text-gray-500">
-              Email from your account
-            </p>
-          </div>
+        <div className="flex h-screen">
+          {/* Left Side - Dark Background */}
+          <div className="w-1/2 bg-black text-white p-12 overflow-y-auto">
+            <div className="max-w-xl mx-auto">
+              <div className="flex items-center gap-3 mb-8">
+                <Image 
+                  src="/logo.png" 
+                  alt="Team Sync" 
+                  width={32} 
+                  height={32} 
+                />
+                <span className="text-lg">Team Sync</span>
+              </div>
 
-          <div className="mt-6">
-            <h3 className="text-xl font-medium text-gray-900 mb-4">Payment Method</h3>
-            
-            {/* Payment Methods */}
-            <div className="space-y-3">
-              {/* Credit Card Option */}
-              <div className="border rounded-lg overflow-hidden">
-                <label className="flex items-center justify-between w-full p-4 cursor-pointer hover:bg-gray-50">
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      name="payment-method"
-                      value="card"
-                      checked={selectedPaymentMethod === 'card'}
-                      onChange={(e) => handlePaymentMethodSelect(e.target.value)}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                    />
-                    <div className="ml-3 flex items-center">
-                      <span className="font-medium text-gray-900 mr-2">Credit Card</span>
-                      <div className="flex space-x-2">
-                        <Image src="/visa.png" alt="Visa" width={32} height={20} className="object-contain" />
-                        <Image src="/mastercard.png" alt="Mastercard" width={32} height={20} className="object-contain" />
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold mb-2">
+                  {planDetails ? `Subscribe to ${planDetails.name}` : 'Subscribe to Team Sync'}
+                </h1>
+                <div className="text-4xl font-bold mb-2">
+                  {planDetails ? formatPlanPriceAndInterval(planDetails) : '$0.00'}
+                  <span className="text-sm">
+                    {getBillingText()}
+                  </span>
+                </div>
+                <div className="text-gray-400">
+                  {planDetails ? formatPlanPriceAndInterval(planDetails) : 'US$10.00 per month, billed annually'}
+                </div>
+              </div>
+
+              {/* 计划详情 */}
+              <div className="space-y-6">
+                <div className="flex justify-between">
+                  <span>{planDetails ? planDetails.name : 'Team Sync'}</span>
+                  <span>{planDetails ? formatPlanPriceAndInterval(planDetails) : '$0.00'}</span>
+                </div>
+
+                <div className="text-sm text-gray-400">
+                  {planDetails ? planDetails.description : 'Team Sync is a team collaboration tool that helps you manage your team and projects.'}
+                </div>
+
+                <div className="flex justify-end">
+                  <span>{planDetails ? planDetails.billing_interval : 'Annually'}</span>
+                </div>
+
+                <div className="border-t border-gray-800 pt-4">
+                  <div className="flex w-full">
+                    {!showPromoInput ? (
+                      <div className="w-full">
+                        {validPromo && appliedPromoCode ? (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <span className="text-green-400 mr-2">✓</span>
+                              <span className="text-green-400">Applied Code: {appliedPromoCode}</span>
+                            </div>
+                            <button 
+                              onClick={async () => {
+                                // Keep track of the code being removed
+                                const codeToRemove = appliedPromoCode;
+                                
+                                // Reset the UI state first
+                                setValidPromo(false);
+                                setDiscount(0);
+                                setAppliedPromoCode('');
+                                setPromoCode('');
+                                setShowPromoInput(true);
+                                
+                                // Then decrease the usage count
+                                if (codeToRemove) {
+                                  await decreasePromoCodeUsage(codeToRemove);
+                                }
+                              }}
+                              className="text-gray-400 text-sm hover:text-white"
+                            >
+                              Change
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => setShowPromoInput(true)}
+                            className="transition-all duration-300 ease-in-out bg-gray-800 w-1/4 text-gray-400 py-2 hover:bg-gray-700 rounded"
+                          >
+                            Add Promo Code
+                          </button>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                </label>
-
-                {/* Card Form - Shows when selected */}
-                {selectedPaymentMethod === 'card' && (
-                  <div className="p-4 border-t">
-                    {clientSecret ? (
-                      <Elements 
-                        stripe={stripePromise} 
-                        options={{
-                          clientSecret,
-                          appearance,
-                        }}
-                      >
-                        <CheckoutForm onPaymentSubmit={onPaymentSubmit} />
-                      </Elements>
                     ) : (
-                      <div className="text-center py-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-                        <p className="mt-2 text-gray-600">Loading payment form...</p>
+                      <div className="flex w-full flex-col">
+                        <div className="flex w-full">
+                          <input
+                            type="text"
+                            value={promoCode}
+                            onChange={(e) => setPromoCode(e.target.value)}
+                            placeholder="Add Promo Code"
+                            className="flex-1 bg-white text-gray-900 px-3 py-2 focus:outline-none rounded-l transition-all duration-300 ease-in-out"
+                            autoFocus
+                            disabled={isPromoLoading}
+                            onBlur={(e) => {
+                              if (!promoCode.trim()) {
+                                setShowPromoInput(false);
+                              }
+                            }}
+                          />
+                          <button 
+                            onClick={handleApplyPromoCode}
+                            disabled={isPromoLoading}
+                            className={`px-4 py-2 rounded-r transition-colors duration-300 flex items-center justify-center ${
+                              isPromoLoading 
+                                ? 'bg-gray-400 cursor-not-allowed' 
+                                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                            }`}
+                          >
+                            {isPromoLoading ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : 'Apply'}
+                          </button>
+                        </div>
+                        
+                        {promoMessage && (
+                          <div className={`mt-2 p-2 text-sm rounded ${
+                            messageType === 'success' 
+                              ? 'bg-green-900 text-green-300' 
+                              : 'bg-red-900 text-red-300'
+                          }`}>
+                            {promoMessage}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Alipay Option */}
-              <div className="border rounded-lg overflow-hidden">
-                <label className="flex items-center justify-between w-full p-4 cursor-pointer hover:bg-gray-50">
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      name="payment-method"
-                      value="alipay"
-                      checked={selectedPaymentMethod === 'alipay'}
-                      onChange={(e) => handlePaymentMethodSelect(e.target.value)}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                    />
-                    <div className="ml-3 flex items-center">
-                      <span className="font-medium text-gray-900 mr-2">Alipay 支付宝</span>
-                      <Image src="/alipay.png" alt="Alipay" width={64} height={20} className="object-contain" />
-                    </div>
+                <div className="flex justify-between border-t border-gray-800 pt-4">
+                  <span>Today's Subtotal</span>
+                  <span>{formatPlanPriceAndInterval(planDetails)}</span>
+                </div>
+
+                {validPromo && discount > 0 && (
+                  <div className="flex justify-between text-green-400 pt-2">
+                    <span>Discount ({appliedPromoCode})</span>
+                    <span>-{formatPlanPriceAndInterval(planDetails)}</span>
                   </div>
-                </label>
+                )}
 
-                {selectedPaymentMethod === 'alipay' && (
-                  <div className="p-4 border-t">
-                    <button
-                      onClick={handleAlipayPayment}
-                      disabled={isProcessing}
-                      className={`w-full py-2 px-4 rounded-lg ${
-                        isProcessing 
-                          ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-[#1677FF] hover:bg-[#0E66E7]'
-                      } text-white`}
-                    >
-                      {isProcessing ? 'Processing...' : 'Pay with Alipay'}
-                    </button>
+                {validPromo && (
+                  <div className="flex justify-between border-t border-gray-800 pt-4 font-bold">
+                    <span>Total</span>
+                    <span>{formatPlanPriceAndInterval(planDetails)}</span>
                   </div>
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Payment Button */}
-            <button
-              onClick={handlePaymentButtonClick}
-              disabled={!selectedPaymentMethod || paymentStatus === 'processing' || isProcessing}
-              className={`w-full py-3 rounded-md mt-6 ${
-                !selectedPaymentMethod 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : paymentStatus === 'processing' || isProcessing
-                  ? 'bg-indigo-400 cursor-wait'
-                  : 'bg-indigo-600 hover:bg-indigo-700'
-              } text-white`}
-            >
-              {paymentStatus === 'processing' || isProcessing ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Processing...
+          {/* Right Side - Light Background */}
+          <div className="w-1/2 bg-white p-12 overflow-y-auto">
+            <div className="max-w-xl mx-auto">
+              <h2 className="text-xl mb-6">Contact Information</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <div className="relative">
+                    <input 
+                      type="email" 
+                      value={email}
+                      disabled
+                      className="w-full p-3 rounded-md bg-gray-50 text-gray-700"
+                    />
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Email from your account
+                  </p>
                 </div>
-              ) : getPaymentButtonText()}
-            </button>
 
+                <div className="mt-6">
+                  <h3 className="text-xl font-medium text-gray-900 mb-4">Payment Method</h3>
+                  
+                  {/* Payment Methods */}
+                  <div className="space-y-3">
+                    {/* Credit Card Option */}
+                    <div className="border rounded-lg overflow-hidden">
+                      <label className="flex items-center justify-between w-full p-4 cursor-pointer hover:bg-gray-50">
+                        <div className="flex items-center">
+                          <input
+                            type="radio"
+                            name="payment-method"
+                            value="card"
+                            checked={selectedPaymentMethod === 'card'}
+                            onChange={(e) => handlePaymentMethodSelect(e.target.value)}
+                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                          />
+                          <div className="ml-3 flex items-center">
+                            <span className="font-medium text-gray-900 mr-2">Credit Card</span>
+                            <div className="flex space-x-2">
+                              <Image src="/visa.png" alt="Visa" width={32} height={20} className="object-contain" />
+                              <Image src="/mastercard.png" alt="Mastercard" width={32} height={20} className="object-contain" />
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+
+                      {/* Card Form - Shows when selected */}
+                      {selectedPaymentMethod === 'card' && (
+                        <div className="p-4 border-t">
+                          {clientSecret ? (
+                            <Elements 
+                              stripe={stripePromise} 
+                              options={{
+                                clientSecret,
+                                appearance,
+                              }}
+                            >
+                              <CheckoutForm onPaymentSubmit={onPaymentSubmit} />
+                            </Elements>
+                          ) : (
+                            <div className="text-center py-4">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                              <p className="mt-2 text-gray-600">Loading payment form...</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Alipay Option */}
+                    <div className="border rounded-lg overflow-hidden">
+                      <label className="flex items-center justify-between w-full p-4 cursor-pointer hover:bg-gray-50">
+                        <div className="flex items-center">
+                          <input
+                            type="radio"
+                            name="payment-method"
+                            value="alipay"
+                            checked={selectedPaymentMethod === 'alipay'}
+                            onChange={(e) => handlePaymentMethodSelect(e.target.value)}
+                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                          />
+                          <div className="ml-3 flex items-center">
+                            <span className="font-medium text-gray-900 mr-2">Alipay 支付宝</span>
+                            <Image src="/alipay.png" alt="Alipay" width={64} height={20} className="object-contain" />
+                          </div>
+                        </div>
+                      </label>
+
+                      {selectedPaymentMethod === 'alipay' && (
+                        <div className="p-4 border-t">
+                          <button
+                            onClick={handleAlipayPayment}
+                            disabled={isProcessing}
+                            className={`w-full py-2 px-4 rounded-lg ${
+                              isProcessing 
+                                ? 'bg-gray-400 cursor-not-allowed' 
+                                : 'bg-[#1677FF] hover:bg-[#0E66E7]'
+                            } text-white`}
+                          >
+                            {isProcessing ? 'Processing...' : 'Pay with Alipay'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Payment Button */}
+                  <button
+                    onClick={handlePaymentButtonClick}
+                    disabled={!selectedPaymentMethod || paymentStatus === 'processing' || isProcessing}
+                    className={`w-full py-3 rounded-md mt-6 ${
+                      !selectedPaymentMethod 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : paymentStatus === 'processing' || isProcessing
+                        ? 'bg-indigo-400 cursor-wait'
+                        : 'bg-indigo-600 hover:bg-indigo-700'
+                    } text-white`}
+                  >
+                    {paymentStatus === 'processing' || isProcessing ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Processing...
+                      </div>
+                    ) : getPaymentButtonText()}
+                  </button>
+
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </PaymentValidation>
   )
 }

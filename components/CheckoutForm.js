@@ -15,13 +15,12 @@ export default function CheckoutForm({ onPaymentSubmit }) {
     }
 
     try {
-      // Get the URL parameters (planId and userId) from the current URL
+      // Get only the planId from URL parameters
       const urlParams = new URLSearchParams(window.location.search);
       const planId = urlParams.get('plan_id');
-      const userId = urlParams.get('user_id');
 
-      // Build the return URL with these parameters preserved
-      const returnUrl = `${window.location.origin}/payment-success?plan_id=${planId}&user_id=${userId}`;
+      // Build the return URL with only planId
+      const returnUrl = `${window.location.origin}/payment-success?plan_id=${planId}`;
       
       console.log('Confirming payment with return URL:', returnUrl);
       

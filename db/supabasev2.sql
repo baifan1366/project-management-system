@@ -465,7 +465,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
     "name" VARCHAR(50) NOT NULL,
     "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
     "price" DECIMAL(10, 2) NOT NULL,
-    "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
+    "billing_interval" TEXT CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY') OR "billing_interval" IS NULL),
     "description" TEXT,
     "features" JSONB NOT NULL, -- 存储计划包含的功能列表
     "max_projects" INT NOT NULL, -- 最大项目数
@@ -487,15 +487,15 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
     "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
     "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
     "start_date" TIMESTAMP NOT NULL,
-    "end_date" TIMESTAMP NOT NULL,
+    "end_date" TIMESTAMP,
     -- 使用统计
-    "current_projects" INT DEFAULT 0,
-    "current_teams" INT DEFAULT 0,
-    "current_members" INT DEFAULT 0,
-    "current_ai_chat" INT DEFAULT 0,
-    "current_ai_task" INT DEFAULT 0,
-    "current_ai_workflow" INT DEFAULT 0,
-    "current_storage" INT DEFAULT 0,
+    "current_projects" INT DEFAULT 0 NULL,
+    "current_teams" INT DEFAULT 0 NULL,
+    "current_members" INT DEFAULT 0 NULL,
+    "current_ai_chat" INT DEFAULT 0 NULL,
+    "current_ai_task" INT DEFAULT 0 NULL,
+    "current_ai_workflow" INT DEFAULT 0 NULL,
+    "current_storage" INT DEFAULT 0 NULL,
     -- 时间戳
     "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -751,6 +751,7 @@ CREATE TABLE "payment" (
   "applied_promo_code" VARCHAR(50),
   "stripe_payment_id" VARCHAR(255),
   "metadata" JSONB,
+  "is_processed" BOOLEAN DEFAULT FALSE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

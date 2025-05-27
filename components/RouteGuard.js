@@ -70,7 +70,7 @@ export default function RouteGuard({ children }) {
         path: pathname,
         isAdminPath,
         isLoggedIn,
-        hasAuthToken: isLoggedIn,
+        hasAuthToken: Boolean(isLoggedIn),
         isPublicPath,
         isSpecialPath,
         isTeamInvitationPath,
