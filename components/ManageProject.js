@@ -129,7 +129,7 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
   // 项目信息状态
   const [projectInfo, setProjectInfo] = useState({
     project_name: "",
-    theme_color: "#3b82f6",
+    theme_color: "#000000",
     visibility: "private",
     status: "PENDING"
   });
@@ -149,6 +149,9 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
   
   // 存储原始颜色名称
   const [originalColorName, setOriginalColorName] = useState('');
+  
+  // 名称验证状态
+  const [nameError, setNameError] = useState("");
   
   // 加载项目信息
   useEffect(() => {
@@ -275,9 +278,35 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
     setProcessedMembers(Array.from(userMap.values()));
   };
   
+  // 验证项目名称
+  const validateProjectName = (name) => {
+    const trimmedName = name.trim();
+    if (trimmedName.length < 2) {
+      return t("Projects.projectNameTooShort");
+    }
+    if (trimmedName.length > 50) {
+      return t("Projects.projectNameTooLong");
+    }
+    return "";
+  };
+
+  // 处理项目名称变更
+  const handleProjectNameChange = (e) => {
+    const newName = e.target.value;
+    setProjectInfo({...projectInfo, project_name: newName});
+    setNameError(validateProjectName(newName));
+  };
+  
   // 保存项目设置
   const handleSaveProject = async () => {
     try {
+      // 验证项目名称
+      const nameValidationError = validateProjectName(projectInfo.project_name);
+      if (nameValidationError) {
+        setNameError(nameValidationError);
+        return;
+      }
+      
       setSaving(true);
       setError(null);
       
@@ -485,12 +514,19 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
                   <Label htmlFor="project_name" className="text-right">
                     {t("Projects.projectName")}
                   </Label>
-                  <Input
-                    id="project_name"
-                    value={projectInfo.project_name}
-                    onChange={(e) => setProjectInfo({...projectInfo, project_name: e.target.value})}
-                    className="col-span-3"
-                  />
+                  <div className="col-span-3 relative">
+                    <Input
+                      id="project_name"
+                      value={projectInfo.project_name}
+                      onChange={handleProjectNameChange}
+                      maxLength={50}
+                      className={`${nameError ? "border-red-500" : ""}`}
+                    />
+                    <div className="flex justify-between mt-1 text-xs">
+                      {nameError && <span className="text-red-500">{nameError}</span>}
+                      <span className="ml-auto text-gray-500">{projectInfo.project_name.trim().length}/50</span>
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -569,7 +605,7 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
               <Button 
                 onClick={handleSaveProject}
                 variant={buttonColorVariant}
-                disabled={saving || !projectInfo.project_name || loading || error}
+                disabled={saving || !projectInfo.project_name.trim() || nameError || loading || error}
               >
                 {saving ? t("common.saving") : t("common.save")}
               </Button>
@@ -616,7 +652,7 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
                                 {member.teams.map((team, idx) => (
                                   <div key={`${member.id}-${team.teamId}-${idx}`} className="flex items-center gap-1">
                                     <span className="text-sm">{team.teamName}:</span>
-                                    <Badge className={`${roleColors[team.role] || "text-gray-800 border border-none"} bg-transparent border-none cursor-default`}>
+                                    <Badge className={`${roleColors[team.role] || "text-gray-800 border border-none"} bg-transparent border-none cursor-default hover:bg-accent`}>
                                       {roleLabels[team.role] || team.role}
                                     </Badge>
                                   </div>

@@ -257,6 +257,9 @@
     }
   },
   "Projects": {
+    "projectNameTooShort": "Project name must be at least 3 characters long",
+    "errorSavingProject": "Error saving project",
+    "projectNameTooLong": "Project name must be less than 50 characters long",
     "redirecting": "Project not found, redirecting to projects list",
     "unarchiveTeamConfirmTitle": "Unarchive Team",
     "willBeUnarchived": "will be unarchived",
@@ -1862,6 +1865,10 @@
     "newTask": "New Task",
     "today": "Today",
     "month": "Month",
+    "editTeamDetails": "Edit Team Details",
+    "manageMembers": "Manage Members",
+    "editTeamAccess": "Edit Team Access",
+    "archiveTeam": "Archive Team",
     "deleteTaskConfirmTitle": "Delete Task",
     "deleteTaskConfirmDescription": "Are you sure you want to delete this task? This action cannot be undone.",
     "taskDeleted": "Task deleted successfully",
