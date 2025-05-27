@@ -8,7 +8,9 @@
     "dashboard": "Dashboard",
     "projects": "Projects",
     "tasks": "Tasks",
+    "features": "Features",
     "pricing": "Pricing",
+    "contact": "Contact Us",
     "login": "Login",
     "signup": "Sign Up"
   },

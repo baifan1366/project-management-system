@@ -1,19 +1,25 @@
 'use client'
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPaymentStatus, setPaymentMetadata } from '@/lib/redux/features/paymentSlice';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
+import ProcessedPaymentModal from '@/components/payment/paymentProcessed';
+import PaymentSuccessModal from '@/components/payment/paymentSuccees';
 
 export default function PaymentSuccess() {
+  const router = useRouter();
   const dispatch = useDispatch();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState(null);
   const [isOrderIdExpanded, setIsOrderIdExpanded] = useState(false);
+  const [showProcessedModal, setShowProcessedModal] = useState(false);
+  const [countdown, setCountdown] = useState(3);
   
   const { paymentDetails, metadata, status, error } = useSelector(state => state.payment);
 
@@ -26,8 +32,10 @@ export default function PaymentSuccess() {
   const copyToClipboard = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
+      toast.success('Copied to clipboard');
     } catch (err) {
       console.error('Failed to copy text:', err);
+      toast.error('Failed to copy');
     }
   };
 
@@ -90,27 +98,46 @@ export default function PaymentSuccess() {
   // 更新用户订阅计划
   const updateUserSubscription = async (userId, planId) => {
     try {
-      console.log('Updating user subscription:', { userId, planId });
-      
       // Get current date for start_date
       const startDate = new Date().toISOString();
       
-      // Calculate end_date based on plan details
+      // Get plan details
       const { data: planData, error: planError } = await supabase
         .from('subscription_plan')
-        .select('billing_interval')
+        .select('billing_interval, type')
         .eq('id', planId)
         .single();
       
       if (planError) throw planError;
       
       // Calculate end date based on billing interval
-      const endDate = new Date();
-      if (planData.billing_interval === 'MONTHLY') {
-        endDate.setMonth(endDate.getMonth() + 1);
-      } else if (planData.billing_interval === 'YEARLY') {
-        endDate.setFullYear(endDate.getFullYear() + 1);
+      let endDate = null;
+      if (planData.type !== 'FREE') {  // 只有非免费计划才设置结束日期
+        endDate = new Date();
+        if (planData.billing_interval === 'MONTHLY') {
+          endDate.setMonth(endDate.getMonth() + 1);
+        } else if (planData.billing_interval === 'YEARLY') {
+          endDate.setFullYear(endDate.getFullYear() + 1);
+        }
+        endDate = endDate.toISOString();
       }
+      
+      // Update subscription
+      const updateData = {
+        user_id: userId,
+        plan_id: planId,
+        status: 'ACTIVE',
+        start_date: startDate,
+        end_date: endDate,  // 可以为 null
+        current_projects: 0,
+        current_teams: 0,
+        current_members: 0,
+        current_ai_chat: 0,
+        current_ai_task: 0,
+        current_ai_workflow: 0,
+        current_storage: 0,
+        updated_at: new Date().toISOString()
+      };
       
       // First, check if a record already exists
       const { data: existingData, error: checkError } = await supabase
@@ -128,54 +155,62 @@ export default function PaymentSuccess() {
         // Update existing record
         result = await supabase
           .from('user_subscription_plan')
-          .update({ 
-            plan_id: planId,
-            status: 'ACTIVE',
-            start_date: startDate,
-            end_date: endDate.toISOString(),
-            current_projects: 0,
-            current_teams: 0,
-            current_members: 0,
-            current_ai_chat: 0,
-            current_ai_task: 0,
-            current_ai_workflow: 0,
-            current_storage: 0,
-            updated_at: now
-          })
+          .update(updateData)
           .eq('user_id', userId);
       } else {
         // Insert new record
         result = await supabase
           .from('user_subscription_plan')
-          .insert({ 
-            user_id: userId,
-            plan_id: planId,
-            status: 'ACTIVE',
-            start_date: startDate,
-            end_date: endDate.toISOString(),
-            current_projects: 0,
-            current_teams: 0,
-            current_members: 0,
-            current_ai_chat: 0,
-            current_ai_task: 0,
-            current_ai_workflow: 0,
-            current_storage: 0,
-            created_at: now,
-            updated_at: now
-          });
+          .insert(updateData);
       }
       
       if (result.error) throw result.error;
       
       console.log('User subscription updated successfully');
       return true;
+    } catch (error) {
+      console.error('Error updating subscription:', error);
+      throw error;
+    }
+  };
+
+  // 添加新的检查函数
+  const checkPaymentProcessed = async (paymentIntentId) => {
+    try {
+      const { data, error } = await supabase
+        .from('payment')
+        .select('is_processed, stripe_payment_id')
+        .eq('stripe_payment_id', paymentIntentId)
+        .single();
+
+      if (error) throw error;
+      return data?.is_processed || false;
     } catch (err) {
-      console.error('Error updating user subscription:', err);
+      console.error('Error checking payment processed status:', err);
       return false;
     }
   };
 
-  // 创建支付记录
+  // 添加更新支付状态的函数
+  const updatePaymentProcessed = async (paymentIntentId) => {
+    try {
+      const { error } = await supabase
+        .from('payment')
+        .update({ 
+          is_processed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('stripe_payment_id', paymentIntentId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating payment processed status:', err);
+      return false;
+    }
+  };
+
+  // 修改现有的 createPaymentRecord 函数
   const createPaymentRecord = async (paymentData) => {
     try {
       console.log('Creating payment record:', paymentData);
@@ -206,7 +241,8 @@ export default function PaymentSuccess() {
         metadata: {
           planId: paymentData.metadata?.planId,
           planName: paymentData.metadata?.planName,
-        }
+        },
+        is_processed: false, // 初始设置为 false
       };
       
       // 插入支付记录并返回创建的记录
@@ -231,15 +267,56 @@ export default function PaymentSuccess() {
     const initializePaymentSuccess = async () => {
       try {
         const paymentIntent = searchParams.get('payment_intent');
+        
         if (!paymentIntent) {
-          throw new Error('No payment intent ID found');
+          router.push('/');
+          return;
         }
 
+        // 检查支付是否已处理
+        const isProcessed = await checkPaymentProcessed(paymentIntent);
+        
+        if (isProcessed) {
+          setShowProcessedModal(true);
+          
+          let count = 3;
+          setCountdown(count);
+          
+          const toastId = toast.warning(
+            "Payment Already Processed", 
+            {
+              description: `This payment has already been processed. Redirecting to dashboard in ${count} seconds...`,
+              duration: 3000,
+            }
+          );
+          
+          const interval = setInterval(() => {
+            count--;
+            setCountdown(count);
+            
+            if (count > 0) {
+              toast.warning(
+                "Payment Already Processed",
+                {
+                  id: toastId,
+                  description: `This payment has already been processed. Redirecting to dashboard in ${count} seconds...`,
+                  duration: 1000,
+                }
+              );
+            } else {
+              clearInterval(interval);
+              router.push('/dashboard');
+            }
+          }, 1000);
+          
+          return;
+        }
+
+        // 如果支付未处理，继续正常的支付处理流程
         const result = await dispatch(fetchPaymentStatus(paymentIntent)).unwrap();
         console.log('Payment status result:', result);
         
         if (result.metadata) {
-          // Update Redux metadata with all payment details
           dispatch(setPaymentMetadata({
             ...result.metadata,
             orderId: result.metadata.orderId,
@@ -247,23 +324,22 @@ export default function PaymentSuccess() {
           }));
         }
 
-        // 获取用户邮箱并发送确认邮件
+        // 处理支付成功的逻辑
         if (result.metadata?.userId) {
           const email = await fetchUserEmail(result.metadata.userId);
           
-          // 更新用户的订阅计划
           if (result.metadata?.planId) {
             await updateUserSubscription(result.metadata.userId, result.metadata.planId);
           }
           
-          // 创建支付记录
           const paymentRecord = await createPaymentRecord({
             ...result,
             userId: result.metadata.userId
           });
 
-          // Update payment details in Redux after creating the record
           if (paymentRecord) {
+            // 更新支付处理状态
+            await updatePaymentProcessed(paymentIntent);
             dispatch(fetchPaymentStatus.fulfilled(paymentRecord, 'payment/fetchPaymentStatus', paymentRecord.id));
           }
           
@@ -279,6 +355,7 @@ export default function PaymentSuccess() {
         }
       } catch (err) {
         console.error('Error initializing payment success:', err);
+        router.push('/payment-error');
       } finally {
         setLoading(false);
       }
@@ -350,91 +427,20 @@ export default function PaymentSuccess() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
-        <div className="text-center">
-          {/* Success Icon */}
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-            <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-
-          {/* Title and Subtitle */}
-          <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Successful!</h2>
-          <p className="mt-2 text-gray-600">
-            Thank you for subscribing to {metadata.planName}
-          </p>
-
-          {/* Order Summary */}
-          <div className="mt-6 border-t border-gray-200 pt-6">
-            <div className="text-left">
-              <h3 className="font-medium text-gray-900">Order Summary</h3>
-              <dl className="mt-4 space-y-4">
-                <div className="flex justify-between items-center">
-                  <dt className="text-gray-600">Order ID</dt>
-                  <dd className="text-gray-900 font-mono flex items-center gap-2">
-                    <span>{formatOrderId(metadata?.orderId || paymentDetails?.order_id || 'N/A')}</span>
-                    {(metadata?.orderId || paymentDetails?.order_id) && (
-                      <>
-                        <button
-                          onClick={() => setIsOrderIdExpanded(!isOrderIdExpanded)}
-                          className="text-indigo-600 hover:text-indigo-700 text-sm"
-                        >
-                          {isOrderIdExpanded ? 'Show Less' : 'Show More'}
-                        </button>
-                        <button
-                          onClick={() => copyToClipboard(metadata?.orderId || paymentDetails?.order_id)}
-                          className="text-indigo-600 hover:text-indigo-700"
-                          title="Copy to clipboard"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        </button>
-                      </>
-                    )}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Plan</dt>
-                  <dd className="text-gray-900">{metadata.planName}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Amount</dt>
-                  <dd className="text-gray-900">{formatAmount(metadata.amount)}</dd>
-                </div>
-                {userEmail && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Email</dt>
-                    <dd className="text-gray-900">{userEmail}</dd>
-                  </div>
-                )}
-                <div className="flex justify-between border-t border-gray-200 pt-4">
-                  <dt className="text-gray-900 font-medium">Total</dt>
-                  <dd className="text-indigo-600 font-medium">{formatAmount(metadata.amount)}</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="mt-8 space-y-3">
-            <Link 
-              href="/dashboard"
-              className="block w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 transition-colors"
-            >
-              Go to Dashboard
-            </Link>
-            <Link 
-              href="/"
-              className="block w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-md hover:bg-gray-200 transition-colors"
-            >
-              Return to Home
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
+    <>
+      {showProcessedModal ? (
+        <ProcessedPaymentModal countdown={countdown} />
+      ) : (
+        <PaymentSuccessModal
+          metadata={metadata}
+          userEmail={userEmail}
+          formatAmount={formatAmount}
+          formatOrderId={formatOrderId}
+          isOrderIdExpanded={isOrderIdExpanded}
+          setIsOrderIdExpanded={setIsOrderIdExpanded}
+          copyToClipboard={copyToClipboard}
+        />
+      )}
+    </>
   );
 }
