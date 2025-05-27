@@ -15,7 +15,7 @@ export async function GET(request) {
             .eq('team_id', teamId)
             .eq('id', sectionId)
             .single()
-            .order('id', { ascending: true });
+            .order('order_index', { ascending: true });
         if (error) {
             return NextResponse.json({ error: error.message }, { status: 500 })
         }
@@ -25,7 +25,7 @@ export async function GET(request) {
             .from('section')
             .select('*')
             .eq('team_id', teamId)
-            .order('id', { ascending: true });
+            .order('order_index', { ascending: true });
         if (error) {
             return NextResponse.json({ error: error.message }, { status: 500 })
         }
@@ -119,6 +119,52 @@ export async function PATCH(request) {
         }
         
         return NextResponse.json(section)
+    }
+    if(body.sectionIds) {
+        const { teamId, sectionIds } = body;
+        
+        if (!teamId || !Array.isArray(sectionIds) || sectionIds.length === 0) {
+            return NextResponse.json({ 
+                error: '无效的参数。需要：teamId 和 sectionIds 数组' 
+            }, { status: 400 })
+        }
+        
+        console.log('更新分区顺序:', { teamId, sectionIds });
+        
+        // 开始事务以确保所有更新原子性执行
+        const updatePromises = sectionIds.map((sectionId, index) => {
+            return supabase
+                .from('section')
+                .update({
+                    order_index: index,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', sectionId)
+                .eq('team_id', teamId);
+        });
+        
+        try {
+            // 执行所有更新
+            await Promise.all(updatePromises);
+            
+            // 获取更新后的分区列表
+            const { data: updatedSections, error: fetchError } = await supabase
+                .from('section')
+                .select('*')
+                .eq('team_id', teamId)
+                .order('order_index', { ascending: true });
+            
+            if (fetchError) {
+                console.error('获取更新后的分区列表错误:', fetchError);
+                return NextResponse.json({ error: fetchError.message }, { status: 500 })
+            }
+            
+            console.log('分区顺序更新成功!');
+            return NextResponse.json(updatedSections)
+        } catch (error) {
+            console.error('更新分区顺序错误:', error);
+            return NextResponse.json({ error: error.message }, { status: 500 })
+        }
     }
     
     // 如果没有匹配的条件，返回错误

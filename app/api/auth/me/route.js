@@ -7,7 +7,8 @@ export async function GET() {
     const userData = await getCurrentUser();
     
     // Check if token exists but is invalid
-    const token = (await cookies()).get('auth_token')?.value;
+    const cookieStore = cookies();
+    const token = await cookieStore.get('auth_token')?.value;
     
     if (token && !userData) {
       // If there's a token but no user data, it's likely an expired or invalid token

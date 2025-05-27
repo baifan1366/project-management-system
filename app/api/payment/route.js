@@ -48,6 +48,7 @@ export async function POST(request) {
       metadata: {
         planId,
         userId,
+        orderId: body.metadata?.orderId,
         planName: planName || '',
         quantity: quantity.toString(),
         promoCode: promoCode || '',

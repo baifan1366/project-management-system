@@ -570,8 +570,8 @@ export default function ChatPage() {
     const trimmedMessage = message.trim();
     
     // Add message length validation
-    if (trimmedMessage.length > 2000) {
-      toast.error(t('errors.messageTooLong') || 'Message too long (max 2000 characters)');
+    if (trimmedMessage.length > 1000) {
+      toast.error(t('errors.messageTooLong') || 'Message too long (max 1000 characters)');
       return;
     }
     
@@ -1120,9 +1120,9 @@ export default function ChatPage() {
                   />
                   
                   {/* Show character count when approaching limit */}
-                  {message.length > 1500 && (
-                    <div className={`text-xs absolute bottom-1 right-3 ${message.length > 2000 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                      {message.length}/2000
+                  {message.length > 700 && (
+                    <div className={`text-xs absolute bottom-1 right-3 ${message.length > 1000 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                      {message.length}/1000
                     </div>
                   )}
                   
@@ -1158,8 +1158,8 @@ export default function ChatPage() {
                 <button 
                   type="submit" 
                   className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                  disabled={!message.trim() || isPending}
-                  title={t('send')}
+                  disabled={!message.trim() || isPending || message.length > 1000}
+                  title={message.length > 1000 ? t('errors.messageTooLong') || 'Message too long (max 1000 characters)' : t('send')}
                 >
                   <Send className="h-5 w-5" />
                 </button>

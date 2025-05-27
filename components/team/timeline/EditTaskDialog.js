@@ -98,6 +98,7 @@ export default function EditTaskDialog({
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPastTask, setIsPastTask] = useState(false);
   const dispatch = useDispatch();
   // 初始化表单
   const form = useForm({
@@ -119,9 +120,9 @@ export default function EditTaskDialog({
     // 任务名称检查 (2-100字符)
     const isTaskNameValid = taskName.trim().length >= 2 && taskName.trim().length <= 100;
     
-    // 开始日期检查 (不能早于当前日期)
+    // 开始日期检查 (如果是过去的任务，跳过此验证)
     let isStartDateValid = true;
-    if (startDate) {
+    if (startDate && !isPastTask) {
       const selectedDate = new Date(startDate);
       selectedDate.setHours(0, 0, 0, 0);
       
@@ -136,6 +137,19 @@ export default function EditTaskDialog({
     const isDurationValid = !isNaN(durationValue) && durationValue >= 1 && durationValue <= 999;
     
     return isTaskNameValid && isStartDateValid && isDurationValid;
+  };
+
+  // 检查任务开始日期是否早于当前日期
+  const checkIsPastTask = (startDate) => {
+    if (!startDate) return false;
+    
+    const taskDate = new Date(startDate);
+    taskDate.setHours(0, 0, 0, 0);
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return taskDate < today;
   };
 
   // 表单验证
@@ -236,6 +250,11 @@ export default function EditTaskDialog({
         duration: editTask.duration || 1,
         progress: editTask.progress || 0
       });
+      
+      // 检查是否为过去的任务
+      const isPast = checkIsPastTask(editTask.start_date);
+      setIsPastTask(isPast);
+      
       setFormErrors({});
     }
   }, [showEditForm, editTask, form]);
@@ -258,7 +277,9 @@ export default function EditTaskDialog({
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">{t('editTask')}</DialogTitle>
           <DialogDescription>
-            {t('modifyTaskInformationOrAdjustCompletionProgress')}
+            {isPastTask 
+              ? t('onlyProgressAndDurationEditable') || '此任务的开始日期已过，只能修改完成进度和持续时间'
+              : t('modifyTaskInformationOrAdjustCompletionProgress')}
           </DialogDescription>
         </DialogHeader>
         
@@ -284,6 +305,7 @@ export default function EditTaskDialog({
                       onChange={(e) => {
                         field.onChange(e);
                       }}
+                      disabled={isPastTask}
                     />
                   </FormControl>
                   <FormMessage className="flex justify-end">
@@ -317,6 +339,7 @@ export default function EditTaskDialog({
                         onChange={(e) => {
                           field.onChange(e);
                         }}
+                        disabled={isPastTask}
                       />
                     </FormControl>
                   </FormItem>
@@ -384,15 +407,18 @@ export default function EditTaskDialog({
             />
           
             <DialogFooter className="flex justify-between pt-4">
-              <Button 
-                type="button"
-                variant="destructive"
-                onClick={handleDeleteTask}
-                className="bg-red-600 hover:bg-red-700"
-                disabled={isLoading}
-              >
-                {t('delete')}
-              </Button>
+              {!isPastTask && (
+                <Button 
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDeleteTask}
+                  className="bg-red-600 hover:bg-red-700"
+                  disabled={isLoading}
+                >
+                  {t('delete')}
+                </Button>
+              )}
+              {isPastTask && <div></div>} {/* 占位元素以保持布局 */}
               <div className="flex-1 flex justify-end gap-2">
                 <Button 
                   type="button"

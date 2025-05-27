@@ -54,6 +54,7 @@ CREATE TABLE "project" (
   "description" TEXT,
   "visibility" VARCHAR(20) NOT NULL,
   "theme_color" VARCHAR(20) DEFAULT 'white',
+  "archived" BOOL DEFAULT FALSE,
   "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD')) DEFAULT 'PENDING',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -108,7 +109,8 @@ CREATE TABLE "section" (
   "task_ids" INT[] DEFAULT '{}',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "order_index" INT DEFAULT 0
 );
 
 -- 任务表
@@ -195,6 +197,42 @@ CREATE TABLE "team_post" (
   "is_pinned" BOOLEAN DEFAULT FALSE,
   "reactions" JSONB DEFAULT '{}', -- Store reactions as {emoji: [user_ids]} format
   "comment_id" INT[] DEFAULT '{}', -- Array of comments associated with the post
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "agile_role" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "team_agile" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
+  "start_date" TIMESTAMP NOT NULL,
+  "duration" INT DEFAULT 2,
+  "goal" TEXT,
+  "task_ids" JSONB DEFAULT '{}',
+  "status" TEXT NOT NULL CHECK ("status" IN ('PLANNING', 'PENDING', 'RETROSPECTIVE')) DEFAULT 'PENDING',
+  "whatWentWell" JSONB,
+  "toImprove" JSONB,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "agile_member" (
+  "id" SERIAL PRIMARY KEY,
+  "agile_id" INT NOT NULL REFERENCES "team_agile"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "role_id" INT NOT NULL REFERENCES "agile_role"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -427,7 +465,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
     "name" VARCHAR(50) NOT NULL,
     "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
     "price" DECIMAL(10, 2) NOT NULL,
-    "billing_interval" TEXT NOT NULL CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY')),
+    "billing_interval" TEXT CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY') OR "billing_interval" IS NULL),
     "description" TEXT,
     "features" JSONB NOT NULL, -- 存储计划包含的功能列表
     "max_projects" INT NOT NULL, -- 最大项目数
@@ -449,15 +487,15 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
     "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
     "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
     "start_date" TIMESTAMP NOT NULL,
-    "end_date" TIMESTAMP NOT NULL,
+    "end_date" TIMESTAMP,
     -- 使用统计
-    "current_projects" INT DEFAULT 0,
-    "current_teams" INT DEFAULT 0,
-    "current_members" INT DEFAULT 0,
-    "current_ai_chat" INT DEFAULT 0,
-    "current_ai_task" INT DEFAULT 0,
-    "current_ai_workflow" INT DEFAULT 0,
-    "current_storage" INT DEFAULT 0,
+    "current_projects" INT DEFAULT 0 NULL,
+    "current_teams" INT DEFAULT 0 NULL,
+    "current_members" INT DEFAULT 0 NULL,
+    "current_ai_chat" INT DEFAULT 0 NULL,
+    "current_ai_task" INT DEFAULT 0 NULL,
+    "current_ai_workflow" INT DEFAULT 0 NULL,
+    "current_storage" INT DEFAULT 0 NULL,
     -- 时间戳
     "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -482,7 +520,7 @@ CREATE TABLE "promo_code" (
 -- 联系表（用于存储联系表单提交）
 CREATE TABLE "contact" (
   "id" SERIAL PRIMARY KEY,
-  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE')), -- 区分一般查询和企业查询
+  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE', 'DOWNGRADE')), -- 添加 DOWNGRADE 类型
   "email" VARCHAR(255) NOT NULL,
   "message" TEXT, -- 用于一般查询的消息
   -- 企业查询特有字段
@@ -496,6 +534,29 @@ CREATE TABLE "contact" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Downgrade Request Table
+CREATE TABLE "downgrade_request" (
+  "id" SERIAL PRIMARY KEY,
+  "contact_id" INT NOT NULL REFERENCES "contact"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "current_subscription_id" INT NOT NULL REFERENCES "user_subscription_plan"("id") ON DELETE CASCADE,
+  "target_plan_id" INT NOT NULL REFERENCES "subscription_plan"("id") ON DELETE CASCADE,
+  "reason" TEXT NOT NULL,
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'APPROVED', 'REJECTED')) DEFAULT 'PENDING',
+  "processed_by" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
+  "processed_at" TIMESTAMP,
+  "notes" TEXT,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for downgrade_request
+CREATE INDEX idx_downgrade_request_user_id ON "downgrade_request"("user_id");
+CREATE INDEX idx_downgrade_request_contact_id ON "downgrade_request"("contact_id");
+CREATE INDEX idx_downgrade_request_current_subscription ON "downgrade_request"("current_subscription_id");
+CREATE INDEX idx_downgrade_request_target_plan ON "downgrade_request"("target_plan_id");
+CREATE INDEX idx_downgrade_request_status ON "downgrade_request"("status");
 
 -- Support Contact Reply Table (integrates with existing contact table)
 CREATE TABLE "contact_reply" (
@@ -701,6 +762,7 @@ CREATE INDEX idx_landing_page_content_sort ON "landing_page_content"("sort_order
 -- Payment table for Stripe integration
 CREATE TABLE "payment" (
   "id" SERIAL PRIMARY KEY,
+  "order_id" UUID NOT NULL UNIQUE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "amount" DECIMAL(10, 2) NOT NULL,
   "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
@@ -712,9 +774,13 @@ CREATE TABLE "payment" (
   "applied_promo_code" VARCHAR(50),
   "stripe_payment_id" VARCHAR(255),
   "metadata" JSONB,
+  "is_processed" BOOLEAN DEFAULT FALSE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Create index for order_id
+CREATE INDEX idx_payment_order_id ON "payment"("order_id");
 
 -- For better performance when querying payment by user
 CREATE INDEX idx_payment_user_id ON "payment"("user_id");
@@ -729,3 +795,21 @@ CREATE TABLE task_links (
     FOREIGN KEY (source_task_id) REFERENCES task(id) ON DELETE CASCADE,
     FOREIGN KEY (target_task_id) REFERENCES task(id) ON DELETE CASCADE
 );
+
+-- Create mytasks table for user's personal task tracking
+CREATE TABLE "mytasks" (
+  "id" SERIAL PRIMARY KEY,
+  "task_id" INT REFERENCES "task"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
+  "expected_completion_date" TIMESTAMP,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for mytasks table
+CREATE INDEX idx_mytasks_task_id ON "mytasks"("task_id");
+CREATE INDEX idx_mytasks_user_id ON "mytasks"("user_id");
+CREATE INDEX idx_mytasks_status ON "mytasks"("status");

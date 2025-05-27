@@ -121,12 +121,18 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
   // Format using relative time (e.g. "2 hours ago")
   const formatTime = (dateString) => {
     try {
-      const date = new Date(dateString);
-      return formatDistanceToNow(date, { 
+      // First adjust the timestamp according to user timezone
+      // This ensures the relative time is calculated from the user's perspective
+      const adjustedDate = formatDateToUserTimezone 
+        ? new Date(formatDateToUserTimezone(dateString, { dateStyle: undefined, timeStyle: undefined })) 
+        : new Date(dateString);
+      
+      return formatDistanceToNow(adjustedDate, { 
         addSuffix: true,
         locale: locale === 'zh' ? zhCN : enUS
       });
     } catch (error) {
+      console.error('Error formatting relative time:', error);
       return dateString;
     }
   };

@@ -12,12 +12,13 @@ export async function GET() {
     
     const supabase = createClient(supabaseUrl, supabaseKey)
     
-    console.log('2. Fetching subscription plans')
+    console.log('2. Fetching active subscription plans')
     const { data, error } = await supabase
       .from('subscription_plan')
       .select('*')
-      .order('price', { ascending: true }) // First order by price
-      .order('id', { ascending: true })    // Then by ID for same-price plans
+      .eq('is_active', true) // 只获取激活的计划
+      .order('price', { ascending: true })
+      .order('id', { ascending: true })
 
     console.log('3. Query result:', { data, error })
 

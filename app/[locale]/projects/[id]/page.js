@@ -24,8 +24,9 @@ export default function Home({ params }) {
   const { locale } = projectParams;
   const [themeColor, setThemeColor] = useState('#64748b')
   const project = useSelector(state => 
-    state.projects.projects.find(p => String(p.id) === String(projectId))
+    state.projects.projects ? state.projects.projects.find(p => p && String(p.id) === String(projectId)) : null
   );
+  const projectsStatus = useSelector(state => state.projects.status);
   const t = useTranslations('Projects');
   const t_pengy = useTranslations('pengy');
   const [activeTab, setActiveTab] = useState('overview');
@@ -42,6 +43,7 @@ export default function Home({ params }) {
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const [permissionChecked, setPermissionChecked] = useState(false);
+  const [showArchivedDialog, setShowArchivedDialog] = useState(false);
 
   // 使用Redux获取任务数据
   const dispatch = useDispatch();
@@ -64,18 +66,24 @@ export default function Home({ params }) {
           setUserId(user.id);
         }
       } catch (err) {
-        console.error('Error getting current user:', err);
       }
     }
     
     getCurrentUser();
   }, [user]);
 
-  // 检查用户是否有权限访问此项目
+  // 检查用户是否有权限访问此项目以及项目是否已归档
   useEffect(() => {
     async function checkProjectPermission() {
       try {
         if (!userId || !projectId) return;
+
+        // 检查项目是否已归档
+        if (project && project.archived) {
+          setShowArchivedDialog(true);
+          setPermissionChecked(true);
+          return;
+        }
 
         // 检查用户是否是项目创建者
         if (project && project.created_by === userId) {
@@ -110,6 +118,12 @@ export default function Home({ params }) {
   // 处理权限对话框关闭
   const handlePermissionDialogClose = () => {
     setShowPermissionDialog(false);
+    router.push(`/${locale}/projects`);
+  };
+
+  // 处理归档项目对话框关闭
+  const handleArchivedDialogClose = () => {
+    setShowArchivedDialog(false);
     router.push(`/${locale}/projects`);
   };
 
@@ -175,6 +189,22 @@ export default function Home({ params }) {
     };
   };
 
+  // 立即检查项目是否存在
+  if (projectsStatus === 'succeeded' && !project) {
+    // 如果项目加载完成但不存在，立即重定向
+    router.replace(`/${locale}/projects`);
+    
+    // 显示加载状态，直到重定向完成
+    return (
+      <div className="container px-4 py-6 flex justify-center items-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>{t('redirecting')}</p>
+        </div>
+      </div>
+    );
+  }
+
   // 转换所有任务
   const displayTasks = tasks.map(transformTaskForDisplay);
 
@@ -187,6 +217,25 @@ export default function Home({ params }) {
           <p>{t('loading')}</p>
         </div>
       </div>
+    );
+  }
+
+  // 如果项目已归档，显示归档警告对话框
+  if (showArchivedDialog) {
+    return (
+      <AlertDialog open={showArchivedDialog} onOpenChange={setShowArchivedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('projectArchived')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('projectArchivedDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleArchivedDialogClose}>{t('close')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     );
   }
 

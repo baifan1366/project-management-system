@@ -19,6 +19,9 @@ import { FaGoogle } from 'react-icons/fa';
 import { WeekView, DayView } from '@/components/calendar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 export default function CalendarPage() {
   const t = useTranslations('Calendar');
@@ -29,7 +32,8 @@ export default function CalendarPage() {
   const [googleEvents, setGoogleEvents] = useState([]);
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
-  const { tasks = [] } = useSelector((state) => state.tasks);
+  const [tasks, setTasks] = useState([]); // Changed from using redux state to local state
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false); // Added loading state for tasks
   const calendarRef = useRef(null);
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -38,6 +42,13 @@ export default function CalendarPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [userLoadTimeout, setUserLoadTimeout] = useState(false);
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    personalEvents: true,
+    googleEvents: true,
+    tasks: true
+  });
 
   // Add a safety timeout to prevent waiting forever for user data
   useEffect(() => {
@@ -173,10 +184,112 @@ export default function CalendarPage() {
     }
   }, [currentUser, userLoading, t, userLoadTimeout]);
 
-  // 加载任务数据
-  // useEffect(() => {
-  //   dispatch(fetchTasksByUserId());
-  // }, [dispatch]);
+  // 获取任务的标题
+  const getTaskTitle = React.useCallback((task) => {
+    if (task.title) return task.title;
+    if (!task?.tag_values) return null;
+    
+    // 通过分析示例数据，推断数字键与字段的映射关系
+    const fieldKeyMap = {
+      'title': 1,        // 1 对应标题/描述
+    };
+    
+    // 首先检查是否有这个映射
+    const mappedKey = fieldKeyMap['title'];
+    if (mappedKey !== undefined && task.tag_values[mappedKey]) {
+      return task.tag_values[mappedKey];
+    }
+    
+    return null;
+  }, []);
+  
+  // 加载任务数据 - 替换之前的Redux dispatch
+  useEffect(() => {
+    const fetchUserTasks = async () => {
+      if (!currentUser || !currentUser.id) return;
+
+      try {
+        setIsLoadingTasks(true);
+        
+        // 获取mytasks表中的当前用户的任务
+        const { data: userMyTasks, error: myTasksError } = await supabase
+          .from('mytasks')
+          .select('*')
+          .eq('user_id', currentUser.id);
+        
+        if (myTasksError) throw myTasksError;
+        
+        // 准备合并的任务列表
+        let combinedTasks = [];
+        
+        // 处理有关联task_id的任务
+        const tasksWithReference = userMyTasks.filter(mt => mt.task_id !== null);
+        const standaloneMyTasks = userMyTasks.filter(mt => mt.task_id === null);
+        
+        // 获取关联的任务详情
+        if (tasksWithReference.length > 0) {
+          const taskIds = tasksWithReference.map(mt => mt.task_id);
+          
+          const { data: taskDetails, error: taskError } = await supabase
+            .from('task')
+            .select('*')
+            .in('id', taskIds);
+            
+          if (taskError) throw taskError;
+          
+          // 合并关联的任务
+          const linkedTasks = taskDetails.map(task => {
+            const myTask = tasksWithReference.find(mt => mt.task_id === task.id);
+            return {
+              ...task,
+              my_task_id: myTask.id,
+              status: myTask.status,
+              title: myTask.title || getTaskTitle(task),
+              description: myTask.description,
+              expected_completion_date: myTask.expected_completion_date || task.due_date
+            };
+          });
+          
+          combinedTasks = [...linkedTasks];
+        }
+        
+        // 添加独立任务（没有关联task_id的mytasks记录）
+        const standaloneTasks = standaloneMyTasks.map(myTask => ({
+          id: `local-${myTask.id}`,
+          my_task_id: myTask.id,
+          tag_values: {},
+          status: myTask.status,
+          title: myTask.title,
+          description: myTask.description,
+          expected_completion_date: myTask.expected_completion_date,
+          due_date: myTask.expected_completion_date,
+          is_standalone: true
+        }));
+        
+        // 合并所有任务
+        combinedTasks = [...combinedTasks, ...standaloneTasks];
+        
+        setTasks(combinedTasks);
+      } catch (error) {
+        console.error('获取任务失败:', error);
+        toast.error(t('getTasksFailed'));
+      } finally {
+        setIsLoadingTasks(false);
+        // 更新加载状态
+        if (isViewLoading && !isLoadingGoogle && !isLoadingPersonal) {
+          setIsViewLoading(false);
+        }
+        // 如果初始加载尚未完成
+        if (isLoading && (!isGoogleConnected || !isLoadingGoogle) && !isLoadingPersonal) {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    if (currentUser && (!userLoading || userLoadTimeout)) {
+      fetchUserTasks();
+    }
+  }, [currentUser, userLoading, userLoadTimeout, getTaskTitle, t, isViewLoading, isLoading, isGoogleConnected, isLoadingGoogle, isLoadingPersonal, currentDate]);
 
   // 获取个人日历事件
   useEffect(() => {
@@ -321,36 +434,43 @@ export default function CalendarPage() {
   const handlePrevMonth = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => subMonths(prev, 1));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleNextMonth = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addMonths(prev, 1));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handlePrevWeek = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, -7));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleNextWeek = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, 7));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handlePrevDay = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, -1));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleNextDay = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, 1));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleTodayClick = () => {
     setIsViewLoading(true);
     setCurrentDate(new Date());
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleConnectGoogle = async () => {
@@ -375,6 +495,16 @@ export default function CalendarPage() {
   };
 
   const handleOpenCreateEvent = (date = new Date()) => {
+    // Check if the selected date is before today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+    
+    if (date < today) {
+      // If date is in the past, don't open the dialog
+      toast.info(t('cantCreateEventInPast') || "Can't create events in the past");
+      return;
+    }
+    
     setSelectedDate(date);
     setIsCreateEventOpen(true);
   };
@@ -494,11 +624,90 @@ export default function CalendarPage() {
       }
     };
     
-    // 并行执行两个数据获取操作
+    // 刷新任务数据
+    const fetchUserTasks = async () => {
+      if (!currentUser) return;
+      
+      try {
+        setIsLoadingTasks(true);
+        
+        // 获取mytasks表中的当前用户的任务
+        const { data: userMyTasks, error: myTasksError } = await supabase
+          .from('mytasks')
+          .select('*')
+          .eq('user_id', currentUser.id);
+        
+        if (myTasksError) throw myTasksError;
+        
+        // 准备合并的任务列表
+        let combinedTasks = [];
+        
+        // 处理有关联task_id的任务
+        const tasksWithReference = userMyTasks.filter(mt => mt.task_id !== null);
+        const standaloneMyTasks = userMyTasks.filter(mt => mt.task_id === null);
+        
+        // 获取关联的任务详情
+        if (tasksWithReference.length > 0) {
+          const taskIds = tasksWithReference.map(mt => mt.task_id);
+          
+          const { data: taskDetails, error: taskError } = await supabase
+            .from('task')
+            .select('*')
+            .in('id', taskIds);
+            
+          if (taskError) throw taskError;
+          
+          // 合并关联的任务
+          const linkedTasks = taskDetails.map(task => {
+            const myTask = tasksWithReference.find(mt => mt.task_id === task.id);
+            return {
+              ...task,
+              my_task_id: myTask.id,
+              status: myTask.status,
+              title: myTask.title || getTaskTitle(task),
+              description: myTask.description,
+              expected_completion_date: myTask.expected_completion_date || task.due_date
+            };
+          });
+          
+          combinedTasks = [...linkedTasks];
+        }
+        
+        // 添加独立任务（没有关联task_id的mytasks记录）
+        const standaloneTasks = standaloneMyTasks.map(myTask => ({
+          id: `local-${myTask.id}`,
+          my_task_id: myTask.id,
+          tag_values: {},
+          status: myTask.status,
+          title: myTask.title,
+          description: myTask.description,
+          expected_completion_date: myTask.expected_completion_date,
+          due_date: myTask.expected_completion_date,
+          is_standalone: true
+        }));
+        
+        // 合并所有任务
+        combinedTasks = [...combinedTasks, ...standaloneTasks];
+        
+        setTasks(combinedTasks);
+      } catch (error) {
+        console.error('获取任务失败:', error);
+        toast.error(t('getTasksFailed'));
+      } finally {
+        setIsLoadingTasks(false);
+        // 检查其他数据是否已完成加载
+        if (!isLoadingGoogle && !isLoadingPersonal) {
+          setIsViewLoading(false);
+        }
+      }
+    };
+    
+    // 并行执行数据获取操作
     fetchPersonalEvents();
     if (isGoogleConnected) {
       fetchGoogleEvents();
     }
+    fetchUserTasks(); // 添加任务获取
   };
 
   // 渲染加载骨架屏
@@ -697,24 +906,36 @@ export default function CalendarPage() {
     setView(newView);
   };
   
+  // Filter events based on current filter settings
+  const filteredGoogleEvents = filters.googleEvents ? googleEvents : [];
+  const filteredPersonalEvents = filters.personalEvents ? personalEvents : [];
+  const filteredTasks = filters.tasks ? tasks : [];
+
+  const handleFilterChange = (filterType) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: !prev[filterType]
+    }));
+  };
+
   // 修改日历头部以使用新的视图切换函数
   const renderCalendarHeader = () => (
-    <div className="flex items-center justify-between mb-4">
+    <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-3">
       <div className="flex items-center space-x-2">
         <CalendarIcon className="h-5 w-5" />
         <h1 className="text-2xl font-bold">{t('calendar')}</h1>
       </div>
       
-      <div className="flex items-center space-x-2">
-        <Tabs value={view} onValueChange={handleViewChange} className="mr-2">
-          <TabsList>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:space-x-2">
+        <Tabs value={view} onValueChange={handleViewChange} className="w-full sm:w-auto sm:mr-2">
+          <TabsList className="w-full">
             <TabsTrigger value="month">{t('month')}</TabsTrigger>
             <TabsTrigger value="week">{t('week')}</TabsTrigger>
             <TabsTrigger value="day">{t('day')}</TabsTrigger>
           </TabsList>
         </Tabs>
         
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto space-x-2">
           <Button variant="outline" size="icon" onClick={() => {
             if (view === 'month') handlePrevMonth();
             else if (view === 'week') handlePrevWeek();
@@ -722,10 +943,10 @@ export default function CalendarPage() {
           }}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="font-medium">
-            {view === 'month' && format(currentDate, 'MMMM yyyy')}
-            {view === 'week' && `${format(startOfWeek(currentDate), 'MMM d')} - ${format(addDays(startOfWeek(currentDate), 6), 'MMM d, yyyy')}`}
-            {view === 'day' && format(currentDate, 'EEEE, MMMM d, yyyy')}
+          <div className="font-medium whitespace-nowrap">
+            {view === 'month' && format(currentDate, 'MMM yyyy')}
+            {view === 'week' && `${format(startOfWeek(currentDate), 'MMM d')} - ${format(addDays(startOfWeek(currentDate), 6), 'MMM d')}`}
+            {view === 'day' && format(currentDate, 'MMM d, yyyy')}
           </div>
           <Button variant="outline" size="icon" onClick={() => {
             if (view === 'month') handleNextMonth();
@@ -734,23 +955,94 @@ export default function CalendarPage() {
           }}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="outline" className="ml-2" onClick={handleTodayClick}>
+          <Button variant="outline" className="sm:ml-2" size="sm" onClick={handleTodayClick}>
             {t('today')}
           </Button>
         </div>
         
-        <Button variant="outline">
-          <Filter className="h-4 w-4 mr-2" />
-          {t('filter')}
-        </Button>
-        
-        <Button onClick={() => handleOpenCreateEvent()}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t('newEvent')}
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto justify-between sm:justify-start">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                <span className="sm:inline">{t('filter')}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56">
+              <div className="space-y-4">
+                <h4 className="font-medium">{t('showEvents')}</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="filter-personal-events" 
+                      checked={filters.personalEvents}
+                      onCheckedChange={() => handleFilterChange('personalEvents')}
+                    />
+                    <Label htmlFor="filter-personal-events" className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                      <span>{t('personalCalendar')}</span>
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="filter-google-events" 
+                      checked={filters.googleEvents}
+                      onCheckedChange={() => handleFilterChange('googleEvents')}
+                      disabled={!isGoogleConnected}
+                    />
+                    <Label htmlFor="filter-google-events" className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                      <span>{t('googleCalendar')}</span>
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="filter-tasks" 
+                      checked={filters.tasks}
+                      onCheckedChange={() => handleFilterChange('tasks')}
+                    />
+                    <Label htmlFor="filter-tasks" className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                      <span>{t('myTasks')}</span>
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          
+          <Button onClick={() => handleOpenCreateEvent()} size="sm">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">{t('newEvent')}</span>
+          </Button>
+        </div>
       </div>
     </div>
   );
+
+  // Update WeekView component
+  const handleUpdateComponentsForTasks = () => {
+    // Make sure both WeekView and DayView look for both due_date and expected_completion_date fields
+    
+    const filteredTasks = filters.tasks ? tasks.map(task => {
+      // Ensure we have a date field for display on the calendar
+      // We prioritize due_date and fall back to expected_completion_date
+      if (!task.due_date && task.expected_completion_date) {
+        task.due_date = task.expected_completion_date;
+      }
+      
+      // Make sure all tasks have a title
+      if (!task.title) {
+        task.title = t('noTitle') || 'No Title';
+      }
+      
+      return task;
+    }) : [];
+    
+    return filteredTasks;
+  };
 
   // 渲染月视图
   const renderMonthView = () => {
@@ -762,7 +1054,7 @@ export default function CalendarPage() {
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     
     // 添加调试日志
-    console.log('月视图渲染，总Google事件数:', googleEvents?.length);
+    console.log('月视图渲染，总Google事件数:', filteredGoogleEvents?.length);
     console.log('当前月份:', format(currentDate, 'yyyy-MM'));
 
     // 处理多天事件
@@ -770,8 +1062,8 @@ export default function CalendarPage() {
       const allEvents = [];
       
       // 处理Google事件
-      if (googleEvents && googleEvents.length > 0) {
-        googleEvents.forEach(event => {
+      if (filteredGoogleEvents && filteredGoogleEvents.length > 0) {
+        filteredGoogleEvents.forEach(event => {
           try {
             const startDateTime = parseISO(event.start.dateTime || event.start.date);
             const endDateTime = parseISO(event.end.dateTime || event.end.date);
@@ -801,8 +1093,8 @@ export default function CalendarPage() {
       }
       
       // 处理个人事件
-      if (personalEvents && personalEvents.length > 0) {
-        personalEvents.forEach(event => {
+      if (filteredPersonalEvents && filteredPersonalEvents.length > 0) {
+        filteredPersonalEvents.forEach(event => {
           try {
             const startDateTime = parseISO(event.start_time);
             const endDateTime = parseISO(event.end_time);
@@ -918,7 +1210,9 @@ export default function CalendarPage() {
       <div className="grid grid-cols-7 gap-px">
         {daysOfWeek.map(day => (
           <div key={day} className="h-8 flex items-center justify-center font-medium text-sm">
-            {t(day.toLowerCase())}
+            {/* Show short abbreviation on small screens */}
+            <span className="block sm:hidden">{t(day.toLowerCase())[0]}</span>
+            <span className="hidden sm:block">{t(day.toLowerCase())}</span>
           </div>
         ))}
       </div>
@@ -936,12 +1230,14 @@ export default function CalendarPage() {
       const currentDay = new Date(day);
       
       // 获取该日期的任务
-      const dayTasks = tasks.filter(task => 
-        task.due_date && isSameDay(parseISO(task.due_date), day)
-      );
+      const dayTasks = filteredTasks.filter(task => {
+        // 检查不同的日期字段，因为任务可能使用不同的日期字段
+        const dueDate = task.due_date || task.expected_completion_date;
+        return dueDate && isSameDay(parseISO(dueDate), day);
+      });
 
       // 获取该日期的单日Google事件
-      const dayEvents = googleEvents.filter(event => {
+      const dayEvents = filteredGoogleEvents.filter(event => {
         try {
           const eventStart = parseISO(event.start.dateTime || event.start.date);
           const eventEnd = parseISO(event.end.dateTime || event.end.date);
@@ -969,7 +1265,7 @@ export default function CalendarPage() {
       }
 
       // 获取该日期的单日个人事件
-      const dayPersonalEvents = personalEvents.filter(event => {
+      const dayPersonalEvents = filteredPersonalEvents.filter(event => {
         try {
           const eventStart = parseISO(event.start_time);
           const eventEnd = parseISO(event.end_time);
@@ -988,7 +1284,7 @@ export default function CalendarPage() {
 
       const dayCellContent = (
         <div className="flex flex-col h-full">
-          <div className="flex justify-between items-start mb-2">
+          <div className="flex justify-between items-start mb-1 sm:mb-2">
             <span className={cn(
               "inline-flex h-5 w-5 items-center justify-center rounded-full text-xs",
               isToday && "bg-primary text-primary-foreground font-medium"
@@ -1015,18 +1311,18 @@ export default function CalendarPage() {
             )}
           </div>
 
-          <div className="space-y-0.5 mt-10 max-h-[75px] overflow-y-auto">
-            {dayTasks.map((task) => (
+          <div className="space-y-0.5 mt-auto max-h-[50px] sm:max-h-[75px] overflow-y-auto text-xs">
+            {dayTasks.slice(0, 3).map((task) => (
               <div 
                 key={`task-${task.id}`} 
                 className="text-xs py-0.5 px-1 bg-blue-100 dark:bg-blue-900/30 rounded truncate"
                 title={task.title}
               >
-                {task.title}
+                <span className="truncate block">{task.title || t('noTitle')}</span>
               </div>
             ))}
 
-            {dayEvents.map((event) => (
+            {dayEvents.slice(0, 3).map((event) => (
               <div 
                 key={`event-${event.id}`} 
                 className={cn(
@@ -1052,16 +1348,23 @@ export default function CalendarPage() {
               </div>
             ))}
 
-            {dayPersonalEvents.map((event) => (
+            {dayPersonalEvents.slice(0, 3).map((event) => (
               <div 
                 key={`personal-${event.id}`} 
                 className="text-xs py-0.5 px-1 bg-purple-100 dark:bg-purple-900/30 rounded truncate"
                 style={event.color ? {backgroundColor: `${event.color}20`} : {}}
                 title={event.title}
               >
-                {event.title}
+                <span className="truncate block">{event.title}</span>
               </div>
             ))}
+            
+            {/* Show a more indicator if there are more events than we're displaying */}
+            {(dayTasks.length + dayEvents.length + dayPersonalEvents.length) > 3 && (
+              <div className="text-xs text-muted-foreground text-center">
+                +{(dayTasks.length + dayEvents.length + dayPersonalEvents.length) - 3} more
+              </div>
+            )}
           </div>
         </div>
       );
@@ -1070,12 +1373,21 @@ export default function CalendarPage() {
         <div 
           key={formattedDate}
           className={cn(
-            "min-h-[120px] p-1.5 pt-1 border border-border/50 cursor-pointer transition-colors relative",
+            "min-h-[80px] sm:min-h-[120px] p-1 sm:p-1.5 pt-1 border border-border/50 cursor-pointer transition-colors relative",
             !isCurrentMonth && "bg-muted/30 text-muted-foreground",
             isToday && "bg-accent/10",
-            "hover:bg-accent/5"
+            new Date(day) < new Date(new Date().setHours(0,0,0,0)) ? "opacity-70" : "hover:bg-accent/5"
           )}
-          onClick={() => handleOpenCreateEvent(currentDay)}
+          onClick={() => {
+            // Only open create event dialog for current or future dates
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (new Date(day) >= today) {
+              handleOpenCreateEvent(currentDay);
+            } else {
+              toast.info(t('cantCreateEventInPast') || "Can't create events in the past");
+            }
+          }}
         >
           {dayCellContent}
         </div>
@@ -1160,6 +1472,8 @@ export default function CalendarPage() {
 
   // 渲染周视图
   const renderWeekView = () => {
+    const processedTasks = handleUpdateComponentsForTasks();
+    
     return (
       <WeekView
         currentDate={currentDate}
@@ -1167,9 +1481,9 @@ export default function CalendarPage() {
         t={t}
         isGoogleConnected={isGoogleConnected}
         handleConnectGoogle={handleConnectGoogle}
-        googleEvents={googleEvents}
-        personalEvents={personalEvents}
-        tasks={tasks}
+        googleEvents={filteredGoogleEvents}
+        personalEvents={filteredPersonalEvents}
+        tasks={processedTasks}
         googleCalendarColors={googleCalendarColors}
       />
     );
@@ -1177,6 +1491,8 @@ export default function CalendarPage() {
 
   // 渲染日视图
   const renderDayView = () => {
+    const processedTasks = handleUpdateComponentsForTasks();
+    
     return (
       <DayView
         currentDate={currentDate}
@@ -1184,9 +1500,9 @@ export default function CalendarPage() {
         t={t}
         isGoogleConnected={isGoogleConnected}
         handleConnectGoogle={handleConnectGoogle}
-        googleEvents={googleEvents}
-        personalEvents={personalEvents}
-        tasks={tasks}
+        googleEvents={filteredGoogleEvents}
+        personalEvents={filteredPersonalEvents}
+        tasks={processedTasks}
         googleCalendarColors={googleCalendarColors}
       />
     );
@@ -1197,13 +1513,14 @@ export default function CalendarPage() {
       acc[`--google-${id}`] = color;
       return acc;
     }, {})}>
-      <div className="flex-none py-6">
+      <div className="flex-none py-3 md:py-6 px-3 md:px-6">
         {renderCalendarHeader()}
       </div>
       
       <div className="flex-1 overflow-hidden">
-        <div className="h-[calc(100vh-120px)] grid grid-cols-12 gap-4">
-          <div className="col-span-2">
+        <div className="h-[calc(100vh-120px)] grid grid-cols-1 md:grid-cols-12 gap-4 px-3 md:px-6">
+          {/* Desktop sidebar */}
+          <div className="hidden md:block md:col-span-2">
             <Card className="h-full p-4 overflow-y-auto">
               <h3 className="font-medium mb-3">{t('calendars')}</h3>
               
@@ -1229,7 +1546,7 @@ export default function CalendarPage() {
                     className="w-full justify-start" 
                     onClick={handleConnectGoogle}
                   >
-                    <FaGoogle/>
+                    <FaGoogle className="mr-2" />
                     <span>{t('connectGoogle')}</span>
                   </Button>
                 )}
@@ -1251,14 +1568,76 @@ export default function CalendarPage() {
             </Card>
           </div>
           
-          <div className="col-span-10 overflow-hidden">
+          {/* Mobile calendar sidebar */}
+          <div className="block md:hidden mb-3">
+            <Card className="p-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium">{t('calendars')}</h3>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56">
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                          <span>{t('myCalendar')}</span>
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                          <span>{t('personalCalendar')}</span>
+                        </div>
+                        
+                        {isGoogleConnected ? (
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                            <span>{t('googleCalendar')}</span>
+                          </div>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start text-sm" 
+                            size="sm"
+                            onClick={handleConnectGoogle}
+                          >
+                            <FaGoogle className="mr-2" />
+                            <span>{t('connectGoogle')}</span>
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="pt-2 border-t">
+                        <h3 className="font-medium mb-2">{t('myTasks')}</h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
+                            <span>{t('allTasks')}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                            <span>{t('upcomingTasks')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </Card>
+          </div>
+          
+          <div className="col-span-1 md:col-span-10 overflow-hidden">
             {isViewLoading ? (
-              // 根据当前视图显示相应的骨架屏
+              // Responsive skeleton loaders
               <>
                 {view === 'month' && (
-                  <Card className="p-2">
-                    {/* 月视图骨架屏 */}
-                    <div className="grid grid-cols-7 gap-px">
+                  <Card className="p-2 overflow-x-auto">
+                    {/* Month view skeleton */}
+                    <div className="grid grid-cols-7 gap-px min-w-[700px]">
                       {Array(7).fill().map((_, i) => (
                         <Skeleton key={`view-week-day-${i}`} className="h-8" />
                       ))}
@@ -1270,7 +1649,7 @@ export default function CalendarPage() {
                           {Array(7).fill().map((_, dayIndex) => (
                             <Skeleton 
                               key={`view-day-${weekIndex}-${dayIndex}`} 
-                              className="min-h-[120px]" 
+                              className="h-[70px] sm:min-h-[120px]" 
                             />
                           ))}
                         </div>
@@ -1280,9 +1659,9 @@ export default function CalendarPage() {
                 )}
                 
                 {view === 'week' && (
-                  <Card className="p-0 overflow-hidden">
-                    {/* 周视图骨架屏 */}
-                    <div className="grid grid-cols-8 border-b">
+                  <Card className="p-0 overflow-x-auto">
+                    {/* Week view skeleton */}
+                    <div className="grid grid-cols-8 border-b min-w-[700px]">
                       <div className="py-3 px-3">
                         <Skeleton className="h-10 w-10" />
                       </div>
@@ -1294,8 +1673,8 @@ export default function CalendarPage() {
                       ))}
                     </div>
                     
-                    {/* 全天事件骨架屏 */}
-                    <div className="grid grid-cols-8 border-b">
+                    {/* All-day events skeleton */}
+                    <div className="grid grid-cols-8 border-b min-w-[700px]">
                       <div className="py-2 px-3">
                         <Skeleton className="h-4 w-16" />
                       </div>
@@ -1305,54 +1684,24 @@ export default function CalendarPage() {
                         </div>
                       ))}
                     </div>
-                    
-                    {/* 时间网格骨架屏 */}
-                    <div className="grid grid-cols-8">
-                      {/* 时间标签列 */}
-                      <div className="border-r border-r-border/40">
-                        {Array(24).fill().map((_, i) => (
-                          <div key={`view-time-${i}`} className="h-12 pr-2 text-right border-t border-t-border/40">
-                            <Skeleton className="h-3 w-10 ml-auto" />
-                          </div>
-                        ))}
-                      </div>
-                      
-                      {/* 天列 */}
-                      {Array(7).fill().map((_, dayIndex) => (
-                        <div key={`view-day-col-${dayIndex}`} className="border-l border-l-border/40">
-                          {Array(24).fill().map((_, hourIndex) => (
-                            <div 
-                              key={`view-hour-${dayIndex}-${hourIndex}`} 
-                              className="h-12 border-t border-t-border/40 relative"
-                            >
-                              {hourIndex % 4 === 0 && (
-                                <Skeleton 
-                                  className="absolute h-10 w-[90%] top-1 left-[5%] rounded-md"
-                                />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
                   </Card>
                 )}
                 
                 {view === 'day' && (
                   <Card className="p-0 overflow-hidden">
-                    {/* 日视图骨架屏 */}
+                    {/* Day view skeleton */}
                     <div className="p-4 border-b">
                       <Skeleton className="h-6 w-64 mx-auto" />
                     </div>
                     
-                    {/* 全天事件骨架屏 */}
+                    {/* All-day events skeleton */}
                     <div className="p-2 border-b">
                       <Skeleton className="h-4 w-16 mb-2" />
                       <Skeleton className="h-10 w-full" />
                     </div>
                     
-                    {/* 时间网格骨架屏 */}
-                    <div className="grid grid-cols-[80px_1fr]">
+                    {/* Time grid skeleton */}
+                    <div className="grid grid-cols-[80px_1fr] overflow-y-auto">
                       {Array(24).fill().map((_, i) => (
                         <React.Fragment key={`view-day-time-${i}`}>
                           <div className="h-14 pr-3 text-right py-1 border-t border-t-border/40">
@@ -1372,9 +1721,17 @@ export default function CalendarPage() {
                 )}
               </>
             ) : (
-              <div className="h-full overflow-y-auto">
-                {view === 'month' && renderMonthView()}
-                {view === 'week' && renderWeekView()}
+              <div className="h-full overflow-x-auto">
+                {view === 'month' && (
+                  <div className="min-w-[700px]">
+                    {renderMonthView()}
+                  </div>
+                )}
+                {view === 'week' && (
+                  <div className="min-w-[700px]">
+                    {renderWeekView()}
+                  </div>
+                )}
                 {view === 'day' && renderDayView()}
               </div>
             )}

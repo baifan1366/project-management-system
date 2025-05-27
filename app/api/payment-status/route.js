@@ -27,8 +27,9 @@ export async function GET(request) {
       currency: paymentIntent.currency,
       metadata: {
         ...paymentIntent.metadata,
-        userEmail: paymentIntent.metadata.userEmail, // 确保邮箱被包含
-        payment_method: paymentIntent.metadata.payment_method // Ensure payment method is included
+        orderId: paymentIntent.metadata.orderId, // Ensure orderId is explicitly included
+        userEmail: paymentIntent.metadata.userEmail,
+        payment_method: paymentIntent.metadata.payment_method
       },
       created: paymentIntent.created
     };
