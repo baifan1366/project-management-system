@@ -8,7 +8,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarIcon, EyeIcon, CheckCircleIcon, PlusCircleIcon, MessageSquareIcon, Plus, Archive, RefreshCcw } from "lucide-react";
+import { CalendarIcon, EyeIcon, CheckCircleIcon, PlusCircleIcon, MessageSquareIcon, Plus, Archive, RefreshCcw, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getSubscriptionLimit } from '@/lib/subscriptionService';
@@ -18,6 +18,15 @@ import CreateProjectDialog from '@/components/CreateProject';
 import { toggleShowArchived, restoreProject } from '@/lib/redux/features/projectSlice';
 import { useConfirm } from '@/hooks/use-confirm';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function ProjectsPage() {
   const { locale } = useParams();
@@ -29,13 +38,16 @@ export default function ProjectsPage() {
   const { user } = useGetUser();
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const { confirm } = useConfirm();
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   useEffect(() => {
     if (projects.length > 0) {
-      // 根据showArchived状态筛选项目
-      const filteredProjects = projects.filter(project => 
-        showArchived ? project.archived : !project.archived
-      );
+      // 根据showArchived状态和statusFilter筛选项目
+      const filteredProjects = projects.filter(project => {
+        const matchesArchiveState = showArchived ? project.archived : !project.archived;
+        const matchesStatusFilter = statusFilter === 'ALL' || project.status === statusFilter;
+        return matchesArchiveState && matchesStatusFilter;
+      });
       
       const formatted = filteredProjects.map(project => ({
         ...project,
@@ -43,7 +55,7 @@ export default function ProjectsPage() {
       }));
       setFormattedProjects(formatted);
     }
-  }, [projects, showArchived]);
+  }, [projects, showArchived, statusFilter]);
 
   const handleCardClick = (projectId) => {
     router.push(`/${locale}/projects/${projectId}`);
@@ -111,6 +123,15 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleStatusFilterChange = (status) => {
+    setStatusFilter(status);
+  };
+
+  const getStatusFilterLabel = () => {
+    if (statusFilter === 'ALL') return t('allStatuses');
+    return t(`status.${statusFilter.toLowerCase()}`);
+  };
+
   if (status === 'loading') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -139,9 +160,59 @@ export default function ProjectsPage() {
               {t('archivedProjects')}
             </Badge>
           )}
+          {statusFilter !== 'ALL' && (
+            <Badge variant="outline" className="ml-2 bg-muted">
+              {getStatusFilterLabel()}
+            </Badge>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                <Filter size={16} />
+                {t('filterByStatus')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>{t('projectStatus')}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => handleStatusFilterChange('ALL')}>
+                  <span className={statusFilter === 'ALL' ? 'font-bold' : ''}>
+                    {t('allStatuses')}
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusFilterChange('PENDING')}>
+                  <span className={statusFilter === 'PENDING' ? 'font-bold' : ''}>
+                    {t('status.pending')}
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusFilterChange('IN_PROGRESS')}>
+                  <span className={statusFilter === 'IN_PROGRESS' ? 'font-bold' : ''}>
+                    {t('status.in_progress')}
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusFilterChange('COMPLETED')}>
+                  <span className={statusFilter === 'COMPLETED' ? 'font-bold' : ''}>
+                    {t('status.completed')}
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusFilterChange('CANCELLED')}>
+                  <span className={statusFilter === 'CANCELLED' ? 'font-bold' : ''}>
+                    {t('status.cancelled')}
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusFilterChange('ON_HOLD')}>
+                  <span className={statusFilter === 'ON_HOLD' ? 'font-bold' : ''}>
+                    {t('status.on_hold')}
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button
             onClick={handleToggleArchived}
             size="sm"

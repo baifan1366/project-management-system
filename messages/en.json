@@ -27,6 +27,8 @@
     "aiWorkFlow": "Ai WorkFlow"
   },
   "common": {
+    "processing": "Processing...",
+    "saving": "Saving...",  
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -253,8 +255,13 @@
     }
   },
   "Projects": {
+    "filterByStatus": "Filter by Status",
+    "projectStatus": "Project Status",
+    "allStatuses": "All Statuses",
     "create": "Create Project",
     "statusTitle": "Status",
+    "archiveProjectConfirmTitle": "Archive Project",
+    "archiveProjectConfirmDescription": "Are you sure you want to archive this project?",
     "status": {
       "pending": "Pending",
       "in_progress": "In Progress",
@@ -289,6 +296,8 @@
     "noAccessToProject": "You do not have access to this project. You might not be a team member or project owner.",
     "close": "Close",
     "loading": "Loading...",
+    "projectArchived": "Project Archived",
+    "projectArchivedDescription": "This project has been archived and is no longer accessible. Please contact the project owner if you need to access it.",
     "filters": {
       "all": "All",
       "recent": "Recent",
@@ -343,7 +352,31 @@
       "updatedTeam": "updated team",
       "joinedTeam": "joined team",
       "leftTeam": "left team"
-    }
+    },
+    "general": "General",
+    "access": "Access",
+    "themeColor": "Theme Color",
+    "projectMembers": "Project Members",
+    "member": "Member",
+    "noMembersYet": "No Members Yet",
+    "notImplemented": "Not Implemented",
+    "inviteNewMember": "Invite New Member",
+    "selectTeam": "Select Team",
+    "teams": "Teams",
+    "unnamed": "Unnamed",
+    "role": "Role",
+    "selectTeamPlaceholder": "Select a team",
+    "selectRole": "Select Role",
+    "invite": "Invite",
+    "manageProjectDescription": "Manage your project details and members",
+    "manageProject": "Manage Project",
+    "restoreProject": "Restore Project",
+    "archivedProjects": "Archived Projects",
+    "showActiveProjects": "Show Active Projects",
+    "showArchivedProjects": "Show Archived Projects",
+    "restoreProjectConfirmTitle": "Restore Project",
+    "restoreProjectConfirmDescription": "Are you sure you want to restore this project?",
+    "noArchivedProjects": "No archived projects"
   },
   "tasks": {
     "title": "Tasks",

@@ -583,13 +583,7 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
         </CardTitle>
       </CardHeader>
       
-      <CardContent>
-        {(loading || isLoading) && (
-          <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
-            <p>{t('updating')}</p>
-          </div>
-        )}
-        
+      <CardContent>        
         {hasError && (
           <div className="p-4 mb-4 bg-red-50 text-red-800 rounded-md flex items-center">
             <AlertCircle className="w-5 h-5 mr-2" />
@@ -599,7 +593,7 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* 待处理列 */}
-          <div className="bg-gray-50 p-2 rounded-md">
+          <div className="bg-background p-2 rounded-md">
             <h3 className="font-medium p-2 text-center border-b mb-2">
               {t('todo')} ({tasksByStatus.todo.length})
             </h3>
@@ -613,7 +607,7 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
           </div>
           
           {/* 进行中列 */}
-          <div className="bg-gray-50 p-2 rounded-md">
+          <div className="bg-background p-2 rounded-md">
             <h3 className="font-medium p-2 text-center border-b mb-2">
               {t('inProgress')} ({tasksByStatus.in_progress.length})
             </h3>
@@ -627,7 +621,7 @@ const SprintBoard = ({ sprint, agileMembers = [] }) => {
           </div>
           
           {/* 已完成列 */}
-          <div className="bg-gray-50 p-2 rounded-md">
+          <div className="bg-background p-2 rounded-md">
             <h3 className="font-medium p-2 text-center border-b mb-2">
               {t('done')} ({tasksByStatus.done.length})
             </h3>

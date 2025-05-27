@@ -263,7 +263,7 @@ export default function ProjectSidebar({ projectId }) {
     confirm({
       title: t('archiveProjectConfirmTitle'),
       description: t('archiveProjectConfirmDescription'),
-      variant: "warning",
+      variant: "error",
       onConfirm: async () => {
         try {
           await dispatch(archiveProject(projectId)).unwrap();

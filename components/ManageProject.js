@@ -26,9 +26,9 @@ const roleLabels = {
 // 角色对应的颜色
 const roleColors = {
   'OWNER': 'text-purple-800',
-  'CAN_EDIT': 'text-blue-800',
+  'CAN_EDIT': 'text-green-800',
   'CAN_CHECK': 'text-amber-800',
-  'CAN_VIEW': 'text-gray-800'
+  'CAN_VIEW': 'text-blue-800'
 };
 
 // 主题颜色选项
@@ -39,8 +39,17 @@ const themeColorOptions = [
   { value: 'blue', label: '蓝色', hex: '#3b6dbf' },
   { value: 'purple', label: '紫色', hex: '#5c4b8a' },
   { value: 'pink', label: '粉色', hex: '#d83c5e' },
-  { value: 'red', label: '红色', hex: '#c72c41' },
-  { value: 'white', label: '白色', hex: '#ffffff' }
+  { value: 'red', label: '红色', hex: '#c72c41' }
+  // { value: 'white', label: '白色', hex: '#ffffff' }
+];
+
+// 项目状态选项
+const projectStatusOptions = [
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
+  { value: 'ON_HOLD', label: 'On Hold' },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'CANCELLED', label: 'Cancelled' }
 ];
 
 // 将颜色名称转换为十六进制格式
@@ -121,7 +130,8 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
   const [projectInfo, setProjectInfo] = useState({
     project_name: "",
     theme_color: "#3b82f6",
-    visibility: "private"
+    visibility: "private",
+    status: "PENDING"
   });
 
   // 团队和成员相关状态
@@ -168,7 +178,8 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
           setProjectInfo({
             project_name: projectData[0].project_name || "",
             theme_color: colorOption ? colorOption.hex : convertColorToHex(themeColor),
-            visibility: projectData[0].visibility || "private"
+            visibility: projectData[0].visibility || "private",
+            status: projectData[0].status || "PENDING"
           });
         } else {
           // 如果是十六进制值或其他格式
@@ -181,7 +192,8 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
           setProjectInfo({
             project_name: projectData[0].project_name || "",
             theme_color: convertColorToHex(themeColor) || "#3b82f6",
-            visibility: projectData[0].visibility || "private"
+            visibility: projectData[0].visibility || "private",
+            status: projectData[0].status || "active"
           });
         }
       }
@@ -310,7 +322,8 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
             ...updatedProjectData[0], 
             project_name: updatedProject.project_name,
             theme_color: updatedProject.theme_color,
-            visibility: updatedProject.visibility
+            visibility: updatedProject.visibility,
+            status: updatedProject.status
           };
         } else {
           // 如果原来没有项目数据，添加新的项目数据
@@ -518,6 +531,27 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
                     <SelectContent>
                       <SelectItem value="public">{t("Projects.public")}</SelectItem>
                       <SelectItem value="private">{t("Projects.private")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="status" className="text-right">
+                    {t("Projects.statusTitle")}
+                  </Label>
+                  <Select
+                    value={projectInfo.status}
+                    onValueChange={(value) => setProjectInfo({...projectInfo, status: value})}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projectStatusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
