@@ -32,7 +32,8 @@ export default function CalendarPage() {
   const [googleEvents, setGoogleEvents] = useState([]);
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
-  const { tasks = [] } = useSelector((state) => state.tasks);
+  const [tasks, setTasks] = useState([]); // Changed from using redux state to local state
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false); // Added loading state for tasks
   const calendarRef = useRef(null);
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -183,10 +184,112 @@ export default function CalendarPage() {
     }
   }, [currentUser, userLoading, t, userLoadTimeout]);
 
-  // 加载任务数据
-  // useEffect(() => {
-  //   dispatch(fetchTasksByUserId());
-  // }, [dispatch]);
+  // 获取任务的标题
+  const getTaskTitle = React.useCallback((task) => {
+    if (task.title) return task.title;
+    if (!task?.tag_values) return null;
+    
+    // 通过分析示例数据，推断数字键与字段的映射关系
+    const fieldKeyMap = {
+      'title': 1,        // 1 对应标题/描述
+    };
+    
+    // 首先检查是否有这个映射
+    const mappedKey = fieldKeyMap['title'];
+    if (mappedKey !== undefined && task.tag_values[mappedKey]) {
+      return task.tag_values[mappedKey];
+    }
+    
+    return null;
+  }, []);
+  
+  // 加载任务数据 - 替换之前的Redux dispatch
+  useEffect(() => {
+    const fetchUserTasks = async () => {
+      if (!currentUser || !currentUser.id) return;
+
+      try {
+        setIsLoadingTasks(true);
+        
+        // 获取mytasks表中的当前用户的任务
+        const { data: userMyTasks, error: myTasksError } = await supabase
+          .from('mytasks')
+          .select('*')
+          .eq('user_id', currentUser.id);
+        
+        if (myTasksError) throw myTasksError;
+        
+        // 准备合并的任务列表
+        let combinedTasks = [];
+        
+        // 处理有关联task_id的任务
+        const tasksWithReference = userMyTasks.filter(mt => mt.task_id !== null);
+        const standaloneMyTasks = userMyTasks.filter(mt => mt.task_id === null);
+        
+        // 获取关联的任务详情
+        if (tasksWithReference.length > 0) {
+          const taskIds = tasksWithReference.map(mt => mt.task_id);
+          
+          const { data: taskDetails, error: taskError } = await supabase
+            .from('task')
+            .select('*')
+            .in('id', taskIds);
+            
+          if (taskError) throw taskError;
+          
+          // 合并关联的任务
+          const linkedTasks = taskDetails.map(task => {
+            const myTask = tasksWithReference.find(mt => mt.task_id === task.id);
+            return {
+              ...task,
+              my_task_id: myTask.id,
+              status: myTask.status,
+              title: myTask.title || getTaskTitle(task),
+              description: myTask.description,
+              expected_completion_date: myTask.expected_completion_date || task.due_date
+            };
+          });
+          
+          combinedTasks = [...linkedTasks];
+        }
+        
+        // 添加独立任务（没有关联task_id的mytasks记录）
+        const standaloneTasks = standaloneMyTasks.map(myTask => ({
+          id: `local-${myTask.id}`,
+          my_task_id: myTask.id,
+          tag_values: {},
+          status: myTask.status,
+          title: myTask.title,
+          description: myTask.description,
+          expected_completion_date: myTask.expected_completion_date,
+          due_date: myTask.expected_completion_date,
+          is_standalone: true
+        }));
+        
+        // 合并所有任务
+        combinedTasks = [...combinedTasks, ...standaloneTasks];
+        
+        setTasks(combinedTasks);
+      } catch (error) {
+        console.error('获取任务失败:', error);
+        toast.error(t('getTasksFailed'));
+      } finally {
+        setIsLoadingTasks(false);
+        // 更新加载状态
+        if (isViewLoading && !isLoadingGoogle && !isLoadingPersonal) {
+          setIsViewLoading(false);
+        }
+        // 如果初始加载尚未完成
+        if (isLoading && (!isGoogleConnected || !isLoadingGoogle) && !isLoadingPersonal) {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    if (currentUser && (!userLoading || userLoadTimeout)) {
+      fetchUserTasks();
+    }
+  }, [currentUser, userLoading, userLoadTimeout, getTaskTitle, t, isViewLoading, isLoading, isGoogleConnected, isLoadingGoogle, isLoadingPersonal, currentDate]);
 
   // 获取个人日历事件
   useEffect(() => {
@@ -331,36 +434,43 @@ export default function CalendarPage() {
   const handlePrevMonth = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => subMonths(prev, 1));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleNextMonth = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addMonths(prev, 1));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handlePrevWeek = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, -7));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleNextWeek = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, 7));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handlePrevDay = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, -1));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleNextDay = () => {
     setIsViewLoading(true);
     setCurrentDate(prev => addDays(prev, 1));
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleTodayClick = () => {
     setIsViewLoading(true);
     setCurrentDate(new Date());
+    // Tasks should be refreshed when the useEffect detects the date change
   };
 
   const handleConnectGoogle = async () => {
@@ -514,11 +624,90 @@ export default function CalendarPage() {
       }
     };
     
-    // 并行执行两个数据获取操作
+    // 刷新任务数据
+    const fetchUserTasks = async () => {
+      if (!currentUser) return;
+      
+      try {
+        setIsLoadingTasks(true);
+        
+        // 获取mytasks表中的当前用户的任务
+        const { data: userMyTasks, error: myTasksError } = await supabase
+          .from('mytasks')
+          .select('*')
+          .eq('user_id', currentUser.id);
+        
+        if (myTasksError) throw myTasksError;
+        
+        // 准备合并的任务列表
+        let combinedTasks = [];
+        
+        // 处理有关联task_id的任务
+        const tasksWithReference = userMyTasks.filter(mt => mt.task_id !== null);
+        const standaloneMyTasks = userMyTasks.filter(mt => mt.task_id === null);
+        
+        // 获取关联的任务详情
+        if (tasksWithReference.length > 0) {
+          const taskIds = tasksWithReference.map(mt => mt.task_id);
+          
+          const { data: taskDetails, error: taskError } = await supabase
+            .from('task')
+            .select('*')
+            .in('id', taskIds);
+            
+          if (taskError) throw taskError;
+          
+          // 合并关联的任务
+          const linkedTasks = taskDetails.map(task => {
+            const myTask = tasksWithReference.find(mt => mt.task_id === task.id);
+            return {
+              ...task,
+              my_task_id: myTask.id,
+              status: myTask.status,
+              title: myTask.title || getTaskTitle(task),
+              description: myTask.description,
+              expected_completion_date: myTask.expected_completion_date || task.due_date
+            };
+          });
+          
+          combinedTasks = [...linkedTasks];
+        }
+        
+        // 添加独立任务（没有关联task_id的mytasks记录）
+        const standaloneTasks = standaloneMyTasks.map(myTask => ({
+          id: `local-${myTask.id}`,
+          my_task_id: myTask.id,
+          tag_values: {},
+          status: myTask.status,
+          title: myTask.title,
+          description: myTask.description,
+          expected_completion_date: myTask.expected_completion_date,
+          due_date: myTask.expected_completion_date,
+          is_standalone: true
+        }));
+        
+        // 合并所有任务
+        combinedTasks = [...combinedTasks, ...standaloneTasks];
+        
+        setTasks(combinedTasks);
+      } catch (error) {
+        console.error('获取任务失败:', error);
+        toast.error(t('getTasksFailed'));
+      } finally {
+        setIsLoadingTasks(false);
+        // 检查其他数据是否已完成加载
+        if (!isLoadingGoogle && !isLoadingPersonal) {
+          setIsViewLoading(false);
+        }
+      }
+    };
+    
+    // 并行执行数据获取操作
     fetchPersonalEvents();
     if (isGoogleConnected) {
       fetchGoogleEvents();
     }
+    fetchUserTasks(); // 添加任务获取
   };
 
   // 渲染加载骨架屏
@@ -833,6 +1022,28 @@ export default function CalendarPage() {
     </div>
   );
 
+  // Update WeekView component
+  const handleUpdateComponentsForTasks = () => {
+    // Make sure both WeekView and DayView look for both due_date and expected_completion_date fields
+    
+    const filteredTasks = filters.tasks ? tasks.map(task => {
+      // Ensure we have a date field for display on the calendar
+      // We prioritize due_date and fall back to expected_completion_date
+      if (!task.due_date && task.expected_completion_date) {
+        task.due_date = task.expected_completion_date;
+      }
+      
+      // Make sure all tasks have a title
+      if (!task.title) {
+        task.title = t('noTitle') || 'No Title';
+      }
+      
+      return task;
+    }) : [];
+    
+    return filteredTasks;
+  };
+
   // 渲染月视图
   const renderMonthView = () => {
     const monthStart = startOfMonth(currentDate);
@@ -1019,9 +1230,11 @@ export default function CalendarPage() {
       const currentDay = new Date(day);
       
       // 获取该日期的任务
-      const dayTasks = filteredTasks.filter(task => 
-        task.due_date && isSameDay(parseISO(task.due_date), day)
-      );
+      const dayTasks = filteredTasks.filter(task => {
+        // 检查不同的日期字段，因为任务可能使用不同的日期字段
+        const dueDate = task.due_date || task.expected_completion_date;
+        return dueDate && isSameDay(parseISO(dueDate), day);
+      });
 
       // 获取该日期的单日Google事件
       const dayEvents = filteredGoogleEvents.filter(event => {
@@ -1105,7 +1318,7 @@ export default function CalendarPage() {
                 className="text-xs py-0.5 px-1 bg-blue-100 dark:bg-blue-900/30 rounded truncate"
                 title={task.title}
               >
-                <span className="truncate block">{task.title}</span>
+                <span className="truncate block">{task.title || t('noTitle')}</span>
               </div>
             ))}
 
@@ -1259,6 +1472,8 @@ export default function CalendarPage() {
 
   // 渲染周视图
   const renderWeekView = () => {
+    const processedTasks = handleUpdateComponentsForTasks();
+    
     return (
       <WeekView
         currentDate={currentDate}
@@ -1268,7 +1483,7 @@ export default function CalendarPage() {
         handleConnectGoogle={handleConnectGoogle}
         googleEvents={filteredGoogleEvents}
         personalEvents={filteredPersonalEvents}
-        tasks={filteredTasks}
+        tasks={processedTasks}
         googleCalendarColors={googleCalendarColors}
       />
     );
@@ -1276,6 +1491,8 @@ export default function CalendarPage() {
 
   // 渲染日视图
   const renderDayView = () => {
+    const processedTasks = handleUpdateComponentsForTasks();
+    
     return (
       <DayView
         currentDate={currentDate}
@@ -1285,7 +1502,7 @@ export default function CalendarPage() {
         handleConnectGoogle={handleConnectGoogle}
         googleEvents={filteredGoogleEvents}
         personalEvents={filteredPersonalEvents}
-        tasks={filteredTasks}
+        tasks={processedTasks}
         googleCalendarColors={googleCalendarColors}
       />
     );
