@@ -15,6 +15,7 @@ import { useGetUser } from '@/lib/hooks/useGetUser';
 import { createSelector } from '@reduxjs/toolkit';
 import { fetchProjectById, archiveProject } from '@/lib/redux/features/projectSlice'
 import ManageProject from '@/components/ManageProject';
+import ProjectSettings from '@/components/ProjectSettings';
 import { api } from '@/lib/api';
 import { useConfirm } from '@/hooks/use-confirm';
 
@@ -56,6 +57,7 @@ export default function ProjectSidebar({ projectId }) {
   const [isManageProjectOpen, setIsManageProjectOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [projectData, setProjectData] = useState(null);
+  const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
 
   // 项目名称下拉菜单
   useEffect(() => {
@@ -321,10 +323,13 @@ export default function ProjectSidebar({ projectId }) {
                 <Users size={16} className="text-muted-foreground" />
                 <span>{t('members')}</span>
               </div>
-              <Link href="#" className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors">
+              <div 
+                onClick={() => setIsProjectSettingsOpen(true)} 
+                className="flex items-center px-4 py-2 hover:bg-accent text-sm gap-2 text-foreground transition-colors cursor-pointer"
+              >
                 <Settings size={16} className="text-muted-foreground" />
                 <span>{t('settings')}</span>
-              </Link>
+              </div>
               <div className="my-1 border-t border-border"></div>
               <div 
                 onClick={handleArchiveProject} 
@@ -464,6 +469,15 @@ export default function ProjectSidebar({ projectId }) {
           setActiveTab={(tab) => setActiveTab(tab)}
           projectData={projectData}
           setProjectData={(data) => setProjectData(data)}
+        />
+
+        <ProjectSettings 
+          isOpen={isProjectSettingsOpen} 
+          onClose={() => {
+            setIsProjectSettingsOpen(false);
+            fetchTeams();
+          }} 
+          projectId={projectId}
         />
       </div>
     </TooltipProvider>
