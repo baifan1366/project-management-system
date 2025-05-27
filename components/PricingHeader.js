@@ -83,6 +83,17 @@ export function PricingHeader() {
                   <Link href={item.href}>{item.label}</Link>
                 </DropdownMenuItem>
               ))}
+              {!user && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/login">{t('login')}</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/signup">{t('signup')}</Link>
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -92,8 +103,17 @@ export function PricingHeader() {
             <ThemeToggle />
           </div>
 
-          {/* User Profile */}
-          {user && (
+          {/* Auth Buttons or User Profile */}
+          {!user && !isLoading ? (
+            <div className="hidden md:flex items-center gap-2">
+              <Button variant="ghost" asChild>
+                <Link href="/login">{t('login')}</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/signup">{t('signup')}</Link>
+              </Button>
+            </div>
+          ) : user && (
             <Popover open={isProfileOpen} onOpenChange={setProfileOpen}>
               <PopoverTrigger asChild>
                 <Button size="icon" variant="ghost" className="w-10 h-10">
