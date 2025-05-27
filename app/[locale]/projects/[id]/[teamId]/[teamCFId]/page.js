@@ -67,7 +67,7 @@ const TeamCustomFieldPage = () => {
   const selectedTeam = useSelector(state => selectTeamById(state, teamId));
   // 从Redux获取项目数据
   const project = useSelector(state => 
-    state.projects.projects.find(p => String(p.id) === String(projectId))
+    state.projects.projects ? state.projects.projects.find(p => p && String(p.id) === String(projectId)) : null
   );
   const { user } = useGetUser();
   const { confirm } = useConfirm();

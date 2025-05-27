@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector, useDispatch, shallowEqual } from 'react-redux';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -28,51 +28,122 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+// 组件外部的辅助函数，避免重复创建
+function checkUserInProjectTeams(project, user, teams, userTeams) {
+  if (!user || !user.id || !project) return false;
+  
+  try {
+    // 查找与项目关联的团队
+    const projectTeams = Array.isArray(teams) ? 
+      teams.filter(team => team && team.project_id === project.id) : [];
+    
+    if (projectTeams.length === 0) return false;
+    
+    // 提取项目团队ID
+    const projectTeamIds = projectTeams.map(team => team.id);
+    
+    // 检查用户是否在这些团队中
+    const isInTeam = Array.isArray(userTeams) && userTeams.some(userTeam => 
+      userTeam && userTeam.user_id === user.id && 
+      projectTeamIds.includes(userTeam.team_id)
+    );
+    
+    return isInTeam;
+  } catch (error) {
+    console.error('检查用户团队关系出错:', error);
+    return false;
+  }
+}
+
 export default function ProjectsPage() {
   const { locale } = useParams();
   const router = useRouter();
   const dispatch = useDispatch();
-  const { projects, status, showArchived } = useSelector((state) => state.projects);
+  
+  // 使用shallowEqual优化选择器
+  const { projects, status, showArchived } = useSelector(
+    (state) => ({
+      projects: state.projects.projects || [],
+      status: state.projects.status,
+      showArchived: state.projects.showArchived
+    }),
+    shallowEqual
+  );
+  
+  // 分开选择器以避免不必要的重新渲染
+  const teams = useSelector((state) => state.teams?.teams || [], shallowEqual);
+  const teamUsers = useSelector((state) => state.teamUsers?.teamUsers || {}, shallowEqual);
+  const userTeams = useSelector((state) => state.userTeams?.userTeams || [], shallowEqual);
+  
   const t = useTranslations('Projects');
-  const [formattedProjects, setFormattedProjects] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const { user } = useGetUser();
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const { confirm } = useConfirm();
-  const [statusFilter, setStatusFilter] = useState('ALL');
 
-  useEffect(() => {
-    if (projects.length > 0) {
-      // 根据showArchived状态和statusFilter筛选项目
-      const filteredProjects = projects.filter(project => {
-        const matchesArchiveState = showArchived ? project.archived : !project.archived;
-        const matchesStatusFilter = statusFilter === 'ALL' || project.status === statusFilter;
-        return matchesArchiveState && matchesStatusFilter;
-      });
-      
-      const formatted = filteredProjects.map(project => ({
-        ...project,
-        created_at: new Date(project.created_at).toLocaleDateString('en-US', { timeZone: 'UTC' }),
-      }));
-      setFormattedProjects(formatted);
+  // 使用useMemo计算过滤后的项目列表
+  const formattedProjects = useMemo(() => {
+    if (!projects.length) {
+      return [];
     }
-  }, [projects, showArchived, statusFilter]);
+    
+    // 根据showArchived状态和statusFilter筛选项目
+    const filteredProjects = projects.filter(project => {
+      try {
+        // 检查归档状态
+        const matchesArchiveState = showArchived ? project.archived : !project.archived;
+        
+        // 检查状态筛选
+        const matchesStatusFilter = statusFilter === 'ALL' || project.status === statusFilter;
+        
+        // 检查可见性权限
+        let hasVisibilityAccess = false;
+        
+        // 获取可见性设置，默认为private
+        const visibility = project.visibility?.toLowerCase?.() || 'private';
+        
+        // 重要：如果项目是public，所有用户都可以查看
+        if (visibility === 'public') {
+          hasVisibilityAccess = true;
+        }
+        // 对于private项目，只有创建者可以查看
+        else if (visibility === 'private' && user && user.id === project.created_by) {
+          hasVisibilityAccess = true;
+        }
+        
+        return matchesArchiveState && matchesStatusFilter && hasVisibilityAccess;
+      } catch (error) {
+        console.error('项目过滤错误:', error, project);
+        return false;
+      }
+    });
+    
+    return filteredProjects.map(project => ({
+      ...project,
+      created_at: new Date(project.created_at || Date.now()).toLocaleDateString('en-US', { timeZone: 'UTC' }),
+      // 添加标志表示项目是否与用户相关
+      isUserCreated: user && user.id === project.created_by,
+      isUserInTeam: user ? checkUserInProjectTeams(project, user, teams, userTeams) : false
+    }));
+  }, [projects, showArchived, statusFilter, user, teams, userTeams]);
 
-  const handleCardClick = (projectId) => {
+  // 使用useCallback记忆化事件处理程序
+  const handleCardClick = useCallback((projectId) => {
     router.push(`/${locale}/projects/${projectId}`);
-  };
+  }, [router, locale]);
 
-  const handleAddTask = (e, projectId) => {
+  const handleAddTask = useCallback((e, projectId) => {
     e.stopPropagation();
     router.push(`/${locale}/projects/${projectId}/tasks/create`);
-  };
+  }, [router, locale]);
 
-  const handleTeamsChat = (e, projectId) => {
+  const handleTeamsChat = useCallback((e, projectId) => {
     e.stopPropagation();
     // 这里可以添加Teams集成的链接或功能
     window.open(`https://teams.microsoft.com/l/chat/0/0?users=${projectId}`, '_blank');
-  };
+  }, []);
 
-  const handleRestoreProject = (e, projectId) => {
+  const handleRestoreProject = useCallback((e, projectId) => {
     e.stopPropagation();
     confirm({
       title: t('restoreProjectConfirmTitle'),
@@ -86,15 +157,15 @@ export default function ProjectsPage() {
         }
       }
     });
-  };
+  }, [confirm, t, dispatch]);
 
   // 切换已归档/未归档项目视图
-  const handleToggleArchived = () => {
+  const handleToggleArchived = useCallback(() => {
     dispatch(toggleShowArchived());
-  };
+  }, [dispatch]);
 
   // 添加检查订阅限制的函数
-  const checkLimit = async (e) => {
+  const checkLimit = useCallback(async (e) => {
     e.preventDefault();
     
     try {
@@ -121,16 +192,16 @@ export default function ProjectsPage() {
     } catch (error) {
       console.error('检查订阅限制失败:', error);
     }
-  };
+  }, [user, router, locale, dispatch]);
 
-  const handleStatusFilterChange = (status) => {
+  const handleStatusFilterChange = useCallback((status) => {
     setStatusFilter(status);
-  };
+  }, []);
 
-  const getStatusFilterLabel = () => {
+  const getStatusFilterLabel = useCallback(() => {
     if (statusFilter === 'ALL') return t('allStatuses');
     return t(`status.${statusFilter.toLowerCase()}`);
-  };
+  }, [statusFilter, t]);
 
   if (status === 'loading') {
     return (

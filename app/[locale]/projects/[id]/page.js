@@ -24,8 +24,9 @@ export default function Home({ params }) {
   const { locale } = projectParams;
   const [themeColor, setThemeColor] = useState('#64748b')
   const project = useSelector(state => 
-    state.projects.projects.find(p => String(p.id) === String(projectId))
+    state.projects.projects ? state.projects.projects.find(p => p && String(p.id) === String(projectId)) : null
   );
+  const projectsStatus = useSelector(state => state.projects.status);
   const t = useTranslations('Projects');
   const t_pengy = useTranslations('pengy');
   const [activeTab, setActiveTab] = useState('overview');
@@ -65,7 +66,6 @@ export default function Home({ params }) {
           setUserId(user.id);
         }
       } catch (err) {
-        console.error('Error getting current user:', err);
       }
     }
     
@@ -188,6 +188,22 @@ export default function Home({ params }) {
       comments: task.comments || 0
     };
   };
+
+  // 立即检查项目是否存在
+  if (projectsStatus === 'succeeded' && !project) {
+    // 如果项目加载完成但不存在，立即重定向
+    router.replace(`/${locale}/projects`);
+    
+    // 显示加载状态，直到重定向完成
+    return (
+      <div className="container px-4 py-6 flex justify-center items-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>{t('redirecting')}</p>
+        </div>
+      </div>
+    );
+  }
 
   // 转换所有任务
   const displayTasks = tasks.map(transformTaskForDisplay);
