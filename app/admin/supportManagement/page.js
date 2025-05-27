@@ -26,6 +26,8 @@ export default function AdminSupport() {
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
   const adminState = useSelector((state) => state.admin);
+  const [downgradeData, setDowngradeData] = useState(null);
+  const [usageComparison, setUsageComparison] = useState(null);
 
   // initialize the page
   useEffect(() => {
@@ -107,6 +109,13 @@ export default function AdminSupport() {
     
     // Fetch replies for this ticket
     await fetchTicketReplies(ticket.id);
+    
+    // If it's a downgrade request, fetch the downgrade data
+    if (ticket.type === 'DOWNGRADE') {
+      await fetchDowngradeData(ticket.id);
+    } else {
+      setDowngradeData(null);
+    }
     
     // Log activity
     if (adminData) {
@@ -309,6 +318,22 @@ export default function AdminSupport() {
   // Add this function after fetchSupportTickets
   const fetchTicketReplies = async (ticketId) => {
     try {
+      console.log('Fetching replies for ticket:', ticketId);
+      
+      // First, get the admin user data
+      const { data: adminUserData, error: adminError } = await supabase
+        .from('admin_user')
+        .select('id, username, full_name')
+        .eq('id', adminData.id)
+        .single();
+        
+      if (adminError) {
+        console.error('Error fetching admin user data:', adminError);
+      } else {
+        console.log('Admin user data:', adminUserData);
+      }
+
+      // Then fetch the replies with admin user data
       const { data, error } = await supabase
         .from('contact_reply')
         .select(`
@@ -321,13 +346,306 @@ export default function AdminSupport() {
         .eq('contact_id', ticketId)
         .order('created_at', { ascending: true });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching ticket replies:', error);
+        throw error;
+      }
       
+      console.log('Fetched ticket replies:', data);
+      
+      // Update the state with the replies
       setTicketReplies(data || []);
       
     } catch (error) {
-      console.error('Error fetching ticket replies:', error);
+      console.error('Error in fetchTicketReplies:', error);
       toast.error(`Failed to load replies: ${error.message}`);
+    }
+  };
+  
+  // Update checkDowngradeEligibility to handle target plan data correctly
+  const checkDowngradeEligibility = async (userId, targetPlanData) => {
+    try {
+      console.log('Checking eligibility for user:', userId, 'target plan:', targetPlanData);
+      
+      if (!userId || !targetPlanData) {
+        throw new Error('Missing required parameters: userId or targetPlanData');
+      }
+
+      // Convert UUID string to UUID if needed
+      const userUUID = typeof userId === 'string' ? userId : userId.toString();
+
+      // Fetch user's current subscription with plan details
+      const { data: userSubscription, error: userSubError } = await supabase
+        .from('user_subscription_plan')
+        .select(`
+          id,
+          user_id,
+          status,
+          current_projects,
+          current_teams,
+          current_members,
+          current_ai_chat,
+          current_ai_task,
+          current_ai_workflow,
+          current_storage
+        `)
+        .eq('user_id', userUUID)
+        .eq('status', 'ACTIVE')
+        .limit(1)
+        .maybeSingle();
+
+      if (userSubError) {
+        console.error('Error fetching user subscription:', userSubError);
+        throw userSubError;
+      }
+
+      if (!userSubscription) {
+        throw new Error('No active subscription found for user');
+      }
+      
+      console.log('User subscription data:', userSubscription);
+
+      // Compare limits
+      const comparison = {
+        projects: {
+          current: userSubscription.current_projects || 0,
+          limit: targetPlanData.max_projects,
+          exceeds: (userSubscription.current_projects || 0) > targetPlanData.max_projects
+        },
+        teams: {
+          current: userSubscription.current_teams || 0,
+          limit: targetPlanData.max_teams,
+          exceeds: (userSubscription.current_teams || 0) > targetPlanData.max_teams
+        },
+        members: {
+          current: userSubscription.current_members || 0,
+          limit: targetPlanData.max_members,
+          exceeds: (userSubscription.current_members || 0) > targetPlanData.max_members
+        },
+        aiChat: {
+          current: userSubscription.current_ai_chat || 0,
+          limit: targetPlanData.max_ai_chat,
+          exceeds: (userSubscription.current_ai_chat || 0) > targetPlanData.max_ai_chat
+        },
+        aiTask: {
+          current: userSubscription.current_ai_task || 0,
+          limit: targetPlanData.max_ai_task,
+          exceeds: (userSubscription.current_ai_task || 0) > targetPlanData.max_ai_task
+        },
+        aiWorkflow: {
+          current: userSubscription.current_ai_workflow || 0,
+          limit: targetPlanData.max_ai_workflow,
+          exceeds: (userSubscription.current_ai_workflow || 0) > targetPlanData.max_ai_workflow
+        },
+        storage: {
+          current: userSubscription.current_storage || 0,
+          limit: targetPlanData.max_storage,
+          exceeds: (userSubscription.current_storage || 0) > targetPlanData.max_storage
+        }
+      };
+
+      console.log('Usage comparison:', comparison);
+      setUsageComparison(comparison);
+      
+    } catch (error) {
+      console.error('Error checking downgrade eligibility:', error);
+      toast.error(`Failed to check downgrade eligibility: ${error.message}`);
+    }
+  };
+
+  // Update fetchDowngradeData to handle target plan data correctly
+  const fetchDowngradeData = async (contactId) => {
+    try {
+      // First get the downgrade request with all necessary plan details
+      const { data: requests, error: requestError } = await supabase
+        .from('downgrade_request')
+        .select(`
+          *,
+          current_subscription:current_subscription_id (
+            id,
+            subscription_plan:plan_id (
+              id,
+              type,
+              name,
+              max_projects,
+              max_teams,
+              max_members,
+              max_ai_chat,
+              max_ai_task,
+              max_ai_workflow,
+              max_storage
+            )
+          ),
+          target_plan:target_plan_id (
+            id,
+            type,
+            name,
+            max_projects,
+            max_teams,
+            max_members,
+            max_ai_chat,
+            max_ai_task,
+            max_ai_workflow,
+            max_storage
+          )
+        `)
+        .eq('contact_id', contactId)
+        .limit(1);
+      
+      if (requestError) {
+        console.error('Error fetching downgrade request:', requestError);
+        throw requestError;
+      }
+
+      // If we found a request, use the first one
+      const data = requests?.[0];
+      
+      if (data) {
+        setDowngradeData(data);
+        // Check eligibility using the target plan data
+        await checkDowngradeEligibility(data.user_id, data.target_plan);
+      } else {
+        console.log('No downgrade request found for contact:', contactId);
+        setDowngradeData(null);
+      }
+    } catch (error) {
+      console.error('Error in fetchDowngradeData:', error);
+      toast.error('Failed to load downgrade request details');
+      setDowngradeData(null);
+    }
+  };
+  
+  // Handle downgrade request approval/rejection
+  const handleDowngradeAction = async (action) => {
+    if (!selectedTicket || !downgradeData) return;
+    
+    try {
+      console.log('Starting downgrade action:', action);
+      console.log('Admin data:', adminData); // Log admin data
+      
+      if (!adminData?.id) {
+        throw new Error('Admin ID is required to process the request');
+      }
+
+      const loadingToastId = toast.loading(`Processing downgrade request...`);
+
+      // For both approve and reject, first check the limits
+      const { data: targetPlanData, error: targetPlanError } = await supabase
+        .from('subscription_plan')
+        .select('*')
+        .eq('type', downgradeData.target_plan)
+        .single();
+
+      if (targetPlanError) throw targetPlanError;
+      console.log('Target plan data:', targetPlanData);
+
+      // Fetch user's current usage
+      const { data: userSubscription, error: userSubError } = await supabase
+        .from('user_subscription_plan')
+        .select('*')
+        .eq('user_id', downgradeData.user_id)
+        .eq('status', 'ACTIVE')
+        .single();
+
+      if (userSubError) throw userSubError;
+      console.log('User subscription data:', userSubscription);
+
+      // Check if current usage exceeds target plan limits
+      const limitExceededMessages = [];
+      
+      if (userSubscription.current_projects > targetPlanData.max_projects) {
+        limitExceededMessages.push(`Projects: ${userSubscription.current_projects}/${targetPlanData.max_projects}`);
+      }
+      if (userSubscription.current_teams > targetPlanData.max_teams) {
+        limitExceededMessages.push(`Teams: ${userSubscription.current_teams}/${targetPlanData.max_teams}`);
+      }
+      if (userSubscription.current_members > targetPlanData.max_members) {
+        limitExceededMessages.push(`Team Members: ${userSubscription.current_members}/${targetPlanData.max_members}`);
+      }
+      if (userSubscription.current_ai_chat > targetPlanData.max_ai_chat) {
+        limitExceededMessages.push(`AI Chat Usage: ${userSubscription.current_ai_chat}/${targetPlanData.max_ai_chat}`);
+      }
+      if (userSubscription.current_ai_task > targetPlanData.max_ai_task) {
+        limitExceededMessages.push(`AI Task Usage: ${userSubscription.current_ai_task}/${targetPlanData.max_ai_task}`);
+      }
+      if (userSubscription.current_ai_workflow > targetPlanData.max_ai_workflow) {
+        limitExceededMessages.push(`AI Workflow Usage: ${userSubscription.current_ai_workflow}/${targetPlanData.max_ai_workflow}`);
+      }
+      if (userSubscription.current_storage > targetPlanData.max_storage) {
+        limitExceededMessages.push(`Storage Usage: ${userSubscription.current_storage}GB/${targetPlanData.max_storage}GB`);
+      }
+
+      console.log('Limit exceeded messages:', limitExceededMessages);
+
+      // If limits are exceeded, add a warning note first
+      if (limitExceededMessages.length > 0) {
+        console.log('Adding warning note to ticket');
+        // Add an internal note about the exceeded limits
+        const warningContent = `⚠️ WARNING: Current usage exceeds ${downgradeData.target_plan} plan limits:\n\n${limitExceededMessages.join('\n')}\n\nPlease ensure the user is aware they need to reduce their usage before the downgrade can take effect.`;
+        console.log('Warning content:', warningContent);
+        
+        const { data: replyData, error: replyError } = await supabase
+          .from('contact_reply')
+          .insert({
+            contact_id: selectedTicket.id,
+            content: warningContent,
+            admin_id: adminData.id,
+            is_from_contact: false,
+            is_internal_note: true
+          })
+          .select();
+
+        if (replyError) {
+          console.error('Error adding warning note:', replyError);
+          throw replyError;
+        }
+        console.log('Added warning note:', replyData);
+
+        // Refresh ticket replies to show the warning
+        await fetchTicketReplies(selectedTicket.id);
+        console.log('Fetched updated ticket replies');
+
+        // Show warning toast and ask for confirmation
+        toast.dismiss(loadingToastId);
+        
+        const confirmMessage = `WARNING: User's current usage exceeds ${downgradeData.target_plan} plan limits:\n\n${limitExceededMessages.join('\n')}\n\nDo you want to proceed with the ${action}?`;
+        console.log('Showing confirmation dialog:', confirmMessage);
+        
+        if (!window.confirm(confirmMessage)) {
+          console.log('Action cancelled by admin');
+          return;
+        }
+      }
+
+      console.log('Processing downgrade request');
+      // Process the downgrade request
+      const { error: downgradeError } = await supabase
+        .from('downgrade_request')
+        .update({
+          status: action === 'approve' ? 'APPROVED' : 'REJECTED',
+          processed_by: adminData.id,
+          processed_at: new Date().toISOString(),
+          notes: limitExceededMessages.length > 0 ? 
+            `${action === 'approve' ? 'Approved' : 'Rejected'} with usage warnings:\n${limitExceededMessages.join('\n')}` : 
+            null
+        })
+        .eq('id', downgradeData.id);
+      
+      if (downgradeError) throw downgradeError;
+      
+      // Update ticket status
+      await handleStatusChange('COMPLETED');
+      
+      // Refresh ticket data
+      await fetchDowngradeData(selectedTicket.id);
+      await fetchTicketReplies(selectedTicket.id);
+      
+      toast.dismiss(loadingToastId);
+      toast.success(`Downgrade request ${action === 'approve' ? 'approved' : 'rejected'} successfully`);
+      
+    } catch (error) {
+      console.error('Error processing downgrade request:', error);
+      toast.error(`Failed to process downgrade request: ${error.message}`);
     }
   };
   
@@ -521,7 +839,9 @@ export default function AdminSupport() {
                           </span>
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                          {ticket.type === 'ENTERPRISE' ? 'Enterprise Inquiry' : 'General Support'}
+                          {ticket.type === 'ENTERPRISE' ? 'Enterprise Inquiry' : 
+                           ticket.type === 'DOWNGRADE' ? 'Downgrade Request' : 
+                           'General Support'}
                         </p>
                         <div className="flex items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
                           <FaClock className="mr-1" />
@@ -546,7 +866,9 @@ export default function AdminSupport() {
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {selectedTicket.type === 'ENTERPRISE' ? 'Enterprise Inquiry' : 'General Support Request'}
+                        {selectedTicket.type === 'ENTERPRISE' ? 'Enterprise Inquiry' : 
+                         selectedTicket.type === 'DOWNGRADE' ? 'Downgrade Request' : 
+                         'General Support'}
                       </h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                         Ticket #{selectedTicket.id} • Created {formatDate(selectedTicket.created_at)}
@@ -794,6 +1116,117 @@ export default function AdminSupport() {
                       </div>
                     </form>
                   </div>  
+                  )}
+
+                  {/* Update the Downgrade Request Details Section */}
+                  {selectedTicket?.type === 'DOWNGRADE' && downgradeData && (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Downgrade Request Details</h4>
+                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">Current Plan</p>
+                            <div className="mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                              <p className="text-sm text-gray-600 dark:text-gray-300">
+                                Name: {downgradeData.current_subscription?.subscription_plan?.name || 'Unknown'}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Type: {downgradeData.current_subscription?.subscription_plan?.type || 'Unknown'}
+                              </p>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">Target Plan</p>
+                            <div className="mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                              <p className="text-sm text-gray-600 dark:text-gray-300">
+                                Name: {downgradeData.target_plan?.name || 'Unknown'}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Type: {downgradeData.target_plan?.type || 'Unknown'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Add Usage Comparison Section */}
+                        {usageComparison && (
+                          <div className="mb-4">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">Usage Analysis</p>
+                            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+                              <div className="space-y-3">
+                                {Object.entries(usageComparison).map(([key, data]) => (
+                                  <div key={key} className={`flex items-center justify-between ${data.exceeds ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                    <span className="text-sm font-medium">
+                                      {key.replace(/([A-Z])/g, ' $1').trim()} {/* Add spaces before capital letters */}
+                                    </span>
+                                    <span className="text-sm">
+                                      {data.current}/{data.limit} {key === 'storage' ? 'GB' : ''}
+                                      {data.exceeds && ' ⚠️'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              {Object.values(usageComparison).some(data => data.exceeds) && (
+                                <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                  <p className="text-sm text-red-700 dark:text-red-300">
+                                    ⚠️ Warning: Current usage exceeds target plan limits in some areas. User must reduce usage before downgrade can be effective.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">Reason for Downgrade</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            {downgradeData.reason}
+                          </p>
+                        </div>
+
+                        {downgradeData.notes && (
+                          <div className="mb-4">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">Processing Notes</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                              {downgradeData.notes}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {downgradeData.status === 'PENDING' ? (
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleDowngradeAction('approve')}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
+                            >
+                              Approve Downgrade
+                            </button>
+                            <button
+                              onClick={() => handleDowngradeAction('reject')}
+                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
+                            >
+                              Reject Downgrade
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <div className={`text-sm font-medium ${
+                              downgradeData.status === 'APPROVED' 
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`}>
+                              Request {downgradeData.status.toLowerCase()}
+                              {downgradeData.processed_at && ` on ${formatDate(downgradeData.processed_at)}`}
+                            </div>
+                            {downgradeData.processed_by && (
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                by {adminData?.username || 'Unknown Admin'}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : (

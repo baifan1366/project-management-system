@@ -520,7 +520,7 @@ CREATE TABLE "promo_code" (
 -- 联系表（用于存储联系表单提交）
 CREATE TABLE "contact" (
   "id" SERIAL PRIMARY KEY,
-  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE')), -- 区分一般查询和企业查询
+  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE', 'DOWNGRADE')), -- 添加 DOWNGRADE 类型
   "email" VARCHAR(255) NOT NULL,
   "message" TEXT, -- 用于一般查询的消息
   -- 企业查询特有字段
@@ -534,6 +534,29 @@ CREATE TABLE "contact" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Downgrade Request Table
+CREATE TABLE "downgrade_request" (
+  "id" SERIAL PRIMARY KEY,
+  "contact_id" INT NOT NULL REFERENCES "contact"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "current_subscription_id" INT NOT NULL REFERENCES "user_subscription_plan"("id") ON DELETE CASCADE,
+  "target_plan_id" INT NOT NULL REFERENCES "subscription_plan"("id") ON DELETE CASCADE,
+  "reason" TEXT NOT NULL,
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'APPROVED', 'REJECTED')) DEFAULT 'PENDING',
+  "processed_by" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
+  "processed_at" TIMESTAMP,
+  "notes" TEXT,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for downgrade_request
+CREATE INDEX idx_downgrade_request_user_id ON "downgrade_request"("user_id");
+CREATE INDEX idx_downgrade_request_contact_id ON "downgrade_request"("contact_id");
+CREATE INDEX idx_downgrade_request_current_subscription ON "downgrade_request"("current_subscription_id");
+CREATE INDEX idx_downgrade_request_target_plan ON "downgrade_request"("target_plan_id");
+CREATE INDEX idx_downgrade_request_status ON "downgrade_request"("status");
 
 -- Support Contact Reply Table (integrates with existing contact table)
 CREATE TABLE "contact_reply" (

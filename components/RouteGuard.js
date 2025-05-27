@@ -13,6 +13,8 @@ const PUBLIC_PATHS = [
   '/terms',
   '/privacy',
   '/admin/adminLogin',
+  '/contactUs',
+  '/landing'
 ];
 const SPECIAL_PATHS = [
   '/auth', 
@@ -20,7 +22,10 @@ const SPECIAL_PATHS = [
   '/pricing', 
   '/payment', 
   '/admin/adminLogin',
-  '/teamInvitation'
+  '/teamInvitation',
+  '/contactUs',
+  '/landing'
+  
 ]; // Special paths that can be accessed even when logged in
 
 export default function RouteGuard({ children }) {
@@ -107,8 +112,8 @@ export default function RouteGuard({ children }) {
         return;
       }
 
-      // Handle logged in users accessing login pages
-      if (isLoggedIn && isPublicPath && !isSpecialPath && pathname !== '/') {
+      // Handle logged in users accessing auth-only pages
+      if (isLoggedIn && isPublicPath && !isSpecialPath && !pathname.startsWith('/pricing') && pathname !== '/') {
         console.log('⚠️ Already logged in, redirecting to appropriate dashboard');
         if (isAdminPath) {
           router.replace('/admin/adminDashboard');
