@@ -19,9 +19,18 @@ import { supabase } from '@/lib/supabase';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import useGetUser from '@/lib/hooks/useGetUser';
 
-export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = new Date(), onSuccess, isGoogleConnected = false }) {
+export default function CreateCalendarEvent({ 
+  isOpen, 
+  setIsOpen, 
+  selectedDate = new Date(), 
+  onSuccess, 
+  isGoogleConnected = false,
+  isEditing = false,
+  eventToEdit = null
+}) {
   const t = useTranslations('Calendar');
-  const [eventType, setEventType] = useState('task'); // 'task', 'google', 'personal'
+  const [eventType, setEventType] = useState(isEditing && eventToEdit ? 
+    eventToEdit.type || (eventToEdit.originalEvent ? 'google' : 'task') : 'task'); // 'task', 'google', 'personal'
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,9 +58,9 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     title: '',
     description: '',
     startDate: selectedDate,
-    startTime: format(new Date().setMinutes(0, 0, 0), 'HH:mm'),
+    startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
     endDate: selectedDate,
-    endTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
+    endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'HH:mm'),
     isAllDay: false,
     location: '',
     reminders: false,
@@ -59,6 +68,61 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     addGoogleMeet: false, // 是否添加Google Meet视频会议
     inviteParticipants: false, // 是否邀请参与者
   });
+
+  // Initialize form data when editing an existing event
+  useEffect(() => {
+    if (isEditing && eventToEdit) {
+      // Set event type based on the event being edited
+      if (eventToEdit.originalEvent) {
+        // Google Calendar event
+        setEventType('google');
+        
+        // Initialize selected users from attendees
+        if (eventToEdit.attendees && eventToEdit.attendees.length > 0) {
+          // Filter out the current user who is likely the organizer
+          const attendees = eventToEdit.attendees
+            .filter(attendee => !attendee.self)
+            .map(attendee => ({
+              id: attendee.email, // Use email as ID since we don't have actual user IDs
+              name: attendee.displayName || attendee.email,
+              email: attendee.email,
+              avatar_url: null // We don't have avatar URLs from Google
+            }));
+            
+          setSelectedUsers(attendees);
+          
+          if (attendees.length > 0) {
+            setFormData(prev => ({
+              ...prev,
+              inviteParticipants: true
+            }));
+          }
+        }
+      } else if (eventToEdit.expected_completion_date) {
+        // Task
+        setEventType('task');
+      } else {
+        // Personal calendar event
+        setEventType('personal');
+      }
+      
+      // Set form data from event
+      setFormData({
+        title: eventToEdit.title || eventToEdit.summary || '',
+        description: eventToEdit.description || '',
+        startDate: eventToEdit.startDate || selectedDate,
+        startTime: eventToEdit.startTime || format(new Date().setMinutes(0, 0, 0), 'HH:mm'),
+        endDate: eventToEdit.endDate || selectedDate,
+        endTime: eventToEdit.endTime || format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
+        isAllDay: eventToEdit.isAllDay || false,
+        location: eventToEdit.location || '',
+        reminders: eventToEdit.reminders || false,
+        color: eventToEdit.color || '#4285F4',
+        addGoogleMeet: eventToEdit.addGoogleMeet || false,
+        inviteParticipants: eventToEdit.attendees?.length > 0 || false,
+      });
+    }
+  }, [isEditing, eventToEdit, selectedDate]);
 
   // 当selectedDate变化时更新表单数据
   useEffect(() => {
@@ -241,7 +305,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
-  // 创建事件
+  // 创建或更新事件
   const handleCreateEvent = async (e) => {
     if (e) e.preventDefault();
     
@@ -254,14 +318,17 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         ? new Date(format(formData.startDate, 'yyyy-MM-dd') + 'T00:00:00')
         : new Date(format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00');
       
-      // Check if the start date/time is in the past
-      if (isPast(startDateTime) && !isSameDay(startDateTime, now)) {
-        throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
-      }
-      
-      // For same-day events, check if the time is in the past
-      if (isSameDay(startDateTime, now) && isPast(startDateTime)) {
-        throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
+      // Skip past date check when editing
+      if (!isEditing) {
+        // Check if the start date/time is in the past
+        if (isPast(startDateTime) && !isSameDay(startDateTime, now)) {
+          throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
+        }
+        
+        // For same-day events, check if the time is in the past
+        if (isSameDay(startDateTime, now) && isPast(startDateTime)) {
+          throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
+        }
       }
       
       if (eventType === 'task') {
@@ -341,7 +408,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
           throw new Error(error.message || '创建个人日历事件失败');
         }
       } else if (eventType === 'google') {
-        // 创建Google日历事件
+        // 创建或更新Google日历事件
         const startDateTime = formData.isAllDay 
           ? format(formData.startDate, 'yyyy-MM-dd')
           : format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00';
@@ -438,8 +505,25 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
           };
         }
         
-        const response = await fetch('/api/google-calendar', {
-          method: 'POST',
+        // Determine if we're creating or updating an event
+        const isUpdateOperation = isEditing && eventToEdit && eventToEdit.id;
+        const apiPath = isUpdateOperation ? 
+          `/api/google-calendar/events/${eventToEdit.id}` : 
+          '/api/google-calendar';
+        
+        const method = isUpdateOperation ? 'PATCH' : 'POST';
+        
+        // If updating, handle existing conference data
+        if (isUpdateOperation && eventToEdit.originalEvent?.conferenceData && !formData.addGoogleMeet) {
+          // We're removing the conference data
+          eventData.conferenceData = null;
+        } else if (isUpdateOperation && eventToEdit.originalEvent?.conferenceData && formData.addGoogleMeet) {
+          // We're keeping existing conference data
+          eventData.conferenceData = eventToEdit.originalEvent.conferenceData;
+        }
+        
+        const response = await fetch(apiPath, {
+          method: method,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -448,7 +532,9 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
             accessToken,
             refreshToken,
             conferenceDataVersion: formData.addGoogleMeet ? 1 : 0,
-            sendNotifications: formData.inviteParticipants
+            sendNotifications: formData.inviteParticipants,
+            sendUpdates: isUpdateOperation ? 'all' : undefined,
+            userId: session.id
           }),
         });
         
@@ -458,20 +544,21 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('创建Google日历事件失败:', errorData);
+          console.error('创建/更新Google日历事件失败:', errorData);
           
           if (errorData.error && errorData.error.includes('insufficient authentication scopes')) {
             throw new Error('Google Calendar权限不足，请重新登录并授予完整日历访问权限');
           }
           
-          throw new Error(errorData.error || '创建Google日历事件失败');
+          throw new Error(errorData.error || '创建/更新Google日历事件失败');
         }
         
-        // 获取创建的事件数据，包括Meet链接
+        // 获取创建或更新的事件数据，包括Meet链接
         const eventResponseData = await response.json();
         
         // 如果有参与者且有会议链接，创建通知
-        if (formData.inviteParticipants && formData.addGoogleMeet && eventResponseData.event.hangoutLink) {
+        if (formData.inviteParticipants && formData.addGoogleMeet && 
+            eventResponseData.event.hangoutLink && !isUpdateOperation) {
           const meetLink = eventResponseData.event.hangoutLink;
           
           // 为每个参与者创建通知
@@ -505,9 +592,9 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         title: '',
         description: '',
         startDate: new Date(),
-        startTime: format(new Date().setMinutes(0, 0, 0), 'HH:mm'),
+        startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
         endDate: new Date(),
-        endTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
+        endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'HH:mm'),
         isAllDay: false,
         location: '',
         reminders: false,
@@ -518,7 +605,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
       
       setSelectedUsers([]);
       setIsOpen(false);
-      toast.success(t('eventCreated'));
+      toast.success(isEditing ? t('eventUpdated') : t('eventCreated'));
       
       // 如果有成功回调，调用它
       if (onSuccess) {
@@ -526,8 +613,8 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
       }
       
     } catch (error) {
-      console.error('Error creating event:', error);
-      toast.error(error.message || t('eventCreationFailed'));
+      console.error('Error creating/updating event:', error);
+      toast.error(error.message || (isEditing ? t('eventUpdateFailed') : t('eventCreationFailed')));
     } finally {
       setIsLoading(false);
     }
@@ -537,18 +624,23 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>{t('createEvent')}</DialogTitle>
+          <DialogTitle>{isEditing ? t('editEvent') : t('createEvent')}</DialogTitle>
           <DialogDescription>
-            {t('createEventDescription')}
+            {isEditing ? t('editEventDescription') : t('createEventDescription')}
           </DialogDescription>
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
-          <Tabs defaultValue={eventType} onValueChange={setEventType} className="w-full mb-2">
+          <Tabs 
+            value={eventType} 
+            onValueChange={setEventType} 
+            className="w-full mb-2"
+            disabled={isEditing} // Disable changing event type when editing
+          >
             <TabsList className="w-full grid grid-cols-3">
-              <TabsTrigger value="task">{t('task')}</TabsTrigger>
-              <TabsTrigger value="personal" disabled={!session}>{t('personalCalendar')}</TabsTrigger>
-              <TabsTrigger value="google" disabled={!isGoogleConnected}>{t('googleCalendar')}</TabsTrigger>
+              <TabsTrigger value="task" disabled={isEditing && eventType !== 'task'}>{t('task')}</TabsTrigger>
+              <TabsTrigger value="personal" disabled={(isEditing && eventType !== 'personal') || !session}>{t('personalCalendar')}</TabsTrigger>
+              <TabsTrigger value="google" disabled={(isEditing && eventType !== 'google') || !isGoogleConnected}>{t('googleCalendar')}</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -832,7 +924,7 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
             onClick={handleCreateEvent}
             className="w-full sm:w-auto"
           >
-            {isLoading ? t('creating') : t('create')}
+            {isLoading ? (isEditing ? t('updating') : t('creating')) : (isEditing ? t('update') : t('create'))}
           </Button>
         </DialogFooter>
       </DialogContent>

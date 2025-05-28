@@ -22,6 +22,8 @@ import { useGetUser } from '@/lib/hooks/useGetUser';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import EventDetailsDialog from '@/components/EventDetailsDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function CalendarPage() {
   const t = useTranslations('Calendar');
@@ -42,7 +44,21 @@ export default function CalendarPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [userLoadTimeout, setUserLoadTimeout] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedEventType, setSelectedEventType] = useState(null);
+  const [isEventDetailsOpen, setIsEventDetailsOpen] = useState(false);
+  const [isEditingEvent, setIsEditingEvent] = useState(false);
+  const [eventToEdit, setEventToEdit] = useState(null);
   
+  // Add the state for the all events dialog
+  const [isAllEventsOpen, setIsAllEventsOpen] = useState(false);
+  const [allEventsData, setAllEventsData] = useState({
+    date: null,
+    tasks: [],
+    googleEvents: [],
+    personalEvents: []
+  });
+
   // Filter states
   const [filters, setFilters] = useState({
     personalEvents: true,
@@ -1299,13 +1315,21 @@ export default function CalendarPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {/* Only show Add Event for current or future dates */}
+                  {new Date(day) >= new Date(new Date().setHours(0,0,0,0)) && (
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenCreateEvent(currentDay);
+                    }}>
+                      {t('addEvent')}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={(e) => {
                     e.stopPropagation();
-                    handleOpenCreateEvent(currentDay);
+                    handleViewAllEvents(currentDay, dayTasks, dayEvents, dayPersonalEvents);
                   }}>
-                    {t('addEvent')}
+                    {t('viewAll')}
                   </DropdownMenuItem>
-                  <DropdownMenuItem>{t('viewAll')}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -1315,8 +1339,12 @@ export default function CalendarPage() {
             {dayTasks.slice(0, 3).map((task) => (
               <div 
                 key={`task-${task.id}`} 
-                className="text-xs py-0.5 px-1 bg-blue-100 dark:bg-blue-900/30 rounded truncate"
+                className="text-xs py-0.5 px-1 bg-blue-100 dark:bg-blue-900/30 rounded truncate cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/30"
                 title={task.title}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEventClick(task, 'task');
+                }}
               >
                 <span className="truncate block">{task.title || t('noTitle')}</span>
               </div>
@@ -1334,13 +1362,11 @@ export default function CalendarPage() {
                 title={`${event.summary}${event.hangoutLink ? ` (${t('hasMeetLink')})` : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (event.hangoutLink) {
-                    window.open(event.hangoutLink, '_blank');
-                  }
+                  handleEventClick(event, 'google');
                 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="truncate">{event.summary || '无标题事件'}</span>
+                  <span className="truncate">{event.summary || t('untitledEvent')}</span>
                   {event.hangoutLink && (
                     <Video className="h-2.5 w-2.5 ml-1 text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                   )}
@@ -1351,11 +1377,15 @@ export default function CalendarPage() {
             {dayPersonalEvents.slice(0, 3).map((event) => (
               <div 
                 key={`personal-${event.id}`} 
-                className="text-xs py-0.5 px-1 bg-purple-100 dark:bg-purple-900/30 rounded truncate"
+                className="text-xs py-0.5 px-1 bg-purple-100 dark:bg-purple-900/30 rounded truncate cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-800/30"
                 style={event.color ? {backgroundColor: `${event.color}20`} : {}}
                 title={event.title}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEventClick(event, 'personal');
+                }}
               >
-                <span className="truncate block">{event.title}</span>
+                <span className="truncate block">{event.title || t('untitledEvent')}</span>
               </div>
             ))}
             
@@ -1433,12 +1463,7 @@ export default function CalendarPage() {
                   title={`${event.title} (${format(event.start, 'yyyy/MM/dd')} - ${format(event.end, 'yyyy/MM/dd')})`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (event.type === 'google' && event.hangoutLink) {
-                      window.open(event.hangoutLink, '_blank');
-                    } else {
-                      // 可以在此添加点击事件的其他处理
-                      toast.info(`${event.title} (${format(event.start, 'yyyy/MM/dd')} - ${format(event.end, 'yyyy/MM/dd')})`);
-                    }
+                    handleEventClick(event, event.type);
                   }}
                 >
                   <div className="flex items-center h-full">
@@ -1485,6 +1510,7 @@ export default function CalendarPage() {
         personalEvents={filteredPersonalEvents}
         tasks={processedTasks}
         googleCalendarColors={googleCalendarColors}
+        handleEventClick={handleEventClick}
       />
     );
   };
@@ -1506,6 +1532,63 @@ export default function CalendarPage() {
         googleCalendarColors={googleCalendarColors}
       />
     );
+  };
+
+  // Handle event click
+  const handleEventClick = (event, eventType) => {
+    setSelectedEvent(event);
+    setSelectedEventType(eventType);
+    setIsEventDetailsOpen(true);
+  };
+  
+  // Handle edit event
+  const handleEditEvent = (event, eventType) => {
+    // Close the details dialog
+    setIsEventDetailsOpen(false);
+    
+    if (eventType === 'google') {
+      // For Google events, set editing state and open the create dialog
+      const startDateTime = event.start?.dateTime ? parseISO(event.start.dateTime) : parseISO(event.start.date);
+      const endDateTime = event.end?.dateTime ? parseISO(event.end.dateTime) : parseISO(event.end.date);
+      
+      const eventForEdit = {
+        ...event,
+        originalEvent: event, // Keep the original event data for reference
+        id: event.id,
+        title: event.summary,
+        description: event.description || '',
+        isAllDay: !event.start?.dateTime,
+        location: event.location || '',
+        startDate: startDateTime,
+        endDate: endDateTime,
+        startTime: event.start?.dateTime ? format(startDateTime, 'HH:mm') : '00:00',
+        endTime: event.end?.dateTime ? format(endDateTime, 'HH:mm') : '23:59',
+        addGoogleMeet: !!event.hangoutLink,
+        color: event.colorId || '1',
+        attendees: event.attendees || [],
+      };
+      
+      setEventToEdit(eventForEdit);
+      setIsEditingEvent(true);
+      setIsCreateEventOpen(true);
+    } 
+    else if (eventType === 'personal' || eventType === 'task') {
+      // For now, we'll just reuse the create event dialog with the event data
+      // You could extend this to handle personal events and tasks as well
+      setSelectedDate(new Date());
+      setIsCreateEventOpen(true);
+    }
+  };
+
+  // Add the handleViewAllEvents function before the return statement
+  const handleViewAllEvents = (date, tasks, googleEvents, personalEvents) => {
+    setAllEventsData({
+      date,
+      tasks,
+      googleEvents,
+      personalEvents
+    });
+    setIsAllEventsOpen(true);
   };
 
   return (
@@ -1745,7 +1828,134 @@ export default function CalendarPage() {
         selectedDate={selectedDate}
         onSuccess={handleEventCreated}
         isGoogleConnected={isGoogleConnected}
+        isEditing={isEditingEvent}
+        eventToEdit={eventToEdit}
       />
+      
+      <EventDetailsDialog
+        isOpen={isEventDetailsOpen}
+        setIsOpen={setIsEventDetailsOpen}
+        event={selectedEvent}
+        eventType={selectedEventType}
+        onEdit={handleEditEvent}
+        onSuccess={handleEventCreated}
+      />
+      
+      {/* Add the AllEventsDialog component */}
+      <Dialog open={isAllEventsOpen} onOpenChange={setIsAllEventsOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {allEventsData.date && format(allEventsData.date, 'MMMM d, yyyy')}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {allEventsData.tasks.length + allEventsData.googleEvents.length + allEventsData.personalEvents.length} {t((allEventsData.tasks.length + allEventsData.googleEvents.length + allEventsData.personalEvents.length) === 1 ? 'event' : 'events')}
+            </p>
+          </DialogHeader>
+          
+          {/* Tasks Section */}
+          {allEventsData.tasks.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-medium mb-2">{t('tasks')}</h4>
+              <div className="space-y-2">
+                {allEventsData.tasks.map((task) => (
+                  <div 
+                    key={`all-task-${task.id}`} 
+                    className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/30"
+                    onClick={() => {
+                      setIsAllEventsOpen(false);
+                      handleEventClick(task, 'task');
+                    }}
+                  >
+                    <div className="font-medium">{task.title || t('noTitle')}</div>
+                    {task.description && <div className="text-xs mt-1">{task.description}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Google Events Section */}
+          {allEventsData.googleEvents.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-medium mb-2">{t('googleCalendar')}</h4>
+              <div className="space-y-2">
+                {allEventsData.googleEvents.map((event) => {
+                  const hasTime = !!event.start?.dateTime;
+                  const startDateTime = parseISO(event.start?.dateTime || event.start?.date);
+                  const endDateTime = parseISO(event.end?.dateTime || event.end?.date);
+                  const timeStr = hasTime ? 
+                    `${format(startDateTime, 'HH:mm')} - ${format(endDateTime, 'HH:mm')}` : 
+                    t('allDay');
+                  
+                  return (
+                    <div 
+                      key={`all-google-${event.id}`} 
+                      className={`p-2 rounded cursor-pointer ${event.hangoutLink ? 'bg-emerald-100 dark:bg-emerald-900/40 border-l-2 border-emerald-500' : 'bg-green-100 dark:bg-green-900/30'} hover:bg-opacity-80`}
+                      onClick={() => {
+                        setIsAllEventsOpen(false);
+                        handleEventClick(event, 'google');
+                      }}
+                    >
+                      <div className="font-medium">{event.summary || t('untitledEvent')}</div>
+                      <div className="text-xs mt-1">{timeStr}</div>
+                      {event.location && <div className="text-xs mt-1">{event.location}</div>}
+                      {event.hangoutLink && (
+                        <div className="text-xs mt-1 flex items-center">
+                          <Video className="h-3 w-3 mr-1" />
+                          {t('hasMeetLink')}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          
+          {/* Personal Events Section */}
+          {allEventsData.personalEvents.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-medium mb-2">{t('personalCalendar')}</h4>
+              <div className="space-y-2">
+                {allEventsData.personalEvents.map((event) => {
+                  const startDateTime = parseISO(event.start_time);
+                  const endDateTime = parseISO(event.end_time);
+                  const isAllDay = format(startDateTime, 'HH:mm') === '00:00' && 
+                                 format(endDateTime, 'HH:mm') === '23:59';
+                  const timeStr = isAllDay ? 
+                    t('allDay') : 
+                    `${format(startDateTime, 'HH:mm')} - ${format(endDateTime, 'HH:mm')}`;
+                  
+                  return (
+                    <div 
+                      key={`all-personal-${event.id}`} 
+                      className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-800/30"
+                      style={event.color ? {backgroundColor: `${event.color}20`} : {}}
+                      onClick={() => {
+                        setIsAllEventsOpen(false);
+                        handleEventClick(event, 'personal');
+                      }}
+                    >
+                      <div className="font-medium">{event.title || t('untitledEvent')}</div>
+                      <div className="text-xs mt-1">{timeStr}</div>
+                      {event.location && <div className="text-xs mt-1">{event.location}</div>}
+                      {event.description && <div className="text-xs mt-1">{event.description}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          
+          {/* No Events Message */}
+          {allEventsData.tasks.length + allEventsData.googleEvents.length + allEventsData.personalEvents.length === 0 && (
+            <div className="py-4 text-center text-muted-foreground">
+              {t('noEventsForThisDay')}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
