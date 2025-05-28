@@ -172,16 +172,18 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
           
           <TabsContent value="deleteProject" className="mt-4">
             <div className="p-4 rounded-md border border-destructive bg-destructive/10">
-              <h3 className="font-medium text-destructive mb-2">{t('dangerZone')}</h3>
+              <h3 className="font-medium text-red-500 hover:text-red-600 mb-2">{t('dangerZone')}</h3>
               <p className="text-sm mb-4">{t('deleteProjectWarning')}</p>
-              <Button 
-                variant="destructive" 
-                onClick={handleDeleteProject}
-                disabled={isLoading}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                {t('deleteProject')}
-              </Button>
+              <div className="flex justify-end">
+                <Button 
+                  variant="destructive" 
+                  onClick={handleDeleteProject}
+                  disabled={isLoading}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {t('deleteProject')}
+                </Button>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
