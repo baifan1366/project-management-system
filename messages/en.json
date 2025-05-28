@@ -932,6 +932,7 @@
     "invitationSent": "Invitation sent",
     "invitationFailed": "Invitation failed",
     "inviting": "Inviting users...",
+    "memberAddedSuccess": "Member added successfully",
     "newMessage": "New message",
     "switchToAI": "Switch to AI assistant",
     "switchToNormal": "Return to normal chat",
@@ -1024,7 +1025,10 @@
       "deleteFailed": "Failed to hide chat",
       "notLoggedIn": "You need to be logged in",
       "muteFailed": "Failed to update notification settings",
-      "unhideFailed": "Failed to unhide chat"
+      "unhideFailed": "Failed to unhide chat",
+      "updateFailed": "Failed to update message",
+      "emptyMessage": "Message cannot be empty",
+      "messageTooLong": "Message too long (max 1000 characters)"
     },
     "searchChat": "Search Chat",
     "searchChatDescription": "Search for messages, media, files, and links in this conversation",
@@ -1073,7 +1077,10 @@
       "hoursAgo": "{hours} hours ago",
       "daysAgo": "{days} days ago"
     },
-    "groupChat": "Group Chat"
+    "groupChat": "Group Chat",
+    "edit": "Edit",
+    "save": "Save",
+    "messageUpdated": "Message updated successfully"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

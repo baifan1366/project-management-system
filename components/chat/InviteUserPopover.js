@@ -18,7 +18,8 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-
+  const { user } = useGetUser();
+  
   // 搜索用户
   const searchUsers = async (query) => {
     if (!query.trim()) {
@@ -28,7 +29,6 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
 
     setIsLoading(true);
     try {
-      const { user } = useGetUser();
       if (!user) return;
 
       // 获取已经在会话中的用户ID
@@ -80,7 +80,8 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
     if (selectedUsers.length === 0) return;
 
     try {
-      toast.loading(t('inviting'));
+      // 创建加载toast并获取它的ID
+      const toastId = toast.loading(t('inviting'));
 
       // 添加新参与者
       const participants = selectedUsers.map(user => ({
@@ -94,24 +95,54 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
         .insert(participants);
 
       if (participantError) {
-        toast.error(t('invitationFailed'));
+        // 更新toast为错误状态
+        toast.error(t('invitationFailed'), { id: toastId });
         throw participantError;
       }
 
-      toast.success(t('invitationSent'));
+      // 立即刷新当前会话信息 - 获取最新的会话详情
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('chat_session')
+        .select(`
+          id,
+          type,
+          name,
+          team_id,
+          created_at,
+          updated_at,
+          participants:chat_participant(
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email,
+              is_online,
+              last_seen_at
+            )
+          )
+        `)
+        .eq('id', sessionId)
+        .single();
+
+      if (sessionError) {
+        console.error('Error refreshing session data:', sessionError);
+      }
+
+      // 更新toast为成功状态
+      toast.success(t('invitationSent'), { id: toastId });
 
       // 重置状态并关闭 popover
       setSelectedUsers([]);
       setSearchQuery('');
       setIsOpen(false);
 
-      // 通知父组件更新
+      // 通知父组件更新 - 同时传递最新的会话信息
       if (onInvite) {
-        onInvite();
+        onInvite(sessionData);
       }
     } catch (error) {
       console.error('Error inviting users:', error);
-      toast.error(t('invitationFailed'));
+      // 这里不需要再次显示错误toast，因为已经在上面处理了
     }
   };
 
