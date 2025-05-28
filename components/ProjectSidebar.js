@@ -58,6 +58,8 @@ export default function ProjectSidebar({ projectId }) {
   const [activeTab, setActiveTab] = useState("general");
   const [projectData, setProjectData] = useState(null);
   const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
+  const [projectCreatedBy, setProjectCreatedBy] = useState(null);
+  const [canCreateTeam, setCanCreateTeam] = useState(false);
 
   // 项目名称下拉菜单
   useEffect(() => {
@@ -99,8 +101,18 @@ export default function ProjectSidebar({ projectId }) {
       const project = await dispatch(fetchProjectById(projectId)).unwrap();
       setThemeColor(project?.theme_color || '#64748b');
       setProjectName(project?.project_name || 'Project');
+      setProjectCreatedBy(project?.created_by || null);
     }
   }, [projectId, dispatch]);
+
+  // 检查当前用户是否是项目创建者
+  useEffect(() => {
+    if (user && projectCreatedBy) {
+      setCanCreateTeam(user.id === projectCreatedBy);
+    } else {
+      setCanCreateTeam(false);
+    }
+  }, [user, projectCreatedBy]);
 
   // 然后在useEffect中添加真正的依赖项
   useEffect(() => {
@@ -249,6 +261,7 @@ export default function ProjectSidebar({ projectId }) {
       const project = projectData[0];
       setProjectName(project.project_name || '项目');
       setThemeColor(project.theme_color || '#64748b');
+      setProjectCreatedBy(project.created_by || null);
     }
   }, [projectData]);
 
@@ -285,8 +298,11 @@ export default function ProjectSidebar({ projectId }) {
           {/* 项目名称下拉菜单 */}
           <div className="relative" ref={dropdownRef}>
             <button 
-              onClick={() => setDropdownOpen(!isDropdownOpen)} 
-              className="flex items-center justify-between w-full px-4 py-2.5 text-foreground hover:bg-accent/50 transition-colors"
+              onClick={() => canCreateTeam && setDropdownOpen(!isDropdownOpen)} 
+              className={cn(
+                "flex items-center justify-between w-full px-4 py-2.5 text-foreground transition-colors",
+                canCreateTeam ? "hover:bg-accent/50 cursor-pointer" : "cursor-default"
+              )}
             >
               <div className="flex items-center gap-2 flex-wrap">
                 <div 
@@ -299,7 +315,7 @@ export default function ProjectSidebar({ projectId }) {
                 </div>
                 <span className="text-sm font-medium break-all overflow-wrap w-[130px] text-left">{projectName}</span>
               </div>
-              <ChevronDown className="h-4 w-4"/>           
+              {canCreateTeam && <ChevronDown className="h-4 w-4"/>}           
             </button>
             <div className={cn(
               "absolute left-0 right-0 mt-1 py-1 bg-popover border border-border rounded-md shadow-lg z-10",
@@ -438,16 +454,18 @@ export default function ProjectSidebar({ projectId }) {
             </DragDropContext>
           </nav>
 
-          {/* 创建团队按钮 */}
-          <button 
-            onClick={() => {
-              setDialogOpen(true);
-            }} 
-            className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors"
-          >
-            <Plus size={16} className="text-muted-foreground" />
-            <span className="ml-2 text-sm">{t('new_team')}</span>
-          </button>
+          {/* 创建团队按钮 - 仅当当前用户是项目创建者时显示 */}
+          {canCreateTeam && (
+            <button 
+              onClick={() => {
+                setDialogOpen(true);
+              }} 
+              className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors"
+            >
+              <Plus size={16} className="text-muted-foreground" />
+              <span className="ml-2 text-sm">{t('new_team')}</span>
+            </button>
+          )}
         </div>
 
         <CreateTeamDialog 
