@@ -337,6 +337,7 @@ export function ChatProvider({ children }) {
           type,
           name,
           team_id,
+          created_by,
           created_at,
           updated_at,
           participants:chat_participant(
@@ -512,7 +513,15 @@ export function ChatProvider({ children }) {
     const sessionsWithMessages = sessionsData.map(item => {
       const lastMessage = lastMessagesBySession[item.chat_session.id];
       const otherParticipants = item.chat_session.participants
-        .map(p => processAvatarUrl(p.user))
+        .map(p => {
+          const processedUser = processAvatarUrl(p.user);
+          // Add a unique session-specific identifier to each participant
+          return {
+            ...processedUser,
+            // Create a unique ID for this user in this specific session
+            sessionUserId: `${item.chat_session.id}_${processedUser.id}`
+          };
+        })
         .filter(user => user.id !== authSession.id);
       
       const sessionId = item.chat_session.id;
@@ -521,6 +530,7 @@ export function ChatProvider({ children }) {
       
       return {
         ...item.chat_session,
+        created_by: item.chat_session.created_by, // Explicitly include created_by
         participants: otherParticipants,
         participantsCount: item.chat_session.participants.length,
         unreadCount,

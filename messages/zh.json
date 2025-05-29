@@ -853,16 +853,15 @@
     "undoRoleChange": "撤销角色更改",
     "noTeamMembers": "没有团队成员",
     "inviteMembers": "邀请成员",
-    "removeMember": "删除成员",
+    "removeMember": "移除成员",
     "checker": "检查者",
     "viewer": "查看者",
     "editor": "编辑者",
     "owner": "所有者",
-    "transferOwnerDescription": "转移团队的拥有权给其他成员。",
-    "editorDescription": "可以创建和编辑任务。不能管理项目设置",
-    "checkerDescription": "可以标记和评论任务。不能创建任务和项目。",
-    "viewerDescription": "只能评论和聊天。",
-    "membersViewDescription": "可以查看团队成员和他们的角色。只有团队所有者可以更改成员角色。",
+    "transferOwnerDescription": "转移团队的拥有权给另一个成员。",
+    "editorDescription": "项目成员只能创建、编辑和删除任务。",
+    "viewerDescription": "项目成员只能查看任务。",
+    "membersViewDescription": "可以查看团队成员及其角色。只有团队所有者可以更改成员角色。",
     "accessViewDescription": "可以查看团队访问设置。只有团队所有者可以更改访问设置。",
     "me": "我",
     "mustHaveOwner": "必须有所有者",
@@ -1073,7 +1072,14 @@
       "hoursAgo": "{hours} 小时前",
       "daysAgo": "{days} 天前"
     },
-    "groupChat": "群聊"
+    "groupChat": "群聊",
+    "clickToEditName": "点击编辑群组名称",
+    "chatNameUpdated": "群聊名称已更新",
+    "cannotEditPrivateChatName": "无法编辑私聊名称",
+    "errors": {
+      "nameCannotBeEmpty": "群组名称不能为空",
+      "updateFailed": "更新群组名称失败"
+    }
   },
   "Invitation": {
     "inviteToTeam": "邀请加入",

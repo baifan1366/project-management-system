@@ -481,6 +481,8 @@ export default function ChatPage() {
   const [message, setMessage] = useState('');
   const { confirm } = useConfirm();
   const [isEditing, setIsEditing] = useState(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
   const { 
     currentSession, 
     messages, 
@@ -971,7 +973,7 @@ export default function ChatPage() {
   
   // Optimize messages display
   const renderedMessages = useMemo(() => {
-    // Using message ID to create a unique list
+    // Using message ID to create a unique list with additional index to ensure uniqueness
     const uniqueMessages = [];
     const messageIds = new Set();
     
@@ -982,12 +984,12 @@ export default function ChatPage() {
       }
     }
     
-    return uniqueMessages.map((msg) => {    
+    return uniqueMessages.map((msg, index) => {    
       const isMe = msg.user_id === currentUser?.id;
       
       return (
         <MemoizedMessage
-          key={msg.id}
+          key={`${msg.id}-${index}-${new Date(msg.created_at || 0).getTime()}`}
           msg={msg}
           isMe={isMe}
           currentUser={currentUser}
@@ -1062,6 +1064,99 @@ export default function ChatPage() {
     }
   }, [message, textareaRef.current]);
 
+  // Add function to update the chat session name
+  const updateChatName = async (newName) => {
+    if (!currentSession || !currentUser) return;
+    
+    // Only allow editing for group chats or if the user is the creator
+    if (currentSession.type !== 'GROUP') {
+      toast.error(t('cannotEditPrivateChatName'));
+      return;
+    }
+    
+    // Add debug logging
+    console.log('Updating chat name, created_by:', currentSession.created_by);
+    
+    try {
+      const { error } = await supabase
+        .from('chat_session')
+        .update({ name: newName })
+        .eq('id', currentSession.id);
+      
+      if (error) {
+        console.error('Error updating chat name:', error);
+        toast.error(t('errors.updateFailed'));
+        return;
+      }
+      
+      // Update local session data
+      setCurrentSession({
+        ...currentSession,
+        name: newName
+      });
+      
+      // Refetch chat sessions to update the sidebar
+      fetchChatSessions();
+      
+      toast.success(t('chatNameUpdated'));
+    } catch (error) {
+      console.error('Error updating chat name:', error);
+      toast.error(t('errors.updateFailed'));
+    }
+  };
+  
+  // Handle starting name edit
+  const handleStartEditName = () => {
+    // Only allow editing group chats
+    if (currentSession?.type !== 'GROUP') return;
+    
+    // Debug logging
+    console.log('Current session:', currentSession);
+    console.log('Chat owner ID:', currentSession.created_by);
+    console.log('Current user ID:', currentUser?.id);
+    
+    // Check permission:
+    // 1. If created_by is missing (older chats), allow editing for backward compatibility
+    // 2. If created_by exists, only allow the creator to edit
+    if (currentSession.created_by && currentSession.created_by !== currentUser?.id) {
+      toast.error(t('errors.onlyOwnerCanEditName') || 'Only the group owner can edit the group name');
+      return;
+    }
+    
+    setEditedName(currentSession.name || '');
+    setIsEditingName(true);
+  };
+  
+  // Handle saving name edit
+  const handleSaveNameEdit = () => {
+    if (!editedName.trim()) {
+      toast.error(t('errors.nameCannotBeEmpty'));
+      return;
+    }
+    
+    const trimmedName = editedName.trim();
+    
+    // Only update if the name has actually changed
+    if (trimmedName === currentSession.name) {
+      console.log('Name unchanged, skipping update');
+      setIsEditingName(false);
+      return;
+    }
+    
+    updateChatName(trimmedName);
+    setIsEditingName(false);
+  };
+  
+  // Handle escape key when editing name
+  const handleNameEditKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveNameEdit();
+    } else if (e.key === 'Escape') {
+      setIsEditingName(false);
+    }
+  };
+
   if (!currentSession && chatMode === 'normal') {
     return (
       <div className="flex flex-col h-screen items-center justify-center text-muted-foreground">
@@ -1094,7 +1189,16 @@ export default function ChatPage() {
   if (currentSession?.type === 'PRIVATE') {
     sessionEmail = otherParticipant?.email || t('newContact');
   } else {
-    sessionEmail = `${currentSession?.participantsCount || 0} ${t('members')}`;
+    // For group chats, always calculate total participants from the complete participants array
+    // Always add 1 for the current user since participants array only includes other users
+    let participantsCount = 1; // Start with 1 for current user
+    
+    if (currentSession?.participants) {
+      // Add all participants from the array (these are other users)
+      participantsCount += currentSession.participants.length;
+    }
+    
+    sessionEmail = `${participantsCount} ${t('members')}`;
   }
 
   // In the rendered content, use a virtualized list for large message counts
@@ -1123,9 +1227,42 @@ export default function ChatPage() {
                   )}
                 </div>
                 <div>
-                  <h2 className="text-base font-medium">
-                    {sessionName || t('unknownChat')}
-                  </h2>
+                  {currentSession?.type === 'GROUP' ? (
+                    isEditingName ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={editedName}
+                          onChange={(e) => setEditedName(e.target.value)}
+                          onKeyDown={handleNameEditKeyDown}
+                          onBlur={handleSaveNameEdit}
+                          autoFocus
+                          className="text-base font-medium bg-accent/50 px-2 py-1 rounded border border-input focus:border-primary focus:outline-none"
+                        />
+                      </div>
+                    ) : (
+                      <h2 
+                        className={`text-base font-medium leading-none${
+                          // If created_by is missing, assume current user can edit (legacy behavior)
+                          !currentSession.created_by || currentSession.created_by === currentUser?.id 
+                            ? "cursor-pointer hover:underline" 
+                            : ""
+                        }`}
+                        onClick={handleStartEditName}
+                        title={
+                          !currentSession.created_by || currentSession.created_by === currentUser?.id 
+                            ? t('clickToEditName') 
+                            : null
+                        }
+                      >
+                        {sessionName || t('unknownChat')}
+                      </h2>
+                    )
+                  ) : (
+                    <h2 className="text-base font-medium">
+                      {sessionName || t('unknownChat')}
+                    </h2>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {sessionEmail}
                   </p>

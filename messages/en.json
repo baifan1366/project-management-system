@@ -1080,7 +1080,14 @@
     "groupChat": "Group Chat",
     "edit": "Edit",
     "save": "Save",
-    "messageUpdated": "Message updated successfully"
+    "messageUpdated": "Message updated successfully",
+    "clickToEditName": "Click to edit group name",
+    "chatNameUpdated": "Group chat name updated",
+    "cannotEditPrivateChatName": "You can't edit private chat names",
+    "errors": {
+      "nameCannotBeEmpty": "Group name cannot be empty",
+      "updateFailed": "Failed to update group name"
+    }
   },
   "Invitation": {
     "inviteToTeam": "Invite to",

@@ -128,6 +128,20 @@ export default function InviteUserPopover({ sessionId, onInvite }) {
         console.error('Error refreshing session data:', sessionError);
       }
 
+      // 处理会话数据，确保包含正确的参与者数量
+      if (sessionData) {
+        // 保存原始的参与者列表
+        const allParticipants = sessionData.participants || [];
+        
+        // 过滤出其他参与者（非当前用户）
+        sessionData.participants = allParticipants
+          .filter(p => p.user.id !== user?.id)
+          .map(p => p.user);
+          
+        // 设置参与者总数量
+        sessionData.participantsCount = allParticipants.length;
+      }
+
       // 更新toast为成功状态
       toast.success(t('invitationSent'), { id: toastId });
 
