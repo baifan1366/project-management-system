@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import useGetUser from '@/lib/hooks/useGetUser';
 
 /**
@@ -145,10 +145,29 @@ export function useUserTimezone() {
    * @param {Date|string} dateInput - Date object or date string
    * @returns {Date} Adjusted date object
    */
-  const adjustTimeByOffset = (dateInput) => {
-    if (!dateInput) return new Date();
+  const adjustTimeByOffset = useCallback((dateInput) => {
+    // 添加输入值的调试日志
+    console.log("adjustTimeByOffset 输入:", dateInput);
     
-    const date = new Date(dateInput);
+    if (!dateInput) {
+      console.log("adjustTimeByOffset: 输入为空，返回当前日期");
+      return new Date();
+    }
+    
+    let date;
+    try {
+      // 确保创建有效的日期对象
+      date = new Date(dateInput);
+      
+      // 验证日期是否有效
+      if (isNaN(date.getTime())) {
+        console.error("无效的日期输入:", dateInput);
+        return new Date();
+      }
+    } catch (error) {
+      console.error("创建日期对象失败:", error, dateInput);
+      return new Date();
+    }
     
     // If no UTC offset specified, use UTC+8 as default for displaying to users
     // This ensures users in UTC+8 timezone see correct times even without profile settings
@@ -157,6 +176,7 @@ export function useUserTimezone() {
     try {
       // Get hour offset from UTC timezone string
       const offsetHours = getHourOffset(userUtcOffset);
+      console.log("时区偏移小时数:", offsetHours);
       
       // Create new UTC date
       const utcDate = new Date(date.toUTCString());
@@ -164,18 +184,20 @@ export function useUserTimezone() {
       // Adjust hours based on offset
       utcDate.setUTCHours(utcDate.getUTCHours() + offsetHours);
       
+      console.log("调整后的日期:", utcDate);
       return utcDate;
     } catch (error) {
       console.error('Time adjustment error:', error);
       // If error occurs, apply UTC+8 offset directly as fallback
       const fallbackDate = new Date(date.toUTCString());
       fallbackDate.setUTCHours(fallbackDate.getUTCHours() + 8);
+      console.log("使用回退方案的日期:", fallbackDate);
       return fallbackDate;
     }
-  };
+  }, [utcOffset]);
   
   // Format time to user timezone's local time string
-  const formatToUserTimezone = (timestamp, options = {}) => {
+  const formatToUserTimezone = useCallback((timestamp, options = {}) => {
     if (!timestamp) return '';
     
     try {
@@ -195,10 +217,10 @@ export function useUserTimezone() {
       console.error('Format time error:', error);
       return new Date(timestamp).toLocaleTimeString();
     }
-  };
+  }, [adjustTimeByOffset, hourFormat]);
   
   // Format full date and time
-  const formatDateToUserTimezone = (timestamp, options = {}) => {
+  const formatDateToUserTimezone = useCallback((timestamp, options = {}) => {
     if (!timestamp) return '';
     
     try {
@@ -221,7 +243,7 @@ export function useUserTimezone() {
       console.error('Format date-time error:', error);
       return new Date(timestamp).toLocaleString();
     }
-  };
+  }, [adjustTimeByOffset, hourFormat]);
 
   return {
     userTimezone,

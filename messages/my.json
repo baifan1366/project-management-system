@@ -39,7 +39,8 @@
     "success": "Berjaya",
     "warning": "Amaran",
     "confirm": "Sahkan",
-    "actions": "Tindakan"
+    "actions": "Tindakan",
+    "clearFilters": "Kosongkan penapis"
   },
   "profile": {
     "title": "Tetapan Profil",

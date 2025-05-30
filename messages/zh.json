@@ -55,6 +55,7 @@
     "type": "类型",
     "status": "状态",
     "filters": "过滤器",
+    "clearFilters": "清除过滤器",
     "settings": "设置",
     "createProject": "创建项目",
     "retry": "重试",

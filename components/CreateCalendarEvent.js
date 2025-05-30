@@ -67,6 +67,7 @@ export default function CreateCalendarEvent({
     reminders: false,
     addGoogleMeet: false, // 是否添加Google Meet视频会议
     inviteParticipants: false, // 是否邀请参与者
+    priority: 'MEDIUM',
   });
 
   // 添加日期时间验证状态
@@ -125,6 +126,7 @@ export default function CreateCalendarEvent({
         reminders: eventToEdit.reminders || false,
         addGoogleMeet: eventToEdit.addGoogleMeet || false,
         inviteParticipants: eventToEdit.attendees?.length > 0 || false,
+        priority: eventToEdit.priority || 'MEDIUM',
       });
     }
   }, [isEditing, eventToEdit, selectedDate]);
@@ -426,44 +428,46 @@ export default function CreateCalendarEvent({
               // 更新现有任务
               console.log('Updating existing task with ID:', eventToEdit.id);
               
-              // 准备任务的开始和结束时间
-              const startDateTime = formData.isAllDay 
-                ? `${format(formData.startDate, 'yyyy-MM-dd')}T00:00:00`
-                : `${format(formData.startDate, 'yyyy-MM-dd')}T${startTimeStr}:00`;
-              
-              const endDateTime = formData.isAllDay
-                ? `${format(formData.endDate, 'yyyy-MM-dd')}T23:59:59`
-                : `${format(formData.endDate, 'yyyy-MM-dd')}T${endTimeStr}:00`;
-              
-              const { data, error } = await supabase.from('mytasks').update({
+              // 准备任务数据
+              const taskData = {
                 title: formData.title,
                 description: formData.description || '',
-                expected_start_time: startDateTime,  // 添加开始时间
-                expected_completion_date: endDateTime  // 使用结束时间作为完成日期
-              })
-              .eq('id', eventToEdit.id)
-              .select();
+                expected_start_time: startDateTime,
+                expected_completion_date: endDateTime,
+                priority: formData.priority || 'MEDIUM',
+                updated_at: new Date().toISOString()
+              };
+              
+              const { data, error } = await supabase.from('mytasks')
+                .update(taskData)
+                .eq('id', eventToEdit.id)
+                .select();
               
               if (error) {
                 console.error('Error updating task:', error);
-                throw new Error(error.message || 'Failed to update task');
+                throw new Error(error.message || t('updateTaskFailed') || 'Failed to update task');
               }
               
               console.log('Task successfully updated:', data);
             } else {
               // 创建新任务
-              const { data, error } = await supabase.from('mytasks').insert({
+              const taskData = {
                 user_id: userId,
                 title: formData.title,
                 description: formData.description || '',
                 status: 'TODO',
-                expected_start_time: startDateTime,  // 添加开始时间
-                expected_completion_date: endDateTime  // 使用结束时间作为完成日期
-              }).select();
+                priority: formData.priority || 'MEDIUM',
+                expected_start_time: startDateTime,
+                expected_completion_date: endDateTime
+              };
+              
+              const { data, error } = await supabase.from('mytasks')
+                .insert(taskData)
+                .select();
               
               if (error) {
                 console.error('Error details:', error);
-                throw new Error(error.message || 'Failed to create mytask');
+                throw new Error(error.message || t('createTaskFailed') || 'Failed to create task');
               }
               
               console.log('Task successfully added to mytasks:', data);
@@ -720,6 +724,7 @@ export default function CreateCalendarEvent({
         reminders: false,
         addGoogleMeet: false,
         inviteParticipants: false,
+        priority: 'MEDIUM',
       });
       
       setSelectedUsers([]);
@@ -779,6 +784,7 @@ export default function CreateCalendarEvent({
         reminders: false,
         addGoogleMeet: false,
         inviteParticipants: false,
+        priority: 'MEDIUM',
       });
       setSelectedUsers([]);
       setFormErrors({
@@ -930,6 +936,27 @@ export default function CreateCalendarEvent({
               </div>
             )}
           </div>
+          
+          {/* Priority selector for tasks */}
+          {eventType === 'task' && (
+            <div className="space-y-2">
+              <Label htmlFor="priority">{t('priority')}</Label>
+              <Select 
+                value={formData.priority} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('selectPriority')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">{t('lowPriority')}</SelectItem>
+                  <SelectItem value="MEDIUM">{t('mediumPriority')}</SelectItem>
+                  <SelectItem value="HIGH">{t('highPriority')}</SelectItem>
+                  <SelectItem value="URGENT">{t('urgentPriority')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           {(eventType === 'google' || eventType === 'personal') && (
             <div className="space-y-2">
@@ -1091,6 +1118,7 @@ export default function CreateCalendarEvent({
               reminders: false,
               addGoogleMeet: false,
               inviteParticipants: false,
+              priority: 'MEDIUM',
             });
             setSelectedUsers([]);
             setFormErrors({
