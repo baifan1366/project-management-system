@@ -1028,7 +1028,8 @@
       "unhideFailed": "Failed to unhide chat",
       "updateFailed": "Failed to update message",
       "emptyMessage": "Message cannot be empty",
-      "messageTooLong": "Message too long (max 1000 characters)"
+      "messageTooLong": "Message too long (max 1000 characters)",
+      "nameCannotBeEmpty": "Group name cannot be empty"
     },
     "searchChat": "Search Chat",
     "searchChatDescription": "Search for messages, media, files, and links in this conversation",
@@ -1083,11 +1084,7 @@
     "messageUpdated": "Message updated successfully",
     "clickToEditName": "Click to edit group name",
     "chatNameUpdated": "Group chat name updated",
-    "cannotEditPrivateChatName": "You can't edit private chat names",
-    "errors": {
-      "nameCannotBeEmpty": "Group name cannot be empty",
-      "updateFailed": "Failed to update group name"
-    }
+    "cannotEditPrivateChatName": "You can't edit private chat names"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
@@ -1360,7 +1357,22 @@
     "noTitle": "No Title",
     "noEventsForThisDay": "No events for this day",
     "tasks": "Tasks",
-    "getTasksFailed": "Failed to get tasks"
+    "getTasksFailed": "Failed to get tasks",
+    "updateEventFailed": "Failed to update event time",
+    "cannotSelectPastDate": "Cannot select a date in the past",
+    "cannotSelectPastTime": "Cannot select a time in the past",
+    "cannotCreatePastEvents": "Cannot create events in the past",
+    "eventTimeUpdated": "Event time updated",
+    "dragToReposition": "Drag to reposition",
+    "endTimeCannotBeBeforeStart": "End time cannot be before start time",
+    "personalEventCreated": "Personal event created successfully",
+    "personalEventUpdated": "Personal event updated successfully",
+    "attendees": "attendees",
+    "tokenRefreshFailed": "Failed to refresh your Google authorization",
+    "tokenRefreshError": "Error refreshing your Google authorization",
+    "missingUserId": "User ID not found. Please try signing in again.",
+    "pastEvent": "events in the past",
+    "schedule": "Schedule"
   },
   "CreateTag": {
     "createTag": "Create New Field",

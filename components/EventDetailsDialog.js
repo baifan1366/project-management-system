@@ -19,6 +19,32 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
   
   if (!event) return null;
 
+  // Check if event is in the past
+  const isEventInPast = () => {
+    try {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0); // Set to start of day
+      
+      let eventEndDate;
+      if (eventType === 'google') {
+        const endDateString = event.end?.dateTime || event.end?.date;
+        eventEndDate = endDateString ? parseISO(endDateString) : null;
+      } else if (eventType === 'personal') {
+        eventEndDate = event.end_time ? parseISO(event.end_time) : null;
+      } else if (eventType === 'task') {
+        const dueDate = event.due_date || event.expected_completion_date;
+        eventEndDate = dueDate ? parseISO(dueDate) : null;
+      }
+      
+      return eventEndDate && eventEndDate < now;
+    } catch (error) {
+      console.error('Error checking if event is in past:', error);
+      return false;
+    }
+  };
+  
+  const isPastEvent = isEventInPast();
+
   // Format event date/time based on event type
   const formatEventTime = () => {
     try {
@@ -26,6 +52,9 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
       if (eventType === 'google') {
         const start = event.start?.dateTime || event.start?.date;
         const end = event.end?.dateTime || event.end?.date;
+        
+        if (!start) return t('invalidDate');
+        
         const isAllDay = !event.start?.dateTime;
         
         if (isAllDay) {
@@ -34,11 +63,14 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
           } (${t('allDay')})`;
         }
         
-        return `${format(parseISO(start), 'PPp')} - ${format(parseISO(end), 'PPp')}`;
+        return `${format(parseISO(start), 'PPp')}${end ? ` - ${format(parseISO(end), 'PPp')}` : ''}`;
       }
       else if (eventType === 'personal') {
         const start = event.start_time;
         const end = event.end_time;
+        
+        if (!start) return t('invalidDate');
+        
         const isAllDay = event.is_all_day;
         
         if (isAllDay) {
@@ -47,7 +79,7 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
           } (${t('allDay')})`;
         }
         
-        return `${format(parseISO(start), 'PPp')} - ${format(parseISO(end), 'PPp')}`;
+        return `${format(parseISO(start), 'PPp')}${end ? ` - ${format(parseISO(end), 'PPp')}` : ''}`;
       }
       else if (eventType === 'task') {
         const dueDate = event.due_date || event.expected_completion_date;
@@ -59,7 +91,7 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
       return t('invalidDate');
     }
     
-    return '';
+    return t('invalidDate');
   };
 
   // Get event title based on event type
@@ -107,6 +139,13 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
 
   // Handle delete event
   const handleDeleteEvent = async () => {
+    // Check if event is in the past
+    if (isPastEvent) {
+      toast.error(t('cannotModifyPastEvents') || "Cannot modify events in the past");
+      setConfirmDeleteOpen(false);
+      return;
+    }
+    
     try {
       setIsDeleting(true);
       setConfirmDeleteOpen(false);
@@ -181,17 +220,33 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
 
   // Handle edit event
   const handleEditEvent = () => {
-    if (eventType === 'google') {
-      setIsEditing(true);
-      // Handle Google Calendar event editing via CreateCalendarEvent component
-      if (onEdit) {
+    // Check if event is in the past
+    if (isPastEvent) {
+      toast.error(t('cannotModifyPastEvents') || "Cannot modify events in the past");
+      return;
+    }
+    
+    // Prepare event with safely parsed dates for editing
+    try {
+      let eventForEdit = {...event};
+      
+      if (eventType === 'google') {
+        // Handle Google Calendar event editing
+        const startDateTime = event.start?.dateTime || event.start?.date;
+        const endDateTime = event.end?.dateTime || event.end?.date;
+        
+        if (onEdit) {
+          setIsOpen(false);
+          onEdit(event, eventType);
+        }
+      } else if (eventType === 'personal' || eventType === 'task') {
+        // For other event types
         setIsOpen(false);
-        onEdit(event, eventType);
+        if (onEdit) onEdit(event, eventType);
       }
-    } else {
-      // For other event types
-      setIsOpen(false);
-      if (onEdit) onEdit(event, eventType);
+    } catch (error) {
+      console.error("Error preparing event for editing:", error);
+      toast.error(t('editError') || "Error preparing event for editing");
     }
   };
 
@@ -237,6 +292,7 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
               <DialogDescription className="text-xs uppercase tracking-wider font-medium text-muted-foreground">
                 {eventType === 'google' ? t('googleCalendar') : 
                   eventType === 'personal' ? t('personalCalendar') : t('task')}
+                {isPastEvent && <span className="ml-2 text-amber-500">({t('pastEvent') || 'Past Event'})</span>}
               </DialogDescription>
             )}
           </DialogHeader>
@@ -332,7 +388,7 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
               variant="destructive" 
               size="sm"
               onClick={showDeleteConfirmation}
-              disabled={isDeleting}
+              disabled={isDeleting || isPastEvent}
               className="gap-1"
             >
               <Trash2 className="h-4 w-4" />
@@ -344,6 +400,7 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
               variant="outline" 
               size="sm"
               onClick={handleEditEvent}
+              disabled={isPastEvent}
               className="gap-1"
             >
               <Edit className="h-4 w-4" />

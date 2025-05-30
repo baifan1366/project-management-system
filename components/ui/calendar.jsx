@@ -10,6 +10,7 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  isdndDisabled = false,
   ...props
 }) {
   return (
