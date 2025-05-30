@@ -26,7 +26,7 @@
     "calendar": "Calendar",
     "chat": "Chat",
     "taskAssistant": "Task Assistant",
-    "aiWorkFlow": "Ai WorkFlow"
+    "aiWorkFlow": "AI Workflow"
   },
   "common": {
     "processing": "Processing...",
@@ -260,6 +260,9 @@
     }
   },
   "Projects": {
+    "projectNotPublic": "Project not public",
+    "ok": "OK",
+    "projectNotPublicDescription": "Only public projects can be shared with teams. Please modify the visibility of the project in the project settings.",
     "projectNameTooShort": "Project name must be at least 3 characters long",
     "errorSavingProject": "Error saving project",
     "projectNameTooLong": "Project name must be less than 50 characters long",
@@ -1871,6 +1874,15 @@
     "sendEmail": "Send Email"
   },
   "TeamOverview": {
+    "titleLengthError": "Title must be between 2 and 50 characters",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "viewOnly": "View Only",
+    "placeholder": "Enter announcement content...",
+    "loading": "Loading...",
+    "error": "Error",
+    "pin": "Pin",
+    "noAnnouncements": "No Announcements",
     "teamDescription": "Team Description",
     "description": "What's the team about?",
     "membersRole": "Members Role",
@@ -1897,7 +1909,19 @@
     "editor": "Editor",
     "checker": "Checker",
     "viewer": "Viewer",
-    "teamDescriptionUpdated": "Team description updated"
+    "teamDescriptionUpdated": "Team description updated",
+    "teamDescriptionEdit": "You can edit the team description using the following tools:",
+    "teamDescriptionEditOnlyOwner": "Only team owner can edit this content, other members can only view it.",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "heading": "Heading 1 and 2",
+    "paragraph": "Paragraph",
+    "codeBlock": "Code Block",
+    "highlight": "Highlight",
+    "quoteBlock": "Quote Block",
+    "bulletList": "Bullet List",
+    "orderedList": "Ordered List"
   },
   "confirmation": {
     "confirm": "Confirm",
@@ -2009,6 +2033,8 @@
     "accessSettingsPlaceholder": "Select access level",
     "editTeam": "Team Management",
     "enterTeamName": "Enter team name",
+    "teamNameMin2": "Team name must be at least 2 characters",
+    "teamNameMax50": "Team name cannot exceed 50 characters",
     "enterTeamDescription": "Enter team description",
     "teamAccessPlaceholder": "Select access level",
     "inviteOnly": "Invite only",

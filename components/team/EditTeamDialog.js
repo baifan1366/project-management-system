@@ -488,11 +488,24 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                   <Input 
                     id="teamName" 
                     value={teamName} 
-                    onChange={(e) => setTeamName(e.target.value)} 
+                    onChange={(e) => {
+                      if (e.target.value.length <= 50) setTeamName(e.target.value);
+                    }} 
                     placeholder={t('enterTeamName')}
                     readOnly={!isCurrentUserOwner()}
                     disabled={!isCurrentUserOwner()}
+                    maxLength={50}
                   />
+                  <div className="flex items-center justify-between mt-1">
+                    {(teamName.length > 0 && teamName.length < 2) && (
+                      <span className="text-xs text-red-500">{t('teamNameMin2')}</span>
+                    )}
+                    {teamName.length > 50 && (
+                      <span className="text-xs text-red-500">{t('teamNameMax50')}</span>
+                    )}
+                    <span className="text-xs text-red-500"></span>
+                    <span className={`justify-end text-xs ${teamName.length < 2 || teamName.length > 50 ? 'text-red-500' : 'text-gray-400'}`}>{teamName.length}/50</span>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
