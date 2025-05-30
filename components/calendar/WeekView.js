@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { format, addDays, startOfWeek, endOfWeek, eachHourOfInterval, isSameDay, parseISO, addHours, isBefore, isAfter, isSameHour } from 'date-fns';
+import { format, addDays, startOfWeek, endOfWeek, eachHourOfInterval, isSameDay, parseISO, addHours, isBefore, isAfter, isSameHour, setHours, setMinutes, addMinutes, differenceInMinutes, differenceInDays, set } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Video, ExternalLink, UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,6 +21,8 @@ export default function WeekView({
   personalEvents = [],
   tasks = [],
   googleCalendarColors,
+  handleEventClick,
+  onEventUpdate, // Keeping the prop for compatibility
 }) {
   // Calculate week start based on currentDate
   const weekStart = useMemo(() => startOfWeek(currentDate), [currentDate]);
@@ -67,7 +69,8 @@ export default function WeekView({
             location: event.location || '',
             description: event.description || '',
             hangoutLink: event.hangoutLink,
-            attendees: event.attendees || []
+            attendees: event.attendees || [],
+            originalEvent: event // Keep original event data for updates
           });
         } catch (err) {
           console.error('Failed to process Google event:', err, event);
@@ -98,6 +101,7 @@ export default function WeekView({
             allDay: event.all_day || false,
             location: event.location || '',
             description: event.description || '',
+            originalEvent: event // Keep original event data for updates
           });
         } catch (err) {
           console.error('Failed to process personal event:', err, event);
@@ -108,29 +112,52 @@ export default function WeekView({
     // Process tasks with due dates as events
     if (tasks && tasks.length) {
       tasks.forEach(task => {
-        if (task.due_date) {
-          try {
-            // Parse dates (tasks are all-day by default)
-            const taskDate = parseISO(task.due_date);
-            
-            // Skip if task is outside current week view
-            if (isAfter(taskDate, weekEnd) || isBefore(taskDate, weekStart)) {
-              return;
-            }
-            
-            events.push({
-              id: `task-${task.id}`,
-              title: task.title,
-              start: taskDate,
-              end: addHours(taskDate, 1), // Make it 1 hour duration
-              color: '#FF9800', // Orange
-              type: 'task',
-              allDay: true
-            });
-          } catch (err) {
-            console.error('Failed to process task:', err, task);
-          }
+        // 跳过没有日期的任务
+        if (!task.due_date && !task.expected_completion_date) return null;
+        
+        // 确定日期（优先使用due_date，然后是expected_completion_date）
+        const taskDate = task.due_date || task.expected_completion_date;
+        const taskDay = parseISO(taskDate);
+        
+        // 确定任务的开始时间（优先使用expected_start_time，否则使用当天开始时间）
+        const startTime = task.expected_start_time 
+          ? parseISO(task.expected_start_time)
+          : set(taskDay, { hours: 0, minutes: 0, seconds: 0 });
+        
+        // 确定任务的结束时间（使用due_date或expected_completion_date）
+        const endTime = parseISO(taskDate);
+        
+        // 如果不是当前显示的周，则跳过
+        if (taskDay < startOfWeek(currentDate) || taskDay > addDays(startOfWeek(currentDate), 6)) {
+          return null;
         }
+        
+        // 获取任务在周中的位置
+        const taskDayIndex = differenceInDays(taskDay, startOfWeek(currentDate));
+        
+        if (taskDayIndex < 0 || taskDayIndex > 6) return null;
+        
+        // 任务的ID
+        const taskId = `task-${task.my_task_id || task.id}`;
+        
+        // 原始事件数据
+        const originalEvent = {
+          ...task,
+          id: taskId,
+          type: 'task'
+        };
+        
+        events.push({
+          id: taskId,
+          title: task.title || t('noTitle'),
+          start: startTime,
+          end: endTime,
+          color: '#3b82f6', // Blue
+          type: 'task',
+          allDay: false,
+          originalEvent: originalEvent,
+          uniqueId: taskId
+        });
       });
     }
     
@@ -162,7 +189,9 @@ export default function WeekView({
             days[index].push({
               ...event,
               dayStart: new Date(dayStart),
-              dayEnd: new Date(dayEnd)
+              dayEnd: new Date(dayEnd),
+              dayIndex: index,
+              uniqueId: `${event.type}-${event.id}-day${index}` // Keep ID format for consistency
             });
           }
         });
@@ -235,7 +264,14 @@ export default function WeekView({
   }, [eventsByDay]);
   
   // Handle event click
-  const handleEventClick = (event) => {
+  const onEventClick = (event) => {
+    // Call the parent component's handler if provided
+    if (handleEventClick) {
+      handleEventClick(event, event.type);
+      return;
+    }
+    
+    // Fallback to old behavior if no handler is provided
     // For Google Meet events, open the hangout link
     if (event.type === 'google' && event.hangoutLink) {
       window.open(event.hangoutLink, '_blank');
@@ -298,7 +334,7 @@ export default function WeekView({
           
           return (
             <div
-              key={`${event.type}-${event.id}`}
+              key={event.uniqueId}
               className={cn(
                 "absolute rounded-md border left-0 p-1 text-xs overflow-hidden cursor-pointer transition-opacity hover:opacity-90",
                 event.type === 'google' ? "border-green-300 dark:border-green-700" : "border-purple-300 dark:border-purple-700",
@@ -312,7 +348,7 @@ export default function WeekView({
                 backgroundColor: `${event.color}20`,
                 borderLeft: `3px solid ${event.color}`
               }}
-              onClick={() => handleEventClick(event)}
+              onClick={() => onEventClick(event)}
             >
               <div className="flex flex-col h-full">
                 <div className="font-medium leading-tight truncate flex items-center">
@@ -372,7 +408,7 @@ export default function WeekView({
                   backgroundColor: `${event.color}20`,
                   borderLeft: `2px solid ${event.color}`
                 }}
-                onClick={() => handleEventClick(event)}
+                onClick={() => onEventClick(event)}
               >
                 {event.title}
               </div>

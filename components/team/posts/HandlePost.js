@@ -13,7 +13,7 @@ export default function HandlePost({ teamId }) {
   const user = useSelector(state => state.users.currentUser);
 
   // 创建新帖子
-  const CreatePost = useCallback(async ({ title, description, teamId }) => {
+  const CreatePost = useCallback(async ({ title, description, type, teamId }) => {
     try {
       if (!user?.id) {
         toast.error('用户未认证');
@@ -24,7 +24,9 @@ export default function HandlePost({ teamId }) {
         title,
         description,
         team_id: teamId,
+        type: type, // 包含帖子类型
         created_by: user.id,
+        created_at: new Date().toISOString(), // 添加创建时间
         is_pinned: false,
         reactions: {},
         comment_id: [], // 使用新的comment_id字段

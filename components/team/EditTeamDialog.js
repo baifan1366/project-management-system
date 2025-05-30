@@ -360,8 +360,8 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                 {currentRole === 'OWNER' ? t('owner') : 
                  currentRole === 'CAN_VIEW' ? t('viewer') :
                  currentRole === 'CAN_EDIT' ? t('editor') :
-                 currentRole === 'CAN_CHECK' ? t('checker') : ''}
-                {currentRole === 'OWNER' && " (" + t('me') + ")"}
+                 currentRole === 'OWNER' && " (" + t('me') + ")"
+                }
               </span>
             ) : (
               /* 其他所有成员，所有者可以编辑 */
@@ -372,17 +372,15 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                     onValueChange={(value) => handlePendingRoleChange(teamUser.user.id, value)}
                     disabled={status === 'loading' || saving}
                   >
-                    <SelectTrigger className="w-[170px] h-8 border-border focus:ring-0 focus:ring-offset-0">
+                    <SelectTrigger className="w-[130px] h-8 border-border focus:ring-0 focus:ring-offset-0">
                       <SelectValue>
                         {currentRole && (
                           <div className="flex items-center">
                             {currentRole === 'CAN_VIEW' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
                             {currentRole === 'CAN_EDIT' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
-                            {currentRole === 'CAN_CHECK' && <CheckCircle className="w-4 h-4 mr-2 text-gray-500" />}
                             <span className="truncate">
                               {currentRole === 'CAN_VIEW' && t('viewer')}
                               {currentRole === 'CAN_EDIT' && t('editor')}
-                              {currentRole === 'CAN_CHECK' && t('checker')}
                             </span>
                           </div>
                         )}
@@ -396,17 +394,6 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                             <div className="font-medium">{t('editor')}</div>
                             <div className="text-xs text-gray-500 mt-0.5">
                               {t('editorDescription')}
-                            </div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="CAN_CHECK">
-                        <div className="flex items-center w-full">
-                          <CheckCircle className="w-5 h-5 mr-3 text-gray-500" />
-                          <div className="flex-1">
-                            <div className="font-medium">{t('checker')}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {t('checkerDescription')}
                             </div>
                           </div>
                         </div>
@@ -430,11 +417,9 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                   <span className="text-sm text-muted-foreground mr-2 flex items-center">
                     {currentRole === 'CAN_VIEW' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
                     {currentRole === 'CAN_EDIT' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
-                    {currentRole === 'CAN_CHECK' && <CheckCircle className="w-4 h-4 mr-2 text-gray-500" />}
                     {currentRole === 'OWNER' && <Lock className="w-4 h-4 mr-2 text-orange-500" />}
                     {currentRole === 'CAN_VIEW' && t('viewer')}
                     {currentRole === 'CAN_EDIT' && t('editor')}
-                    {currentRole === 'CAN_CHECK' && t('checker')}
                     {currentRole === 'OWNER' && t('owner')}
                   </span>
                 )}
@@ -503,12 +488,24 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                   <Input 
                     id="teamName" 
                     value={teamName} 
-                    onChange={(e) => setTeamName(e.target.value)} 
+                    onChange={(e) => {
+                      if (e.target.value.length <= 50) setTeamName(e.target.value);
+                    }} 
                     placeholder={t('enterTeamName')}
                     readOnly={!isCurrentUserOwner()}
                     disabled={!isCurrentUserOwner()}
-                    className={!isCurrentUserOwner() ? "opacity-70 cursor-not-allowed" : ""}
+                    maxLength={50}
                   />
+                  <div className="flex items-center justify-between mt-1">
+                    {(teamName.length > 0 && teamName.length < 2) && (
+                      <span className="text-xs text-red-500">{t('teamNameMin2')}</span>
+                    )}
+                    {teamName.length > 50 && (
+                      <span className="text-xs text-red-500">{t('teamNameMax50')}</span>
+                    )}
+                    <span className="text-xs text-red-500"></span>
+                    <span className={`justify-end text-xs ${teamName.length < 2 || teamName.length > 50 ? 'text-red-500' : 'text-gray-400'}`}>{teamName.length}/50</span>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
@@ -521,7 +518,6 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                     rows={4}
                     readOnly={!isCurrentUserOwner()}
                     disabled={!isCurrentUserOwner()}
-                    className={!isCurrentUserOwner() ? "opacity-70 cursor-not-allowed" : ""}
                   />
                 </div>
               </div>
@@ -532,22 +528,6 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
               <div className="mt-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="teamMembers">{t('teamMembers')}</Label>
-                  {isCurrentUserOwner() && (
-                    <Button 
-                      variant={themeColor} 
-                      size="icon"
-                      onClick={
-                        () => {
-                          setShowInviteDialog(true);
-                          onClose();
-                        }
-                      }
-                      className="items-center"
-                    >
-                      <Plus size={16} />
-                      {/* {t('inviteMembers')} */}
-                    </Button>
-                  )}
                 </div>
                 <div className="text-sm text-muted-foreground mb-4">
                   {isCurrentUserOwner() 
@@ -586,12 +566,10 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                               <div className="flex items-center">
                                 {teamAccess === 'invite_only' && <Lock className="w-4 h-4 mr-2 text-gray-500" />}
                                 {teamAccess === 'can_edit' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
-                                {teamAccess === 'can_check' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
-                                {teamAccess === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500" />}
+                                {teamAccess === 'can_view' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
                                 <span>
                                   {teamAccess === 'invite_only' && t('inviteOnly')}
                                   {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName })}
-                                  {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName })}
                                   {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })}
                                 </span>
                               </div>
@@ -624,20 +602,9 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                             </div>
                           </div>
                         </SelectItem>
-                        <SelectItem value="can_check" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
-                          <div className="flex items-center w-full">
-                            <Eye className="w-5 h-5 mr-3 text-gray-500" />
-                            <div className="flex-1">
-                              <div className="font-medium">{t('everyoneAt{projectName}CanCheck', { projectName })}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">
-                                {t('everyoneCanCheckDescription')}
-                              </div>
-                            </div>
-                          </div>
-                        </SelectItem>
                         <SelectItem value="can_view" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
                           <div className="flex items-center w-full">
-                            <Unlock className="w-5 h-5 mr-3 text-gray-500" />
+                            <Eye className="w-5 h-5 mr-3 text-gray-500" />
                             <div className="flex-1">
                               <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName })}</div>
                               <div className="text-xs text-gray-500 mt-0.5">
@@ -653,12 +620,10 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                       <div className="flex items-center">
                         {teamAccess === 'invite_only' && <Lock className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
                         {teamAccess === 'can_edit' && <Pencil className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
-                        {teamAccess === 'can_check' && <Eye className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
-                        {teamAccess === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
+                        {teamAccess === 'can_view' && <Eye className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
                         <span>
                           {teamAccess === 'invite_only' && t('inviteOnly')}
                           {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName })}
-                          {teamAccess === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName })}
                           {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })}
                         </span>
                       </div>

@@ -404,10 +404,25 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     if (!content || typeof content !== 'string') {
       return <div className="rich-content w-full overflow-x-hidden break-all"></div>;
     }
+    
+    // 确保内容被正确解析为HTML
+    // 如果内容包含HTML标签但未被正确解析，可能需要解码实体
+    let htmlContent = content;
+    
+    // 对内容进行额外的处理，确保HTML实体被正确解码
+    try {
+      // 处理可能被编码的HTML实体
+      const textarea = document.createElement('textarea');
+      textarea.innerHTML = content;
+      htmlContent = textarea.value;
+    } catch (error) {
+      console.error('Error decoding HTML content:', error);
+    }
+    
     return (
       <div 
         className="rich-content w-full overflow-x-hidden break-all" 
-        dangerouslySetInnerHTML={{ __html: content }} 
+        dangerouslySetInnerHTML={{ __html: htmlContent }} 
       />
     );
   };
@@ -824,6 +839,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         id: editingPostId,
         title: trimmedTitle,
         description: editPostContent, // 始终使用富文本编辑器的内容
+        type: postType,
         team_id: teamId
       };
       
@@ -870,17 +886,17 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                 <div className="">
                   <div className="relative">
                     <Input
-                      id="edit-title"
+                      id="new-title"
                       autoFocus
                       placeholder={t('postTitlePlaceholder')}
-                      value={editPostTitle}
-                      onChange={(e) => setEditPostTitle(e.target.value)}
+                      value={newPostTitle}
+                      onChange={(e) => setNewPostTitle(e.target.value)}
                       className="text-lg border-border border shadow-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[#252423] dark:text-white w-full focus:border-gray-500 dark:focus:border-white pr-16"
                       maxLength={50}
                     />
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-[#605E5C] dark:text-[#C8C6C4]">
                       <span className="font-medium">
-                        {editPostTitle.trim().length}/50
+                        {newPostTitle.trim().length}/50
                       </span>
                     </div>
                   </div>
@@ -894,7 +910,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               variant="ghost"
               size="icon"
               className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-              onClick={cancelEditingPost}
+              onClick={() => handleDeletePost(post.id)}
             >
               <Trash2 className="h-4 w-4 text-red-500 hover:text-red-600" />
             </Button>
@@ -906,8 +922,8 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
             <div className="relative mb-6">
               <RichEditor
                 placeholder={t('postDescriptionPlaceholder')}
-                value={editPostContent}
-                onChange={setEditPostContent}
+                value={newPostContent}
+                onChange={setNewPostContent}
                 className="h-[150px] min-h-[150px] max-h-[250px] overflow-y-auto text-[#252423] dark:text-white border-[#E1DFDD] dark:border-[#3B3A39]"
               />
             </div>
@@ -935,7 +951,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 rounded-full"
-                      onClick={() => setEditPostContent(prev => prev + emoji)}
+                      onClick={() => setNewPostContent(prev => prev + emoji)}
                     >
                       {emoji}
                     </Button>
@@ -951,13 +967,59 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
             >
               <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
             </Button>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-md hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39] flex items-center gap-1 text-[#252423] dark:text-white"
+                >
+                  <div className="flex items-center gap-1">
+                    {postType === 'post' ? (
+                      <MessageSquare className="h-4 w-4" />
+                    ) : (
+                      <MessageSquare className="h-4 w-4 rotate-180" />
+                    )}
+                    <span>{postType === 'post' ? t('post') : t('announcement')}</span>
+                  </div>
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-0">
+                <div className="py-1">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 rounded-none"
+                    onClick={() => setPostType('post')}
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      <span>{t('post')}</span>
+                    </div>
+                    {postType === 'post' && <Check className="h-4 w-4 ml-auto" />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 rounded-none"
+                    onClick={() => setPostType('announcement')}
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 rotate-180" />
+                      <span>{t('announcement')}</span>
+                    </div>
+                    {postType === 'announcement' && <Check className="h-4 w-4 ml-auto" />}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           
           <div className="flex space-x-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={cancelEditingPost}
+              onClick={() => setShowInlineEditor(false)}
               className="rounded-md border-[#E1DFDD] text-[#252423] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:text-white dark:hover:bg-[#3B3A39]"
             >
               {t('cancel')}
@@ -965,8 +1027,8 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
             <Button
               variant={themeColor}
               size="sm"
-              onClick={saveEditedPost}
-              disabled={!isEditFormValid || isLoading}
+              onClick={handleCreatePost}
+              disabled={!isFormValid || isLoading}
               className="rounded-md min-w-[80px]"
             >
               {isLoading ? (
@@ -978,7 +1040,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                   {t('saving') || '保存中'}
                 </div>
               ) : (
-                t('save') || '保存'
+                t('post') || '发布'
               )}
             </Button>
           </div>
@@ -1031,7 +1093,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               variant="ghost"
               size="icon"
               className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-              onClick={cancelEditingPost}
+              onClick={() => handleDeletePost(post.id)}
             >
               <Trash2 className="h-4 w-4 text-red-500 hover:text-red-600" />
             </Button>
@@ -1234,6 +1296,18 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           white-space: pre-wrap;
           overflow-x: auto;
           max-width: 100%;
+        }
+        .rich-content blockquote {
+          border-left: 4px solid #e5e7eb;
+          padding-left: 1rem;
+          margin-left: 0;
+          margin-right: 0;
+          font-style: italic;
+          color: #6b7280;
+        }
+        .dark .rich-content blockquote {
+          border-left-color: #4b5563;
+          color: #9ca3af;
         }
         .rich-content * {
           max-width: 100%;

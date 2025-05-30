@@ -34,6 +34,7 @@ import MentionSelector from '@/components/chat/MentionSelector';
 import MentionItem from '@/components/chat/MentionItem';
 import { debounce } from 'lodash';
 import { useSearchParams } from 'next/navigation';
+import UserProfileDialog from '@/components/chat/UserProfileDialog';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -221,7 +222,11 @@ const MemoizedMessage = memo(function Message({
   formatMessage, 
   handleReplyMessage, 
   handleDeleteMessage, 
-  handleTranslateMessage, 
+  handleTranslateMessage,
+  handleEditMessage,
+  isEditing,
+  handleSaveEdit,
+  handleCancelEdit,
   translatorRefs, 
   translatedMessages, 
   hourFormat, 
@@ -229,6 +234,14 @@ const MemoizedMessage = memo(function Message({
   t 
 }) {
   const isDeleted = msg.is_deleted;
+  const [editContent, setEditContent] = useState('');
+  
+  // Initialize edit content when entering edit mode
+  useEffect(() => {
+    if (isEditing && isEditing.id === msg.id) {
+      setEditContent(isEditing.content);
+    }
+  }, [isEditing, msg.id]);
   
   return (
     <div
@@ -291,7 +304,33 @@ const MemoizedMessage = memo(function Message({
           
           {isDeleted ? (
             <span className="pr-7">{t('messageWithdrawn')}</span>
+          ) : isEditing && isEditing.id === msg.id ? (
+            // Edit mode
+            <div className="pr-2">
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="w-full bg-background text-foreground border border-border rounded-md p-2 text-sm mb-2"
+                rows={3}
+                autoFocus
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => handleCancelEdit()}
+                  className="text-xs px-2 py-1 rounded-md bg-secondary text-secondary-foreground"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  onClick={() => handleSaveEdit(msg.id, editContent)}
+                  className="text-xs px-2 py-1 rounded-md bg-primary text-primary-foreground"
+                >
+                  {t('save')}
+                </button>
+              </div>
+            </div>
           ) : (
+            // Display mode
             <div className="pr-7">
               <GoogleTranslator 
                 content={msg.content}
@@ -309,7 +348,7 @@ const MemoizedMessage = memo(function Message({
           )}
           
           {/* Message actions menu */}
-          {!isDeleted && (
+          {!isDeleted && !(isEditing && isEditing.id === msg.id) && (
             <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -325,6 +364,18 @@ const MemoizedMessage = memo(function Message({
                     <Reply className="h-4 w-4" />
                     <span>{t('reply')}</span>
                   </DropdownMenuItem>
+                  {isMe && (
+                    <DropdownMenuItem 
+                      onClick={() => handleEditMessage(msg)}
+                      className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                      <span>{t('edit')}</span>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     onClick={() => handleTranslateMessage(msg.id)}
                     className="flex items-center gap-2 hover:cursor-pointer hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-900"
@@ -401,7 +452,8 @@ const MemoizedMessage = memo(function Message({
     prevProps.msg.content === nextProps.msg.content &&
     prevProps.msg.is_deleted === nextProps.msg.is_deleted &&
     prevProps.isMe === nextProps.isMe &&
-    prevProps.translatedMessages[prevProps.msg.id] === nextProps.translatedMessages[nextProps.msg.id]
+    prevProps.translatedMessages[prevProps.msg.id] === nextProps.translatedMessages[nextProps.msg.id] &&
+    (prevProps.isEditing?.id === prevProps.msg.id) === (nextProps.isEditing?.id === nextProps.msg.id)
   );
 });
 
@@ -429,6 +481,9 @@ export default function ChatPage() {
   const { userTimezone, hourFormat, adjustTimeByOffset } = useUserTimezone();
   const [message, setMessage] = useState('');
   const { confirm } = useConfirm();
+  const [isEditing, setIsEditing] = useState(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
   const { 
     currentSession, 
     messages, 
@@ -472,6 +527,137 @@ export default function ChatPage() {
   // Get other participant ID
   const otherParticipantId = currentSession?.type === 'PRIVATE' ? currentSession?.participants?.[0]?.id : null;
   
+  // Add state for user profile dialog
+  const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
+  const [clickedUser, setClickedUser] = useState(null);
+  
+  // Move all editing-related functions to the beginning
+  // Update message function
+  const updateMessage = async (messageId, updatedContent) => {
+    if (!currentUser?.id) {
+      toast.error(t('errors.userNotLoggedIn'));
+      return false;
+    }
+    
+    try {
+      // Update the message in the database
+      const { data, error } = await supabase
+        .from('chat_message')
+        .update({ 
+          content: updatedContent,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', messageId)
+        .eq('user_id', currentUser.id) // Ensure only the owner can edit the message
+        .single();
+
+      if (error) {
+        console.error('Error updating message:', error);
+        toast.error(t('errors.updateFailed'));
+        return false;
+      }
+
+      // Refresh messages to reflect the update
+      if (currentSession?.id) {
+        // Refetch messages from the server
+        fetchMessages(currentSession.id);
+        
+        // Also refresh the chat sessions list to update previews
+        fetchChatSessions();
+      }
+
+      toast.success(t('messageUpdated'));
+      return true;
+    } catch (error) {
+      console.error('Error updating message:', error);
+      toast.error(t('errors.updateFailed'));
+      return false;
+    }
+  };
+
+  // Handle edit message
+  const handleEditMessage = (msg) => {
+    setIsEditing({
+      id: msg.id,
+      content: msg.content
+    });
+  };
+
+  // Handle save edit
+  const handleSaveEdit = async (messageId, content) => {
+    if (!content.trim()) {
+      toast.error(t('errors.emptyMessage'));
+      return;
+    }
+    
+    // Add message length validation
+    if (content.trim().length > 1000) {
+      toast.error(t('errors.messageTooLong') || 'Message too long (max 1000 characters)');
+      return;
+    }
+    
+    const success = await updateMessage(messageId, content.trim());
+    if (success) {
+      setIsEditing(null);
+    }
+  };
+
+  // Add cancel edit function
+  const handleCancelEdit = () => {
+    setIsEditing(null);
+  };
+  
+  // 回复消息处理函数
+  const handleReplyMessage = (msg) => {
+    setReplyToMessage(msg);
+    // 聚焦输入框
+    document.querySelector('textarea')?.focus();
+  };
+  
+  // 取消回复
+  const handleCancelReply = () => {
+    setReplyToMessage(null);
+  };
+
+  // 处理删除消息
+  const handleDeleteMessage = async (messageId) => {
+    confirm({
+      title: t('confirmDelete'),
+      description: t('confirmDeleteDesc'),
+      variant: 'warning',
+      confirmText: t('delete'),
+      cancelText: t('cancel'),
+      onConfirm: async () => {
+        try {
+          const result = await deleteMessage(messageId);
+          if (result.success) {
+            toast.success(t('messageDeleted'));
+          } else {
+            toast.error(t('errors.deleteFailed') + ': ' + (result.error?.message || t('errors.unknown')));
+          }
+        } catch (error) {
+          console.error('Failed to delete message:', error);
+          toast.error(t('errors.deleteFailed'));
+        }
+      }
+    });
+  };
+
+  // 添加处理翻译的函数
+  const handleTranslateMessage = (msgId) => {
+    const translatorRef = translatorRefs.current[`translator-${msgId}`];
+    if (translatorRef && typeof translatorRef.translateText === 'function') {
+      translatorRef.translateText();
+      
+      // 更新翻译状态
+      setTranslatedMessages(prev => {
+        const newState = { ...prev };
+        newState[msgId] = !prev[msgId]; // 切换状态
+        return newState;
+      });
+    }
+  };
+
   // Optimize the extraction of mentions
   const extractMentionsFromMessage = useCallback((text) => {
     if (!text) return [];
@@ -504,7 +690,7 @@ export default function ChatPage() {
     
     return mentions;
   }, []);
-  
+
   // Create a memoized formatter
   const formatMessage = useMemoizedMessageFormatter(messages);
   
@@ -602,18 +788,6 @@ export default function ChatPage() {
     }
   }, [message, currentSession, mentions, replyToMessage, sendMessage, extractMentionsFromMessage, otherParticipantId, getUserStatus, t]);
   
-  // 回复消息处理函数
-  const handleReplyMessage = (msg) => {
-    setReplyToMessage(msg);
-    // 聚焦输入框
-    document.querySelector('textarea')?.focus();
-  };
-  
-  // 取消回复
-  const handleCancelReply = () => {
-    setReplyToMessage(null);
-  };
-
   // 处理emoji选择
   const handleEmojiSelect = (emojiData) => {
     const emoji = emojiData.emoji;
@@ -702,45 +876,6 @@ export default function ChatPage() {
       setIsPending(false);
     }
   }, [currentUser, currentSession, t, supabase, otherParticipantId, getUserStatus, fetchMessages, isPending]);
-
-  // 处理删除消息
-  const handleDeleteMessage = async (messageId) => {
-    confirm({
-      title: t('confirmDelete'),
-      description: t('confirmDeleteDesc'),
-      variant: 'warning',
-      confirmText: t('delete'),
-      cancelText: t('cancel'),
-      onConfirm: async () => {
-        try {
-          const result = await deleteMessage(messageId);
-          if (result.success) {
-            toast.success(t('messageDeleted'));
-          } else {
-            toast.error(t('errors.deleteFailed') + ': ' + (result.error?.message || t('errors.unknown')));
-          }
-        } catch (error) {
-          console.error('Failed to delete message:', error);
-          toast.error(t('errors.deleteFailed'));
-        }
-      }
-    });
-  };
-
-  // 添加处理翻译的函数
-  const handleTranslateMessage = (msgId) => {
-    const translatorRef = translatorRefs.current[`translator-${msgId}`];
-    if (translatorRef && typeof translatorRef.translateText === 'function') {
-      translatorRef.translateText();
-      
-      // 更新翻译状态
-      setTranslatedMessages(prev => {
-        const newState = { ...prev };
-        newState[msgId] = !prev[msgId]; // 切换状态
-        return newState;
-      });
-    }
-  };
 
   // Optimize handleInputChange with debouncing
   const debouncedPositionCalculation = useCallback(
@@ -843,7 +978,7 @@ export default function ChatPage() {
   
   // Optimize messages display
   const renderedMessages = useMemo(() => {
-    // Using message ID to create a unique list
+    // Using message ID to create a unique list with additional index to ensure uniqueness
     const uniqueMessages = [];
     const messageIds = new Set();
     
@@ -854,12 +989,12 @@ export default function ChatPage() {
       }
     }
     
-    return uniqueMessages.map((msg) => {    
+    return uniqueMessages.map((msg, index) => {    
       const isMe = msg.user_id === currentUser?.id;
       
       return (
         <MemoizedMessage
-          key={msg.id}
+          key={`${msg.id}-${index}-${new Date(msg.created_at || 0).getTime()}`}
           msg={msg}
           isMe={isMe}
           currentUser={currentUser}
@@ -867,6 +1002,10 @@ export default function ChatPage() {
           handleReplyMessage={handleReplyMessage}
           handleDeleteMessage={handleDeleteMessage}
           handleTranslateMessage={handleTranslateMessage}
+          handleEditMessage={handleEditMessage}
+          isEditing={isEditing}
+          handleSaveEdit={handleSaveEdit}
+          handleCancelEdit={handleCancelEdit}
           translatorRefs={translatorRefs}
           translatedMessages={translatedMessages}
           hourFormat={hourFormat}
@@ -876,18 +1015,19 @@ export default function ChatPage() {
       );
     });
   }, [messages, currentUser, formatMessage, handleReplyMessage, handleDeleteMessage, 
-      handleTranslateMessage, translatorRefs, translatedMessages, hourFormat, adjustTimeByOffset, t]);
+      handleTranslateMessage, handleEditMessage, isEditing, handleSaveEdit, handleCancelEdit,
+      translatorRefs, translatedMessages, hourFormat, adjustTimeByOffset, t]);
 
   // Add useSearchParams and useEffect to check for session parameter in URL
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session');
   
   useEffect(() => {
-    if (sessionId && !currentSession && sessions.length > 0 && !messagesLoading) {
+    if (sessionId && sessions.length > 0) {
       // Find the session in our loaded sessions
       const sessionToOpen = sessions.find(s => s.id === sessionId);
       if (sessionToOpen) {
-        // Set the current session
+        // Set the current session immediately, regardless of what's currently open
         setCurrentSession(sessionToOpen);
         
         // Scroll to bottom once messages are loaded
@@ -896,7 +1036,137 @@ export default function ChatPage() {
         }, 500);
       }
     }
-  }, [sessions, currentSession, messagesLoading, setCurrentSession, scrollToBottom]);
+  }, [sessions, sessionId, setCurrentSession, scrollToBottom]);
+
+  // 在其他imports和hooks后添加一个新的useEffect来自动调整textarea高度
+  useEffect(() => {
+    const adjustTextareaHeight = () => {
+      if (textareaRef.current) {
+        // Reset height to calculate the correct scrollHeight
+        textareaRef.current.style.height = 'auto';
+        
+        // Calculate the new height
+        const scrollHeight = textareaRef.current.scrollHeight;
+        
+        // Apply the new height with a maximum limit
+        textareaRef.current.style.height = 
+          `${Math.min(scrollHeight, 200)}px`; // 最大高度限制为200px
+      }
+    };
+    
+    // Call the function initially
+    adjustTextareaHeight();
+    
+    // Adjust height when the message changes
+    if (textareaRef.current) {
+      const textareaElement = textareaRef.current;
+      textareaElement.addEventListener('input', adjustTextareaHeight);
+      
+      // Cleanup event listener
+      return () => {
+        textareaElement.removeEventListener('input', adjustTextareaHeight);
+      };
+    }
+  }, [message, textareaRef.current]);
+
+  // Add function to update the chat session name
+  const updateChatName = async (newName) => {
+    if (!currentSession || !currentUser) return;
+    
+    // Only allow editing for group chats or if the user is the creator
+    if (currentSession.type !== 'GROUP') {
+      toast.error(t('cannotEditPrivateChatName'));
+      return;
+    }
+    
+    // Add debug logging
+    console.log('Updating chat name, created_by:', currentSession.created_by);
+    
+    try {
+      const { error } = await supabase
+        .from('chat_session')
+        .update({ name: newName })
+        .eq('id', currentSession.id);
+      
+      if (error) {
+        console.error('Error updating chat name:', error);
+        toast.error(t('errors.updateFailed'));
+        return;
+      }
+      
+      // Update local session data
+      setCurrentSession({
+        ...currentSession,
+        name: newName
+      });
+      
+      // Refetch chat sessions to update the sidebar
+      fetchChatSessions();
+      
+      toast.success(t('chatNameUpdated'));
+    } catch (error) {
+      console.error('Error updating chat name:', error);
+      toast.error(t('errors.updateFailed'));
+    }
+  };
+  
+  // Handle starting name edit
+  const handleStartEditName = () => {
+    // Only allow editing group chats
+    if (currentSession?.type !== 'GROUP') return;
+    
+    // Debug logging
+    console.log('Current session:', currentSession);
+    console.log('Chat owner ID:', currentSession.created_by);
+    console.log('Current user ID:', currentUser?.id);
+    
+    // Check permission:
+    // 1. If created_by is missing (older chats), allow editing for backward compatibility
+    // 2. If created_by exists, only allow the creator to edit
+    if (currentSession.created_by && currentSession.created_by !== currentUser?.id) {
+      toast.error(t('errors.onlyOwnerCanEditName') || 'Only the group owner can edit the group name');
+      return;
+    }
+    
+    setEditedName(currentSession.name || '');
+    setIsEditingName(true);
+  };
+  
+  // Handle saving name edit
+  const handleSaveNameEdit = () => {
+    if (!editedName.trim()) {
+      toast.error(t('errors.nameCannotBeEmpty'));
+      return;
+    }
+    
+    const trimmedName = editedName.trim();
+    
+    // Only update if the name has actually changed
+    if (trimmedName === currentSession.name) {
+      console.log('Name unchanged, skipping update');
+      setIsEditingName(false);
+      return;
+    }
+    
+    updateChatName(trimmedName);
+    setIsEditingName(false);
+  };
+  
+  // Handle escape key when editing name
+  const handleNameEditKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveNameEdit();
+    } else if (e.key === 'Escape') {
+      setIsEditingName(false);
+    }
+  };
+
+  // Add function to open user profile
+  const handleOpenUserProfile = (user) => {
+    setClickedUser(user);
+    setIsUserProfileOpen(true);
+  };
 
   if (!currentSession && chatMode === 'normal') {
     return (
@@ -930,7 +1200,16 @@ export default function ChatPage() {
   if (currentSession?.type === 'PRIVATE') {
     sessionEmail = otherParticipant?.email || t('newContact');
   } else {
-    sessionEmail = `${currentSession?.participantsCount || 0} ${t('members')}`;
+    // For group chats, always calculate total participants from the complete participants array
+    // Always add 1 for the current user since participants array only includes other users
+    let participantsCount = 1; // Start with 1 for current user
+    
+    if (currentSession?.participants) {
+      // Add all participants from the array (these are other users)
+      participantsCount += currentSession.participants.length;
+    }
+    
+    sessionEmail = `${participantsCount} ${t('members')}`;
   }
 
   // In the rendered content, use a virtualized list for large message counts
@@ -947,7 +1226,11 @@ export default function ChatPage() {
           <div className="flex items-center gap-3">
             {chatMode === 'normal' ? (
               <>
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0">
+                <div 
+                  className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0 cursor-pointer"
+                  onClick={() => currentSession?.type === 'PRIVATE' && otherParticipant ? handleOpenUserProfile(otherParticipant) : null}
+                  title={currentSession?.type === 'PRIVATE' ? t('viewProfile') : ''}
+                >
                   {sessionAvatar ? (
                     <img 
                       src={sessionAvatar} 
@@ -958,10 +1241,46 @@ export default function ChatPage() {
                     <span>{sessionName?.charAt(0) || '?'}</span>
                   )}
                 </div>
-                <div>
-                  <h2 className="text-base font-medium">
-                    {sessionName || t('unknownChat')}
-                  </h2>
+                <div 
+                  className={currentSession?.type === 'PRIVATE' ? "cursor-pointer" : ""}
+                  onClick={() => currentSession?.type === 'PRIVATE' && otherParticipant ? handleOpenUserProfile(otherParticipant) : null}
+                >
+                  {currentSession?.type === 'GROUP' ? (
+                    isEditingName ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={editedName}
+                          onChange={(e) => setEditedName(e.target.value)}
+                          onKeyDown={handleNameEditKeyDown}
+                          onBlur={handleSaveNameEdit}
+                          autoFocus
+                          className="text-base font-medium bg-accent/50 px-2 py-1 rounded border border-input focus:border-primary focus:outline-none"
+                        />
+                      </div>
+                    ) : (
+                      <h2 
+                        className={`text-base font-medium leading-none${
+                          // If created_by is missing, assume current user can edit (legacy behavior)
+                          !currentSession.created_by || currentSession.created_by === currentUser?.id 
+                            ? "cursor-pointer hover:underline" 
+                            : ""
+                        }`}
+                        onClick={handleStartEditName}
+                        title={
+                          !currentSession.created_by || currentSession.created_by === currentUser?.id 
+                            ? t('clickToEditName') 
+                            : null
+                        }
+                      >
+                        {sessionName || t('unknownChat')}
+                      </h2>
+                    )
+                  ) : (
+                    <h2 className="text-base font-medium">
+                      {sessionName || t('unknownChat')}
+                    </h2>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {sessionEmail}
                   </p>
@@ -1021,9 +1340,16 @@ export default function ChatPage() {
           {currentSession?.type !== 'PRIVATE' && chatMode === 'normal' && (
             <InviteUserPopover 
               sessionId={currentSession.id} 
-              onInvite={() => {
-                // 重新获取会话信息以更新成员数量
-                fetchChatSessions();
+              onInvite={(updatedSession) => {
+                // 如果收到了更新的会话数据，直接更新当前会话
+                if (updatedSession) {
+                  setCurrentSession(updatedSession);
+                } else {
+                  // 否则重新获取整个会话列表
+                  fetchChatSessions();
+                }
+                // 显示通知
+                toast.success(t('memberAddedSuccess') || '成员已添加');
               }} 
             />
           )}
@@ -1037,6 +1363,13 @@ export default function ChatPage() {
         messages={messages}
         hourFormat={hourFormat}
         adjustTimeByOffset={adjustTimeByOffset}
+      />
+      
+      {/* Add User Profile Dialog */}
+      <UserProfileDialog 
+        open={isUserProfileOpen}
+        onOpenChange={setIsUserProfileOpen}
+        user={clickedUser}
       />
       
       {/* 聊天内容区域 */}
@@ -1114,7 +1447,7 @@ export default function ChatPage() {
                       }
                     }}
                     placeholder={t('inputPlaceholder')}
-                    className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm p-2 max-h-60"
+                    className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm p-2 min-h-[40px] overflow-y-auto"
                     rows={1}
                     ref={textareaRef}
                   />

@@ -337,6 +337,7 @@ export function ChatProvider({ children }) {
           type,
           name,
           team_id,
+          created_by,
           created_at,
           updated_at,
           participants:chat_participant(
@@ -512,7 +513,15 @@ export function ChatProvider({ children }) {
     const sessionsWithMessages = sessionsData.map(item => {
       const lastMessage = lastMessagesBySession[item.chat_session.id];
       const otherParticipants = item.chat_session.participants
-        .map(p => processAvatarUrl(p.user))
+        .map(p => {
+          const processedUser = processAvatarUrl(p.user);
+          // Add a unique session-specific identifier to each participant
+          return {
+            ...processedUser,
+            // Create a unique ID for this user in this specific session
+            sessionUserId: `${item.chat_session.id}_${processedUser.id}`
+          };
+        })
         .filter(user => user.id !== authSession.id);
       
       const sessionId = item.chat_session.id;
@@ -521,6 +530,7 @@ export function ChatProvider({ children }) {
       
       return {
         ...item.chat_session,
+        created_by: item.chat_session.created_by, // Explicitly include created_by
         participants: otherParticipants,
         participantsCount: item.chat_session.participants.length,
         unreadCount,
@@ -964,6 +974,133 @@ export function ChatProvider({ children }) {
     }
   };
 
+  // 删除聊天会话功能
+  const deleteChatSession = async (sessionId) => {
+    try {
+      if (!authSession) {
+        console.error('用户未登录，无法删除会话');
+        return { success: false, error: '未登录' };
+      }
+      
+      // 获取会话信息以检查权限
+      const { data: session, error: sessionError } = await supabase
+        .from('chat_session')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+        
+      if (sessionError) {
+        console.error('获取会话信息失败:', sessionError);
+        return { success: false, error: sessionError };
+      }
+      
+      // 严格检查是否为会话创建者，只有创建者可以删除
+      if (session.created_by !== authSession.id) {
+        console.error('无权删除此会话，只有会话创建者可以删除');
+        return { success: false, error: '无权操作' };
+      }
+      
+      // 开始删除会话相关数据
+
+      // 首先获取所有与此会话相关的消息ID
+      const { data: messageIds, error: messageIdsError } = await supabase
+        .from('chat_message')
+        .select('id')
+        .eq('session_id', sessionId);
+        
+      if (messageIdsError) {
+        console.error('获取消息ID失败:', messageIdsError);
+        // 继续执行，不中断流程
+      }
+      
+      // 如果有消息ID，删除相关的附件和阅读状态
+      if (messageIds && messageIds.length > 0) {
+        // 提取ID数组
+        const ids = messageIds.map(msg => msg.id);
+        
+        // 1. 删除所有附件
+        const { error: attachmentsError } = await supabase
+          .from('chat_attachment')
+          .delete()
+          .in('message_id', ids);
+          
+        if (attachmentsError) {
+          console.error('删除附件失败:', attachmentsError);
+          // 继续执行，不中断流程
+        }
+        
+        // 2. 删除消息读取状态
+        const { error: readStatusError } = await supabase
+          .from('chat_message_read_status')
+          .delete()
+          .in('message_id', ids);
+          
+        if (readStatusError) {
+          console.error('删除消息读取状态失败:', readStatusError);
+          // 继续执行，不中断流程
+        }
+      }
+      
+      // 3. 删除所有消息
+      const { error: messagesError } = await supabase
+        .from('chat_message')
+        .delete()
+        .eq('session_id', sessionId);
+        
+      if (messagesError) {
+        console.error('删除消息失败:', messagesError);
+        // 继续执行，不中断流程
+      }
+      
+      // 4. 删除AI消息 (如果有)
+      const { error: aiMessagesError } = await supabase
+        .from('ai_chat_message')
+        .delete()
+        .eq('session_id', sessionId);
+        
+      if (aiMessagesError) {
+        console.error('删除AI消息失败:', aiMessagesError);
+        // 继续执行，不中断流程
+      }
+      
+      // 5. 删除会话参与者
+      const { error: participantsError } = await supabase
+        .from('chat_participant')
+        .delete()
+        .eq('session_id', sessionId);
+        
+      if (participantsError) {
+        console.error('删除会话参与者失败:', participantsError);
+        // 继续执行，不中断流程
+      }
+      
+      // 6. 最后删除会话本身
+      const { error: deleteSessionError } = await supabase
+        .from('chat_session')
+        .delete()
+        .eq('id', sessionId);
+        
+      if (deleteSessionError) {
+        console.error('删除会话失败:', deleteSessionError);
+        return { success: false, error: deleteSessionError };
+      }
+      
+      // 如果是当前会话，清除当前会话
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(null);
+        setMessages([]);
+      }
+      
+      // 更新会话列表
+      setSessions(prevSessions => prevSessions.filter(s => s.id !== sessionId));
+      
+      return { success: true };
+    } catch (error) {
+      console.error('删除会话过程中发生错误:', error);
+      return { success: false, error };
+    }
+  };
+
   // 实时消息订阅
   useEffect(() => {
     if (!currentSession) return;
@@ -1399,7 +1536,8 @@ export function ChatProvider({ children }) {
       chatMode,
       setChatMode,
       fetchMessages,
-      deleteMessage
+      deleteMessage,
+      deleteChatSession
     }}>
       {children}
     </ChatContext.Provider>

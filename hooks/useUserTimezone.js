@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import useGetUser from '@/lib/hooks/useGetUser';
 
 /**
@@ -145,10 +145,26 @@ export function useUserTimezone() {
    * @param {Date|string} dateInput - Date object or date string
    * @returns {Date} Adjusted date object
    */
-  const adjustTimeByOffset = (dateInput) => {
-    if (!dateInput) return new Date();
+  const adjustTimeByOffset = useCallback((dateInput) => {
     
-    const date = new Date(dateInput);
+    if (!dateInput) {
+      return new Date();
+    }
+    
+    let date;
+    try {
+      // 确保创建有效的日期对象
+      date = new Date(dateInput);
+      
+      // 验证日期是否有效
+      if (isNaN(date.getTime())) {
+        console.error("无效的日期输入:", dateInput);
+        return new Date();
+      }
+    } catch (error) {
+      console.error("创建日期对象失败:", error, dateInput);
+      return new Date();
+    }
     
     // If no UTC offset specified, use UTC+8 as default for displaying to users
     // This ensures users in UTC+8 timezone see correct times even without profile settings
@@ -157,13 +173,12 @@ export function useUserTimezone() {
     try {
       // Get hour offset from UTC timezone string
       const offsetHours = getHourOffset(userUtcOffset);
-      
       // Create new UTC date
       const utcDate = new Date(date.toUTCString());
       
       // Adjust hours based on offset
       utcDate.setUTCHours(utcDate.getUTCHours() + offsetHours);
-      
+
       return utcDate;
     } catch (error) {
       console.error('Time adjustment error:', error);
@@ -172,10 +187,10 @@ export function useUserTimezone() {
       fallbackDate.setUTCHours(fallbackDate.getUTCHours() + 8);
       return fallbackDate;
     }
-  };
+  }, [utcOffset]);
   
   // Format time to user timezone's local time string
-  const formatToUserTimezone = (timestamp, options = {}) => {
+  const formatToUserTimezone = useCallback((timestamp, options = {}) => {
     if (!timestamp) return '';
     
     try {
@@ -195,10 +210,10 @@ export function useUserTimezone() {
       console.error('Format time error:', error);
       return new Date(timestamp).toLocaleTimeString();
     }
-  };
+  }, [adjustTimeByOffset, hourFormat]);
   
   // Format full date and time
-  const formatDateToUserTimezone = (timestamp, options = {}) => {
+  const formatDateToUserTimezone = useCallback((timestamp, options = {}) => {
     if (!timestamp) return '';
     
     try {
@@ -221,7 +236,7 @@ export function useUserTimezone() {
       console.error('Format date-time error:', error);
       return new Date(timestamp).toLocaleString();
     }
-  };
+  }, [adjustTimeByOffset, hourFormat]);
 
   return {
     userTimezone,
