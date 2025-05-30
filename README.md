@@ -21,7 +21,6 @@ A comprehensive, full-featured project management application built with Next.js
 - **Frontend**: Next.js, React 19, TailwindCSS
 - **Backend**: Next.js API routes, Supabase
 - **Database**: PostgreSQL (via Supabase)
-- **Authentication**: Supabase Auth
 - **State Management**: Redux Toolkit
 - **UI Components**: Radix UI, Shadcn/UI
 - **Styling**: TailwindCSS
@@ -31,7 +30,6 @@ A comprehensive, full-featured project management application built with Next.js
 - **Charts**: Chart.js, React-Chartjs-2
 - **Drag and Drop**: @hello-pangea/dnd
 - **Internationalization**: next-intl
-- **Form Handling**: react-hook-form with Zod validation
 - **Date Handling**: date-fns
 - **AI Integration**: OpenAI, HuggingFace
 - **3D Visualization**: Three.js, React Three Fiber

@@ -479,7 +479,7 @@ CREATE TABLE "user_subscription_plan" (
   "id" SERIAL PRIMARY KEY,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
-  "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
+  "status" TEXT NULL,
   "start_date" TIMESTAMP NOT NULL,
   "end_date" TIMESTAMP,
   -- 使用统计

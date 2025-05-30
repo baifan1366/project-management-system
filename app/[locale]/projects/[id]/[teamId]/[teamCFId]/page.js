@@ -82,6 +82,7 @@ const TeamCustomFieldPage = () => {
   const [addButtonText, setAddButtonText] = useState('addTask');  
   const [onClose, setOnClose] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showVisibilityDialog, setShowVisibilityDialog] = useState(false);
   // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
   const isStarred = selectedTeam?.star || false;
   
@@ -657,7 +658,18 @@ const TeamCustomFieldPage = () => {
             </div>
             <div className="flex items-center self-end sm:self-auto gap-2 mt-1 sm:mt-0">
               {isCurrentUserOwner() && (
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(true)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    if (project?.visibility === 'public') {
+                      setOpen(true);
+                    } else {
+                      setShowVisibilityDialog(true);
+                    }
+                  }}
+                >
                   <Share2 className="h-4 w-4" />
                 </Button>
               )}
@@ -680,14 +692,14 @@ const TeamCustomFieldPage = () => {
           </div>
         </div>
         <div className="w-full p-0">
-          { currentItem?.custom_field?.type !== 'AGILE' && (
+          { currentItem?.custom_field?.type !== 'AGILE' &&
+          currentItem?.custom_field?.type !== 'OVERVIEW' && (
             <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex">
                 {/* if currentItem?.custom_field?.type !== 'FILES' and POSTS */}
                 {currentItem?.custom_field?.type !== 'FILES' && 
-                 currentItem?.custom_field?.type !== 'POSTS' && 
-                 currentItem?.custom_field?.type !== 'OVERVIEW' && (
+                 currentItem?.custom_field?.type !== 'POSTS' && (
                   <>
                     <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
                       <Plus className="h-4 w-4 mr-1" />
@@ -735,6 +747,7 @@ const TeamCustomFieldPage = () => {
                 <span className="hidden md:inline">{t('group')}</span>
               </Button>
             </div>
+            
           </div>
           )}
           
@@ -751,6 +764,21 @@ const TeamCustomFieldPage = () => {
         onSuccess={handleEditSuccess}
         projectId={projectId}
       />
+      <AlertDialog open={showVisibilityDialog} onOpenChange={setShowVisibilityDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tProjects('projectNotPublic')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {tProjects('projectNotPublicDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowVisibilityDialog(false)}>
+              {tProjects('ok')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
