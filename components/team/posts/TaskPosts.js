@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Filter, Search, SortAsc, Grid3X3, List, Moon, Sun, Bookmark, Heart, MessageSquare, MoreHorizontal, ThumbsUp, Calendar, Clock, Tag, Pin, PinOff, Star, ChevronDown, Pen, Trash2, ChevronUp } from 'lucide-react';
+import { Plus, Filter, Search, SortAsc, Grid3X3, List, Moon, Sun, Bookmark, Heart, MessageSquare, MoreHorizontal, ThumbsUp, Calendar, Clock, Tag, Pin, PinOff, Star, ChevronDown, Pen, Trash2, ChevronUp, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,10 @@ import { RichEditor } from '@/components/ui/rich-editor';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Smile, Paperclip, Check } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import EmojiPicker from '@/components/chat/EmojiPicker';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { fetchCommentsByPostId, fetchCommentById, createComment } from '@/lib/redux/features/commentsSlice';
 
 export default function TaskPosts({ projectId, teamId, teamCFId }) {
   const t = useTranslations('PostsView');
@@ -36,6 +40,36 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   );
   const { confirm } = useConfirm();
   const [userMap, setUserMap] = useState({});
+  
+  // 使用用户时区钩子
+  const { 
+    formatToUserTimezone, 
+    formatDateToUserTimezone, 
+    loading: timeZoneLoading,
+    adjustTimeByOffset
+  } = useUserTimezone();
+  
+  // 格式化日期时间的辅助函数，包含错误处理和默认值
+  const formatPostDate = (timestamp, options = {}) => {
+    if (!timestamp) return '-';
+    try {
+      return formatDateToUserTimezone(timestamp, options);
+    } catch (error) {
+      console.error('日期格式化错误:', error);
+      return new Date(timestamp).toLocaleDateString();
+    }
+  };
+  
+  // 格式化时间的辅助函数
+  const formatPostTime = (timestamp) => {
+    if (!timestamp) return '-';
+    try {
+      return formatToUserTimezone(timestamp);
+    } catch (error) {
+      console.error('时间格式化错误:', error);
+      return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+  };
   
   // 获取颜色的十六进制代码
   const getColorHexCode = (colorName) => {
@@ -91,6 +125,16 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   // 存储用户在提示后想要执行的操作
   const [pendingAction, setPendingAction] = useState(null);
   
+  // 添加评论相关状态
+  const [openComments, setOpenComments] = useState({});
+  const [commentsMap, setCommentsMap] = useState({});
+  const [newCommentText, setNewCommentText] = useState('');
+  const [activeCommentPostId, setActiveCommentPostId] = useState(null);
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false);
+  const [commentLoading, setCommentLoading] = useState(false);
+  // 添加评论计数状态
+  const [commentCounts, setCommentCounts] = useState({});
+  
   // Hook into data handlers
   const { 
     CreatePost, 
@@ -109,18 +153,29 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   // Fetch users for avatars
   const fetchUserById = async (userId) => {
     try {
+      // 如果用户ID无效，直接返回
+      if (!userId) {
+        console.warn('尝试获取无效的用户ID');
+        return;
+      }
+      
       // If already fetched, return from cache
       if (userMap[userId]) return;
       
+      console.log(`获取用户信息: ${userId}`);
       const response = await api.users.getById(userId);
+      
       if (response.success && response.data) {
+        console.log(`用户信息获取成功: ${userId}`, response.data);
         setUserMap(prev => ({
           ...prev,
           [userId]: response.data
         }));
+      } else {
+        console.warn(`获取用户信息失败: ${userId}`, response);
       }
     } catch (error) {
-      console.error('Failed to fetch user:', error);
+      console.error(`获取用户失败 (${userId}):`, error);
     }
   };
   
@@ -151,7 +206,11 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         
         // Set the posts
         setPosts(postsData);
+        
+        // 只有当时区信息已加载完成时，才结束加载状态
+        if (!timeZoneLoading) {
         setIsLoading(false);
+        }
       } catch (error) {
         console.error('Failed to fetch data:', error);
         setIsLoading(false);
@@ -159,7 +218,14 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     }
     
     fetchPosts();
-  }, [teamId, dispatch]);
+  }, [teamId, dispatch, timeZoneLoading]);
+  
+  // 监听时区加载状态，当时区加载完成且帖子已加载时结束加载状态
+  useEffect(() => {
+    if (!timeZoneLoading && posts.length > 0 && isLoading) {
+      setIsLoading(false);
+    }
+  }, [timeZoneLoading, posts.length, isLoading]);
   
   // Toggle pin status for a post
   const togglePinPost = async (postId) => {
@@ -222,13 +288,17 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
       if (aIsPinned && !bIsPinned) return -1;
       if (!aIsPinned && bIsPinned) return 1;
       
+      // 调整日期以考虑用户时区
+      const dateA = adjustTimeByOffset(a.created_at);
+      const dateB = adjustTimeByOffset(b.created_at);
+      
       // If both posts have the same pin status, sort by date (oldest at top, newest at bottom)
       // Then apply the selected sort option
       switch (sortOption) {
         case 'newest':
-          return new Date(a.created_at) - new Date(b.created_at); // 反转：最新的在底部
+          return dateA - dateB; // 反转：最新的在底部
         case 'oldest':
-          return new Date(b.created_at) - new Date(a.created_at); // 反转：最旧的在顶部
+          return dateB - dateA; // 反转：最旧的在顶部
         case 'alphabetical':
           return a.title.localeCompare(b.title);
         case 'popular':
@@ -237,7 +307,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           const bReactions = Object.values(b.reactions || {}).flat().length;
           return bReactions - aReactions;
         default:
-          return new Date(a.created_at) - new Date(b.created_at); // 默认最新的在底部
+          return dateA - dateB; // 默认最新的在底部
       }
     });
   
@@ -460,6 +530,457 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     </div>
   );
   
+  // 获取帖子评论数量
+  const fetchPostCommentCount = async (postId) => {
+    try {
+      console.log(`获取帖子(${postId})评论数量`);
+      // 通过帖子ID获取评论
+      const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
+      // 计算获取到的评论总数
+      const count = comments ? comments.length : 0;
+      console.log(`帖子(${postId})有 ${count} 条评论`);
+      
+      // 更新评论计数缓存
+      setCommentCounts(prev => ({
+        ...prev,
+        [postId]: count
+      }));
+      
+      return count;
+    } catch (error) {
+      console.error(`获取帖子(${postId})评论数量失败:`, error);
+      return 0;
+    }
+  };
+  
+  // 获取帖子的评论数量
+  const getPostCommentCount = (postId) => {
+    // 如果已经有缓存的数量，直接返回
+    if (commentCounts[postId] !== undefined) {
+      return commentCounts[postId];
+    }
+    
+    // 如果还没有缓存的评论数量，触发异步获取
+    fetchPostCommentCount(postId).catch(err => {
+      console.error(`获取帖子(${postId})评论计数失败:`, err);
+    });
+    
+    // 在异步加载完成前，尝试从已有数据中获取计数
+    // 如果有评论数据，直接计算长度
+    if (commentsMap[postId]) {
+      return commentsMap[postId].length;
+    }
+    
+    // 如果帖子对象有评论数组，使用它的长度
+    const post = posts.find(p => p.id === postId);
+    return post?.comments?.length || 0;
+  };
+  
+  // 在帖子加载完成后获取评论数量
+  useEffect(() => {
+    if (!isLoading && posts.length > 0) {
+      const fetchCounts = async () => {
+        // 只获取没有评论计数的帖子
+        const postsWithoutCounts = posts.filter(post => 
+          commentCounts[post.id] === undefined && 
+          (!post.comments || post.comments.length > 0)
+        );
+        
+        if (postsWithoutCounts.length > 0) {
+          console.log(`获取 ${postsWithoutCounts.length} 个帖子的评论计数`);
+          
+          // 并发获取评论计数，但限制并发数以避免过多请求
+          const batchSize = 3;
+          for (let i = 0; i < postsWithoutCounts.length; i += batchSize) {
+            const batch = postsWithoutCounts.slice(i, i + batchSize);
+            await Promise.all(batch.map(post => fetchPostCommentCount(post.id)));
+          }
+        }
+      };
+      
+      fetchCounts();
+    }
+  }, [isLoading, posts]);
+  
+  // 切换评论展开/收起状态
+  const toggleComments = async (postId) => {
+    handlePotentialLeave(async () => {
+      setCommentLoading(true);
+      try {
+        // 如果评论还未加载，则加载评论
+        if (!commentsMap[postId]) {
+          console.log('开始加载帖子评论:', postId);
+          const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
+          console.log('获取到的评论:', comments);
+          
+          // 更新评论计数
+          setCommentCounts(prev => ({
+            ...prev,
+            [postId]: comments ? comments.length : 0
+          }));
+          
+          // 获取评论中的用户信息
+          if (comments && comments.length > 0) {
+            console.log(`加载 ${comments.length} 个评论的用户信息`);
+            for (const comment of comments) {
+              if (comment.user_id) {
+                // 确保异步加载不会阻塞UI
+                fetchUserById(comment.user_id).catch(err => {
+                  console.error(`加载评论用户 ${comment.user_id} 信息失败:`, err);
+                });
+              } else {
+                console.warn('评论缺少用户ID:', comment);
+              }
+            }
+          }
+          
+          setCommentsMap(prev => ({
+            ...prev,
+            [postId]: comments || []
+          }));
+        }
+        
+        // 切换显示状态
+        setOpenComments(prev => ({
+          ...prev,
+          [postId]: !prev[postId]
+        }));
+        
+        setActiveCommentPostId(postId);
+        
+        // 无论是什么视图，都打开侧边面板
+        setCommentDialogOpen(true);
+      } catch (error) {
+        console.error("加载评论失败:", error);
+        toast.error(t('loadCommentsError') || "加载评论失败");
+      } finally {
+        setCommentLoading(false);
+      }
+    });
+  };
+  
+  // 创建新评论
+  const submitComment = async (postId) => {
+    if (!newCommentText.trim()) {
+      toast.error(t('commentRequired') || "评论内容不能为空");
+      return;
+    }
+    
+    try {
+      setCommentLoading(true);
+      
+      // 构建评论数据
+      const commentData = {
+        post_id: postId,
+        text: newCommentText.trim(),
+        user_id: user?.id // 确保传递用户ID
+      };
+      
+      console.log("提交评论数据:", commentData);
+      
+      // 使用Redux action创建评论
+      const result = await dispatch(createComment(commentData)).unwrap();
+      
+      if (result) {
+        // 确保获取评论作者信息
+        if (result.user_id) {
+          await fetchUserById(result.user_id);
+        }
+        
+        // 更新评论列表
+        setCommentsMap(prev => {
+          const updatedComments = [...(prev[postId] || []), result];
+          
+          // 同时更新评论计数
+          setCommentCounts(prev => ({
+            ...prev,
+            [postId]: updatedComments.length
+          }));
+          
+          return {
+            ...prev,
+            [postId]: updatedComments
+          };
+        });
+        
+        // 清空输入框
+        setNewCommentText('');
+        
+        toast.success(t('commentAdded') || "评论已添加");
+      }
+    } catch (error) {
+      console.error("添加评论失败:", error);
+      toast.error(t('addCommentError') || "添加评论失败");
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+  
+  // 渲染评论对话框（用于网格视图）
+  const renderCommentDialog = () => {
+    const activePost = posts.find(post => post.id === activeCommentPostId);
+    
+    if (!activePost || !commentDialogOpen) return null; // 确保只有当commentDialogOpen为true时才渲染
+    
+    return (
+      <>
+        {/* 遮罩层 */}
+        <div 
+          className="fixed inset-0 bg-black/30 dark:bg-black/50 z-[998]"
+          onClick={() => setCommentDialogOpen(false)}
+        />
+        
+        {/* 评论侧边栏 */}
+        <div 
+          className={`fixed inset-y-0 right-0 max-w-md w-full shadow-xl bg-background dark:bg-[#1F1F1F] border-l border-[#E1DFDD] dark:border-[#3B3A39] transform transition-transform duration-300 ease-in-out z-[999] flex flex-col ${commentDialogOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        >
+          {/* 顶部标题区域 */}
+          <div className="p-4 border-b border-[#E1DFDD] dark:border-[#3B3A39] flex items-center justify-between">
+            <div className="flex items-center">
+              <MessageSquare className="h-5 w-5 mr-2 flex-shrink-0 text-[#6264A7]" />
+              <span className="font-medium text-base">{t('comments') || "评论"}</span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setCommentDialogOpen(false)}
+              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* 帖子信息区域 */}
+          <div className="px-4 py-3 border-b border-[#E1DFDD] dark:border-[#3B3A39] bg-accent/30 dark:bg-accent/10">
+            <h3 className="text-base font-medium line-clamp-2 break-words">{activePost.title}</h3>
+            <div className="mt-2 text-sm text-[#605E5C] dark:text-[#C8C6C4] flex items-center">
+              <Avatar className="h-6 w-6 mr-2 border border-[#E1DFDD] dark:border-[#3B3A39]">
+                <AvatarImage src={userMap[activePost.created_by]?.avatar_url || "/placeholder-avatar.jpg"} />
+                <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white text-xs">
+                  {userMap[activePost.created_by]?.name?.substring(0, 2).toUpperCase() || 'UN'}
+                </AvatarFallback>
+              </Avatar>
+              <span className="truncate">
+                {userMap[activePost.created_by]?.name || t('unknownUser')} · {formatPostDate(activePost.created_at)}
+              </span>
+            </div>
+          </div>
+          
+          {/* 评论列表区域 */}
+          <div className="flex-grow overflow-y-auto p-4 pb-24">
+            {/* 评论数量标题 */}
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-medium text-sm text-[#252423] dark:text-white">
+                {commentsMap[activeCommentPostId]?.length > 0 
+                  ? `${t('comments') || "评论"} (${commentsMap[activeCommentPostId]?.length})` 
+                  : t('noComments') || "暂无评论"}
+              </h4>
+              {commentLoading && (
+                <div className="flex items-center">
+                  <svg className="animate-spin h-4 w-4 mr-2 text-[#6264A7]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-xs text-[#6264A7]">{t('loading') || "加载中..."}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* 评论列表 */}
+            <div className="space-y-3">
+              {(commentsMap[activeCommentPostId] || []).map(comment => (
+                <div key={comment.id} className="flex space-x-3 bg-background hover:bg-accent/30 dark:hover:bg-accent/10 p-3 rounded-lg transition-colors border border-transparent hover:border-[#E1DFDD] dark:hover:border-[#3B3A39]">
+                  <Avatar className="h-8 w-8 border-2 flex-shrink-0">
+                    <AvatarImage src={userMap[comment.user_id]?.avatar_url || "/placeholder-avatar.jpg"} />
+                    <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white text-xs">
+                      {userMap[comment.user_id] ? userMap[comment.user_id].name?.substring(0, 2).toUpperCase() : (comment.user_id?.substring(0, 2) || 'UN')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-sm truncate max-w-[180px] text-[#252423] dark:text-white">
+                        {userMap[comment.user_id]?.name || `未知用户 (${comment.user_id?.substring(0, 8) || '无ID'})`}
+                      </div>
+                      <div className="text-xs text-[#605E5C] dark:text-[#C8C6C4] flex-shrink-0">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-default">
+                                {formatPostTime(comment.created_at)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              <p>{formatPostDate(comment.created_at, { 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
+                    <div className="text-sm mt-1 break-words whitespace-pre-wrap overflow-wrap-anywhere overflow-x-hidden text-[#252423] dark:text-white">
+                      {comment.text}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* 没有评论时显示提示信息 */}
+              {(commentsMap[activeCommentPostId]?.length === 0 && !commentLoading) && (
+                <div className="text-center py-8">
+                  <MessageSquare className="h-10 w-10 mx-auto mb-2 text-[#A19F9D] dark:text-[#605E5C]" />
+                  <p className="text-sm text-[#605E5C] dark:text-[#A19F9D]">{t('beFirstToComment') || "成为第一个评论的人"}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* 底部固定的评论输入框 */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-background dark:bg-[#1F1F1F] border-t border-[#E1DFDD] dark:border-[#3B3A39] shadow-md">
+            <div className="flex space-x-2 items-center">
+              <Avatar className="h-8 w-8 border-2 flex-shrink-0">
+                <AvatarImage src={user?.avatar_url || "/placeholder-avatar.jpg"} />
+                <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white text-xs">
+                  {user?.name?.substring(0, 2).toUpperCase() || 'UN'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 flex space-x-2">
+                <Input 
+                  placeholder={t('addComment') || "添加评论..."}
+                  value={newCommentText}
+                  onChange={(e) => setNewCommentText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      submitComment(activeCommentPostId);
+                    }
+                  }}
+                  className="flex-1 h-9 text-sm border-[#E1DFDD] dark:border-[#3B3A39] focus-visible:ring-1 focus-visible:ring-[#6264A7]"
+                />
+                <Button 
+                  variant={themeColor}
+                  size="sm" 
+                  onClick={() => submitComment(activeCommentPostId)}
+                  disabled={!newCommentText.trim() || commentLoading}
+                  className="h-9 px-3 flex-shrink-0"
+                >
+                  {commentLoading ? (
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : t('send') || "发送"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+  
+  // 修改renderComments函数，简化评论渲染
+  const renderComments = (postId) => {
+    const comments = commentsMap[postId] || [];
+    
+    // 列表视图中显示完整评论内容
+    return (
+      <div className="mt-4 space-y-4">
+        <h4 className="font-medium text-sm">
+          {comments.length > 0 ? `${t('comments') || "评论"} (${comments.length})` : t('noComments') || "暂无评论"}
+        </h4>
+        
+        {comments.length > 0 && (
+          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+            {comments.map(comment => (
+              <div key={comment.id} className="flex space-x-2 bg-background hover:bg-accent/50 p-2 rounded-md transition-colors">
+                <Avatar className="h-8 w-8 border-2 flex-shrink-0">
+                  <AvatarImage src={userMap[comment.user_id]?.avatar_url || "/placeholder-avatar.jpg"} />
+                  <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white text-xs">
+                    {userMap[comment.user_id] ? userMap[comment.user_id].name?.substring(0, 2).toUpperCase() : (comment.user_id?.substring(0, 2) || 'UN')}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-sm truncate max-w-[180px]">
+                      {userMap[comment.user_id]?.name || `未知用户 (${comment.user_id?.substring(0, 8) || '无ID'})`}
+                    </div>
+                    <div className="text-xs text-[#605E5C] dark:text-[#C8C6C4] flex-shrink-0">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-default">
+                              {formatPostTime(comment.created_at)}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            <p>{formatPostDate(comment.created_at, { 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric', 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                  <div className="text-sm mt-1 break-words whitespace-pre-wrap overflow-wrap-anywhere overflow-x-hidden">
+                    {comment.text}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* 列表视图下的评论输入框 */}
+        <div className="flex space-x-2 mt-4">
+          <Avatar className="h-8 w-8 border-2 flex-shrink-0">
+            <AvatarImage src={user?.avatar_url || "/placeholder-avatar.jpg"} />
+            <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white text-xs">
+              {user?.name?.substring(0, 2).toUpperCase() || 'UN'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 flex space-x-2">
+            <Input 
+              placeholder={t('addComment') || "添加评论..."}
+              value={newCommentText}
+              onChange={(e) => setNewCommentText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  submitComment(postId);
+                }
+              }}
+              className="flex-1 h-8 text-sm border-[#E1DFDD] dark:border-[#3B3A39]"
+            />
+            <Button 
+              variant={themeColor}
+              size="sm" 
+              onClick={() => submitComment(postId)}
+              disabled={!newCommentText.trim() || commentLoading}
+              className="h-8 px-3 flex-shrink-0"
+            >
+              {commentLoading ? (
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : t('send') || "发送"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+    
+  };
+  
   // Render grid view of posts
   const renderGridView = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -491,7 +1012,24 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                         </CardTitle>
                       </div>
                       <CardDescription className="text-xs text-[#605E5C] dark:text-[#C8C6C4]">
-                        {new Date(post.created_at).toLocaleDateString()}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-default">
+                                {formatPostDate(post.created_at, { year: 'numeric', month: 'short', day: 'numeric', hour: undefined, minute: undefined })}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              <p>{formatPostDate(post.created_at, { 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </CardDescription>
                     </div>
                   </div>
@@ -603,25 +1141,52 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+                    className={cn(
+                      "h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]",
+                      openComments[post.id] && "text-[#6264A7]"
+                    )}
+                    onClick={() => toggleComments(post.id)}
                   >
-                    <MessageSquare className="h-4 w-4 text-[#252423] dark:text-white" />
-                    {post.comments?.length > 0 && (
-                      <span className="ml-1 text-xs text-[#252423] dark:text-white">
-                        {post.comments.length}
+                    <MessageSquare className={cn(
+                      "h-4 w-4 text-[#252423] dark:text-white"
+                      
+                    )} />
+                    {getPostCommentCount(post.id) > 0 && (
+                      <span className={cn(
+                        "ml-1 text-xs text-[#252423] dark:text-white",
+                      )}>
+                        {getPostCommentCount(post.id)}
                       </span>
                     )}
                   </Button>
                 </div>
                 <div className="flex items-center text-xs text-[#605E5C] dark:text-[#C8C6C4]">
-                  <Clock className="h-3 w-3 mr-1" />
-                  {new Date(post.updated_at || post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center cursor-default">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {formatPostTime(post.updated_at || post.created_at)}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p>{formatPostDate(post.updated_at || post.created_at, { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric', 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </CardFooter>
             </Card>
           )}
         </div>
       ))}
+      {renderCommentDialog()}
     </div>
   );
   
@@ -633,158 +1198,218 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           {editingPostId === post.id ? (
             renderEditForm(post)
           ) : (
-            <Card 
-              className={cn(
-                "overflow-hidden overflow-x-auto transition-all hover:shadow-md relative border-[#E1DFDD] hover:bg-accent dark:border-[#3B3A39] dark:text-white",
-                post.is_pinned && "border-l-4"
-              )}
-              style={post.is_pinned ? { borderLeftColor: getColorHexCode(themeColor) } : {}}
-            >
-              <div className="flex flex-col md:flex-row p-0 h-full">
-                <div className="flex-grow p-4 flex flex-col">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="border-2">
-                        <AvatarImage src={userMap[post.created_by]?.avatar_url || "/placeholder-avatar.jpg"} />
-                        <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white">
-                          {post.created_by && userMap[post.created_by] ? userMap[post.created_by].name?.substring(0, 2).toUpperCase() : 'UN'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center">
-                          <h3 className="text-base font-semibold truncate max-w-[200px] sm:max-w-[250px] md:max-w-[350px] lg:max-w-[450px] xl:max-w-[550px]">
-                            {post.title || t('noTitle')}
-                          </h3>
-                          {post.is_pinned && (
-                            <Pin size={14} style={{ color: getColorHexCode(themeColor) }} className="ml-2 flex-shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-xs text-[#605E5C] dark:text-[#C8C6C4]">
-                          {new Date(post.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="flex items-center text-xs mr-4 text-[#605E5C] dark:text-[#C8C6C4]">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {new Date(post.updated_at || post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] text-[#252423] dark:hover:bg-[#3B3A39] dark:text-white flex-shrink-0"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent 
-                          align="end"
-                        >
-                          <DropdownMenuItem 
-                            className="hover:bg-accent"
-                            onClick={() => togglePinPost(post.id)}
-                          >
-                            {post.is_pinned ? (
-                              <>
-                                <PinOff className="h-4 w-4 mr-2" />
-                                {t('unpin')}
-                              </>
-                            ) : (
-                              <>
-                                <Pin className="h-4 w-4 mr-2" />
-                                {t('pin')}
-                              </>
+            <>
+              <Card 
+                className={cn(
+                  "overflow-hidden overflow-x-auto transition-all hover:shadow-md relative border-[#E1DFDD] hover:bg-accent dark:border-[#3B3A39] dark:text-white",
+                  post.is_pinned && "border-l-4"
+                )}
+                style={post.is_pinned ? { borderLeftColor: getColorHexCode(themeColor) } : {}}
+              >
+                <div className="flex flex-col md:flex-row p-0 h-full">
+                  <div className="flex-grow p-4 flex flex-col">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="border-2">
+                          <AvatarImage src={userMap[post.created_by]?.avatar_url || "/placeholder-avatar.jpg"} />
+                          <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white">
+                            {post.created_by && userMap[post.created_by] ? userMap[post.created_by].name?.substring(0, 2).toUpperCase() : 'UN'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center">
+                            <h3 className="text-base font-semibold truncate max-w-[200px] sm:max-w-[250px] md:max-w-[350px] lg:max-w-[450px] xl:max-w-[550px]">
+                              {post.title || t('noTitle')}
+                            </h3>
+                            {post.is_pinned && (
+                              <Pin size={14} style={{ color: getColorHexCode(themeColor) }} className="ml-2 flex-shrink-0" />
                             )}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="hover:bg-accent"
-                            onClick={() => startEditingPost(post)}
-                          >
-                            <Pen className="h-4 w-4 mr-2" />
-                            {t('edit')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="hover:bg-accent"
-                            onClick={() => handleDeletePost(post.id)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2 text-red-500 hover:text-red-600" />
-                            <span className="text-red-500 hover:text-red-600">{t('delete')}</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                  
-                  <div className={cn(
-                    "rich-text-container overflow-hidden overflow-x-auto relative mt-2 w-full flex-grow",
-                    expandedPosts[post.id] 
-                      ? "max-h-full overflow-y-auto" 
-                      : "max-h-[80px]"
-                  )}>
-                    {post.description ? (
-                      <div className="prose prose-sm max-w-full dark:prose-invert break-words break-all overflow-x-hidden">
-                        {renderRichTextContent(post.description)}
+                          </div>
+                          <CardDescription className="text-xs text-[#605E5C] dark:text-[#C8C6C4]">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-default">
+                                    {formatPostDate(post.created_at, { year: 'numeric', month: 'short', day: 'numeric', hour: undefined, minute: undefined })}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <p>{formatPostDate(post.created_at, { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric', 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </CardDescription>
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-sm text-[#605E5C] dark:text-[#C8C6C4]">
-                        {t('noDescription')}
-                      </p>
-                    )}
-                  </div>
-                  
-                  {post.description && typeof post.description === 'string' && post.description.length > 100 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full mt-1 text-xs flex items-center justify-center"
-                      onClick={() => togglePostExpand(post.id)}
-                    >
-                      {expandedPosts[post.id] ? (
-                        <>
-                          <ChevronUp className="h-3 w-3 ml-1" />
-                        </>
+                      <div className="flex items-center">
+                        <div className="flex items-center text-xs mr-4 text-[#605E5C] dark:text-[#C8C6C4]">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center cursor-default">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {formatPostTime(post.updated_at || post.created_at)}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <p>{formatPostDate(post.updated_at || post.created_at, { 
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric', 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] text-[#252423] dark:hover:bg-[#3B3A39] dark:text-white flex-shrink-0"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent 
+                            align="end"
+                          >
+                            <DropdownMenuItem 
+                              className="hover:bg-accent"
+                              onClick={() => togglePinPost(post.id)}
+                            >
+                              {post.is_pinned ? (
+                                <>
+                                  <PinOff className="h-4 w-4 mr-2" />
+                                  {t('unpin')}
+                                </>
+                              ) : (
+                                <>
+                                  <Pin className="h-4 w-4 mr-2" />
+                                  {t('pin')}
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="hover:bg-accent"
+                              onClick={() => startEditingPost(post)}
+                            >
+                              <Pen className="h-4 w-4 mr-2" />
+                              {t('edit')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="hover:bg-accent"
+                              onClick={() => handleDeletePost(post.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2 text-red-500 hover:text-red-600" />
+                              <span className="text-red-500 hover:text-red-600">{t('delete')}</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                    
+                    <div className={cn(
+                      "rich-text-container overflow-hidden overflow-x-auto relative mt-2 w-full flex-grow",
+                      expandedPosts[post.id] 
+                        ? "max-h-full overflow-y-auto" 
+                        : "max-h-[80px]"
+                    )}>
+                      {post.description ? (
+                        <div className="prose prose-sm max-w-full dark:prose-invert break-words break-all overflow-x-hidden">
+                          {renderRichTextContent(post.description)}
+                        </div>
                       ) : (
-                        <>
-                          <ChevronDown className="h-3 w-3 ml-1" />
-                        </>
+                        <p className="text-sm text-[#605E5C] dark:text-[#C8C6C4]">
+                          {t('noDescription')}
+                        </p>
                       )}
-                    </Button>
-                  )}
-                  
-                  <div className="flex justify-start items-center mt-auto pt-3">
-                    <div className="flex space-x-3">
-                      <Button 
-                        variant="ghost" 
+                    </div>
+                    
+                    {post.description && typeof post.description === 'string' && post.description.length > 100 && (
+                      <Button
+                        variant="ghost"
                         size="sm"
-                        className={cn(
-                          "h-8 px-2 rounded-md flex items-center hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]",
-                          post.reactions?.like?.includes(user?.id) && "text-[#6264A7]"
+                        className="w-full mt-1 text-xs flex items-center justify-center"
+                        onClick={() => togglePostExpand(post.id)}
+                      >
+                        {expandedPosts[post.id] ? (
+                          <>
+                            <ChevronUp className="h-3 w-3 ml-1" />
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3 w-3 ml-1" />
+                          </>
                         )}
-                        onClick={() => handleReaction(post.id, 'like')}
-                      >
-                        <ThumbsUp className={cn(
-                          "h-4 w-4 mr-1 text-[#252423] dark:text-white", 
-                          post.reactions?.like?.includes(user?.id) && "fill-current text-[#6264A7]"
-                        )} />
-                        <span className={post.reactions?.like?.includes(user?.id) ? "text-[#6264A7]" : ""}>
-                          {post.reactions?.like?.length || 0}
-                        </span>
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="h-8 px-2 rounded-md flex items-center hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-                      >
-                        <MessageSquare className="h-4 w-4 mr-1 text-[#252423] dark:text-white" />
-                        <span>{post.comments?.length || 0}</span>
-                      </Button>
+                    )}
+                    
+                    <div className="flex justify-start items-center mt-auto pt-3">
+                      <div className="flex space-x-3">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className={cn(
+                            "h-8 px-2 rounded-md flex items-center hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]",
+                            post.reactions?.like?.includes(user?.id) && "text-[#6264A7]"
+                          )}
+                          onClick={() => handleReaction(post.id, 'like')}
+                        >
+                          <ThumbsUp className={cn(
+                            "h-4 w-4 mr-1 text-[#252423] dark:text-white", 
+                            post.reactions?.like?.includes(user?.id) && "fill-current text-[#6264A7]"
+                          )} />
+                          <span className={post.reactions?.like?.includes(user?.id) ? "text-[#6264A7]" : ""}>
+                            {post.reactions?.like?.length || 0}
+                          </span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className={cn(
+                            "h-8 px-2 rounded-md flex items-center hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]",
+                            openComments[post.id] && "text-[#6264A7]"
+                          )}
+                          onClick={() => toggleComments(post.id)}
+                        >
+                          <MessageSquare className={cn(
+                            "h-4 w-4 mr-1 text-[#252423] dark:text-white",
+                          )} />
+                          <span className={openComments[post.id] ? "text-[#6264A7]" : ""}>
+                            {getPostCommentCount(post.id)}
+                          </span>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+              
+              {/* 列表视图下展开评论 */}
+              {openComments[post.id] && (
+                <div className="pl-8 pr-4 py-3 border-l-2 ml-4 bg-background border-[#E1DFDD] dark:border-[#3B3A39] rounded-md">
+                  {commentLoading && commentsMap[post.id] === undefined ? (
+                    <div className="flex justify-center items-center py-4">
+                      <svg className="animate-spin h-5 w-5 text-[#6264A7]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  ) : (
+                    renderComments(post.id)
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       ))}
@@ -886,189 +1511,6 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                 <div className="">
                   <div className="relative">
                     <Input
-                      id="new-title"
-                      autoFocus
-                      placeholder={t('postTitlePlaceholder')}
-                      value={newPostTitle}
-                      onChange={(e) => setNewPostTitle(e.target.value)}
-                      className="text-lg border-border border shadow-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[#252423] dark:text-white w-full focus:border-gray-500 dark:focus:border-white pr-16"
-                      maxLength={50}
-                    />
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-[#605E5C] dark:text-[#C8C6C4]">
-                      <span className="font-medium">
-                        {newPostTitle.trim().length}/50
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2 ml-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-              onClick={() => handleDeletePost(post.id)}
-            >
-              <Trash2 className="h-4 w-4 text-red-500 hover:text-red-600" />
-            </Button>
-          </div>
-        </div>
-        
-        <div className="border-t pt-4 border-[#E1DFDD] dark:border-[#3B3A39]">
-          <div className="grid gap-4">
-            <div className="relative mb-6">
-              <RichEditor
-                placeholder={t('postDescriptionPlaceholder')}
-                value={newPostContent}
-                onChange={setNewPostContent}
-                className="h-[150px] min-h-[150px] max-h-[250px] overflow-y-auto text-[#252423] dark:text-white border-[#E1DFDD] dark:border-[#3B3A39]"
-              />
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex justify-between items-center pt-3 border-t border-[#E1DFDD] dark:border-[#3B3A39]">
-          <div className="flex items-center space-x-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-                >
-                  <Smile className="h-4 w-4 text-[#252423] dark:text-white" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-2">
-                <div className="grid grid-cols-8 gap-2">
-                  {['😊', '👍', '❤️', '😂', '🎉', '🙌', '👏', '🔥',
-                    '💯', '⭐', '✅', '🚀', '💪', '👀', '🤔', '🙏'].map(emoji => (
-                    <Button
-                      key={emoji}
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full"
-                      onClick={() => setNewPostContent(prev => prev + emoji)}
-                    >
-                      {emoji}
-                    </Button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-            >
-              <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
-            </Button>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 rounded-md hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39] flex items-center gap-1 text-[#252423] dark:text-white"
-                >
-                  <div className="flex items-center gap-1">
-                    {postType === 'post' ? (
-                      <MessageSquare className="h-4 w-4" />
-                    ) : (
-                      <MessageSquare className="h-4 w-4 rotate-180" />
-                    )}
-                    <span>{postType === 'post' ? t('post') : t('announcement')}</span>
-                  </div>
-                  <ChevronDown className="h-3 w-3 ml-1" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-0">
-                <div className="py-1">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-2 rounded-none"
-                    onClick={() => setPostType('post')}
-                  >
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      <span>{t('post')}</span>
-                    </div>
-                    {postType === 'post' && <Check className="h-4 w-4 ml-auto" />}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-2 rounded-none"
-                    onClick={() => setPostType('announcement')}
-                  >
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4 rotate-180" />
-                      <span>{t('announcement')}</span>
-                    </div>
-                    {postType === 'announcement' && <Check className="h-4 w-4 ml-auto" />}
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-          
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowInlineEditor(false)}
-              className="rounded-md border-[#E1DFDD] text-[#252423] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:text-white dark:hover:bg-[#3B3A39]"
-            >
-              {t('cancel')}
-            </Button>
-            <Button
-              variant={themeColor}
-              size="sm"
-              onClick={handleCreatePost}
-              disabled={!isFormValid || isLoading}
-              className="rounded-md min-w-[80px]"
-            >
-              {isLoading ? (
-                <div className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {t('saving') || '保存中'}
-                </div>
-              ) : (
-                t('post') || '发布'
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-  
-  // 渲染帖子编辑表单
-  const renderEditForm = (post) => (
-    <Card 
-      ref={inlineEditorRef}
-      className="mb-4 mt-2 overflow-hidden border bg-background border-[#E1DFDD] dark:border-[#3B3A39] dark:text-white"
-    >
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex items-center space-x-3 flex-grow">
-            <Avatar className="border-2">
-              <AvatarImage src={userMap[post.created_by]?.avatar_url || "/placeholder-avatar.jpg"} />
-              <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white">
-                {userMap[post.created_by] ? userMap[post.created_by].name?.substring(0, 2).toUpperCase() : 'UN'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0 w-full max-w-full">
-              <div className="grid gap-2">
-                <div className="">
-                  <div className="relative">
-                    <Input
                       id="edit-title"
                       autoFocus
                       placeholder={t('postTitlePlaceholder')}
@@ -1115,33 +1557,12 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         
         <div className="flex justify-between items-center pt-3 border-t border-[#E1DFDD] dark:border-[#3B3A39]">
           <div className="flex items-center space-x-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-                >
-                  <Smile className="h-4 w-4 text-[#252423] dark:text-white" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-2">
-                <div className="grid grid-cols-8 gap-2">
-                  {['😊', '👍', '❤️', '😂', '🎉', '🙌', '👏', '🔥',
-                    '💯', '⭐', '✅', '🚀', '💪', '👀', '🤔', '🙏'].map(emoji => (
-                    <Button
-                      key={emoji}
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full"
-                      onClick={() => setEditPostContent(prev => prev + emoji)}
-                    >
-                      {emoji}
-                    </Button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
+            
+            <EmojiPicker 
+              onEmojiSelect={(emojiData) => setEditPostContent(prev => prev + emojiData.emoji)}
+              position="right"
+              offset={5}
+            />
             
             <Button
               variant="ghost"
@@ -1256,6 +1677,8 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   const handleViewModeChange = (mode) => {
     handlePotentialLeave(() => {
       setViewMode(mode);
+      // 关闭评论对话框
+      setCommentDialogOpen(false);
     });
   };
   
@@ -1331,6 +1754,18 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           flex-direction: column;
           height: auto;
         }
+        
+        /* 添加评论文本样式 */
+        .whitespace-pre-wrap {
+          white-space: pre-wrap;
+        }
+        .overflow-wrap-anywhere {
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+        .break-words {
+          word-break: break-word;
+        }
       `}</style>
       
       {/* Header */}
@@ -1404,33 +1839,12 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                         />
                         <div className="mt-2 flex justify-between items-center">
                           <div className="flex items-center space-x-2">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-                                >
-                                  <Smile className="h-4 w-4 text-[#252423] dark:text-white" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-80 p-2">
-                                <div className="grid grid-cols-8 gap-2">
-                                  {['😊', '👍', '❤️', '😂', '🎉', '🙌', '👏', '🔥',
-                                    '💯', '⭐', '✅', '🚀', '💪', '👀', '🤔', '🙏'].map(emoji => (
-                                    <Button
-                                      key={emoji}
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 rounded-full"
-                                      onClick={() => setNewPostDescription(prev => prev + emoji)}
-                                    >
-                                      {emoji}
-                                    </Button>
-                                  ))}
-                                </div>
-                              </PopoverContent>
-                            </Popover>
+                            
+                            <EmojiPicker 
+                              onEmojiSelect={(emojiData) => setNewPostDescription(prev => prev + emojiData.emoji)}
+                              position="right"
+                              offset={5}
+                            />
                             
                             <Button
                               variant="ghost"
@@ -1451,7 +1865,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 rounded-md border-[#E1DFDD] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:hover:bg-[#3B3A39] flex items-center gap-1 text-[#252423] dark:text-white"
+                            className="h-8 rounded-md border-[#E1DFDD] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:text-white dark:hover:bg-[#3B3A39] flex items-center gap-1 text-[#252423]"
                           >
                             <div className="flex items-center gap-1">
                               {postType === 'post' ? (

@@ -231,7 +231,6 @@ CREATE TABLE "team_post" (
   "attachment_id" INT[] DEFAULT '{}', -- Array of attachments associated with the post
   "is_pinned" BOOLEAN DEFAULT FALSE,
   "reactions" JSONB DEFAULT '{}', -- Store reactions as {emoji: [user_ids]} format
-  "comment_id" INT[] DEFAULT '{}', -- Array of comments associated with the post
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -277,7 +276,7 @@ CREATE TABLE "agile_member" (
 CREATE TABLE "comment" (
   "id" SERIAL PRIMARY KEY,
   "text" TEXT NOT NULL,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
+  "post_id" INT NOT NULL REFERENCES "team_post"("id") ON DELETE CASCADE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP

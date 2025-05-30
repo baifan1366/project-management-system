@@ -1819,7 +1819,7 @@
     "edit": "Edit",
     "cancel": "Cancel",
     "viewOnly": "View Only",
-    "placeholder": "Enter announcement content...",
+    "placeholder": "Announcement content description...",
     "loading": "Loading...",
     "error": "Error",
     "pin": "Pin",
@@ -2243,6 +2243,14 @@
     "closePreview": "Close Preview"
   },
   "PostsView": {
+    "loadCommentsError": "Load Comments Error",
+    "comments": "comments",
+    "unknownUser": "Unknown User",
+    "noComments": "No Comments",
+    "loading": "Loading...",
+    "beFirstToComment": "Be the first to comment",
+    "addComment": "Add Comment",
+    "send": "Send",
     "posts": "Posts",
     "searchPosts": "Search posts...",
     "newPost": "New Post",

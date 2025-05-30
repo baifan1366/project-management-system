@@ -2207,6 +2207,14 @@
     "closePreview": "关闭预览"
   },
   "PostsView": {
+    "loadCommentsError": "加载评论错误",
+    "comments": "评论",
+    "unknownUser": "未知用户",
+    "noComments": "没有评论",
+    "loading": "加载中...",
+    "beFirstToComment": "成为第一个评论者",
+    "addComment": "添加评论",
+    "send": "发送",    
     "posts": "帖子",
     "searchPosts": "搜索帖子...",
     "newPost": "新帖子",
