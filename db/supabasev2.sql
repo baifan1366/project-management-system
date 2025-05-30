@@ -692,7 +692,9 @@ CREATE TABLE "mytasks" (
   "title" VARCHAR(255) NOT NULL,
   "description" TEXT,
   "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
+  "priority" TEXT CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
   "expected_completion_date" TIMESTAMP,
+  "expected_start_time" TIMESTAMP,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

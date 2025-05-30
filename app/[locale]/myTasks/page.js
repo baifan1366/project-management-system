@@ -16,14 +16,23 @@ import useGetUser from '@/lib/hooks/useGetUser';
 import React from 'react';
 import { supabase } from '@/lib/supabase';
 import NewTaskDialog from '@/components/myTasks/NewTaskDialog';
+import TaskDetailsDialog from '@/components/myTasks/TaskDetailsDialog';
+import EditTaskDialog from '@/components/myTasks/EditTaskDialog';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 
 // 任务看板视图组件
 export default function MyTasksPage() {
   const t_tasks = useTranslations('myTasks');
   const t_common = useTranslations('common');
+  const { formatDateToUserTimezone } = useUserTimezone();
   const [tasks, setTasks] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
-  const [columns, setColumns] = useState({});
+  const [columns, setColumns] = useState({
+    todo: { id: 'todo', title: '', tasks: [] },
+    in_progress: { id: 'in_progress', title: '', tasks: [] },
+    in_review: { id: 'in_review', title: '', tasks: [] },
+    done: { id: 'done', title: '', tasks: [] }
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [selectedType, setSelectedType] = useState('upcoming');
@@ -33,6 +42,9 @@ export default function MyTasksPage() {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState(null);
   const [showNewTaskDialog, setShowNewTaskDialog] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [showTaskDetailsDialog, setShowTaskDetailsDialog] = useState(false);
+  const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
 
   // 根据字段名找到对应的数字键
   const getKeyForField = React.useCallback((fieldName, tagValues) => {
@@ -120,6 +132,10 @@ export default function MyTasksPage() {
   
   // 获取任务的优先级
   const getTaskPriority = React.useCallback((task) => {
+    // First check if priority exists directly on the task
+    if (task.priority) return task.priority;
+    
+    // Then fall back to checking tag_values
     if (!task?.tag_values) return null;
     const priorityKey = getKeyForField('priority', task.tag_values);
     return priorityKey ? task.tag_values[priorityKey] : null;
@@ -188,9 +204,12 @@ export default function MyTasksPage() {
             ...task,
             my_task_id: myTask.id,
             status: myTask.status,
+            priority: myTask.priority,
             title: myTask.title || getTaskTitle(task),
             description: myTask.description || getTaskDescription(task),
-            expected_completion_date: myTask.expected_completion_date
+            expected_completion_date: myTask.expected_completion_date,
+            expected_start_time: myTask.expected_start_time,
+            is_standalone: false
           };
         });
         
@@ -202,16 +221,19 @@ export default function MyTasksPage() {
         id: `local-${myTask.id}`,
         my_task_id: myTask.id,
         tag_values: {},
-        status: myTask.status,
-        title: myTask.title,
-        description: myTask.description,
+        status: myTask.status || 'TODO',
+        priority: myTask.priority || 'MEDIUM',
+        title: myTask.title || t_tasks('noTitle'),
+        description: myTask.description || '',
         expected_completion_date: myTask.expected_completion_date,
+        expected_start_time: myTask.expected_start_time,
         is_standalone: true
       }));
       
       // 合并所有任务
       combinedTasks = [...combinedTasks, ...standaloneTasks];
       
+      console.log('加载的任务列表:', combinedTasks);
       setTasks(combinedTasks);
       setMyTasks(userMyTasks);
       setFilteredTasks(combinedTasks);
@@ -285,48 +307,125 @@ export default function MyTasksPage() {
     }
   }, [user]);
 
+  // 应用所有过滤器（搜索 + 边栏过滤器）
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) return;
+    
+    // 应用所有过滤器
+    let filtered = [...tasks];
+    
+    // 应用搜索过滤
+    if (searchQuery) {
+      filtered = filtered.filter(task => 
+        (task.title && task.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (task.tag_values && 
+          Object.values(task.tag_values).some(value => 
+            value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())
+          ))
+      );
+    }
+    
+    // 按类型过滤（基于任务截止日期）
+    if (selectedType !== 'upcoming') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      filtered = filtered.filter(task => {
+        const dueDate = task.expected_completion_date
+          ? new Date(task.expected_completion_date)
+          : null;
+          
+        switch (selectedType) {
+          case 'pastDue':
+            return dueDate && dueDate < today;
+          case 'today':
+            return dueDate && dueDate.toDateString() === today.toDateString();
+          case 'noDate':
+            return !dueDate;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // 按分配给我过滤 - 我们这里不需要额外过滤，因为所有任务都是当前用户的
+    
+    // 按工作空间/团队过滤
+    if (selectedWorkspace !== 'all') {
+      switch (selectedWorkspace) {
+        case 'workspace':
+          // 过滤个人工作区任务（没有关联task_id的是个人任务）
+          filtered = filtered.filter(task => task.is_standalone);
+          break;
+        case 'shared':
+          // 过滤共享任务（有关联task_id的是共享任务）
+          filtered = filtered.filter(task => !task.is_standalone);
+          break;
+        default:
+          break;
+      }
+    }
+    
+    // 设置筛选后的任务
+    setFilteredTasks(filtered);
+  }, [tasks, searchQuery, selectedType, selectedAssignee, selectedWorkspace]);
+
   // 任务数据处理和分列
   useEffect(() => {
     if (filteredTasks && filteredTasks.length > 0) {
-      // 应用搜索过滤
-      const tasksAfterSearch = searchQuery 
-        ? filteredTasks.filter(task => 
-            (task.title && task.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (task.tag_values && 
-              Object.values(task.tag_values).some(value => 
-                value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())
-              ))
-          )
-        : filteredTasks;
-      
       // 根据状态将任务分组到不同列
       const newColumns = {
         todo: {
           id: 'todo',
           title: t_tasks('status.todo'),
-          tasks: tasksAfterSearch.filter(task => task.status === 'TODO')
+          tasks: filteredTasks.filter(task => task.status === 'TODO')
         },
         in_progress: {
           id: 'in_progress',
           title: t_tasks('status.in_progress'),
-          tasks: tasksAfterSearch.filter(task => task.status === 'IN_PROGRESS')
+          tasks: filteredTasks.filter(task => task.status === 'IN_PROGRESS')
         },
         in_review: {
           id: 'in_review',
           title: t_tasks('status.in_review'),
-          tasks: tasksAfterSearch.filter(task => task.status === 'IN_REVIEW')
+          tasks: filteredTasks.filter(task => task.status === 'IN_REVIEW')
         },
         done: {
           id: 'done',
           title: t_tasks('status.done'),
-          tasks: tasksAfterSearch.filter(task => task.status === 'DONE')
+          tasks: filteredTasks.filter(task => task.status === 'DONE')
         }
       };
       
       setColumns(newColumns);
+    } else {
+      // 如果过滤后没有任务，设置空列
+      const emptyColumns = {
+        todo: {
+          id: 'todo',
+          title: t_tasks('status.todo'),
+          tasks: []
+        },
+        in_progress: {
+          id: 'in_progress',
+          title: t_tasks('status.in_progress'),
+          tasks: []
+        },
+        in_review: {
+          id: 'in_review',
+          title: t_tasks('status.in_review'),
+          tasks: []
+        },
+        done: {
+          id: 'done',
+          title: t_tasks('status.done'),
+          tasks: []
+        }
+      };
+      setColumns(emptyColumns);
     }
-  }, [filteredTasks, searchQuery, t_tasks]);
+  }, [filteredTasks, t_tasks]);
 
   // 处理拖放结束事件
   const onDragEnd = (result) => {
@@ -395,9 +494,10 @@ export default function MyTasksPage() {
   // 获取任务优先级对应的样式
   const getPriorityVariant = React.useCallback((priority) => {
     switch (priority) {
-      case 'HIGH':
       case 'URGENT':
         return 'destructive';
+      case 'HIGH':
+        return 'yellow';
       case 'MEDIUM':
         return 'warning';
       default:
@@ -409,17 +509,74 @@ export default function MyTasksPage() {
   const renderFilterItem = (key, value, selectedValue, setSelectedFunc) => {
     const isSelected = selectedValue === value;
     
+    // 计算每个过滤条件的任务数量
+    const getFilterCount = () => {
+      if (!tasks || tasks.length === 0) return 0;
+      
+      if (value === 'pastDue' || value === 'today' || value === 'upcoming' || value === 'noDate') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        return tasks.filter(task => {
+          const dueDate = task.expected_completion_date
+            ? new Date(task.expected_completion_date)
+            : null;
+            
+          switch (value) {
+            case 'pastDue':
+              return dueDate && dueDate < today;
+            case 'today':
+              return dueDate && dueDate.toDateString() === today.toDateString();
+            case 'upcoming':
+              return dueDate && dueDate > today;
+            case 'noDate':
+              return !dueDate;
+            default:
+              return false;
+          }
+        }).length;
+      }
+      
+      if (value === 'workspace' || value === 'shared' || value === 'all') {
+        if (value === 'workspace') {
+          return tasks.filter(task => task.is_standalone).length;
+        }
+        if (value === 'shared') {
+          return tasks.filter(task => !task.is_standalone).length;
+        }
+        if (value === 'all') {
+          return tasks.length;
+        }
+      }
+      
+      if (value === 'me') {
+        return tasks.length; // 所有任务都是分配给当前用户的
+      }
+      
+      if (value === 'createdBy') {
+        // 暂不支持按创建者筛选，返回0
+        return 0;
+      }
+      
+      return 0;
+    };
+    
     return (
       <div 
         key={value}
         onClick={() => setSelectedFunc(value)}
-        className={`flex items-center gap-2 cursor-pointer p-2 rounded-md ${isSelected ? 'bg-accent/20' : 'hover:bg-accent/10'}`}
+        className={`flex items-center justify-between cursor-pointer p-2 rounded-md ${isSelected ? 'bg-accent/20' : 'hover:bg-accent/10'}`}
       >
-        {isSelected ? 
-          <CheckCircle className="h-4 w-4" /> : 
-          <Circle className="h-4 w-4" />
-        }
-        <span className={isSelected ? 'font-medium' : ''}>{key}</span>
+        <div className="flex items-center gap-2">
+          {isSelected ? 
+            <CheckCircle className="h-4 w-4" /> : 
+            <Circle className="h-4 w-4" />
+          }
+          <span className={isSelected ? 'font-medium' : ''}>{key}</span>
+        </div>
+        <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded-full bg-muted">
+          {getFilterCount()}
+        </span>
       </div>
     );
   };
@@ -429,8 +586,48 @@ export default function MyTasksPage() {
     setShowNewTaskDialog(true);
   };
   
-  // 任务成功创建后更新列表
-  const handleTaskCreated = () => {
+  // 处理点击任务卡片
+  const handleTaskClick = (task) => {
+    // Format the task object with the correct ID and details
+    const detailTask = {
+      ...task,
+      // For standalone tasks, extract the actual ID from the local-prefixed ID
+      id: task.is_standalone && task.id.startsWith('local-') 
+        ? task.id.replace('local-', '') 
+        : task.my_task_id || task.id,
+      priority: getTaskPriority(task) || task.priority,
+      expected_start_time: task.expected_start_time || null, // Ensure field exists even if null
+      expected_completion_date: task.expected_completion_date || null // Ensure field exists even if null
+    };
+    
+    console.log("Original task for details:", task);
+    console.log("Task being passed to TaskDetailsDialog:", detailTask);
+    setSelectedTask(detailTask);
+    setShowTaskDetailsDialog(true);
+  };
+
+  // 处理编辑任务
+  const handleEditTask = (task) => {
+    // Make sure the task has the correct ID format for the edit dialog
+    const editTask = {
+      ...task,
+      // For standalone tasks, extract the actual ID from the local-prefixed ID
+      id: task.is_standalone && task.id.startsWith('local-') 
+        ? task.id.replace('local-', '') 
+        : task.my_task_id || task.id,
+      priority: task.priority || getTaskPriority(task),
+      expected_start_time: task.expected_start_time || null, // Ensure field exists even if null
+      expected_completion_date: task.expected_completion_date || null // Ensure field exists even if null
+    };
+    
+    console.log("Original task before edit:", task);
+    console.log("Task being passed to EditTaskDialog:", editTask);
+    setSelectedTask(editTask);
+    setShowEditTaskDialog(true);
+  };
+
+  // 任务成功创建或编辑后更新列表
+  const handleTaskUpdate = () => {
     if (user) {
       fetchMyTasks(user.id);
     }
@@ -495,17 +692,50 @@ export default function MyTasksPage() {
         </div>
       </div>
 
-      {/* New Task Dialog */}
+      {/* Dialogs */}
       <NewTaskDialog 
         open={showNewTaskDialog}
         onOpenChange={setShowNewTaskDialog}
-        onTaskCreated={handleTaskCreated}
+        onTaskCreated={handleTaskUpdate}
         userId={user?.id}
+      />
+
+      <TaskDetailsDialog
+        isOpen={showTaskDetailsDialog}
+        setIsOpen={setShowTaskDetailsDialog}
+        task={selectedTask}
+        onEdit={handleEditTask}
+        onSuccess={handleTaskUpdate}
+      />
+
+      <EditTaskDialog
+        isOpen={showEditTaskDialog}
+        setIsOpen={setShowEditTaskDialog}
+        task={selectedTask}
+        onSuccess={handleTaskUpdate}
       />
 
       <div className="flex gap-4 h-[calc(100vh-120px)]">
         {/* 左侧过滤器面板 */}
         <div className="w-64 bg-background border rounded-md p-4">
+          {/* 清除过滤器按钮 */}
+          {(selectedType !== 'upcoming' || selectedAssignee !== 'me' || 
+            selectedWorkspace !== 'workspace' || searchQuery) && (
+            <Button 
+              variant="ghost" 
+              className="mb-4 text-xs w-full justify-start text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setSelectedType('upcoming');
+                setSelectedAssignee('me');
+                setSelectedWorkspace('workspace');
+                setSearchQuery('');
+              }}
+            >
+              <Filter className="h-3.5 w-3.5 mr-2 rotate-0 scale-100" />
+              {t_common('clearFilters')}
+            </Button>
+          )}
+
           {/* TYPE 过滤器 */}
           <div className="mb-5">
             <h3 className="text-xs text-muted-foreground mb-2">{t_tasks('type.label')}</h3>
@@ -539,7 +769,7 @@ export default function MyTasksPage() {
         {/* 右侧任务看板 */}
         <div className="flex-1">
           <div className="text-sm text-muted-foreground mb-3">
-            {filteredTasks.length} {t_tasks('results')}
+            {filteredTasks ? filteredTasks.length : 0} {t_tasks('results')}
           </div>
           <DragDropContext onDragEnd={onDragEnd}>
             <div className="flex space-x-4 overflow-x-auto pb-4 h-full">
@@ -572,16 +802,21 @@ export default function MyTasksPage() {
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
-                                  className={`p-3 mb-2 bg-card border rounded-md shadow-sm ${
+                                  className={`p-3 mb-2 bg-card border rounded-md shadow-sm cursor-pointer ${
                                     snapshot.isDragging ? "opacity-75 bg-accent" : ""
                                   }`}
+                                  onClick={() => handleTaskClick(task)}
                                 >
                                   <div className="mb-2 flex justify-between">
                                     <h3 className="font-medium text-sm">
                                       {getTaskTitle(task) || t_tasks('noTitle')}
                                     </h3>
-                                    <Badge variant={getPriorityVariant(getTaskPriority(task))}>
-                                      {getTaskPriority(task)?.toLowerCase() || 'low'}
+                                    {console.log(`Task priority for ${task.id}:`, task.priority, getTaskPriority(task))}
+                                    <Badge 
+                                      variant={getPriorityVariant(getTaskPriority(task))}
+                                      className={getPriorityVariant(getTaskPriority(task)) === 'yellow' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
+                                    >
+                                      {(getTaskPriority(task) || 'LOW')}
                                     </Badge>
                                   </div>
                                   {getTaskDescription(task) && (
@@ -598,11 +833,19 @@ export default function MyTasksPage() {
                                       )}
                                     </div>
                                     <div className="flex items-center gap-3">
+                                      {task.expected_start_time && (
+                                        <div className="flex items-center gap-1">
+                                          <Clock className="w-3 h-3" />
+                                          <span>
+                                            {formatDateToUserTimezone(task.expected_start_time)}
+                                          </span>
+                                        </div>
+                                      )}
                                       {task.expected_completion_date && (
                                         <div className="flex items-center gap-1">
                                           <Calendar className="w-3 h-3" />
                                           <span>
-                                            {format(new Date(task.expected_completion_date), 'yyyy-MM-dd')}
+                                            {formatDateToUserTimezone(task.expected_completion_date)}
                                           </span>
                                         </div>
                                       )}

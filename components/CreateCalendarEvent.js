@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from '@/lib/supabase';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import useGetUser from '@/lib/hooks/useGetUser';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function CreateCalendarEvent({ 
   isOpen, 
@@ -58,15 +59,21 @@ export default function CreateCalendarEvent({
     title: '',
     description: '',
     startDate: selectedDate,
-    startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
+    startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
     endDate: selectedDate,
-    endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'HH:mm'),
+    endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'hh:mm'),
     isAllDay: false,
     location: '',
     reminders: false,
-    color: '#4285F4', // 默认颜色
     addGoogleMeet: false, // 是否添加Google Meet视频会议
     inviteParticipants: false, // 是否邀请参与者
+    priority: 'MEDIUM',
+  });
+
+  // 添加日期时间验证状态
+  const [formErrors, setFormErrors] = useState({
+    dateError: '',
+    timeError: ''
   });
 
   // Initialize form data when editing an existing event
@@ -111,15 +118,15 @@ export default function CreateCalendarEvent({
         title: eventToEdit.title || eventToEdit.summary || '',
         description: eventToEdit.description || '',
         startDate: eventToEdit.startDate || selectedDate,
-        startTime: eventToEdit.startTime || format(new Date().setMinutes(0, 0, 0), 'HH:mm'),
+        startTime: eventToEdit.startTime || format(new Date().setMinutes(0, 0, 0), 'hh:mm'),
         endDate: eventToEdit.endDate || selectedDate,
-        endTime: eventToEdit.endTime || format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
+        endTime: eventToEdit.endTime || format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
         isAllDay: eventToEdit.isAllDay || false,
         location: eventToEdit.location || '',
         reminders: eventToEdit.reminders || false,
-        color: eventToEdit.color || '#4285F4',
         addGoogleMeet: eventToEdit.addGoogleMeet || false,
         inviteParticipants: eventToEdit.attendees?.length > 0 || false,
+        priority: eventToEdit.priority || 'MEDIUM',
       });
     }
   }, [isEditing, eventToEdit, selectedDate]);
@@ -221,70 +228,119 @@ export default function CreateCalendarEvent({
     setSelectedUsers(selectedUsers.filter(user => user.id !== userId));
   };
 
-  // 处理日期变化
-  const handleDateChange = (date, name) => {
-    // Clear any previous errors
-    setDateError('');
+  // 验证表单数据
+  const validateForm = () => {
+    const errors = {
+      dateError: '',
+      timeError: ''
+    };
     
-    // Validate that date is not in the past for start date
-    if (name === 'startDate') {
-      const now = new Date();
-      // Reset time to midnight for comparison when comparing just dates
-      const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const selectedDateMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-      
-      if (selectedDateMidnight < todayDate) {
-        setDateError(t('cannotSelectPastDate') || 'Cannot select a date in the past');
-        return; // Don't update state with invalid date
-      }
-      
-      // If selecting today, also validate the time if a time is already set
-      if (isSameDay(date, now) && formData.startTime) {
-        const timeComponents = formData.startTime.split(':');
-        const selectedDateTime = new Date(
-          date.getFullYear(), 
-          date.getMonth(), 
-          date.getDate(),
-          parseInt(timeComponents[0]), 
-          parseInt(timeComponents[1])
-        );
-        
-        if (isPast(selectedDateTime)) {
-          setDateError(t('cannotSelectPastTime') || 'Cannot select a time in the past');
-          // Still update the date, but show the error for time
-        }
+    // Parse time string to hours and minutes
+    const parseTimeString = (timeStr) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return [hours, minutes];
+    };
+    
+    // 创建完整的开始日期时间和结束日期时间
+    const [startHour, startMinute] = parseTimeString(formData.startTime);
+    const [endHour, endMinute] = parseTimeString(formData.endTime);
+    
+    const startDateTime = new Date(
+      formData.startDate.getFullYear(),
+      formData.startDate.getMonth(),
+      formData.startDate.getDate(),
+      startHour,
+      startMinute
+    );
+    
+    const endDateTime = new Date(
+      formData.endDate.getFullYear(),
+      formData.endDate.getMonth(),
+      formData.endDate.getDate(),
+      endHour,
+      endMinute
+    );
+    
+    // 验证开始日期不是过去的日期
+    const now = new Date();
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startDateMidnight = new Date(formData.startDate.getFullYear(), formData.startDate.getMonth(), formData.startDate.getDate());
+    
+    // Always check if the date is in the past, even when editing
+    if (startDateMidnight < todayDate) {
+      errors.dateError = t('cannotSelectPastDate') || 'Cannot select a date in the past';
+    }
+    
+    // 验证今天的开始时间不是过去的时间 - only check if start date is today
+    if (isSameDay(formData.startDate, now) && startDateTime < now) {
+      errors.timeError = t('cannotSelectPastTime') || 'Cannot select a time in the past';
+    }
+    
+    // Check for time confusion issues
+    const startHour24 = parseInt(formData.startTime.split(':')[0], 10);
+    const endHour24 = parseInt(formData.endTime.split(':')[0], 10);
+    
+    // 验证结束日期时间不早于开始日期时间 - compare full date-times
+    if (endDateTime < startDateTime) {
+      if (!isSameDay(formData.startDate, formData.endDate)) {
+        // Use a more appropriate error message for different days
+        errors.timeError = t('endTimeBeforeStartAcrossDays') || 'End date/time must be after start date/time';
+      } else {
+        errors.timeError = t('endTimeCannotBeBeforeStart') || 'End time cannot be before start time';
       }
     }
     
-    setFormData((prev) => ({ ...prev, [name]: date }));
+    setFormErrors(errors);
+    return !errors.dateError && !errors.timeError;
+  }
+
+  // 处理日期变化
+  const handleDateChange = (date, name) => {
+    // 当开始日期变化时，如果结束日期在开始日期之前，则自动调整结束日期
+    if (name === 'startDate' && formData.endDate < date) {
+      setFormData((prev) => ({ 
+        ...prev, 
+        [name]: date,
+        endDate: date 
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: date }));
+    }
+    
+    // 清除之前的所有错误，因为日期变化可能会解决时间相关的问题
+    setFormErrors(prev => ({
+      dateError: '',
+      timeError: ''
+    }));
   };
   
   // Handle time input changes with validation
   const handleTimeChange = (e) => {
     const { name, value } = e.target;
     
-    // Clear any previous errors
-    setDateError('');
+    setFormData((prev) => ({ ...prev, [name]: value }));
     
-    // For start time changes, validate if the date is today
-    if (name === 'startTime' && isSameDay(formData.startDate, new Date())) {
-      const now = new Date();
-      const timeComponents = value.split(':');
-      const selectedDateTime = new Date(
-        formData.startDate.getFullYear(), 
-        formData.startDate.getMonth(), 
-        formData.startDate.getDate(),
-        parseInt(timeComponents[0]), 
-        parseInt(timeComponents[1])
-      );
+    // 当开始时间变化时，如果时间范围变成无效（结束时间在开始时间之前），则自动调整结束时间
+    // Only auto-adjust when start and end dates are the same day
+    if (name === 'startTime' && formData.startDate && formData.endDate && isSameDay(formData.startDate, formData.endDate)) {
+      const [startHour, startMinute] = value.split(':').map(Number);
+      const [endHour, endMinute] = formData.endTime.split(':').map(Number);
       
-      if (isPast(selectedDateTime)) {
-        setDateError(t('cannotSelectPastTime') || 'Cannot select a time in the past');
-        // Still update the time value to allow the user to correct it
+      if (startHour > endHour || (startHour === endHour && startMinute >= endMinute)) {
+        // 如果新的开始时间大于等于结束时间，则将结束时间设置为开始时间后的1小时
+        const newEndHour = (startHour + 1) % 24;
+        setFormData(prev => ({
+          ...prev,
+          endTime: `${newEndHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`
+        }));
       }
     }
     
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    // 清除之前的错误
+    setFormErrors(prev => ({
+      ...prev,
+      timeError: ''
+    }));
   };
 
   // 处理表单数据变化
@@ -310,36 +366,56 @@ export default function CreateCalendarEvent({
     if (e) e.preventDefault();
     
     try {
+      // 先验证表单数据
+      if (!validateForm()) {
+        return; // 如果验证失败，不提交表单
+      }
+      
       setIsLoading(true);
+      
+      // Parse time string to get hours and minutes
+      const getTimeComponents = (timeStr) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      };
       
       // Validate that event time is not in the past
       const now = new Date();
+      
+      // Get the time string
+      const startTimeStr = getTimeComponents(formData.startTime);
+      const endTimeStr = getTimeComponents(formData.endTime);
+      
       const startDateTime = formData.isAllDay 
         ? new Date(format(formData.startDate, 'yyyy-MM-dd') + 'T00:00:00')
-        : new Date(format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00');
+        : new Date(format(formData.startDate, 'yyyy-MM-dd') + 'T' + startTimeStr + ':00');
       
-      // Skip past date check when editing
-      if (!isEditing) {
-        // Check if the start date/time is in the past
-        if (isPast(startDateTime) && !isSameDay(startDateTime, now)) {
-          throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
-        }
-        
-        // For same-day events, check if the time is in the past
-        if (isSameDay(startDateTime, now) && isPast(startDateTime)) {
-          throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
-        }
+      // Always check if start date/time is in the past, even when editing
+      // Check if the start date/time is in the past
+      if (isPast(startDateTime) && !isSameDay(startDateTime, now)) {
+        throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
+      }
+      
+      // For same-day events, check if the time is in the past
+      if (isSameDay(startDateTime, now) && isPast(startDateTime)) {
+        throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
       }
       
       if (eventType === 'task') {
         try {
-          // 直接创建 mytasks 记录，不需要先创建任务
+          // 检查是否是编辑模式
+          const isUpdateMode = isEditing && eventToEdit && eventToEdit.id;
+          
+          // 准备 mytasks 数据
+          const startDateTime = formData.isAllDay 
+            ? format(formData.startDate, 'yyyy-MM-dd')
+            : format(formData.startDate, 'yyyy-MM-dd') + 'T' + startTimeStr + ':00';
+          
+          const endDateTime = formData.isAllDay
+            ? `${format(formData.endDate, 'yyyy-MM-dd')}T23:59:59`
+            : `${format(formData.endDate, 'yyyy-MM-dd')}T${endTimeStr}:00`;
+          
           if (session) {
-            // 准备 mytasks 数据
-            const dueDate = formData.isAllDay 
-              ? format(formData.startDate, 'yyyy-MM-dd')
-              : format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00';
-            
             // 检查 user_id 是否是有效的 UUID 格式
             const userId = session.id;
             if (!userId) {
@@ -348,30 +424,60 @@ export default function CreateCalendarEvent({
               return;
             }
             
-            // 临时测试生成日志
-            console.log('Current user session:', session);
-            
-            // 插入 mytasks 记录
-            const { data, error } = await supabase.from('mytasks').insert({
-              user_id: userId,
-              title: formData.title,
-              description: formData.description || '',
-              status: 'TODO',
-              expected_completion_date: dueDate
-            }).select();
-            
-            if (error) {
-              console.error('Error details:', error);
-              throw new Error(error.message || 'Failed to create mytask');
+            if (isUpdateMode) {
+              // 更新现有任务
+              console.log('Updating existing task with ID:', eventToEdit.id);
+              
+              // 准备任务数据
+              const taskData = {
+                title: formData.title,
+                description: formData.description || '',
+                expected_start_time: startDateTime,
+                expected_completion_date: endDateTime,
+                priority: formData.priority || 'MEDIUM',
+                updated_at: new Date().toISOString()
+              };
+              
+              const { data, error } = await supabase.from('mytasks')
+                .update(taskData)
+                .eq('id', eventToEdit.id)
+                .select();
+              
+              if (error) {
+                console.error('Error updating task:', error);
+                throw new Error(error.message || t('updateTaskFailed') || 'Failed to update task');
+              }
+              
+              console.log('Task successfully updated:', data);
+            } else {
+              // 创建新任务
+              const taskData = {
+                user_id: userId,
+                title: formData.title,
+                description: formData.description || '',
+                status: 'TODO',
+                priority: formData.priority || 'MEDIUM',
+                expected_start_time: startDateTime,
+                expected_completion_date: endDateTime
+              };
+              
+              const { data, error } = await supabase.from('mytasks')
+                .insert(taskData)
+                .select();
+              
+              if (error) {
+                console.error('Error details:', error);
+                throw new Error(error.message || t('createTaskFailed') || 'Failed to create task');
+              }
+              
+              console.log('Task successfully added to mytasks:', data);
             }
-            
-            console.log('Task successfully added to mytasks:', data);
           } else {
             throw new Error(t('notLoggedIn') || 'Not logged in');
           }
         } catch (error) {
-          console.error('Error creating mytask:', error);
-          toast.error(error.message || t('eventCreationFailed'));
+          console.error('Error creating/updating task:', error);
+          toast.error(error.message || (isEditing ? t('taskUpdateFailed') : t('eventCreationFailed')));
           return; // Stop execution if there's an error
         }
       } else if (eventType === 'personal') {
@@ -382,11 +488,11 @@ export default function CreateCalendarEvent({
 
         const startDateTime = formData.isAllDay 
           ? `${format(formData.startDate, 'yyyy-MM-dd')}T00:00:00`
-          : `${format(formData.startDate, 'yyyy-MM-dd')}T${formData.startTime}:00`;
+          : `${format(formData.startDate, 'yyyy-MM-dd')}T${startTimeStr}:00`;
         
         const endDateTime = formData.isAllDay
           ? `${format(formData.endDate, 'yyyy-MM-dd')}T23:59:59`
-          : `${format(formData.endDate, 'yyyy-MM-dd')}T${formData.endTime}:00`;
+          : `${format(formData.endDate, 'yyyy-MM-dd')}T${endTimeStr}:00`;
         
         const personalEventData = {
           title: formData.title,
@@ -395,27 +501,45 @@ export default function CreateCalendarEvent({
           end_time: endDateTime,
           is_all_day: formData.isAllDay,
           location: formData.location,
-          color: formData.color,
+          color: '#9c27b0', // Default purple color
           user_id: session.id
         };
         
-        const { error } = await supabase
-          .from('personal_calendar_event')
-          .insert(personalEventData);
+        // 检查是否是编辑模式
+        const isUpdateMode = isEditing && eventToEdit && eventToEdit.id;
         
-        if (error) {
-          console.error('创建个人日历事件失败:', error);
-          throw new Error(error.message || '创建个人日历事件失败');
+        if (isUpdateMode) {
+          // 更新现有个人事件
+          console.log('Updating existing personal event with ID:', eventToEdit.id);
+          const { error } = await supabase
+            .from('personal_calendar_event')
+            .update(personalEventData)
+            .eq('id', eventToEdit.id);
+          
+          if (error) {
+            console.error('更新个人日历事件失败:', error);
+            throw new Error(error.message || '更新个人日历事件失败');
+          }
+        } else {
+          // 创建新的个人事件
+          const { error } = await supabase
+            .from('personal_calendar_event')
+            .insert(personalEventData);
+          
+          if (error) {
+            console.error('创建个人日历事件失败:', error);
+            throw new Error(error.message || '创建个人日历事件失败');
+          }
         }
       } else if (eventType === 'google') {
         // 创建或更新Google日历事件
         const startDateTime = formData.isAllDay 
           ? format(formData.startDate, 'yyyy-MM-dd')
-          : format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00';
+          : format(formData.startDate, 'yyyy-MM-dd') + 'T' + startTimeStr + ':00';
         
         const endDateTime = formData.isAllDay
           ? format(formData.endDate, 'yyyy-MM-dd')
-          : format(formData.endDate, 'yyyy-MM-dd') + 'T' + formData.endTime + ':00';
+          : format(formData.endDate, 'yyyy-MM-dd') + 'T' + endTimeStr + ':00';
         
         // Check for Google tokens in the user session
         let accessToken = session?.google_access_token || null;
@@ -592,20 +716,42 @@ export default function CreateCalendarEvent({
         title: '',
         description: '',
         startDate: new Date(),
-        startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
+        startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
         endDate: new Date(),
-        endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'HH:mm'),
+        endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'hh:mm'),
         isAllDay: false,
         location: '',
         reminders: false,
-        color: '#4285F4', // 默认颜色
         addGoogleMeet: false,
         inviteParticipants: false,
+        priority: 'MEDIUM',
       });
       
       setSelectedUsers([]);
+      setFormErrors({
+        dateError: '',
+        timeError: ''
+      });
       setIsOpen(false);
-      toast.success(isEditing ? t('eventUpdated') : t('eventCreated'));
+      
+      // 根据事件类型和操作类型显示不同的成功消息
+      if (isEditing) {
+        if (eventType === 'task') {
+          toast.success(t('taskUpdated') || 'Task updated successfully');
+        } else if (eventType === 'personal') {
+          toast.success(t('personalEventUpdated') || 'Personal event updated successfully');
+        } else {
+          toast.success(t('eventUpdated') || 'Event updated successfully');
+        }
+      } else {
+        if (eventType === 'task') {
+          toast.success(t('taskCreated') || 'Task created successfully');
+        } else if (eventType === 'personal') {
+          toast.success(t('personalEventCreated') || 'Personal event created successfully');
+        } else {
+          toast.success(t('eventCreated') || 'Event created successfully');
+        }
+      }
       
       // 如果有成功回调，调用它
       if (onSuccess) {
@@ -620,8 +766,44 @@ export default function CreateCalendarEvent({
     }
   };
   
+  // Add this effect to reset editing state when dialog closes
+  useEffect(() => {
+    // When dialog closes, reset editing state
+    if (!isOpen && isEditing) {
+      // We don't need to modify isEditing here as it's passed as prop
+      // But we should reset the form if dialog is closed
+      setFormData({
+        title: '',
+        description: '',
+        startDate: selectedDate,
+        startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
+        endDate: selectedDate,
+        endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'hh:mm'),
+        isAllDay: false,
+        location: '',
+        reminders: false,
+        addGoogleMeet: false,
+        inviteParticipants: false,
+        priority: 'MEDIUM',
+      });
+      setSelectedUsers([]);
+      setFormErrors({
+        dateError: '',
+        timeError: ''
+      });
+    }
+  }, [isOpen, isEditing, selectedDate]);
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      // If dialog is closing, make sure to reset editing state in parent component
+      if (!open && isEditing) {
+        // Call setIsOpen directly to close the dialog
+        setIsOpen(false);
+      } else {
+        setIsOpen(open);
+      }
+    }}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>{isEditing ? t('editEvent') : t('createEvent')}</DialogTitle>
@@ -677,7 +859,7 @@ export default function CreateCalendarEvent({
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      dateError && "border-red-500"
+                      formErrors.dateError && "border-red-500"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -693,7 +875,7 @@ export default function CreateCalendarEvent({
                   />
                 </PopoverContent>
               </Popover>
-              {dateError && <p className="text-xs text-red-500 mt-1">{dateError}</p>}
+              {formErrors.dateError && <p className="text-xs text-red-500 mt-1">{formErrors.dateError}</p>}
             </div>
             
             {!formData.isAllDay && (
@@ -704,8 +886,8 @@ export default function CreateCalendarEvent({
                   name="startTime" 
                   type="time" 
                   value={formData.startTime} 
-                  onChange={handleInputChange} 
-                  className={cn(dateError && "border-red-500")}
+                  onChange={handleTimeChange} 
+                  className={cn(formErrors.timeError && "border-red-500")}
                 />
               </div>
             )}
@@ -719,7 +901,10 @@ export default function CreateCalendarEvent({
                   <Button
                     id="endDate"
                     variant="outline"
-                    className="w-full justify-start text-left font-normal"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      formErrors.dateError && "border-red-500"
+                    )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {formData.endDate ? format(formData.endDate, 'PPP') : t('pickDate')}
@@ -730,6 +915,7 @@ export default function CreateCalendarEvent({
                     mode="single"
                     selected={formData.endDate}
                     onSelect={(date) => handleDateChange(date, 'endDate')}
+                    disabled={(date) => !isEditing && date < formData.startDate}
                   />
                 </PopoverContent>
               </Popover>
@@ -743,11 +929,34 @@ export default function CreateCalendarEvent({
                   name="endTime" 
                   type="time" 
                   value={formData.endTime} 
-                  onChange={handleInputChange} 
+                  onChange={handleTimeChange}
+                  className={cn(formErrors.timeError && "border-red-500")}
                 />
+                {formErrors.timeError && <p className="text-xs text-red-500 mt-1">{formErrors.timeError}</p>}
               </div>
             )}
           </div>
+          
+          {/* Priority selector for tasks */}
+          {eventType === 'task' && (
+            <div className="space-y-2">
+              <Label htmlFor="priority">{t('priority')}</Label>
+              <Select 
+                value={formData.priority} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('selectPriority')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">{t('lowPriority')}</SelectItem>
+                  <SelectItem value="MEDIUM">{t('mediumPriority')}</SelectItem>
+                  <SelectItem value="HIGH">{t('highPriority')}</SelectItem>
+                  <SelectItem value="URGENT">{t('urgentPriority')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           {(eventType === 'google' || eventType === 'personal') && (
             <div className="space-y-2">
@@ -759,26 +968,6 @@ export default function CreateCalendarEvent({
                 onChange={handleInputChange} 
                 placeholder={t('locationPlaceholder')} 
               />
-            </div>
-          )}
-          
-          {eventType === 'personal' && (
-            <div className="space-y-2">
-              <Label htmlFor="color">{t('color')}</Label>
-              <div className="flex items-center space-x-2">
-                <Input 
-                  id="color" 
-                  name="color" 
-                  type="color" 
-                  value={formData.color} 
-                  onChange={handleInputChange} 
-                  className="w-12 h-8 p-1" 
-                />
-                <div 
-                  className="h-8 w-8 rounded-md" 
-                  style={{ backgroundColor: formData.color }}
-                ></div>
-              </div>
             </div>
           )}
           
@@ -915,7 +1104,29 @@ export default function CreateCalendarEvent({
         </div>
         
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => setIsOpen(false)} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={() => {
+            // Reset form and close dialog
+            setFormData({
+              title: '',
+              description: '',
+              startDate: selectedDate,
+              startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
+              endDate: selectedDate,
+              endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'hh:mm'),
+              isAllDay: false,
+              location: '',
+              reminders: false,
+              addGoogleMeet: false,
+              inviteParticipants: false,
+              priority: 'MEDIUM',
+            });
+            setSelectedUsers([]);
+            setFormErrors({
+              dateError: '',
+              timeError: ''
+            });
+            setIsOpen(false);
+          }} className="w-full sm:w-auto">
             {t('cancel')}
           </Button>
           <Button 

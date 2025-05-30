@@ -44,7 +44,8 @@ function ChatLayout({ children }) {
     loading: chatLoading,
     fetchChatSessions,
     fetchMessages,
-    setMessages
+    setMessages,
+    deleteChatSession
   } = useChat();
   
   // Notification mute state
@@ -302,40 +303,28 @@ function ChatLayout({ children }) {
     e.stopPropagation();
     
     confirm({
-      title: t('hideChat'),
+      title: t('deleteChat'),
       description: t('deleteChatConfirm'),
       variant: 'destructive',
       confirmText: t('delete'),
       cancelText: t('cancel'),
       onConfirm: async () => {
         try {
-          // Update hidden sessions in state
-          setHiddenSessions(prev => ({
-            ...prev,
-            [sessionId]: true
-          }));
+          // Call the deleteChatSession function from the ChatContext
+          const result = await deleteChatSession(sessionId);
           
-          // Update localStorage
-          try {
-            const savedHidden = JSON.parse(localStorage.getItem('hidden_sessions') || '{}');
-            savedHidden[sessionId] = true;
-            localStorage.setItem('hidden_sessions', JSON.stringify(savedHidden));
-          } catch (error) {
-            console.error('Error saving hidden sessions to localStorage:', error);
+          if (result.success) {
+            // If this was the current session, it's already handled in deleteChatSession
+            toast.success(t('chatDeleted'));
+            
+            // Refresh sessions
+            fetchChatSessions();
+          } else {
+            // Updated error message
+            toast.error(result.error === '无权操作' ? t('errors.deleteNotAllowed') : t('errors.deleteFailed'));
           }
-          
-          // If this was the current session, clear it
-          if (currentSession?.id === sessionId) {
-            setCurrentSession(null);
-          }
-          
-          // Update the sessions list in UI
-          toast.success(t('chatDeleted'));
-          
-          // Refresh sessions
-          fetchChatSessions();
         } catch (error) {
-          console.error('Error hiding chat session:', error);
+          console.error('Error deleting chat session:', error);
           toast.error(t('errors.deleteFailed'));
         }
       }
@@ -406,6 +395,50 @@ function ChatLayout({ children }) {
         new Date(b.lastMessage?.created_at || 0) - new Date(a.lastMessage?.created_at || 0)
       );
   }, [sessions, hiddenSessions]);
+
+  // Function to hide chat session
+  const handleHideSession = async (e, sessionId) => {
+    e.stopPropagation();
+    
+    confirm({
+      title: t('hideChat'),
+      description: t('hideChatConfirm'),
+      confirmText: t('hide'),
+      cancelText: t('cancel'),
+      onConfirm: async () => {
+        try {
+          // Update hidden sessions in state
+          setHiddenSessions(prev => ({
+            ...prev,
+            [sessionId]: true
+          }));
+          
+          // Update localStorage
+          try {
+            const savedHidden = JSON.parse(localStorage.getItem('hidden_sessions') || '{}');
+            savedHidden[sessionId] = true;
+            localStorage.setItem('hidden_sessions', JSON.stringify(savedHidden));
+          } catch (error) {
+            console.error('Error saving hidden sessions to localStorage:', error);
+          }
+          
+          // If this was the current session, clear it
+          if (currentSession?.id === sessionId) {
+            setCurrentSession(null);
+          }
+          
+          // Update the sessions list in UI
+          toast.success(t('chatHidden'));
+          
+          // Refresh sessions
+          fetchChatSessions();
+        } catch (error) {
+          console.error('Error hiding chat session:', error);
+          toast.error(t('errors.hideFailed'));
+        }
+      }
+    });
+  };
 
   return (
     <div className="flex h-screen">
@@ -769,12 +802,22 @@ function ChatLayout({ children }) {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onClick={(e) => handleDeleteSession(e, session.id)}
-                            className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                            onClick={(e) => handleHideSession(e, session.id)}
+                            className="flex items-center gap-2 cursor-pointer"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <X className="h-4 w-4" />
                             <span>{t('hideChat')}</span>
                           </DropdownMenuItem>
+                          {/* Only show delete option if user is the chat creator */}
+                          {session.created_by === currentUser?.id && (
+                            <DropdownMenuItem 
+                              onClick={(e) => handleDeleteSession(e, session.id)}
+                              className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span>{t('deleteChat')}</span>
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
