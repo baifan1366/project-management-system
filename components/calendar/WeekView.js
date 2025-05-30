@@ -21,6 +21,7 @@ export default function WeekView({
   personalEvents = [],
   tasks = [],
   googleCalendarColors,
+  handleEventClick,
 }) {
   // Calculate week start based on currentDate
   const weekStart = useMemo(() => startOfWeek(currentDate), [currentDate]);
@@ -235,7 +236,14 @@ export default function WeekView({
   }, [eventsByDay]);
   
   // Handle event click
-  const handleEventClick = (event) => {
+  const onEventClick = (event) => {
+    // Call the parent component's handler if provided
+    if (handleEventClick) {
+      handleEventClick(event, event.type);
+      return;
+    }
+    
+    // Fallback to old behavior if no handler is provided
     // For Google Meet events, open the hangout link
     if (event.type === 'google' && event.hangoutLink) {
       window.open(event.hangoutLink, '_blank');
@@ -312,7 +320,7 @@ export default function WeekView({
                 backgroundColor: `${event.color}20`,
                 borderLeft: `3px solid ${event.color}`
               }}
-              onClick={() => handleEventClick(event)}
+              onClick={() => onEventClick(event)}
             >
               <div className="flex flex-col h-full">
                 <div className="font-medium leading-tight truncate flex items-center">
@@ -372,7 +380,7 @@ export default function WeekView({
                   backgroundColor: `${event.color}20`,
                   borderLeft: `2px solid ${event.color}`
                 }}
-                onClick={() => handleEventClick(event)}
+                onClick={() => onEventClick(event)}
               >
                 {event.title}
               </div>

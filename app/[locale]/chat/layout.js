@@ -496,7 +496,7 @@ function ChatLayout({ children }) {
                   
                 return (
                   <div
-                    key={`hidden-${session.id}`}
+                    key={`${session.id}-${new Date(session.created_at || 0).getTime()}`}
                     className="flex items-center gap-3 p-3 hover:bg-accent/50 transition-colors relative group border-l-4 border-blue-500 mx-2 my-1 rounded-md bg-accent/20"
                   >
                     <div className="relative flex-shrink-0">
@@ -575,7 +575,7 @@ function ChatLayout({ children }) {
                       
                     return (
                       <div
-                        key={`all-hidden-${session.id}`}
+                        key={`${session.id}-${new Date(session.created_at || 0).getTime()}`}
                         className="flex items-center gap-3 p-3 hover:bg-accent/50 transition-colors relative group mx-2 my-1 rounded-md"
                       >
                         <div className="relative flex-shrink-0">
@@ -647,7 +647,7 @@ function ChatLayout({ children }) {
                   
                 return (
                   <div
-                    key={session.id}
+                    key={`${session.id}-${new Date(session.created_at || 0).getTime()}`}
                     className={`flex items-center gap-3 p-4 hover:bg-accent/50 cursor-pointer transition-colors relative group ${
                       currentSession?.id === session.id ? 'bg-accent' : ''
                     }`}

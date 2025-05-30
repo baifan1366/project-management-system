@@ -21,6 +21,7 @@ export default function DayView({
   personalEvents = [],
   tasks = [],
   googleCalendarColors,
+  handleEventClick,
 }) {
   // Format the current date for display
   const formattedDate = format(currentDate, 'EEEE, MMMM d, yyyy');
@@ -213,8 +214,15 @@ export default function DayView({
     });
   }, [timedEvents]);
   
-  // Handle event click
-  const handleEventClick = (event) => {
+  // Update the handleEventClick function
+  const onEventClick = (event) => {
+    // Call the parent component's handler if provided
+    if (handleEventClick) {
+      handleEventClick(event, event.type);
+      return;
+    }
+    
+    // Fallback to old behavior if no handler is provided
     // For Google Meet events, open the hangout link
     if (event.type === 'google' && event.hangoutLink) {
       window.open(event.hangoutLink, '_blank');
@@ -268,7 +276,7 @@ export default function DayView({
                 backgroundColor: `${event.color}15`,
                 borderLeft: `3px solid ${event.color}`
               }}
-              onClick={() => handleEventClick(event)}
+              onClick={() => onEventClick(event)}
             >
               <div className="flex items-center">
                 <span className="truncate">{event.title}</span>
@@ -327,7 +335,7 @@ export default function DayView({
               backgroundColor: `${event.color}15`,
               borderLeft: `4px solid ${event.color}`
             }}
-            onClick={() => handleEventClick(event)}
+            onClick={() => onEventClick(event)}
           >
             <div className="h-full flex flex-col">
               <div className="font-medium leading-tight truncate flex items-center">
@@ -396,7 +404,7 @@ export default function DayView({
                   <div 
                     key={`sidebar-${event.type}-${event.id}`}
                     className="p-2 rounded-md text-sm cursor-pointer hover:bg-accent/5 transition-colors"
-                    onClick={() => handleEventClick(event)}
+                    onClick={() => onEventClick(event)}
                   >
                     <div className="flex items-center">
                       <div 

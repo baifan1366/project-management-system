@@ -51,7 +51,7 @@ export default function NewChatPopover() {
           .eq('user_id', currentUser.id)
           .eq('chat_session.type', 'PRIVATE')
           .order('joined_at', { ascending: false })
-          .limit(5);
+          .limit(10); // Increased limit to get more contacts before deduplication
 
         if (error) {
           console.error('获取聊天参与者数据错误:', error);
@@ -62,6 +62,8 @@ export default function NewChatPopover() {
 
         // 安全地提取联系人
         const contacts = [];
+        const userIdSet = new Set(); // Set to track unique user IDs
+        
         if (Array.isArray(data)) {
           for (const item of data) {
             if (!item || !item.chat_session) {
@@ -80,13 +82,20 @@ export default function NewChatPopover() {
             
             if (otherParticipants.length > 0) {
               const otherUser = otherParticipants[0].user;
-              console.log('找到联系人:', otherUser.name);
-              contacts.push(otherUser);
+              
+              // Only add the user if we haven't seen their ID before
+              if (!userIdSet.has(otherUser.id)) {
+                console.log('找到联系人:', otherUser.name);
+                contacts.push(otherUser);
+                userIdSet.add(otherUser.id); // Mark this user ID as seen
+              } else {
+                console.log('跳过重复联系人:', otherUser.name);
+              }
             }
           }
         }
 
-        console.log('处理后的联系人列表:', contacts);
+        console.log('处理后的联系人列表 (已去重):', contacts);
         setRecentContacts(contacts);
       } catch (error) {
         console.error('加载最近联系人时出错:', error);
@@ -117,7 +126,13 @@ export default function NewChatPopover() {
         .limit(10);
 
       if (error) throw error;
-      setSearchResults(data);
+      
+      // Ensure no duplicate users in search results
+      const uniqueUsers = Array.from(
+        new Map(data.map(user => [user.id, user])).values()
+      );
+      
+      setSearchResults(uniqueUsers);
     } catch (error) {
       console.error('Error searching users:', error);
     } finally {
@@ -135,10 +150,18 @@ export default function NewChatPopover() {
   // 选择/取消选择用户
   const toggleUser = (user) => {
     setSelectedUsers(prev => {
+      // Check if this user is already selected
       const isSelected = prev.some(u => u.id === user.id);
+      
       if (isSelected) {
+        // If already selected, remove the user
         return prev.filter(u => u.id !== user.id);
       } else {
+        // If not selected, add the user (avoid duplicates)
+        // First check if the user is already in the array (extra safety check)
+        if (prev.find(u => u.id === user.id)) {
+          return prev; // User already exists, don't add again
+        }
         return [...prev, user];
       }
     });
@@ -151,12 +174,19 @@ export default function NewChatPopover() {
     try {
       console.log('开始创建聊天，已选择的用户:', selectedUsers.map(u => u.name).join(', '));
 
-      // 创建聊天会话
+      // Generate a unique timestamp to ensure different chats with the same user don't conflict
+      const uniqueTimestamp = Date.now().toString();
+
+      // 创建聊天会话 - Include timestamp in name for uniqueness
+      const chatName = selectedUsers.length === 1 
+        ? `${selectedUsers[0].name} (${uniqueTimestamp.slice(-4)})` // Add last 4 digits of timestamp for uniqueness
+        : `${selectedUsers.map(u => u.name).join(', ')}`;
+        
       const { data: chatSession, error: chatError } = await supabase
         .from('chat_session')
         .insert([{
           type: selectedUsers.length === 1 ? 'PRIVATE' : 'GROUP',
-          name: selectedUsers.length === 1 ? selectedUsers[0].name : `${selectedUsers.map(u => u.name).join(', ')}`,
+          name: chatName,
           created_by: currentUser.id
         }])
         .select()
@@ -232,19 +262,44 @@ export default function NewChatPopover() {
       // 获取完整的会话对象，包括参与者
       const { data: fullSession, error: fetchError } = await supabase
         .from('chat_session')
-        .select('*')
+        .select(`
+          *,
+          participants:chat_participant(
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email,
+              is_online,
+              last_seen_at
+            )
+          )
+        `)
         .eq('id', chatSession.id)
         .single();
 
       if (!fetchError && fullSession) {
+        // 处理会话数据，确保包含正确的参与者信息
+        const processedSession = {
+          ...fullSession,
+          // 过滤当前用户，只显示其他参与者
+          participants: fullSession.participants
+            .filter(p => p.user.id !== currentUser.id)
+            .map(p => p.user),
+          // 设置总参与者数量，包括当前用户和所有邀请的用户
+          participantsCount: fullSession.participants.length,
+          // Make sure created_by is preserved
+          created_by: fullSession.created_by || currentUser.id
+        };
+
         // 如果当前在AI模式，切换到normal模式
         if (chatMode === 'ai') {
           setChatMode('normal');
         }
         
-        // 直接在这里设置当前会话，提供更好的用户体验
+        // 使用处理过的会话数据
         try {
-          setCurrentSession(fullSession);
+          setCurrentSession(processedSession);
         } catch (err) {
           console.error('设置当前会话失败:', err);
         }
@@ -365,9 +420,9 @@ export default function NewChatPopover() {
                   <Users className="h-4 w-4" />
                   {t('recentContacts')}
                 </div>
-                {recentContacts.map(user => (
+                {recentContacts.map((user, index) => (
                   <div
-                    key={user.id}
+                    key={`${user.id}-${index}`}
                     className="flex items-center gap-3 p-2 hover:bg-accent rounded-md cursor-pointer"
                     onClick={() => toggleUser(user)}
                   >
