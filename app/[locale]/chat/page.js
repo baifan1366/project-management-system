@@ -34,6 +34,7 @@ import MentionSelector from '@/components/chat/MentionSelector';
 import MentionItem from '@/components/chat/MentionItem';
 import { debounce } from 'lodash';
 import { useSearchParams } from 'next/navigation';
+import UserProfileDialog from '@/components/chat/UserProfileDialog';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -525,6 +526,10 @@ export default function ChatPage() {
   
   // Get other participant ID
   const otherParticipantId = currentSession?.type === 'PRIVATE' ? currentSession?.participants?.[0]?.id : null;
+  
+  // Add state for user profile dialog
+  const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
+  const [clickedUser, setClickedUser] = useState(null);
   
   // Move all editing-related functions to the beginning
   // Update message function
@@ -1018,11 +1023,11 @@ export default function ChatPage() {
   const sessionId = searchParams.get('session');
   
   useEffect(() => {
-    if (sessionId && !currentSession && sessions.length > 0 && !messagesLoading) {
+    if (sessionId && sessions.length > 0) {
       // Find the session in our loaded sessions
       const sessionToOpen = sessions.find(s => s.id === sessionId);
       if (sessionToOpen) {
-        // Set the current session
+        // Set the current session immediately, regardless of what's currently open
         setCurrentSession(sessionToOpen);
         
         // Scroll to bottom once messages are loaded
@@ -1031,7 +1036,7 @@ export default function ChatPage() {
         }, 500);
       }
     }
-  }, [sessions, currentSession, messagesLoading, setCurrentSession, scrollToBottom]);
+  }, [sessions, sessionId, setCurrentSession, scrollToBottom]);
 
   // 在其他imports和hooks后添加一个新的useEffect来自动调整textarea高度
   useEffect(() => {
@@ -1157,6 +1162,12 @@ export default function ChatPage() {
     }
   };
 
+  // Add function to open user profile
+  const handleOpenUserProfile = (user) => {
+    setClickedUser(user);
+    setIsUserProfileOpen(true);
+  };
+
   if (!currentSession && chatMode === 'normal') {
     return (
       <div className="flex flex-col h-screen items-center justify-center text-muted-foreground">
@@ -1215,7 +1226,11 @@ export default function ChatPage() {
           <div className="flex items-center gap-3">
             {chatMode === 'normal' ? (
               <>
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0">
+                <div 
+                  className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden flex-shrink-0 cursor-pointer"
+                  onClick={() => currentSession?.type === 'PRIVATE' && otherParticipant ? handleOpenUserProfile(otherParticipant) : null}
+                  title={currentSession?.type === 'PRIVATE' ? t('viewProfile') : ''}
+                >
                   {sessionAvatar ? (
                     <img 
                       src={sessionAvatar} 
@@ -1226,7 +1241,10 @@ export default function ChatPage() {
                     <span>{sessionName?.charAt(0) || '?'}</span>
                   )}
                 </div>
-                <div>
+                <div 
+                  className={currentSession?.type === 'PRIVATE' ? "cursor-pointer" : ""}
+                  onClick={() => currentSession?.type === 'PRIVATE' && otherParticipant ? handleOpenUserProfile(otherParticipant) : null}
+                >
                   {currentSession?.type === 'GROUP' ? (
                     isEditingName ? (
                       <div className="flex items-center gap-1">
@@ -1345,6 +1363,13 @@ export default function ChatPage() {
         messages={messages}
         hourFormat={hourFormat}
         adjustTimeByOffset={adjustTimeByOffset}
+      />
+      
+      {/* Add User Profile Dialog */}
+      <UserProfileDialog 
+        open={isUserProfileOpen}
+        onOpenChange={setIsUserProfileOpen}
+        user={clickedUser}
       />
       
       {/* 聊天内容区域 */}

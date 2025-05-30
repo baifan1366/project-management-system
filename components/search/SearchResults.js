@@ -80,9 +80,34 @@ function getDisplayName(item, t) {
   }
 }
 
-export default function SearchResults({ results, loading, query }) {
+export default function SearchResults({ results, loading, query, onUserClick }) {
   const t = useTranslations();
   const locale = useLocale();
+
+  // Create a wrapper component to handle conditional rendering of Link vs div
+  const ResultItem = ({ item, children }) => {
+    // If it's a user type and we have an onUserClick handler, render a div with onClick
+    if (item.type === 'user' && typeof onUserClick === 'function') {
+      return (
+        <div 
+          className="block p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+          onClick={() => onUserClick(item)}
+        >
+          {children}
+        </div>
+      );
+    }
+    
+    // Otherwise, render a Link as before
+    return (
+      <Link 
+        href={getItemLink(item, locale)} 
+        className="block p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+      >
+        {children}
+      </Link>
+    );
+  };
 
   if (loading) {
     return (
@@ -113,11 +138,7 @@ export default function SearchResults({ results, loading, query }) {
       
       <div className="space-y-4">
         {results.map((item) => (
-          <Link 
-            href={getItemLink(item, locale)} 
-            key={`${item.type}-${item.id}`}
-            className="block p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
+          <ResultItem item={item} key={`${item.type}-${item.id}`}>
             <div className="flex items-start">
               <div className="mr-3 mt-0.5 text-gray-500 dark:text-gray-400">
                 {getItemIcon(item.type)}
@@ -177,7 +198,7 @@ export default function SearchResults({ results, loading, query }) {
                 </div>
               </div>
             </div>
-          </Link>
+          </ResultItem>
         ))}
       </div>
     </div>

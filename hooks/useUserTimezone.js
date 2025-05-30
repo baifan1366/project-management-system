@@ -146,11 +146,8 @@ export function useUserTimezone() {
    * @returns {Date} Adjusted date object
    */
   const adjustTimeByOffset = useCallback((dateInput) => {
-    // 添加输入值的调试日志
-    console.log("adjustTimeByOffset 输入:", dateInput);
     
     if (!dateInput) {
-      console.log("adjustTimeByOffset: 输入为空，返回当前日期");
       return new Date();
     }
     
@@ -176,22 +173,18 @@ export function useUserTimezone() {
     try {
       // Get hour offset from UTC timezone string
       const offsetHours = getHourOffset(userUtcOffset);
-      console.log("时区偏移小时数:", offsetHours);
-      
       // Create new UTC date
       const utcDate = new Date(date.toUTCString());
       
       // Adjust hours based on offset
       utcDate.setUTCHours(utcDate.getUTCHours() + offsetHours);
-      
-      console.log("调整后的日期:", utcDate);
+
       return utcDate;
     } catch (error) {
       console.error('Time adjustment error:', error);
       // If error occurs, apply UTC+8 offset directly as fallback
       const fallbackDate = new Date(date.toUTCString());
       fallbackDate.setUTCHours(fallbackDate.getUTCHours() + 8);
-      console.log("使用回退方案的日期:", fallbackDate);
       return fallbackDate;
     }
   }, [utcOffset]);

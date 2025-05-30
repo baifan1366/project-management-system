@@ -957,6 +957,7 @@
     "maximize": "Maximize",
     "close": "Close",
     "members": "members",
+    "viewProfile": "View profile",
     "inviteUsers": "Invite Users",
     "inviteSelected": "Invite selected users",
     "invitationSent": "Invitation sent",
@@ -1038,12 +1039,15 @@
     "seeOriginal": "See original",
     "translationFailed": "Translation failed",
     "hideChat": "Hide Chat",
-    "deleteChatConfirm": "Are you sure you want to hide this chat? You can unhide it later if needed.",
-    "chatDeleted": "Chat hidden successfully",
+    "hideChatConfirm": "Are you sure you want to hide this chat? You can unhide it later if needed.",
+    "chatHidden": "Chat hidden successfully",
+    "deleteChat": "Delete Chat",
+    "chatDeleted": "Chat deleted successfully",
+    "deleteChatConfirm": "Are you sure you want to permanently delete this chat? This action cannot be undone.",
     "muteNotifications": "Mute notifications",
     "enableNotifications": "Enable notifications",
-    "notificationsMuted": "Notifications muted",
-    "notificationsEnabled": "Notifications enabled",
+    "notificationsMuted": "Notifications Muted",
+    "notificationsEnabled": "Notifications Enabled",
     "hiddenChatsWithMessages": "Chats with new messages",
     "activeChats": "Active chats",
     "unhide": "Unhide",
@@ -1052,7 +1056,8 @@
     "show": "Show",
      "hide": "Hide",
      "errors": {
-      "deleteFailed": "Failed to hide chat",
+      "deleteFailed": "Failed to delete chat",
+      "hideFailed": "Failed to hide chat",
       "notLoggedIn": "You need to be logged in",
       "muteFailed": "Failed to update notification settings",
       "unhideFailed": "Failed to unhide chat",
@@ -1114,7 +1119,10 @@
     "messageUpdated": "Message updated successfully",
     "clickToEditName": "Click to edit group name",
     "chatNameUpdated": "Group chat name updated",
-    "cannotEditPrivateChatName": "You can't edit private chat names"
+    "cannotEditPrivateChatName": "You can't edit private chat names",
+    "deleteChat": "Delete Chat",
+    "chatDeleted": "Chat deleted successfully",
+    "deleteChatConfirm": "Are you sure you want to permanently delete this chat? This action cannot be undone."
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
@@ -2546,5 +2554,17 @@
     "noAccessToTeam": "You do not have access to this team. You may not be a team member or team owner.",
     "deleteTabTitle": "Delete View",
     "deleteTabConfirm": "Are you sure you want to delete this view? This action cannot be undone."
+  },
+  "UserProfile": {
+    "title": "Settings",
+    "userProfileTitle": "{name}'s Profile",
+    "close": "Close",
+    "newChat": "New Chat",
+    "creating": "Creating...",
+    "theme": "theme",
+    "errors": {
+      "chatCreationFailed": "Failed to create chat",
+      "onlyOwnerCanEditName": "Only the group owner can edit the group name"
+    }
   }
 }

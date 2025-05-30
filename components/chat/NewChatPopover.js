@@ -14,7 +14,7 @@ import { useChat } from '@/contexts/ChatContext';
 import { toast } from 'sonner';
 import useGetUser from '@/lib/hooks/useGetUser';
 
-export default function NewChatPopover() {
+export default function NewChatPopover({ className, buttonContent }) {
   const t = useTranslations('Chat');
   const { chatMode, createAIChatSession, setCurrentSession, setChatMode } = useChat();
   const [isOpen, setIsOpen] = useState(false);
@@ -315,39 +315,44 @@ export default function NewChatPopover() {
     }
   };
 
+  // 创建新的AI聊天
+  const handleAIChatClick = async () => {
+    try {
+      const aiSession = await createAIChatSession();
+      setCurrentSession(aiSession);
+      if (chatMode === 'normal') {
+        setChatMode('ai');
+      }
+      setIsOpen(false);
+      setSelectedUsers([]);
+    } catch (error) {
+      console.error('Error creating AI chat:', error);
+      toast.error('Failed to create AI chat');
+    }
+  };
+  
   // 处理新建聊天按钮点击
   const handleNewChatClick = async () => {
-    // 如果是 AI 聊天模式，清空当前对话但不立即创建新会话
     if (chatMode === 'ai') {
-      // 取消选择当前会话，让 AIChatBot 组件显示空白对话界面
-      setCurrentSession(null);
-      
-      // 触发重置对话ID事件
-      const resetEvent = new CustomEvent('reset-ai-conversation');
-      window.dispatchEvent(resetEvent);
-      console.log('发送重置AI对话ID事件');
-      
-      // 发送一个自定义事件通知 AIChatBot 组件清空消息
-      const clearEvent = new CustomEvent('ai-chat-clear');
-      window.dispatchEvent(clearEvent);
-      console.log('发送清空AI聊天事件');
-      
-      return;
+      handleAIChatClick();
+    } else {
+      setIsOpen(true);
     }
-    
-    // 如果是普通聊天模式，则打开选择用户的 popover
-    setIsOpen(true);
   };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button 
-          className="flex items-center gap-2 w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-          onClick={chatMode === 'ai' ? handleNewChatClick : undefined}
+          variant="default" 
+          onClick={handleNewChatClick}
+          className={className || "w-full"}
         >
-          <Plus className="h-5 w-5" />
-          <span>{chatMode === 'ai' ? t('newAIChat') : t('newChat')}</span>
+          {buttonContent || (
+            <>
+              <Plus className="mr-2 h-4 w-4" /> {t('newChat')}
+            </>
+          )}
         </Button>
       </PopoverTrigger>
       {chatMode !== 'ai' && (

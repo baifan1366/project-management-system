@@ -1007,8 +1007,11 @@
     "seeOriginal": "查看原文",
     "translationFailed": "翻译失败",
     "hideChat": "隐藏聊天",
-    "deleteChatConfirm": "确定要隐藏这个聊天吗？您可以稍后取消隐藏。",
-    "chatDeleted": "聊天已隐藏",
+    "hideChatConfirm": "确定要隐藏这个聊天吗？您可以稍后取消隐藏。",
+    "chatHidden": "聊天已隐藏",
+    "deleteChat": "删除聊天",
+    "deleteChatConfirm": "您确定要永久删除此聊天吗？此操作无法撤消。",
+    "chatDeleted": "聊天已删除",
     "muteNotifications": "静音通知",
     "enableNotifications": "启用通知",
     "notificationsMuted": "通知已静音",
@@ -1021,7 +1024,8 @@
     "show": "显示",
      "hide": "隐藏",
      "errors": {
-      "deleteFailed": "隐藏聊天失败",
+      "deleteFailed": "删除聊天失败",
+      "hideFailed": "隐藏聊天失败",
       "notLoggedIn": "您需要登录",
       "muteFailed": "更新通知设置失败",
       "unhideFailed": "取消隐藏聊天失败"

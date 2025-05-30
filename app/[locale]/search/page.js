@@ -9,6 +9,7 @@ import SuggestedSearches from '@/components/search/SuggestedSearches';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import UserProfileDialog from '@/components/chat/UserProfileDialog';
 
 export default function SearchPage() {
   const t = useTranslations();
@@ -18,6 +19,10 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  
+  // Add state for user profile dialog
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
 
   // Load recent searches
   useEffect(() => {
@@ -144,6 +149,12 @@ export default function SearchPage() {
       console.error('Failed to clear search history:', error);
     }
   };
+  
+  // Handle user click to open profile dialog
+  const handleUserClick = (user) => {
+    setSelectedUser(user);
+    setIsUserProfileOpen(true);
+  };
 
   // 搜索结果骨架屏组件
   const SearchResultsSkeleton = () => (
@@ -245,9 +256,17 @@ export default function SearchPage() {
             results={results} 
             loading={false}
             query={query}
+            onUserClick={handleUserClick}
           />
         )
       )}
+      
+      {/* User Profile Dialog */}
+      <UserProfileDialog
+        open={isUserProfileOpen}
+        onOpenChange={setIsUserProfileOpen}
+        user={selectedUser}
+      />
     </div>
   );
 } 
