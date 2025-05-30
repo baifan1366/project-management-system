@@ -1101,6 +1101,64 @@ export function ChatProvider({ children }) {
     }
   };
 
+  // 离开群聊功能
+  const leaveGroupChat = async (sessionId) => {
+    try {
+      if (!authSession || !sessionId) {
+        console.error('用户未登录或会话ID无效');
+        return { success: false, error: '参数无效' };
+      }
+      
+      // 先验证会话类型是否为群聊
+      const { data: session, error: sessionError } = await supabase
+        .from('chat_session')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+        
+      if (sessionError || !session) {
+        console.error('获取会话信息失败:', sessionError);
+        return { success: false, error: sessionError };
+      }
+      
+      if (session.type !== 'GROUP') {
+        console.error('只能退出群聊');
+        return { success: false, error: '只能退出群聊' };
+      }
+      
+      // 检查用户是否为群聊创建者
+      if (session.created_by === authSession.id) {
+        console.error('群聊创建者不能退出群聊，请先转让群主或解散群聊');
+        return { success: false, error: '群聊创建者不能退出群聊' };
+      }
+      
+      // 从参与者表中删除用户
+      const { error: removeError } = await supabase
+        .from('chat_participant')
+        .delete()
+        .eq('session_id', sessionId)
+        .eq('user_id', authSession.id);
+        
+      if (removeError) {
+        console.error('退出群聊失败:', removeError);
+        return { success: false, error: removeError };
+      }
+      
+      // 如果当前会话正好是这个群聊，清除它
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(null);
+      }
+      
+      // 更新会话列表
+      await fetchChatSessions();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('退出群聊过程中发生错误:', error);
+      return { success: false, error };
+    }
+  };
+
   // 实时消息订阅
   useEffect(() => {
     if (!currentSession) return;
@@ -1490,7 +1548,7 @@ export function ChatProvider({ children }) {
     };
   }, [authSession]);
 
-  // 包装setCurrentSession，添加权限检查
+  // 更新会话时进行检查和处理
   const setCurrentSessionWithCheck = (session) => {
     // 检查session是否在用户的会话列表中
     const isAuthorized = sessions.some(s => s.id === session?.id);
@@ -1508,18 +1566,45 @@ export function ChatProvider({ children }) {
           return s;
         });
       });
-      
-      // 立即标记该会话所有消息为已读
-      const setMessagesRead = async () => {
-        if (authSession) {
-          await markMessagesAsRead(session.id, authSession.id);
-        }
-      };
-      
-      setMessagesRead();
     }
     
-    setCurrentSession(session);
+    // 立即标记该会话所有消息为已读
+    const setMessagesRead = async () => {
+      if (authSession && session) {
+        await markMessagesAsRead(session.id, authSession.id);
+      }
+    };
+    
+    // 如果是相同的会话，合并新旧数据以确保所有字段都保留
+    if (session && currentSession && session.id === currentSession.id) {
+      // 合并旧数据和新数据，保留created_by字段
+      const mergedSession = {
+        ...currentSession,
+        ...session,
+        // 特别确保created_by被正确保留
+        created_by: session.created_by || currentSession.created_by
+      };
+      console.log("切换到会话，保留created_by:", mergedSession.created_by);
+      setCurrentSession(mergedSession);
+      
+      // 如果是普通会话，确保将其消息标记为已读
+      if (session.type !== 'AI') {
+        setMessagesRead();
+      }
+    } else {
+      console.log("切换到新会话，created_by:", session?.created_by);
+      // 清除旧的消息
+      if (session?.id !== currentSession?.id) {
+        setMessages([]);
+      }
+      
+      setCurrentSession(session);
+      
+      // 如果是普通会话，确保将其消息标记为已读
+      if (session?.type !== 'AI') {
+        setMessagesRead();
+      }
+    }
   };
 
   return (
@@ -1537,7 +1622,8 @@ export function ChatProvider({ children }) {
       setChatMode,
       fetchMessages,
       deleteMessage,
-      deleteChatSession
+      deleteChatSession,
+      leaveGroupChat
     }}>
       {children}
     </ChatContext.Provider>
