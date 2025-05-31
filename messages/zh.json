@@ -1031,7 +1031,13 @@
       "hideFailed": "隐藏聊天失败",
       "notLoggedIn": "您需要登录",
       "muteFailed": "更新通知设置失败",
-      "unhideFailed": "取消隐藏聊天失败"
+      "unhideFailed": "取消隐藏聊天失败",
+      "updateFailed": "更新消息失败",
+      "emptyMessage": "消息不能为空",
+      "messageTooLong": "消息过长（最多1000个字符）",
+      "nameCannotBeEmpty": "群组名称不能为空",
+      "leaveFailed": "退出群聊失败",
+      "ownerCannotLeave": "群主不能退出群聊，请先转让群主或解散群聊"
     },
     "searchChat": "搜索聊天",
     "searchChatDescription": "搜索消息、媒体、文件和链接",
@@ -1087,7 +1093,16 @@
     "errors": {
       "nameCannotBeEmpty": "群组名称不能为空",
       "updateFailed": "更新群组名称失败"
-    }
+    },
+    "groupActions": "群组操作",
+    "leaveGroup": "退出群聊",
+    "leaveGroupConfirm": "确定要退出此群聊吗？您需要重新被邀请才能加入。",
+    "leftGroup": "您已退出群聊",
+    "leave": "退出",
+    "leaving": "正在退出群聊...",
+    "edit": "编辑",
+    "save": "保存",
+    "messageUpdated": "消息已更新"
   },
   "Invitation": {
     "inviteToTeam": "邀请加入",
@@ -2246,6 +2261,14 @@
     "closePreview": "关闭预览"
   },
   "PostsView": {
+    "loadCommentsError": "加载评论错误",
+    "comments": "评论",
+    "unknownUser": "未知用户",
+    "noComments": "没有评论",
+    "loading": "加载中...",
+    "beFirstToComment": "成为第一个评论者",
+    "addComment": "添加评论",
+    "send": "发送",    
     "posts": "帖子",
     "searchPosts": "搜索帖子...",
     "newPost": "新帖子",

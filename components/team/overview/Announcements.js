@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPostsByTeamId, togglePostPin, deletePost, updatePost } from '@/lib/redux/features/postsSlice';
+import { fetchCommentsByPostId } from '@/lib/redux/features/commentsSlice';
 import { fetchUserById } from '@/lib/redux/features/usersSlice';
 import { useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
@@ -15,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Pin, MoreVertical, Edit, Eye } from 'lucide-react';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import {
@@ -32,6 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Smile, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from "@/components/ui/skeleton";
+import EmojiPicker from '@/components/chat/EmojiPicker';
 
 export default function Announcements({ projectId, teamId }) {
   const t = useTranslations('TeamOverview');
@@ -40,12 +43,19 @@ export default function Announcements({ projectId, teamId }) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
+  const [commentCounts, setCommentCounts] = useState({});
   const users = useSelector(state => state.users.users);
   const { user } = useGetUser();
+  const { adjustTimeByOffset, utcOffset } = useUserTimezone();
   const currentUser = user?.id;
   const [team, setTeam] = useState(null);
   const [isFormValid, setIsFormValid] = useState(false);
-  const project = useSelector(state => state.projects.projects).find(p => p.id === projectId);
+  const project = useSelector(state => {
+    const projects = state.projects?.projects || [];
+    // 确保projectId被转换为相同类型进行比较（数字）
+    const projectIdNum = parseInt(projectId, 10);
+    return projects.find(p => p.id === projectIdNum);
+  });
   
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -53,7 +63,8 @@ export default function Announcements({ projectId, teamId }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
-    
+  const [projectThemeColor, setProjectThemeColor] = useState('primary');
+
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5; // 每页显示5条公告
@@ -107,11 +118,50 @@ export default function Announcements({ projectId, teamId }) {
     loadAnnouncements();
   }, [teamId, dispatch]);
   
+  // 验证表单输入
+  useEffect(() => {
+    const titleValid = editTitle.trim().length >= 2 && editTitle.length <= 50;
+    setIsFormValid(titleValid);
+  }, [editTitle]);
+  
+  // 添加新的useEffect设置项目主题颜色
+  useEffect(() => {
+    console.log(project)
+    if (project && project.theme_color) {
+      setProjectThemeColor(project.theme_color);
+    } else {
+      // 如果项目没有主题颜色，设置默认值
+      setProjectThemeColor('primary');
+    }
+  }, [project]);
+  
   // 格式化日期
   const formatDate = (dateString) => {
     if (!dateString) return '';
     try {
-      return formatDistanceToNow(new Date(dateString), { 
+      // 获取用户时区偏移量（小时）
+      const getHourOffset = (utcOffsetStr) => {
+        if (!utcOffsetStr || typeof utcOffsetStr !== 'string') return 0;
+        const match = utcOffsetStr.match(/^UTC([+-])(\d+)$/);
+        if (!match) return 0;
+        const sign = match[1] === '+' ? 1 : -1;
+        return sign * parseInt(match[2], 10);
+      };
+
+      // 计算原始时间与当前时间的真实差值（考虑时区变化）
+      const postDate = new Date(dateString);
+      const userOffset = getHourOffset(utcOffset); // 当前用户时区
+      
+      // 获取用户当前时区下的"现在"时间
+      const nowInUserTimezone = new Date();
+      
+      // 将发布时间调整为用户当前时区
+      const postDateInUserTimezone = new Date(postDate);
+      // 由于发布时间存储为UTC，先转换为UTC+0下的时间，再加上用户当前时区偏移
+      postDateInUserTimezone.setTime(postDate.getTime() + userOffset * 60 * 60 * 1000);
+      
+      // 使用调整后的日期计算相对时间
+      return formatDistanceToNow(postDateInUserTimezone, { 
         addSuffix: true,
         locale: enUS
       });
@@ -133,12 +183,38 @@ export default function Announcements({ projectId, teamId }) {
   
   // 计算评论数
   const getCommentCount = (post) => {
+    // 如果已经有缓存的数量，直接返回
+    if (commentCounts[post.id] !== undefined) {
+      return commentCounts[post.id];
+    }
+    
+    // 如果没有缓存，触发异步获取评论数量
+    fetchCommentCount(post.id);
+    
+    // 在异步加载完成前，先返回帖子上的评论ID数组长度作为默认值
     return post.comment_id && Array.isArray(post.comment_id) ? post.comment_id.length : 0;
   };
-
-  const getProjectThemeColor = (project) => {
-    return project?.theme_color;
-  }
+  
+  // 异步获取评论数量
+  const fetchCommentCount = async (postId) => {
+    try {
+      // 通过帖子ID获取评论
+      const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
+      // 计算获取到的评论总数
+      const count = comments ? comments.length : 0;
+      
+      // 更新评论计数缓存
+      setCommentCounts(prev => ({
+        ...prev,
+        [postId]: count
+      }));
+      
+      return count;
+    } catch (error) {
+      console.error(`获取帖子(${postId})评论数量失败:`, error);
+      return 0;
+    }
+  };
   
   // 计算点赞数
   const getReactionCount = (post) => {
@@ -197,12 +273,6 @@ export default function Announcements({ projectId, teamId }) {
   const toggleEditMode = () => {
     setIsEditing(!isEditing);
   };
-  
-  // 验证表单输入
-  useEffect(() => {
-    const titleValid = editTitle.trim().length >= 2 && editTitle.trim().length <= 50;
-    setIsFormValid(titleValid);
-  }, [editTitle]);
   
   // 保存编辑的公告
   const saveAnnouncementEdit = async () => {
@@ -534,51 +604,62 @@ export default function Announcements({ projectId, teamId }) {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="py-4">
+          <div className="py-2">
             {isEditing ? (
-              <div className="space-y-2">
+              <div className="">
                 <RichEditor
                   placeholder={t('placeholder')}
                   value={editContent}
                   onChange={setEditContent}
-                  className="h-[135px] min-h-[135px] max-h-[250px] overflow-y-auto border border-[#E1DFDD] text-[#252423] dark:border-[#3B3A39] dark:text-white"
+                  className="h-[135px] mb-5 min-h-[135px] max-h-[250px] overflow-y-auto border border-[#E1DFDD] text-[#252423] dark:border-[#3B3A39] dark:text-white"
                 />
-                <div className="flex items-center space-x-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+                <div className="flex justify-between mt-5">
+                  <div className="flex items-center space-x-2">
+                    <EmojiPicker 
+                      onEmojiSelect={(emojiData) => setEditContent(prev => prev + emojiData.emoji)}
+                      position="right"
+                      offset={5}
+                      className="z-999"
+                    />
+                    
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+                    >
+                      <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
+                    </Button>
+                  </div>
+                  {isEditing && (
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={cancelEdit}
+                        className="border-[#E1DFDD] text-[#252423] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:text-white dark:hover:bg-[#3B3A39]"
+                        disabled={isSaving}
                       >
-                        <Smile className="h-4 w-4 text-[#252423] dark:text-white" />
+                        {t('cancel')}
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 p-2">
-                      <div className="grid grid-cols-8 gap-2">
-                        {['😊', '👍', '❤️', '😂', '🎉', '🙌', '👏', '🔥',
-                          '💯', '⭐', '✅', '🚀', '💪', '👀', '🤔', '🙏'].map(emoji => (
-                          <Button
-                            key={emoji}
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full"
-                            onClick={() => setEditContent(prev => prev + emoji)}
-                          >
-                            {emoji}
-                          </Button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                  
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-                  >
-                    <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
-                  </Button>
+                      <Button 
+                        onClick={saveAnnouncementEdit}
+                        className="bg-[#6264A7] hover:bg-[#494B83] text-white min-w-[80px]"
+                        disabled={!isFormValid || isSaving}
+                        variant={projectThemeColor}
+                      >
+                        {isSaving ? (
+                          <div className="flex items-center">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            {t('saving') || '保存中'}
+                          </div>
+                        ) : (
+                          t('save')
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -588,36 +669,6 @@ export default function Announcements({ projectId, teamId }) {
             )}
           </div>
           
-          {isEditing && (
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={cancelEdit}
-                className="border-[#E1DFDD] text-[#252423] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:text-white dark:hover:bg-[#3B3A39]"
-                disabled={isSaving}
-              >
-                {t('cancel')}
-              </Button>
-              <Button 
-                onClick={saveAnnouncementEdit}
-                className="bg-[#6264A7] hover:bg-[#494B83] text-white min-w-[80px]"
-                disabled={!isFormValid || isSaving}
-                variant={getProjectThemeColor(project)}
-              >
-                {isSaving ? (
-                  <div className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    {t('saving') || '保存中'}
-                  </div>
-                ) : (
-                  t('save')
-                )}
-              </Button>
-            </DialogFooter>
-          )}
         </DialogContent>
       </Dialog>
       
