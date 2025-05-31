@@ -285,13 +285,13 @@ export default function InvitationDialog({ open, onClose }) {
 
         <div className="space-y-4">
           <div className="flex space-x-5">
-            <button 
+            {/* <button 
               className={`flex items-center transition-colors ${!showEmailForm ? 'text-blue-500' : 'text-foreground hover:text-accent-foreground'}`}
               onClick={() => setShowEmailForm(false)}
             > 
               <Link2 className={`w-4 h-4 mr-2 ${!showEmailForm ? 'text-blue-500' : ''}`} />
               <span className="text-sm">{t('shareLink')}</span>
-            </button>
+            </button> */}
               
             <button 
               className={`flex items-center transition-colors ${showEmailForm ? 'text-blue-500' : 'text-foreground hover:text-accent-foreground'}`}
@@ -302,7 +302,7 @@ export default function InvitationDialog({ open, onClose }) {
             </button>
           </div>
 
-          {showEmailForm ? (
+          {/* {showEmailForm ? ( */}
             <form onSubmit={handleSendInvite} className="space-y-4">
             <div className="h-[1px] w-full bg-border" />
             <div className="flex items-center justify-between p-3 h-[40px] border rounded-lg">
@@ -362,7 +362,7 @@ export default function InvitationDialog({ open, onClose }) {
               {t('sendInvite')}
             </Button>
           </form>
-          ) : (
+          {/* ) : (
             <div className="rounded-lg space-y-5">
               <div className="rounded-lg border">
                 <div className="flex items-center justify-between p-3 h-[40px]">
@@ -449,7 +449,7 @@ export default function InvitationDialog({ open, onClose }) {
                   </Button>
                 )}
               </div>
-          )}
+          )} */}
 
           <div className="mt-6">
             <h4 className="text-sm font-medium mb-3">{t('teamMembers')}</h4>

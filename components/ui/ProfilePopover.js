@@ -34,11 +34,6 @@ export function ProfilePopover({ onClose }) {
       href: '/upgrade'
     },
     {
-      icon: <User className="w-4 h-4" />,
-      label: t('profile.refer'),
-      href: '/refer'
-    },
-    {
       icon: <Settings className="w-4 h-4" />,
       label: t('profile.settings'),
       href: '/settings'
@@ -91,7 +86,7 @@ export function ProfilePopover({ onClose }) {
                   {item.icon}
                   <span>{item.label}</span>
                 </div>
-                <ChevronRight className="w-4 h-4" />
+                {/* <ChevronRight className="w-4 h-4" /> */}
               </Button>
             ))}
 
