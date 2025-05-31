@@ -287,7 +287,10 @@ export default function AIChatBot() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages: formattedMessages }),
+        body: JSON.stringify({ 
+          messages: formattedMessages,
+          language: currentUser?.language || 'en' // 传递用户语言设置
+        }),
       });
 
       if (!response.ok) {

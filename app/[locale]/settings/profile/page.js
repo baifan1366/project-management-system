@@ -277,7 +277,7 @@ export default function ProfilePage() {
     // For OAuth providers, use custom OAuth APIs
     if (provider === 'google' || provider === 'github') {
       try {
-        toast.loading(t('connectingProvider', { provider: provider === 'google' ? 'Google' : 'GitHub' }));
+        const toastId = toast.loading(t('connectingProvider', { provider: provider === 'google' ? 'Google' : 'GitHub' }));
         
         // Build the redirect URL
         let redirectUrl = `/api/auth/${provider.toLowerCase()}`;
@@ -294,6 +294,9 @@ export default function ProfilePage() {
         
         // Append search params to redirect URL
         redirectUrl += `?${searchParams.toString()}`;
+        
+        // Dismiss loading toast before redirect
+        toast.dismiss(toastId);
         
         // Redirect to the OAuth endpoint
         window.location.href = redirectUrl;
@@ -314,7 +317,7 @@ export default function ProfilePage() {
     
     setLoading(true);
     try {
-      toast.loading(t('connectingProvider', { provider }));
+      const toastId = toast.loading(t('connectingProvider', { provider }));
       
       const resultAction = await dispatch(connectProvider({ 
         userId: user.id, 
@@ -322,6 +325,8 @@ export default function ProfilePage() {
         providerId,
         providerIdField
       }));
+      
+      toast.dismiss(toastId);
       
       if (connectProvider.fulfilled.match(resultAction)) {
         setProviderData(prev => ({
@@ -345,7 +350,7 @@ export default function ProfilePage() {
     if (!user) return;
     setLoading(true);
     try {
-      toast.loading(t('disconnectingProvider', { provider }));
+      const toastId = toast.loading(t('disconnectingProvider', { provider }));
       
       const providerIdField = provider === 'google' ? 'google_provider_id' : 'github_provider_id';
       
@@ -354,6 +359,8 @@ export default function ProfilePage() {
         provider,
         providerIdField
       }));
+      
+      toast.dismiss(toastId);
       
       if (disconnectProvider.fulfilled.match(resultAction)) {
         setProviderData(prev => ({
