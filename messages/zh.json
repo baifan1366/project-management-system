@@ -30,7 +30,7 @@
   },
   "common": {
     "processing": "处理中...",
-    "saving": "保存中...",  
+    "saving": "保存中...",
     "save": "保存",
     "cancel": "取消",
     "delete": "删除",
@@ -77,7 +77,8 @@
       "successDesc": "您的操作已完成。是否继续下一步？",
       "question": "问题",
       "questionDesc": "是否保存当前更改？"
-    }
+    },
+    "confirmDelete": "确认删除"
   },
   "profile": {
     "title": "设置",
@@ -451,7 +452,8 @@
       "todo": "待处理",
       "in_progress": "进行中",
       "in_review": "审核中",
-      "done": "已完成"
+      "done": "已完成",
+      "label": "状态"
     },
     "type": {
       "label": "类型",
@@ -472,7 +474,7 @@
       "workspace": "工作区"
     },
     "dueDate": {
-      "label": "截止日期", 
+      "label": "截止日期",
       "createdBy": "我创建的"
     },
     "newTask": {
@@ -485,8 +487,35 @@
       "status": "状态",
       "selectStatus": "选择一个状态",
       "dueDate": "截止日期",
-      "selectDate": "选择一个日期"
-    }
+      "selectDate": "选择一个日期",
+      "priority": "优先级",
+      "selectPriority": "选择优先级"
+    },
+    "editTask": "编辑任务",
+    "editTaskDescription": "编辑任务详情",
+    "taskTitle": "任务标题",
+    "taskTitlePlaceholder": "输入任务标题",
+    "description": "描述",
+    "descriptionPlaceholder": "输入任务描述",
+    "priority": "优先级",
+    "selectPriority": "选择优先级",
+    "lowPriority": "低",
+    "mediumPriority": "中",
+    "highPriority": "高",
+    "urgentPriority": "紧急",
+    "selectStatus": "选择状态",
+    "selectDate": "选择日期",
+    "clearDate": "清除日期",
+    "titleRequired": "标题是必填项",
+    "taskUpdated": "任务已更新",
+    "updateTaskFailed": "更新任务失败",
+    "taskDeleted": "任务已删除",
+    "deleteTaskFailed": "删除任务失败",
+    "deleteConfirmationTitle": "删除任务",
+    "deleteConfirmationMessage": "确定要删除此任务吗？此操作无法撤销。",
+    "noDueDate": "无截止日期",
+    "noStartDate": "无开始日期",
+    "startDate": "开始日期"
   },
   "notifications": {
     "title": "通知",
@@ -869,7 +898,8 @@
     "accessViewDescription": "可以查看团队访问设置。只有团队所有者可以更改访问设置。",
     "me": "我",
     "mustHaveOwner": "必须有所有者",
-    "ownerDescription": "团队所有者。可以管理团队成员和访问设置。"
+    "ownerDescription": "团队所有者。可以管理团队成员和访问设置。",
+    "checkerDescription": "可以标记和评论任务。不能创建任务和项目。"
   },
   "ChatDialog": {
     "privateMessages": "私信",
@@ -1025,8 +1055,8 @@
     "chatUnhidden": "聊天已显示",
     "allHiddenChats": "所有隐藏的聊天",
     "show": "显示",
-     "hide": "隐藏",
-     "errors": {
+    "hide": "隐藏",
+    "errors": {
       "deleteFailed": "删除聊天失败",
       "hideFailed": "隐藏聊天失败",
       "notLoggedIn": "您需要登录",
@@ -1037,7 +1067,8 @@
       "messageTooLong": "消息过长（最多1000个字符）",
       "nameCannotBeEmpty": "群组名称不能为空",
       "leaveFailed": "退出群聊失败",
-      "ownerCannotLeave": "群主不能退出群聊，请先转让群主或解散群聊"
+      "ownerCannotLeave": "群主不能退出群聊，请先转让群主或解散群聊",
+      "transferOwnershipFailed": "转让所有权失败"
     },
     "searchChat": "搜索聊天",
     "searchChatDescription": "搜索消息、媒体、文件和链接",
@@ -1090,10 +1121,6 @@
     "clickToEditName": "点击编辑群组名称",
     "chatNameUpdated": "群聊名称已更新",
     "cannotEditPrivateChatName": "无法编辑私聊名称",
-    "errors": {
-      "nameCannotBeEmpty": "群组名称不能为空",
-      "updateFailed": "更新群组名称失败"
-    },
     "groupActions": "群组操作",
     "leaveGroup": "退出群聊",
     "leaveGroupConfirm": "确定要退出此群聊吗？您需要重新被邀请才能加入。",
@@ -1102,7 +1129,23 @@
     "leaving": "正在退出群聊...",
     "edit": "编辑",
     "save": "保存",
-    "messageUpdated": "消息已更新"
+    "messageUpdated": "消息已更新",
+    "viewProfile": "查看资料",
+    "viewMembers": "查看成员",
+    "groupMembers": "群组成员",
+    "totalMembers": "共 {count} 名成员",
+    "owner": "群主",
+    "you": "(您)",
+    "memberAddedSuccess": "成员添加成功",
+    "transferOwnership": "转让所有权",
+    "transferOwnershipDescription": "作为群主，您必须在离开前将所有权转让给另一名成员。",
+    "selectNewOwner": "选择新群主",
+    "noMembersToTransfer": "没有可用于转让所有权的成员",
+    "transferAndLeave": "转让并离开",
+    "transferringOwnership": "正在转让所有权...",
+    "ownershipTransferred": "群组所有权转让成功",
+    "confirmTransferTitle": "转让群组所有权",
+    "confirmTransferDescription": "确定要将此群组的所有权转让给 {name} 吗？此操作无法撤销。"
   },
   "Invitation": {
     "inviteToTeam": "邀请加入",
@@ -1342,7 +1385,7 @@
     "formHasErrors": "表单有错误。请重试。",
     "updateTask": "更新",
     "viewTask": "查看任务",
-    "pastTask": "过去任务",	
+    "pastTask": "过去任务",
     "viewTaskDescription": "查看任务描述",
     "cannotEditPastTask": "不能编辑过去任务",
     "cannotDeletePastTask": "不能删除过去任务",
@@ -1381,7 +1424,25 @@
     "cannotSelectPastTime": "不能选择过去的时间",
     "cannotCreatePastEvents": "不能创建过去的事件",
     "eventTimeUpdated": "事件时间已更新",
-    "dragToReposition": "拖动以重新定位"
+    "dragToReposition": "拖动以重新定位",
+    "endTimeCannotBeBeforeStart": "结束时间不能早于开始时间",
+    "personalEventCreated": "个人事件创建成功",
+    "personalEventUpdated": "个人事件更新成功",
+    "attendees": "参与者",
+    "tokenRefreshFailed": "刷新Google授权失败",
+    "tokenRefreshError": "刷新Google授权时出错",
+    "missingUserId": "未找到用户ID。请尝试重新登录。",
+    "pastEvent": "过去的事件",
+    "schedule": "日程安排",
+    "priority": "优先级",
+    "selectPriority": "选择优先级",
+    "lowPriority": "低",
+    "mediumPriority": "中",
+    "highPriority": "高",
+    "urgentPriority": "紧急",
+    "createTaskFailed": "创建任务失败",
+    "updateTaskFailed": "更新任务失败",
+    "endTimeBeforeStartAcrossDays": "结束日期/时间必须晚于开始日期/时间"
   },
   "CreateTag": {
     "createTag": "创建新字段",
@@ -1837,7 +1898,7 @@
     "edit": "编辑",
     "cancel": "取消",
     "viewOnly": "仅查看",
-    "placeholder": "输入公告内容...",    
+    "placeholder": "输入公告内容...",
     "loading": "加载中...",
     "error": "错误",
     "pin": "置顶",
@@ -1880,7 +1941,7 @@
     "highlight": "高亮",
     "quoteBlock": "引用块",
     "bulletList": "无序列表",
-    "orderedList": "有序列表"    
+    "orderedList": "有序列表"
   },
   "confirmation": {
     "confirm": "确认",
@@ -2268,7 +2329,7 @@
     "loading": "加载中...",
     "beFirstToComment": "成为第一个评论者",
     "addComment": "添加评论",
-    "send": "发送",    
+    "send": "发送",
     "posts": "帖子",
     "searchPosts": "搜索帖子...",
     "newPost": "新帖子",
@@ -2547,5 +2608,17 @@
     "noAccessToTeam": "您没有访问这个团队的权限。您可能不是团队成员或团队负责人。",
     "deleteTabTitle": "删除视图",
     "deleteTabConfirm": "您确定要删除这个视图吗？这个操作无法撤销。"
+  },
+  "UserProfile": {
+    "title": "设置",
+    "userProfileTitle": "{name}的个人资料",
+    "close": "关闭",
+    "newChat": "新聊天",
+    "creating": "创建中...",
+    "theme": "主题",
+    "errors": {
+      "chatCreationFailed": "创建聊天失败",
+      "onlyOwnerCanEditName": "只有群主可以编辑群组名称"
+    }
   }
 }
