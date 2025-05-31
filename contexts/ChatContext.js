@@ -1451,6 +1451,46 @@ export function ChatProvider({ children }) {
           }
         }
       })
+      // Add a handler for UPDATE events to handle message deletions and edits
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'chat_message'
+      }, async (payload) => {
+        if (!authSession) return;
+        
+        // If message was deleted/withdrawn or content was edited, update it in our state
+        if (payload.new.is_deleted !== payload.old.is_deleted || payload.new.content !== payload.old.content) {
+          // Update the messages array if this is for the current session
+          if (currentSession?.id === payload.new.session_id) {
+            setMessages(prevMessages => 
+              prevMessages.map(msg => 
+                msg.id === payload.new.id 
+                  ? { ...msg, is_deleted: payload.new.is_deleted, content: payload.new.content } 
+                  : msg
+              )
+            );
+          }
+          
+          // Also update the last message in the sessions list if this was the last message
+          setSessions(prevSessions => 
+            prevSessions.map(session => {
+              if (session.id === payload.new.session_id && 
+                  session.lastMessage?.id === payload.new.id) {
+                return {
+                  ...session,
+                  lastMessage: {
+                    ...session.lastMessage,
+                    is_deleted: payload.new.is_deleted,
+                    content: payload.new.content
+                  }
+                };
+              }
+              return session;
+            })
+          );
+        }
+      })
       .subscribe();
       
     // 订阅AI聊天消息变化
