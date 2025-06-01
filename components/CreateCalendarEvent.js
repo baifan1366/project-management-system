@@ -10,7 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { format, parse, addHours } from 'date-fns';
+import { format, parse, addHours, isPast, isSameDay, set } from 'date-fns';
 import { CalendarIcon, Clock, Video, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -18,16 +18,27 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from '@/lib/supabase';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import useGetUser from '@/lib/hooks/useGetUser';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = new Date(), onSuccess, isGoogleConnected = false }) {
+export default function CreateCalendarEvent({ 
+  isOpen, 
+  setIsOpen, 
+  selectedDate = new Date(), 
+  onSuccess, 
+  isGoogleConnected = false,
+  isEditing = false,
+  eventToEdit = null
+}) {
   const t = useTranslations('Calendar');
-  const [eventType, setEventType] = useState('task'); // 'task', 'google', 'personal'
+  const [eventType, setEventType] = useState(isEditing && eventToEdit ? 
+    eventToEdit.type || (eventToEdit.originalEvent ? 'google' : 'task') : 'task'); // 'task', 'google', 'personal'
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const { user: session } = useGetUser();
+  const [dateError, setDateError] = useState('');
   
   // Debug: Check Google auth status when component mounts
   useEffect(() => {
@@ -48,16 +59,77 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     title: '',
     description: '',
     startDate: selectedDate,
-    startTime: format(new Date().setMinutes(0, 0, 0), 'HH:mm'),
+    startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
     endDate: selectedDate,
-    endTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
+    endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'hh:mm'),
     isAllDay: false,
     location: '',
     reminders: false,
-    color: '#4285F4', // 默认颜色
     addGoogleMeet: false, // 是否添加Google Meet视频会议
     inviteParticipants: false, // 是否邀请参与者
+    priority: 'MEDIUM',
   });
+
+  // 添加日期时间验证状态
+  const [formErrors, setFormErrors] = useState({
+    dateError: '',
+    timeError: ''
+  });
+
+  // Initialize form data when editing an existing event
+  useEffect(() => {
+    if (isEditing && eventToEdit) {
+      // Set event type based on the event being edited
+      if (eventToEdit.originalEvent) {
+        // Google Calendar event
+        setEventType('google');
+        
+        // Initialize selected users from attendees
+        if (eventToEdit.attendees && eventToEdit.attendees.length > 0) {
+          // Filter out the current user who is likely the organizer
+          const attendees = eventToEdit.attendees
+            .filter(attendee => !attendee.self)
+            .map(attendee => ({
+              id: attendee.email, // Use email as ID since we don't have actual user IDs
+              name: attendee.displayName || attendee.email,
+              email: attendee.email,
+              avatar_url: null // We don't have avatar URLs from Google
+            }));
+            
+          setSelectedUsers(attendees);
+          
+          if (attendees.length > 0) {
+            setFormData(prev => ({
+              ...prev,
+              inviteParticipants: true
+            }));
+          }
+        }
+      } else if (eventToEdit.expected_completion_date) {
+        // Task
+        setEventType('task');
+      } else {
+        // Personal calendar event
+        setEventType('personal');
+      }
+      
+      // Set form data from event
+      setFormData({
+        title: eventToEdit.title || eventToEdit.summary || '',
+        description: eventToEdit.description || '',
+        startDate: eventToEdit.startDate || selectedDate,
+        startTime: eventToEdit.startTime || format(new Date().setMinutes(0, 0, 0), 'hh:mm'),
+        endDate: eventToEdit.endDate || selectedDate,
+        endTime: eventToEdit.endTime || format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
+        isAllDay: eventToEdit.isAllDay || false,
+        location: eventToEdit.location || '',
+        reminders: eventToEdit.reminders || false,
+        addGoogleMeet: eventToEdit.addGoogleMeet || false,
+        inviteParticipants: eventToEdit.attendees?.length > 0 || false,
+        priority: eventToEdit.priority || 'MEDIUM',
+      });
+    }
+  }, [isEditing, eventToEdit, selectedDate]);
 
   // 当selectedDate变化时更新表单数据
   useEffect(() => {
@@ -115,8 +187,12 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
       setIsLoadingUsers(true);
       
       if (!session) {
-        throw new Error(t('notLoggedIn'));
+        console.error('No user session found');
+        setUsers([]);
+        return;
       }
+
+      console.log('Searching users with query:', query, 'Session user ID:', session.id);
 
       const { data, error } = await supabase
         .from('user')
@@ -126,12 +202,15 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         .limit(10);
       
       if (error) {
+        console.error('Error during user search:', error.message);
         throw error;
       }
       
+      console.log('User search results:', data?.length || 0, 'users found');
       setUsers(data || []);
     } catch (error) {
       console.error('搜索用户失败:', error);
+      toast.error('Failed to search users');
     } finally {
       setIsLoadingUsers(false);
     }
@@ -149,9 +228,131 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     setSelectedUsers(selectedUsers.filter(user => user.id !== userId));
   };
 
+  // 验证表单数据
+  const validateForm = () => {
+    const errors = {
+      dateError: '',
+      timeError: ''
+    };
+    
+    // Parse time string to hours and minutes
+    const parseTimeString = (timeStr) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return [hours, minutes];
+    };
+    
+    // 创建完整的开始日期时间和结束日期时间
+    const [startHour, startMinute] = parseTimeString(formData.startTime);
+    const [endHour, endMinute] = parseTimeString(formData.endTime);
+    
+    const startDateTime = new Date(
+      formData.startDate.getFullYear(),
+      formData.startDate.getMonth(),
+      formData.startDate.getDate(),
+      startHour,
+      startMinute
+    );
+    
+    const endDateTime = new Date(
+      formData.endDate.getFullYear(),
+      formData.endDate.getMonth(),
+      formData.endDate.getDate(),
+      endHour,
+      endMinute
+    );
+    
+    // 验证开始日期不是过去的日期
+    const now = new Date();
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startDateMidnight = new Date(formData.startDate.getFullYear(), formData.startDate.getMonth(), formData.startDate.getDate());
+    
+    // Always check if the date is in the past, even when editing
+    if (startDateMidnight < todayDate) {
+      errors.dateError = t('cannotSelectPastDate') || 'Cannot select a date in the past';
+    }
+    
+    // 验证今天的开始时间不是过去的时间 - only check if start date is today
+    if (isSameDay(formData.startDate, now) && startDateTime < now) {
+      errors.timeError = t('cannotSelectPastTime') || 'Cannot select a time in the past';
+    }
+    
+    // Check for time confusion issues
+    const startHour24 = parseInt(formData.startTime.split(':')[0], 10);
+    const endHour24 = parseInt(formData.endTime.split(':')[0], 10);
+    
+    // 验证结束日期时间不早于开始日期时间 - compare full date-times
+    if (endDateTime < startDateTime) {
+      if (!isSameDay(formData.startDate, formData.endDate)) {
+        // Use a more appropriate error message for different days
+        errors.timeError = t('endTimeBeforeStartAcrossDays') || 'End date/time must be after start date/time';
+      } else {
+        errors.timeError = t('endTimeCannotBeBeforeStart') || 'End time cannot be before start time';
+      }
+    }
+    
+    setFormErrors(errors);
+    return !errors.dateError && !errors.timeError;
+  }
+
+  // 处理日期变化
+  const handleDateChange = (date, name) => {
+    // 当开始日期变化时，如果结束日期在开始日期之前，则自动调整结束日期
+    if (name === 'startDate' && formData.endDate < date) {
+      setFormData((prev) => ({ 
+        ...prev, 
+        [name]: date,
+        endDate: date 
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: date }));
+    }
+    
+    // 清除之前的所有错误，因为日期变化可能会解决时间相关的问题
+    setFormErrors(prev => ({
+      dateError: '',
+      timeError: ''
+    }));
+  };
+  
+  // Handle time input changes with validation
+  const handleTimeChange = (e) => {
+    const { name, value } = e.target;
+    
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // 当开始时间变化时，如果时间范围变成无效（结束时间在开始时间之前），则自动调整结束时间
+    // Only auto-adjust when start and end dates are the same day
+    if (name === 'startTime' && formData.startDate && formData.endDate && isSameDay(formData.startDate, formData.endDate)) {
+      const [startHour, startMinute] = value.split(':').map(Number);
+      const [endHour, endMinute] = formData.endTime.split(':').map(Number);
+      
+      if (startHour > endHour || (startHour === endHour && startMinute >= endMinute)) {
+        // 如果新的开始时间大于等于结束时间，则将结束时间设置为开始时间后的1小时
+        const newEndHour = (startHour + 1) % 24;
+        setFormData(prev => ({
+          ...prev,
+          endTime: `${newEndHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`
+        }));
+      }
+    }
+    
+    // 清除之前的错误
+    setFormErrors(prev => ({
+      ...prev,
+      timeError: ''
+    }));
+  };
+
   // 处理表单数据变化
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Use specific time handler for time inputs
+    if (name === 'startTime' || name === 'endTime') {
+      handleTimeChange(e);
+      return;
+    }
+    
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -160,40 +361,124 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
     setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
-  // 处理日期变化
-  const handleDateChange = (date, name) => {
-    setFormData((prev) => ({ ...prev, [name]: date }));
-  };
-
-  // 创建事件
+  // 创建或更新事件
   const handleCreateEvent = async (e) => {
     if (e) e.preventDefault();
     
     try {
+      // 先验证表单数据
+      if (!validateForm()) {
+        return; // 如果验证失败，不提交表单
+      }
+      
       setIsLoading(true);
       
+      // Parse time string to get hours and minutes
+      const getTimeComponents = (timeStr) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      };
+      
+      // Validate that event time is not in the past
+      const now = new Date();
+      
+      // Get the time string
+      const startTimeStr = getTimeComponents(formData.startTime);
+      const endTimeStr = getTimeComponents(formData.endTime);
+      
+      const startDateTime = formData.isAllDay 
+        ? new Date(format(formData.startDate, 'yyyy-MM-dd') + 'T00:00:00')
+        : new Date(format(formData.startDate, 'yyyy-MM-dd') + 'T' + startTimeStr + ':00');
+      
+      // Always check if start date/time is in the past, even when editing
+      // Check if the start date/time is in the past
+      if (isPast(startDateTime) && !isSameDay(startDateTime, now)) {
+        throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
+      }
+      
+      // For same-day events, check if the time is in the past
+      if (isSameDay(startDateTime, now) && isPast(startDateTime)) {
+        throw new Error(t('cannotCreatePastEvents') || 'Cannot create events in the past');
+      }
+      
       if (eventType === 'task') {
-        // 创建任务
-        const taskData = {
-          title: formData.title,
-          description: formData.description,
-          due_date: formData.isAllDay 
+        try {
+          // 检查是否是编辑模式
+          const isUpdateMode = isEditing && eventToEdit && eventToEdit.id;
+          
+          // 准备 mytasks 数据
+          const startDateTime = formData.isAllDay 
             ? format(formData.startDate, 'yyyy-MM-dd')
-            : format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00',
-          // 添加其他必要的任务数据，如 project_id, team_id 等
-        };
-        
-        const response = await fetch('/api/tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(taskData),
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create task');
+            : format(formData.startDate, 'yyyy-MM-dd') + 'T' + startTimeStr + ':00';
+          
+          const endDateTime = formData.isAllDay
+            ? `${format(formData.endDate, 'yyyy-MM-dd')}T23:59:59`
+            : `${format(formData.endDate, 'yyyy-MM-dd')}T${endTimeStr}:00`;
+          
+          if (session) {
+            // 检查 user_id 是否是有效的 UUID 格式
+            const userId = session.id;
+            if (!userId) {
+              console.error('Missing user ID:', userId);
+              toast.error(t('missingUserId') || 'User ID not found. Please try signing in again.');
+              return;
+            }
+            
+            if (isUpdateMode) {
+              // 更新现有任务
+              console.log('Updating existing task with ID:', eventToEdit.id);
+              
+              // 准备任务数据
+              const taskData = {
+                title: formData.title,
+                description: formData.description || '',
+                expected_start_time: startDateTime,
+                expected_completion_date: endDateTime,
+                priority: formData.priority || 'MEDIUM',
+                updated_at: new Date().toISOString()
+              };
+              
+              const { data, error } = await supabase.from('mytasks')
+                .update(taskData)
+                .eq('id', eventToEdit.id)
+                .select();
+              
+              if (error) {
+                console.error('Error updating task:', error);
+                throw new Error(error.message || t('updateTaskFailed') || 'Failed to update task');
+              }
+              
+              console.log('Task successfully updated:', data);
+            } else {
+              // 创建新任务
+              const taskData = {
+                user_id: userId,
+                title: formData.title,
+                description: formData.description || '',
+                status: 'TODO',
+                priority: formData.priority || 'MEDIUM',
+                expected_start_time: startDateTime,
+                expected_completion_date: endDateTime
+              };
+              
+              const { data, error } = await supabase.from('mytasks')
+                .insert(taskData)
+                .select();
+              
+              if (error) {
+                console.error('Error details:', error);
+                throw new Error(error.message || t('createTaskFailed') || 'Failed to create task');
+              }
+              
+              console.log('Task successfully added to mytasks:', data);
+            }
+          } else {
+            throw new Error(t('notLoggedIn') || 'Not logged in');
+          }
+        } catch (error) {
+          console.error('Error creating/updating task:', error);
+          toast.error(error.message || (isEditing ? t('taskUpdateFailed') : t('eventCreationFailed')));
+          return; // Stop execution if there's an error
         }
       } else if (eventType === 'personal') {
         // 创建个人日历事件
@@ -203,11 +488,11 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
 
         const startDateTime = formData.isAllDay 
           ? `${format(formData.startDate, 'yyyy-MM-dd')}T00:00:00`
-          : `${format(formData.startDate, 'yyyy-MM-dd')}T${formData.startTime}:00`;
+          : `${format(formData.startDate, 'yyyy-MM-dd')}T${startTimeStr}:00`;
         
         const endDateTime = formData.isAllDay
           ? `${format(formData.endDate, 'yyyy-MM-dd')}T23:59:59`
-          : `${format(formData.endDate, 'yyyy-MM-dd')}T${formData.endTime}:00`;
+          : `${format(formData.endDate, 'yyyy-MM-dd')}T${endTimeStr}:00`;
         
         const personalEventData = {
           title: formData.title,
@@ -216,27 +501,45 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
           end_time: endDateTime,
           is_all_day: formData.isAllDay,
           location: formData.location,
-          color: formData.color,
+          color: '#9c27b0', // Default purple color
           user_id: session.id
         };
         
-        const { error } = await supabase
-          .from('personal_calendar_event')
-          .insert(personalEventData);
+        // 检查是否是编辑模式
+        const isUpdateMode = isEditing && eventToEdit && eventToEdit.id;
         
-        if (error) {
-          console.error('创建个人日历事件失败:', error);
-          throw new Error(error.message || '创建个人日历事件失败');
+        if (isUpdateMode) {
+          // 更新现有个人事件
+          console.log('Updating existing personal event with ID:', eventToEdit.id);
+          const { error } = await supabase
+            .from('personal_calendar_event')
+            .update(personalEventData)
+            .eq('id', eventToEdit.id);
+          
+          if (error) {
+            console.error('更新个人日历事件失败:', error);
+            throw new Error(error.message || '更新个人日历事件失败');
+          }
+        } else {
+          // 创建新的个人事件
+          const { error } = await supabase
+            .from('personal_calendar_event')
+            .insert(personalEventData);
+          
+          if (error) {
+            console.error('创建个人日历事件失败:', error);
+            throw new Error(error.message || '创建个人日历事件失败');
+          }
         }
       } else if (eventType === 'google') {
-        // 创建Google日历事件
+        // 创建或更新Google日历事件
         const startDateTime = formData.isAllDay 
           ? format(formData.startDate, 'yyyy-MM-dd')
-          : format(formData.startDate, 'yyyy-MM-dd') + 'T' + formData.startTime + ':00';
+          : format(formData.startDate, 'yyyy-MM-dd') + 'T' + startTimeStr + ':00';
         
         const endDateTime = formData.isAllDay
           ? format(formData.endDate, 'yyyy-MM-dd')
-          : format(formData.endDate, 'yyyy-MM-dd') + 'T' + formData.endTime + ':00';
+          : format(formData.endDate, 'yyyy-MM-dd') + 'T' + endTimeStr + ':00';
         
         // Check for Google tokens in the user session
         let accessToken = session?.google_access_token || null;
@@ -326,8 +629,25 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
           };
         }
         
-        const response = await fetch('/api/google-calendar', {
-          method: 'POST',
+        // Determine if we're creating or updating an event
+        const isUpdateOperation = isEditing && eventToEdit && eventToEdit.id;
+        const apiPath = isUpdateOperation ? 
+          `/api/google-calendar/events/${eventToEdit.id}` : 
+          '/api/google-calendar';
+        
+        const method = isUpdateOperation ? 'PATCH' : 'POST';
+        
+        // If updating, handle existing conference data
+        if (isUpdateOperation && eventToEdit.originalEvent?.conferenceData && !formData.addGoogleMeet) {
+          // We're removing the conference data
+          eventData.conferenceData = null;
+        } else if (isUpdateOperation && eventToEdit.originalEvent?.conferenceData && formData.addGoogleMeet) {
+          // We're keeping existing conference data
+          eventData.conferenceData = eventToEdit.originalEvent.conferenceData;
+        }
+        
+        const response = await fetch(apiPath, {
+          method: method,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -336,7 +656,9 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
             accessToken,
             refreshToken,
             conferenceDataVersion: formData.addGoogleMeet ? 1 : 0,
-            sendNotifications: formData.inviteParticipants
+            sendNotifications: formData.inviteParticipants,
+            sendUpdates: isUpdateOperation ? 'all' : undefined,
+            userId: session.id
           }),
         });
         
@@ -346,20 +668,21 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('创建Google日历事件失败:', errorData);
+          console.error('创建/更新Google日历事件失败:', errorData);
           
           if (errorData.error && errorData.error.includes('insufficient authentication scopes')) {
             throw new Error('Google Calendar权限不足，请重新登录并授予完整日历访问权限');
           }
           
-          throw new Error(errorData.error || '创建Google日历事件失败');
+          throw new Error(errorData.error || '创建/更新Google日历事件失败');
         }
         
-        // 获取创建的事件数据，包括Meet链接
+        // 获取创建或更新的事件数据，包括Meet链接
         const eventResponseData = await response.json();
         
         // 如果有参与者且有会议链接，创建通知
-        if (formData.inviteParticipants && formData.addGoogleMeet && eventResponseData.event.hangoutLink) {
+        if (formData.inviteParticipants && formData.addGoogleMeet && 
+            eventResponseData.event.hangoutLink && !isUpdateOperation) {
           const meetLink = eventResponseData.event.hangoutLink;
           
           // 为每个参与者创建通知
@@ -393,20 +716,42 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
         title: '',
         description: '',
         startDate: new Date(),
-        startTime: format(new Date().setMinutes(0, 0, 0), 'HH:mm'),
+        startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
         endDate: new Date(),
-        endTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'HH:mm'),
+        endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'hh:mm'),
         isAllDay: false,
         location: '',
         reminders: false,
-        color: '#4285F4', // 默认颜色
         addGoogleMeet: false,
         inviteParticipants: false,
+        priority: 'MEDIUM',
       });
       
       setSelectedUsers([]);
+      setFormErrors({
+        dateError: '',
+        timeError: ''
+      });
       setIsOpen(false);
-      toast.success(t('eventCreated'));
+      
+      // 根据事件类型和操作类型显示不同的成功消息
+      if (isEditing) {
+        if (eventType === 'task') {
+          toast.success(t('taskUpdated') || 'Task updated successfully');
+        } else if (eventType === 'personal') {
+          toast.success(t('personalEventUpdated') || 'Personal event updated successfully');
+        } else {
+          toast.success(t('eventUpdated') || 'Event updated successfully');
+        }
+      } else {
+        if (eventType === 'task') {
+          toast.success(t('taskCreated') || 'Task created successfully');
+        } else if (eventType === 'personal') {
+          toast.success(t('personalEventCreated') || 'Personal event created successfully');
+        } else {
+          toast.success(t('eventCreated') || 'Event created successfully');
+        }
+      }
       
       // 如果有成功回调，调用它
       if (onSuccess) {
@@ -414,313 +759,383 @@ export default function CreateCalendarEvent({ isOpen, setIsOpen, selectedDate = 
       }
       
     } catch (error) {
-      console.error('Error creating event:', error);
-      toast.error(error.message || t('eventCreationFailed'));
+      console.error('Error creating/updating event:', error);
+      toast.error(error.message || (isEditing ? t('eventUpdateFailed') : t('eventCreationFailed')));
     } finally {
       setIsLoading(false);
     }
   };
   
+  // Add this effect to reset editing state when dialog closes
+  useEffect(() => {
+    // When dialog closes, reset editing state
+    if (!isOpen && isEditing) {
+      // We don't need to modify isEditing here as it's passed as prop
+      // But we should reset the form if dialog is closed
+      setFormData({
+        title: '',
+        description: '',
+        startDate: selectedDate,
+        startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
+        endDate: selectedDate,
+        endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'hh:mm'),
+        isAllDay: false,
+        location: '',
+        reminders: false,
+        addGoogleMeet: false,
+        inviteParticipants: false,
+        priority: 'MEDIUM',
+      });
+      setSelectedUsers([]);
+      setFormErrors({
+        dateError: '',
+        timeError: ''
+      });
+    }
+  }, [isOpen, isEditing, selectedDate]);
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle>{t('createEvent')}</DialogTitle>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      // If dialog is closing, make sure to reset editing state in parent component
+      if (!open && isEditing) {
+        // Call setIsOpen directly to close the dialog
+        setIsOpen(false);
+      } else {
+        setIsOpen(open);
+      }
+    }}>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader>
+          <DialogTitle>{isEditing ? t('editEvent') : t('createEvent')}</DialogTitle>
           <DialogDescription>
-            {t('createEventDescription')}
+            {isEditing ? t('editEventDescription') : t('createEventDescription')}
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="task" value={eventType} onValueChange={setEventType} className="mt-4 flex-shrink-0">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="task">{t('task')}</TabsTrigger>
-            <TabsTrigger value="personal">{t('personalCalendar')}</TabsTrigger>
-            <TabsTrigger value="google">Google {t('event')}</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        
-        {eventType === 'google' && !isGoogleConnected && (
-          <div className="my-4 p-3 border rounded-md bg-amber-50 text-amber-800">
-            <p className="text-sm font-medium mb-2">{t('googleAccountNeeded') || 'Connect your Google account to create Google Calendar events'}</p>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => window.location.href = '/api/auth/google?calendar=true&redirectTo=/calendar'}
-              className="flex items-center gap-2 text-xs"
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16">
-                <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="#4285F4"/>
-              </svg>
-              {t('connectGoogleAccount') || 'Connect Google Account'}
-            </Button>
+        <div className="grid gap-4 py-4">
+          <Tabs 
+            value={eventType} 
+            onValueChange={setEventType} 
+            className="w-full mb-2"
+            disabled={isEditing} // Disable changing event type when editing
+          >
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="task" disabled={isEditing && eventType !== 'task'}>{t('task')}</TabsTrigger>
+              <TabsTrigger value="personal" disabled={(isEditing && eventType !== 'personal') || !session}>{t('personalCalendar')}</TabsTrigger>
+              <TabsTrigger value="google" disabled={(isEditing && eventType !== 'google') || !isGoogleConnected}>{t('googleCalendar')}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="space-y-2">
+            <Label htmlFor="title">{t('title')}</Label>
+            <Input
+              id="title"
+              name="title"
+              value={formData.title}
+              onChange={handleInputChange}
+              placeholder={t('titlePlaceholder')}
+            />
           </div>
-        )}
-        
-        <div className="flex-1 overflow-y-auto pr-2 my-4">
-          <form className="space-y-4" id="eventForm">
+
+          <div className="space-y-2">
+            <Label htmlFor="description">{t('description')}</Label>
+            <Textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              placeholder={t('descriptionPlaceholder')}
+              className="resize-none h-20"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="title">{t('title')}</Label>
-              <Input 
-                id="title" 
-                name="title" 
-                value={formData.title} 
-                onChange={handleInputChange} 
-                placeholder={t('titlePlaceholder')} 
-                required 
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">{t('description')}</Label>
-              <Textarea 
-                id="description" 
-                name="description" 
-                value={formData.description} 
-                onChange={handleInputChange} 
-                placeholder={t('descriptionPlaceholder')} 
-                rows={3} 
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate">{t('startDate')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="startDate"
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.startDate ? format(formData.startDate, 'PPP') : t('pickDate')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.startDate}
-                      onSelect={(date) => handleDateChange(date, 'startDate')}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              
-              {!formData.isAllDay && (
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">{t('startTime')}</Label>
-                  <Input 
-                    id="startTime" 
-                    name="startTime" 
-                    type="time" 
-                    value={formData.startTime} 
-                    onChange={handleInputChange} 
+              <Label htmlFor="startDate">{t('startDate')}</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="startDate"
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      formErrors.dateError && "border-red-500"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.startDate ? format(formData.startDate, 'PPP') : t('pickDate')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.startDate}
+                    onSelect={(date) => handleDateChange(date, 'startDate')}
+                    disabled={(date) => isPast(new Date(date.getFullYear(), date.getMonth(), date.getDate())) && !isSameDay(date, new Date())}
                   />
-                </div>
-              )}
+                </PopoverContent>
+              </Popover>
+              {formErrors.dateError && <p className="text-xs text-red-500 mt-1">{formErrors.dateError}</p>}
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            {!formData.isAllDay && (
               <div className="space-y-2">
-                <Label htmlFor="endDate">{t('endDate')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="endDate"
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.endDate ? format(formData.endDate, 'PPP') : t('pickDate')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.endDate}
-                      onSelect={(date) => handleDateChange(date, 'endDate')}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              
-              {!formData.isAllDay && (
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">{t('endTime')}</Label>
-                  <Input 
-                    id="endTime" 
-                    name="endTime" 
-                    type="time" 
-                    value={formData.endTime} 
-                    onChange={handleInputChange} 
-                  />
-                </div>
-              )}
-            </div>
-            
-            {(eventType === 'google' || eventType === 'personal') && (
-              <div className="space-y-2">
-                <Label htmlFor="location">{t('location')}</Label>
+                <Label htmlFor="startTime">{t('startTime')}</Label>
                 <Input 
-                  id="location" 
-                  name="location" 
-                  value={formData.location} 
-                  onChange={handleInputChange} 
-                  placeholder={t('locationPlaceholder')} 
+                  id="startTime" 
+                  name="startTime" 
+                  type="time" 
+                  value={formData.startTime} 
+                  onChange={handleTimeChange} 
+                  className={cn(formErrors.timeError && "border-red-500")}
                 />
               </div>
             )}
-            
-            {eventType === 'personal' && (
-              <div className="space-y-2">
-                <Label htmlFor="color">{t('color')}</Label>
-                <div className="flex items-center space-x-2">
-                  <Input 
-                    id="color" 
-                    name="color" 
-                    type="color" 
-                    value={formData.color} 
-                    onChange={handleInputChange} 
-                    className="w-12 h-8 p-1" 
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="endDate">{t('endDate')}</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="endDate"
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      formErrors.dateError && "border-red-500"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.endDate ? format(formData.endDate, 'PPP') : t('pickDate')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.endDate}
+                    onSelect={(date) => handleDateChange(date, 'endDate')}
+                    disabled={(date) => !isEditing && date < formData.startDate}
                   />
-                  <div 
-                    className="h-8 w-8 rounded-md" 
-                    style={{ backgroundColor: formData.color }}
-                  ></div>
-                </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            {!formData.isAllDay && (
+              <div className="space-y-2">
+                <Label htmlFor="endTime">{t('endTime')}</Label>
+                <Input 
+                  id="endTime" 
+                  name="endTime" 
+                  type="time" 
+                  value={formData.endTime} 
+                  onChange={handleTimeChange}
+                  className={cn(formErrors.timeError && "border-red-500")}
+                />
+                {formErrors.timeError && <p className="text-xs text-red-500 mt-1">{formErrors.timeError}</p>}
               </div>
             )}
-            
+          </div>
+          
+          {/* Priority selector for tasks */}
+          {eventType === 'task' && (
+            <div className="space-y-2">
+              <Label htmlFor="priority">{t('priority')}</Label>
+              <Select 
+                value={formData.priority} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('selectPriority')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">{t('lowPriority')}</SelectItem>
+                  <SelectItem value="MEDIUM">{t('mediumPriority')}</SelectItem>
+                  <SelectItem value="HIGH">{t('highPriority')}</SelectItem>
+                  <SelectItem value="URGENT">{t('urgentPriority')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          
+          {(eventType === 'google' || eventType === 'personal') && (
+            <div className="space-y-2">
+              <Label htmlFor="location">{t('location')}</Label>
+              <Input 
+                id="location" 
+                name="location" 
+                value={formData.location} 
+                onChange={handleInputChange} 
+                placeholder={t('locationPlaceholder')} 
+              />
+            </div>
+          )}
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="isAllDay" 
+              checked={formData.isAllDay} 
+              onCheckedChange={(checked) => handleCheckboxChange('isAllDay', checked)} 
+            />
+            <label htmlFor="isAllDay" className="text-sm font-medium leading-none">
+              {t('allDay')}
+            </label>
+          </div>
+          
+          {eventType === 'google' && isGoogleConnected && (
             <div className="flex items-center space-x-2">
               <Checkbox 
-                id="isAllDay" 
-                checked={formData.isAllDay} 
-                onCheckedChange={(checked) => handleCheckboxChange('isAllDay', checked)} 
+                id="addGoogleMeet" 
+                checked={formData.addGoogleMeet} 
+                onCheckedChange={(checked) => handleCheckboxChange('addGoogleMeet', checked)} 
               />
-              <label htmlFor="isAllDay" className="text-sm font-medium leading-none">
-                {t('allDay')}
+              <label htmlFor="addGoogleMeet" className="text-sm font-medium leading-none flex items-center">
+                <Video className="h-4 w-4 mr-1" /> {t('addGoogleMeet')}
               </label>
             </div>
-            
-            {eventType === 'google' && isGoogleConnected && (
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="addGoogleMeet" 
-                  checked={formData.addGoogleMeet} 
-                  onCheckedChange={(checked) => handleCheckboxChange('addGoogleMeet', checked)} 
-                />
-                <label htmlFor="addGoogleMeet" className="text-sm font-medium leading-none flex items-center">
-                  <Video className="h-4 w-4 mr-1" /> {t('addGoogleMeet')}
-                </label>
-              </div>
-            )}
-            
-            {eventType === 'google' && isGoogleConnected && (
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="inviteParticipants" 
-                  checked={formData.inviteParticipants} 
-                  onCheckedChange={(checked) => handleCheckboxChange('inviteParticipants', checked)} 
-                />
-                <label htmlFor="inviteParticipants" className="text-sm font-medium leading-none flex items-center">
-                  <Users className="h-4 w-4 mr-1" /> {t('inviteParticipants')}
-                </label>
-              </div>
-            )}
-            
-            {eventType === 'google' && formData.inviteParticipants && (
-              <div className="space-y-2">
-                <Label>{t('participants')}</Label>
-                <Command className="border rounded-md">
-                  <CommandInput 
-                    placeholder={t('searchUsers')} 
+          )}
+          
+          {eventType === 'google' && isGoogleConnected && (
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="inviteParticipants" 
+                checked={formData.inviteParticipants} 
+                onCheckedChange={(checked) => handleCheckboxChange('inviteParticipants', checked)} 
+              />
+              <label htmlFor="inviteParticipants" className="text-sm font-medium leading-none flex items-center">
+                <Users className="h-4 w-4 mr-1" /> {t('inviteParticipants')}
+              </label>
+            </div>
+          )}
+          
+          {eventType === 'google' && formData.inviteParticipants && (
+            <div className="space-y-2">
+              <Label>{t('participants')}</Label>
+              
+              <div className="border rounded-md overflow-hidden">
+                <div className="flex items-center border-b p-2">
+                  <input
+                    type="text"
+                    placeholder={t('searchUsers')}
                     value={searchTerm}
-                    onValueChange={setSearchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-transparent focus:outline-none"
                   />
-                  <CommandList className="max-h-[120px] overflow-y-auto">
-                    {isLoadingUsers ? (
-                      <CommandEmpty>{t('loading')}</CommandEmpty>
-                    ) : users.length === 0 ? (
-                      <CommandEmpty>{t('noUsersFound')}</CommandEmpty>
-                    ) : (
-                      <CommandGroup>
+                </div>
+                
+                <div className="max-h-[120px] overflow-y-auto">
+                  {isLoadingUsers ? (
+                    <div className="p-2 text-sm text-center">{t('loading')}</div>
+                  ) : users.length === 0 ? (
+                    <div className="p-2 text-sm text-center">{t('noUsersFound')}</div>
+                  ) : (
+                    <>
+                      <div className="p-1">
                         {users.map((user) => (
-                          <CommandItem
+                          <div
                             key={user.id}
-                            onSelect={() => selectUser(user)}
-                            className="cursor-pointer"
+                            onClick={() => selectUser(user)}
+                            className="flex items-center gap-2 p-2 cursor-pointer hover:bg-accent rounded-md"
                           >
-                            <div className="flex items-center space-x-2">
-                              {user.avatar_url ? (
-                                <img 
-                                  src={user.avatar_url} 
-                                  alt={user.name} 
-                                  className="h-6 w-6 rounded-full"
-                                />
-                              ) : (
-                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                                  {user.name?.charAt(0) || user.email?.charAt(0)}
-                                </div>
-                              )}
-                              <span>{user.name}</span>
+                            {user.avatar_url ? (
+                              <img 
+                                src={user.avatar_url} 
+                                alt={user.name || user.email} 
+                                className="h-6 w-6 rounded-full"
+                              />
+                            ) : (
+                              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                                {(user.name || user.email)?.charAt(0)}
+                              </div>
+                            )}
+                            <div className="flex flex-col text-left">
+                              <span className="font-medium">{user.name || 'Unnamed User'}</span>
                               <span className="text-xs text-muted-foreground">{user.email}</span>
                             </div>
-                          </CommandItem>
+                          </div>
                         ))}
-                      </CommandGroup>
-                    )}
-                  </CommandList>
-                </Command>
-                
-                {selectedUsers.length > 0 && (
-                  <div className="mt-2">
-                    <Label>{t('selectedParticipants')}</Label>
-                    <div className="flex flex-wrap gap-2 mt-1 max-h-[100px] overflow-y-auto p-1">
-                      {selectedUsers.map((user) => (
-                        <div 
-                          key={user.id} 
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10"
+                      </div>
+                      <div className="px-2 py-1 text-xs text-muted-foreground border-t">
+                        {users.length} {users.length === 1 ? 'user' : 'users'} found
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {selectedUsers.length > 0 && (
+                <div className="mt-2">
+                  <Label>{t('selectedParticipants')}</Label>
+                  <div className="flex flex-wrap gap-2 mt-1 max-h-[100px] overflow-y-auto p-1 border rounded-md">
+                    {selectedUsers.map((user) => (
+                      <div 
+                        key={user.id} 
+                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10"
+                      >
+                        {user.name || user.email}
+                        <button 
+                          type="button"
+                          onClick={() => removeUser(user.id)}
+                          className="text-sm text-muted-foreground hover:text-foreground"
+                          aria-label={`Remove ${user.name || user.email}`}
                         >
-                          {user.name}
-                          <button 
-                            type="button"
-                            onClick={() => removeUser(user.id)}
-                            className="text-sm text-muted-foreground hover:text-foreground"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                          ×
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
-            
-            {eventType === 'google' && (
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="reminders" 
-                  checked={formData.reminders} 
-                  onCheckedChange={(checked) => handleCheckboxChange('reminders', checked)} 
-                />
-                <label htmlFor="reminders" className="text-sm font-medium leading-none">
-                  {t('useDefaultReminders')}
-                </label>
-              </div>
-            )}
-          </form>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {eventType === 'google' && (
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="reminders" 
+                checked={formData.reminders} 
+                onCheckedChange={(checked) => handleCheckboxChange('reminders', checked)} 
+              />
+              <label htmlFor="reminders" className="text-sm font-medium leading-none">
+                {t('useDefaultReminders')}
+              </label>
+            </div>
+          )}
         </div>
         
-        <DialogFooter className="flex-shrink-0 pt-2 border-t">
-          <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => {
+            // Reset form and close dialog
+            setFormData({
+              title: '',
+              description: '',
+              startDate: selectedDate,
+              startTime: format(addHours(new Date().setMinutes(0, 0, 0), 1), 'hh:mm'),
+              endDate: selectedDate,
+              endTime: format(addHours(new Date().setMinutes(0, 0, 0), 2), 'hh:mm'),
+              isAllDay: false,
+              location: '',
+              reminders: false,
+              addGoogleMeet: false,
+              inviteParticipants: false,
+              priority: 'MEDIUM',
+            });
+            setSelectedUsers([]);
+            setFormErrors({
+              dateError: '',
+              timeError: ''
+            });
+            setIsOpen(false);
+          }} className="w-full sm:w-auto">
             {t('cancel')}
           </Button>
           <Button 
-            onClick={handleCreateEvent} 
-            disabled={isLoading}
+            type="submit" 
+            disabled={isLoading || !formData.title} 
+            onClick={handleCreateEvent}
+            className="w-full sm:w-auto"
           >
-            {isLoading ? t('creating') : t('create')}
+            {isLoading ? (isEditing ? t('updating') : t('creating')) : (isEditing ? t('update') : t('create'))}
           </Button>
         </DialogFooter>
       </DialogContent>

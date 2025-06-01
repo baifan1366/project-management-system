@@ -47,8 +47,8 @@ async function refreshAccessToken(refreshToken) {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        client_secret: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
       }),
@@ -69,30 +69,6 @@ async function refreshAccessToken(refreshToken) {
   } catch (error) {
     console.error('Error refreshing access token:', error);
     return null;
-  }
-}
-
-async function updateUserMetadata(userId, accessToken, refreshToken) {
-  try {
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        google_tokens: {
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          updated_at: new Date().toISOString()
-        }
-      }
-    });
-
-    if (error) {
-      console.error('Failed to update user metadata:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error updating user metadata:', error);
-    return false;
   }
 }
 
@@ -180,7 +156,6 @@ export async function GET(request) {
 
         // 更新用户的token信息 - 使用我们自己的数据库而不是Supabase Auth
         try {
-          const { data: { user } } = await supabase.auth.getUser();
           if (user) {
             console.log('Updating user tokens in database');
             const { error: updateError } = await supabase

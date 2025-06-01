@@ -337,6 +337,7 @@ export function ChatProvider({ children }) {
           type,
           name,
           team_id,
+          created_by,
           created_at,
           updated_at,
           participants:chat_participant(
@@ -512,7 +513,15 @@ export function ChatProvider({ children }) {
     const sessionsWithMessages = sessionsData.map(item => {
       const lastMessage = lastMessagesBySession[item.chat_session.id];
       const otherParticipants = item.chat_session.participants
-        .map(p => processAvatarUrl(p.user))
+        .map(p => {
+          const processedUser = processAvatarUrl(p.user);
+          // Add a unique session-specific identifier to each participant
+          return {
+            ...processedUser,
+            // Create a unique ID for this user in this specific session
+            sessionUserId: `${item.chat_session.id}_${processedUser.id}`
+          };
+        })
         .filter(user => user.id !== authSession.id);
       
       const sessionId = item.chat_session.id;
@@ -521,6 +530,7 @@ export function ChatProvider({ children }) {
       
       return {
         ...item.chat_session,
+        created_by: item.chat_session.created_by, // Explicitly include created_by
         participants: otherParticipants,
         participantsCount: item.chat_session.participants.length,
         unreadCount,
@@ -552,16 +562,10 @@ export function ChatProvider({ children }) {
       return;
     }
 
-    // Get user metadata for cleared chat history
-    let clearedTimestamp = null;
-    try {
-      // Get cleared history timestamp from localStorage
-      const clearedHistory = JSON.parse(localStorage.getItem('cleared_chat_history') || '{}');
-      clearedTimestamp = clearedHistory[sessionId];
-    } catch (error) {
-      console.error('Error fetching cleared history data:', error);
-    }
+    // 清空消息状态以避免显示旧消息
+    setMessages([]);
 
+    // 获取所有消息
     const { data, error } = await supabase
       .from('chat_message')
       .select(`
@@ -598,15 +602,8 @@ export function ChatProvider({ children }) {
       return;
     }
 
-    // Filter messages based on cleared history timestamp if it exists
-    let filteredMessages = data;
-    if (clearedTimestamp) {
-      filteredMessages = data.filter(msg => 
-        new Date(msg.created_at) > new Date(clearedTimestamp)
-      );
-    }
-
-    setMessages(filteredMessages.map(msg => ({
+    // Set all messages with proper avatar processing
+    setMessages(data.map(msg => ({
       ...msg,
       user: processAvatarUrl(msg.user),
       replied_message: msg.replied_message ? {
@@ -823,7 +820,7 @@ export function ChatProvider({ children }) {
     // 记录已发送的消息ID，用于防止重复添加
     sentMessageIds.add(data.id);
     
-    // 将消息添加到本地状态
+    // Add message to the UI
     setMessages(prev => [...prev, { 
       ...data, 
       user: processAvatarUrl(data.user),
@@ -832,6 +829,22 @@ export function ChatProvider({ children }) {
         user: processAvatarUrl(data.replied_message.user)
       } : null
     }]);
+    
+    // 同时更新会话的最后一条消息
+    setSessions(prev => {
+      return prev.map(session => {
+        if (session.id === sessionId) {
+          return {
+            ...session,
+            lastMessage: {
+              ...data,
+              user: processAvatarUrl(data.user)
+            }
+          };
+        }
+        return session;
+      });
+    });
     
     // 如果发送的消息可能关联有附件（通过FileUploader组件上传的），
     // 可能需要等待一小段时间再重新获取完整的消息数据（包括附件信息）
@@ -884,6 +897,22 @@ export function ChatProvider({ children }) {
                 } 
               : msg
           );
+        });
+        
+        // Also update the session's last message
+        setSessions(prev => {
+          return prev.map(session => {
+            if (session.id === sessionId) {
+              return {
+                ...session,
+                lastMessage: {
+                  ...refreshedData,
+                  user: processAvatarUrl(refreshedData.user)
+                }
+              };
+            }
+            return session;
+          });
         });
       }
     }, 500); // 等待500ms确保附件处理完成
@@ -945,6 +974,191 @@ export function ChatProvider({ children }) {
     }
   };
 
+  // 删除聊天会话功能
+  const deleteChatSession = async (sessionId) => {
+    try {
+      if (!authSession) {
+        console.error('用户未登录，无法删除会话');
+        return { success: false, error: '未登录' };
+      }
+      
+      // 获取会话信息以检查权限
+      const { data: session, error: sessionError } = await supabase
+        .from('chat_session')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+        
+      if (sessionError) {
+        console.error('获取会话信息失败:', sessionError);
+        return { success: false, error: sessionError };
+      }
+      
+      // 严格检查是否为会话创建者，只有创建者可以删除
+      if (session.created_by !== authSession.id) {
+        console.error('无权删除此会话，只有会话创建者可以删除');
+        return { success: false, error: '无权操作' };
+      }
+      
+      // 开始删除会话相关数据
+
+      // 首先获取所有与此会话相关的消息ID
+      const { data: messageIds, error: messageIdsError } = await supabase
+        .from('chat_message')
+        .select('id')
+        .eq('session_id', sessionId);
+        
+      if (messageIdsError) {
+        console.error('获取消息ID失败:', messageIdsError);
+        // 继续执行，不中断流程
+      }
+      
+      // 如果有消息ID，删除相关的附件和阅读状态
+      if (messageIds && messageIds.length > 0) {
+        // 提取ID数组
+        const ids = messageIds.map(msg => msg.id);
+        
+        // 1. 删除所有附件
+        const { error: attachmentsError } = await supabase
+          .from('chat_attachment')
+          .delete()
+          .in('message_id', ids);
+          
+        if (attachmentsError) {
+          console.error('删除附件失败:', attachmentsError);
+          // 继续执行，不中断流程
+        }
+        
+        // 2. 删除消息读取状态
+        const { error: readStatusError } = await supabase
+          .from('chat_message_read_status')
+          .delete()
+          .in('message_id', ids);
+          
+        if (readStatusError) {
+          console.error('删除消息读取状态失败:', readStatusError);
+          // 继续执行，不中断流程
+        }
+      }
+      
+      // 3. 删除所有消息
+      const { error: messagesError } = await supabase
+        .from('chat_message')
+        .delete()
+        .eq('session_id', sessionId);
+        
+      if (messagesError) {
+        console.error('删除消息失败:', messagesError);
+        // 继续执行，不中断流程
+      }
+      
+      // 4. 删除AI消息 (如果有)
+      const { error: aiMessagesError } = await supabase
+        .from('ai_chat_message')
+        .delete()
+        .eq('session_id', sessionId);
+        
+      if (aiMessagesError) {
+        console.error('删除AI消息失败:', aiMessagesError);
+        // 继续执行，不中断流程
+      }
+      
+      // 5. 删除会话参与者
+      const { error: participantsError } = await supabase
+        .from('chat_participant')
+        .delete()
+        .eq('session_id', sessionId);
+        
+      if (participantsError) {
+        console.error('删除会话参与者失败:', participantsError);
+        // 继续执行，不中断流程
+      }
+      
+      // 6. 最后删除会话本身
+      const { error: deleteSessionError } = await supabase
+        .from('chat_session')
+        .delete()
+        .eq('id', sessionId);
+        
+      if (deleteSessionError) {
+        console.error('删除会话失败:', deleteSessionError);
+        return { success: false, error: deleteSessionError };
+      }
+      
+      // 如果是当前会话，清除当前会话
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(null);
+        setMessages([]);
+      }
+      
+      // 更新会话列表
+      setSessions(prevSessions => prevSessions.filter(s => s.id !== sessionId));
+      
+      return { success: true };
+    } catch (error) {
+      console.error('删除会话过程中发生错误:', error);
+      return { success: false, error };
+    }
+  };
+
+  // 离开群聊功能
+  const leaveGroupChat = async (sessionId) => {
+    try {
+      if (!authSession || !sessionId) {
+        console.error('用户未登录或会话ID无效');
+        return { success: false, error: '参数无效' };
+      }
+      
+      // 先验证会话类型是否为群聊
+      const { data: session, error: sessionError } = await supabase
+        .from('chat_session')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+        
+      if (sessionError || !session) {
+        console.error('获取会话信息失败:', sessionError);
+        return { success: false, error: sessionError };
+      }
+      
+      if (session.type !== 'GROUP') {
+        console.error('只能退出群聊');
+        return { success: false, error: '只能退出群聊' };
+      }
+      
+      // 检查用户是否为群聊创建者
+      if (session.created_by === authSession.id) {
+        console.error('群聊创建者不能退出群聊，请先转让群主或解散群聊');
+        return { success: false, error: '群聊创建者不能退出群聊' };
+      }
+      
+      // 从参与者表中删除用户
+      const { error: removeError } = await supabase
+        .from('chat_participant')
+        .delete()
+        .eq('session_id', sessionId)
+        .eq('user_id', authSession.id);
+        
+      if (removeError) {
+        console.error('退出群聊失败:', removeError);
+        return { success: false, error: removeError };
+      }
+      
+      // 如果当前会话正好是这个群聊，清除它
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(null);
+      }
+      
+      // 更新会话列表
+      await fetchChatSessions();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('退出群聊过程中发生错误:', error);
+      return { success: false, error };
+    }
+  };
+
   // 实时消息订阅
   useEffect(() => {
     if (!currentSession) return;
@@ -1001,7 +1215,8 @@ export function ChatProvider({ children }) {
           console.error('Error fetching complete message data:', error);
           return;
         }
-
+        
+        // Always add new messages to the UI without filtering
         setMessages(prev => {
           // 检查消息是否已经存在
           const messageExists = prev.some(msg => msg.id === messageData.id);
@@ -1018,7 +1233,8 @@ export function ChatProvider({ children }) {
           }];
         });
         
-        // 更新会话列表中的最后一条消息
+        // Always update the session's last message regardless of cleared history status
+        // This ensures the chat list shows the latest message
         setSessions(prev => {
           return prev.map(session => {
             if (session.id === payload.new.session_id) {
@@ -1148,10 +1364,6 @@ export function ChatProvider({ children }) {
           return;
         }
         
-        // 检查消息是否需要标记为未读（如果发送者不是当前用户，且不是当前打开的会话）
-        const isFromOtherUser = messageData.user_id !== authSession.id;
-        const isNotCurrentSession = currentSession?.id !== payload.new.session_id;
-        
         // 获取用户元数据，检查该会话是否被隐藏
         let isHiddenSession = false;
         try {
@@ -1161,6 +1373,10 @@ export function ChatProvider({ children }) {
         } catch (err) {
           console.error('Error checking hidden sessions:', err);
         }
+
+        // 检查消息是否需要标记为未读（如果发送者不是当前用户，且不是当前打开的会话）
+        const isFromOtherUser = messageData.user_id !== authSession.id;
+        const isNotCurrentSession = currentSession?.id !== payload.new.session_id;
         
         // 更新会话列表中的最后一条消息和未读计数
         setSessions(prev => {
@@ -1177,8 +1393,10 @@ export function ChatProvider({ children }) {
           
           // 如果会话存在，更新它
           if (sessionIndex !== -1) {
-            // 如果是其他用户发送的消息，且不是当前打开的会话，增加未读计数
-            const newUnreadCount = isFromOtherUser && isNotCurrentSession 
+            // 如果是其他用户发送的消息，且不是当前打开的会话，则增加未读计数
+            const shouldIncrementUnread = isFromOtherUser && isNotCurrentSession;
+            
+            const newUnreadCount = shouldIncrementUnread
               ? (newSessions[sessionIndex].unreadCount || 0) + 1 
               : newSessions[sessionIndex].unreadCount || 0;
               
@@ -1231,6 +1449,46 @@ export function ChatProvider({ children }) {
               updateUnreadCount(currentSession.id);
             }
           }
+        }
+      })
+      // Add a handler for UPDATE events to handle message deletions and edits
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'chat_message'
+      }, async (payload) => {
+        if (!authSession) return;
+        
+        // If message was deleted/withdrawn or content was edited, update it in our state
+        if (payload.new.is_deleted !== payload.old.is_deleted || payload.new.content !== payload.old.content) {
+          // Update the messages array if this is for the current session
+          if (currentSession?.id === payload.new.session_id) {
+            setMessages(prevMessages => 
+              prevMessages.map(msg => 
+                msg.id === payload.new.id 
+                  ? { ...msg, is_deleted: payload.new.is_deleted, content: payload.new.content } 
+                  : msg
+              )
+            );
+          }
+          
+          // Also update the last message in the sessions list if this was the last message
+          setSessions(prevSessions => 
+            prevSessions.map(session => {
+              if (session.id === payload.new.session_id && 
+                  session.lastMessage?.id === payload.new.id) {
+                return {
+                  ...session,
+                  lastMessage: {
+                    ...session.lastMessage,
+                    is_deleted: payload.new.is_deleted,
+                    content: payload.new.content
+                  }
+                };
+              }
+              return session;
+            })
+          );
         }
       })
       .subscribe();
@@ -1330,7 +1588,7 @@ export function ChatProvider({ children }) {
     };
   }, [authSession]);
 
-  // 包装setCurrentSession，添加权限检查
+  // 更新会话时进行检查和处理
   const setCurrentSessionWithCheck = (session) => {
     // 检查session是否在用户的会话列表中
     const isAuthorized = sessions.some(s => s.id === session?.id);
@@ -1348,18 +1606,45 @@ export function ChatProvider({ children }) {
           return s;
         });
       });
-      
-      // 立即标记该会话所有消息为已读
-      const setMessagesRead = async () => {
-        if (authSession) {
-          await markMessagesAsRead(session.id, authSession.id);
-        }
-      };
-      
-      setMessagesRead();
     }
     
-    setCurrentSession(session);
+    // 立即标记该会话所有消息为已读
+    const setMessagesRead = async () => {
+      if (authSession && session) {
+        await markMessagesAsRead(session.id, authSession.id);
+      }
+    };
+    
+    // 如果是相同的会话，合并新旧数据以确保所有字段都保留
+    if (session && currentSession && session.id === currentSession.id) {
+      // 合并旧数据和新数据，保留created_by字段
+      const mergedSession = {
+        ...currentSession,
+        ...session,
+        // 特别确保created_by被正确保留
+        created_by: session.created_by || currentSession.created_by
+      };
+      console.log("切换到会话，保留created_by:", mergedSession.created_by);
+      setCurrentSession(mergedSession);
+      
+      // 如果是普通会话，确保将其消息标记为已读
+      if (session.type !== 'AI') {
+        setMessagesRead();
+      }
+    } else {
+      console.log("切换到新会话，created_by:", session?.created_by);
+      // 清除旧的消息
+      if (session?.id !== currentSession?.id) {
+        setMessages([]);
+      }
+      
+      setCurrentSession(session);
+      
+      // 如果是普通会话，确保将其消息标记为已读
+      if (session?.type !== 'AI') {
+        setMessagesRead();
+      }
+    }
   };
 
   return (
@@ -1376,7 +1661,9 @@ export function ChatProvider({ children }) {
       chatMode,
       setChatMode,
       fetchMessages,
-      deleteMessage
+      deleteMessage,
+      deleteChatSession,
+      leaveGroupChat
     }}>
       {children}
     </ChatContext.Provider>

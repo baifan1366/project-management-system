@@ -8,7 +8,9 @@ export const ChatMessage = ({
   message, 
   currentUser, 
   t,
-  PenguinIcon 
+  PenguinIcon,
+  hourFormat = '24h',
+  adjustTimeByOffset
 }) => {
   // 检查是否是思考过程
   const isThinking = message.role === 'assistant' && message.content.includes('</think>');
@@ -20,6 +22,24 @@ export const ChatMessage = ({
     thinkingContent = parts[0];
     displayContent = parts[1] || '';
   }
+
+  // 格式化时间，考虑用户的时区和时间格式设置
+  const formatTime = (timestamp) => {
+    if (adjustTimeByOffset && timestamp) {
+      return adjustTimeByOffset(new Date(timestamp)).toLocaleTimeString([], {
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: hourFormat === '12h'
+      });
+    }
+    
+    // 如果没有提供 adjustTimeByOffset 函数，使用默认的本地时间
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: hourFormat === '12h'
+    });
+  };
 
   return (
     <div>
@@ -68,7 +88,7 @@ export const ChatMessage = ({
               {message.role === 'user' ? (message.user?.name || currentUser?.name || t('user')) : t('aiAssistant')}
             </span>
             <span className="text-xs text-muted-foreground dark:text-gray-400 flex-shrink-0">
-              {new Date(message.timestamp).toLocaleTimeString()}
+              {formatTime(message.timestamp)}
             </span>
           </div>
           <div className={cn(

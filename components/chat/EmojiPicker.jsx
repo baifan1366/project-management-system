@@ -59,7 +59,7 @@ export default function EmojiPicker({
   const getPositionStyles = () => {
     const baseStyles = {
       position: 'absolute',
-      zIndex: 50
+      zIndex: 999
     };
 
     // 获取触发按钮的位置

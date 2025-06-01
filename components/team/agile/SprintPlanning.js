@@ -27,48 +27,98 @@ import {
   DialogHeader, 
   DialogTitle 
 } from '@/components/ui/dialog';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Plus, MoveUp, MoveDown, CheckCircle2, ChevronDown, ChevronUp, PlayCircle, ListStartIcon } from 'lucide-react';
+import { CalendarIcon, Plus, MoveUp, MoveDown, CheckCircle2, ChevronDown, ChevronUp, PlayCircle, ListStartIcon, Trash2 } from 'lucide-react';
 import BodyContent from './BodyContent';
 import SprintBoard from './SprintBoard';
 import RoleAssignment from './RoleAssignment';
 import SprintRetrospective from './SprintRetrospective';
+import { Card } from '@/components/ui/card';
+import { useDispatch } from 'react-redux';
+import { fetchAgileRoleById, fetchAgileMembers } from '@/lib/redux/features/agileSlice';
+import { useGetUser } from '@/lib/hooks/useGetUser';
 
 const SprintPlanning = ({ 
   teamId, 
   projectId, 
   sprints, 
   currentSprint, 
+  agileRoles = [],
+  agileMembers = [],
   onCreateSprint, 
   onStartSprint,
-  onCompleteSprint
+  onCompleteSprint,
+  onUpdateMembers
 }) => {
     const t = useTranslations('Agile');
+    const dispatch = useDispatch();
+    
+  // 辅助函数 - 解析日期
+  const parseDateSafely = (dateString) => {
+    if (!dateString) return null;
+    
+    try {
+      // 尝试将其解析为ISO格式
+      if (typeof dateString === 'string' && dateString.includes('T')) {
+        return parseISO(dateString);
+      }
+      
+      // 尝试处理 "2025-05-24 14:55:10" 这种格式
+      if (typeof dateString === 'string' && dateString.includes(' ')) {
+        // 替换空格为T以便parseISO正确处理
+        return parseISO(dateString.replace(' ', 'T'));
+      }
+      
+      // 处理其他情况
+      return new Date(dateString);
+    } catch (e) {
+      console.error('日期解析错误:', dateString, e);
+      return null;
+    }
+  };
+  
+  // 辅助函数 - 格式化日期
+  const formatDateSafely = (dateValue, formatStr = 'yyyy-MM-dd') => {
+    if (!dateValue) return '-';
+    
+    try {
+      const dateObj = parseDateSafely(dateValue);
+      if (!dateObj || isNaN(dateObj.getTime())) {
+        throw new Error('无效日期');
+      }
+      return format(dateObj, formatStr);
+    } catch (e) {
+      console.error('日期格式化错误:', dateValue, e);
+      return typeof dateValue === 'string' ? dateValue : '-';
+    }
+  };
+
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [backlogTasks, setBacklogTasks] = useState([]);
   const [sprintTasks, setSprintTasks] = useState([]);
   const [selectedSprint, setSelectedSprint] = useState(null);
-  const [selectedType, setSelectedType] = useState('pending');
+  const [selectedType, setSelectedType] = useState('PENDING');
   const [loading, setLoading] = useState(true);
   const [isSprintInfoExpanded, setIsSprintInfoExpanded] = useState(false);
-  
+  const {user} = useGetUser();
   // 新冲刺表单状态
   const [newSprint, setNewSprint] = useState({
     name: '',
     startDate: null,
     endDate: null,
     duration: '2', // 默认2周
-    goal: ''
+    goal: '',
+    created_by: user?.id
   });
 
   // 根据类型过滤冲刺
   const filteredSprints = sprints.filter(sprint => {
-    if (selectedType === 'pending') return sprint.status === 'in_progress';
-    if (selectedType === 'planning') return sprint.status === 'planning';
-    if (selectedType === 'retrospective') return sprint.status === 'completed';
+    if (selectedType === 'PENDING') return sprint.status === 'PENDING';
+    if (selectedType === 'PLANNING') return sprint.status === 'PLANNING';
+    if (selectedType === 'RETROSPECTIVE') return sprint.status === 'RETROSPECTIVE';
     return false;
   });
 
@@ -78,7 +128,7 @@ const SprintPlanning = ({
       return null;
     }
 
-    if (currentSprint.status === 'in_progress') {
+    if (currentSprint.status === 'PENDING') {
       return (
         <Button 
           variant="outline" //themeColor 
@@ -90,7 +140,7 @@ const SprintPlanning = ({
       );
     }
 
-    if (currentSprint.status === 'planning') {
+    if (currentSprint.status === 'PLANNING') {
       return (
         <Button 
           variant="default" 
@@ -154,9 +204,10 @@ const SprintPlanning = ({
     }
   }, [teamId, projectId]);
 
-  // 选择冲刺时加载该冲刺的任务
+  // 选择冲刺时加载该冲刺的任务和成员
   useEffect(() => {
-    if (selectedSprint) {
+    if (selectedSprint && selectedSprint.id) {
+      // 获取冲刺任务
       // 这里应该从数据库获取冲刺任务
       // fetchSprintTasks(selectedSprint.id);
       
@@ -183,135 +234,310 @@ const SprintPlanning = ({
       ];
       
       setSprintTasks(mockSprintTasks);
+      
+      // 获取该冲刺的成员数据
+      dispatch(fetchAgileMembers(selectedSprint.id));
     } else {
       setSprintTasks([]);
     }
-  }, [selectedSprint]);
+  }, [selectedSprint, dispatch]);
 
   // 自动选中当前类型下的第一个冲刺
   useEffect(() => {
     if (
       filteredSprints.length > 0 &&
-      (!selectedSprint || !filteredSprints.some(s => s.id === selectedSprint.id))
+      (!selectedSprint || !filteredSprints.some(s => s.id === selectedSprint?.id))
     ) {
       setSelectedSprint(filteredSprints[0]);
     } else if (filteredSprints.length === 0) {
       setSelectedSprint(null);
     }
-  }, [selectedType, sprints]);
+  }, [selectedType, filteredSprints]);
 
   // 设置默认选择当前冲刺或最新的冲刺
   useEffect(() => {
+    
     if (currentSprint) {
+      // 总是优先选择当前冲刺
       setSelectedSprint(currentSprint);
+      setSelectedType(currentSprint.status); // 自动切换到对应的类型标签
     } else if (sprints.length > 0 && !selectedSprint) {
-      // 选择最新的计划中冲刺
-      const planningSprints = sprints.filter(s => s.status === 'planning');
-      if (planningSprints.length > 0) {
-        setSelectedSprint(planningSprints[planningSprints.length - 1]);
-      } else {
-        // 如果没有计划中的冲刺，选择最新的冲刺
-        setSelectedSprint(sprints[sprints.length - 1]);
+      // 如果没有当前冲刺，选择合适的冲刺
+      
+      // 首先尝试选择PENDING状态的冲刺
+      const pendingSprints = sprints.filter(s => s.status === 'PENDING');
+      if (pendingSprints.length > 0) {
+        setSelectedSprint(pendingSprints[0]);
+        setSelectedType('PENDING');
+        return;
       }
+      
+      // 其次尝试选择PLANNING状态的冲刺
+      const planningSprints = sprints.filter(s => s.status === 'PLANNING');
+      if (planningSprints.length > 0) {
+        setSelectedSprint(planningSprints[0]);
+        setSelectedType('PLANNING');
+        return;
+      }
+      
+      // 最后选择任意可用的冲刺
+      setSelectedSprint(sprints[0]);
+      setSelectedType(sprints[0].status);
     }
   }, [sprints, currentSprint]);
 
   // 计算冲刺结束日期
   const calculateEndDate = (startDate, duration) => {
     if (!startDate) return null;
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + (parseInt(duration) * 7) - 1); // 减1是因为包括开始日期
-    return endDate;
+    
+    try {
+      let dateObj;
+      
+      // 如果是字符串类型的日期
+      if (typeof startDate === 'string') {
+        // 处理 "2025-05-24 14:55:10" 格式
+        if (startDate.includes(' ')) {
+          const datePart = startDate.split(' ')[0];
+          dateObj = new Date(datePart);
+        } 
+        // 处理 "2025-05-05T16:00:00" 格式
+        else if (startDate.includes('T')) {
+          dateObj = new Date(startDate);
+        } 
+        // 处理其他字符串格式
+        else {
+          dateObj = new Date(startDate);
+        }
+      } 
+      // 如果是日期对象
+      else if (startDate instanceof Date) {
+        dateObj = new Date(startDate);
+      } 
+      // 其他情况
+      else {
+        console.error('无效的日期格式:', startDate);
+        return null;
+      }
+      
+      // 检查日期是否有效
+      if (isNaN(dateObj.getTime())) {
+        console.error('无效的日期:', startDate);
+        return null;
+      }
+      
+      console.log('有效的日期对象:', dateObj);
+      const durationInDays = parseInt(duration) * 7; // 将周转换为天数
+      console.log('持续天数:', durationInDays);
+      
+      dateObj.setDate(dateObj.getDate() + durationInDays);
+      console.log('计算后的结束日期:', dateObj);
+      console.log('=== calculateEndDate 调试结束 ===');
+      return dateObj;
+    } catch (e) {
+      console.error('计算结束日期时出错:', e);
+      console.log('=== calculateEndDate 调试结束(出错) ===');
+      return null;
+    }
   };
 
   // 处理创建新冲刺
   const handleCreateNewSprint = () => {
     if (!newSprint.name || !newSprint.startDate || !newSprint.duration) {
-      return; // 表单验证失败
+      return;
     }
-
-    const endDate = calculateEndDate(newSprint.startDate, newSprint.duration);
+    
+    // 确保获取到所有必要参数
+    if (!user?.id) {
+      console.error('创建冲刺失败: 无法获取用户ID');
+      return;
+    }
+    
+    if (!teamId) {
+      console.error('创建冲刺失败: 无法获取团队ID');
+      return;
+    }
     
     const sprintData = {
-      name: newSprint.name,
-      startDate: newSprint.startDate,
-      endDate: endDate,
-      duration: parseInt(newSprint.duration),
-      goal: newSprint.goal
+      ...newSprint,
+      team_id: teamId,
+      project_id: projectId,
+      created_by: user.id, // 确保始终传递用户ID
+      endDate: calculateEndDate(newSprint.startDate, newSprint.duration),
+      status: 'PLANNING', // 设置初始状态
+      task_ids: [] // 初始没有任务
     };
     
-    const createdSprint = onCreateSprint(sprintData);
-    setSelectedSprint(createdSprint);
-    setCreateDialogOpen(false);
     
-    // 重置表单
-    setNewSprint({
-      name: '',
-      startDate: null,
-      endDate: null,
-      duration: '2',
-      goal: ''
-    });
+    try {
+      const createdSprint = onCreateSprint(sprintData);
+      
+      if (createdSprint) {
+        setCreateDialogOpen(false);
+        // 重置表单
+        setNewSprint({
+          name: '',
+          startDate: null,
+          endDate: null,
+          duration: '2',
+          goal: '',
+          created_by: user?.id
+        });
+        
+        // 显示成功消息
+        
+        // 短暂延迟后刷新页面
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
+      }
+    } catch (error) {
+      console.error('创建冲刺失败:', error);
+      // 可以在这里添加错误处理，如显示错误消息
+    }
   };
 
   // 添加任务到冲刺
-  const addTaskToSprint = (taskId) => {
-    if (!selectedSprint || selectedSprint.status !== 'planning') {
-      return; // 只有在计划阶段才能添加任务
-    }
+  const addTaskToSprint = async (taskId) => {
+    if (!selectedSprint) return;
     
-    const task = backlogTasks.find(t => t.id === taskId);
-    if (task) {
-      // 从待办事项中移除
-      setBacklogTasks(prev => prev.filter(t => t.id !== taskId));
-      // 添加到冲刺任务
-      setSprintTasks(prev => [...prev, {...task, status: 'todo'}]);
+    try {
+      // 将任务添加到冲刺
+      const taskIds = selectedSprint.task_ids || [];
+      if (taskIds.includes(taskId)) return; // 避免重复添加
       
-      // 在实际应用中，这里应该调用API保存到数据库
+      const updatedTaskIds = [...taskIds, taskId];
+      
+      const response = await fetch(`/api/teams/agile/sprint/${selectedSprint.id}/tasks`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ taskIds: updatedTaskIds }),
+      });
+      
+      if (!response.ok) throw new Error('添加任务到冲刺失败');
+      
+      // 更新本地状态
+      const updatedSprint = await response.json();
+      setSelectedSprint(updatedSprint);
+      
+      // 添加到当前显示的冲刺任务中
+      const taskDetails = backlogTasks.find(task => task.id === taskId);
+      if (taskDetails) {
+        setSprintTasks([...sprintTasks, taskDetails]);
+      }
+    } catch (error) {
+      console.error('添加任务到冲刺失败:', error);
     }
   };
 
   // 从冲刺中移除任务
-  const removeTaskFromSprint = (taskId) => {
-    if (!selectedSprint || selectedSprint.status !== 'planning') {
-      return; // 只有在计划阶段才能移除任务
-    }
+  const removeTaskFromSprint = async (taskId) => {
+    if (!selectedSprint) return;
     
-    const task = sprintTasks.find(t => t.id === taskId);
-    if (task) {
-      // 从冲刺任务中移除
-      setSprintTasks(prev => prev.filter(t => t.id !== taskId));
-      // 添加回待办事项
-      setBacklogTasks(prev => [...prev, {...task, assignee: null}]);
+    try {
+      // 从冲刺中移除任务
+      const taskIds = selectedSprint.task_ids || [];
+      const updatedTaskIds = taskIds.filter(id => id !== taskId);
       
-      // 在实际应用中，这里应该调用API保存到数据库
+      const response = await fetch(`/api/teams/agile/sprint/${selectedSprint.id}/tasks`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ taskIds: updatedTaskIds }),
+      });
+      
+      if (!response.ok) throw new Error('从冲刺中移除任务失败');
+      
+      // 更新本地状态
+      const updatedSprint = await response.json();
+      setSelectedSprint(updatedSprint);
+      
+      // 从当前显示的冲刺任务中移除
+      setSprintTasks(sprintTasks.filter(task => task.id !== taskId));
+    } catch (error) {
+      console.error('从冲刺中移除任务失败:', error);
     }
   };
 
   // 更新任务优先级
-  const moveTaskPriority = (taskId, direction) => {
-    const tasks = [...backlogTasks];
-    const taskIndex = tasks.findIndex(t => t.id === taskId);
-    
-    if (taskIndex === -1) return; // 任务不存在
-    if (
-      (direction === 'up' && taskIndex === 0) || 
-      (direction === 'down' && taskIndex === tasks.length - 1)
-    ) {
-      return; // 已经是最高或最低优先级
+  const moveTaskPriority = async (taskId, direction) => {
+    if (!selectedSprint) return;
+
+    try {
+      // 获取当前任务顺序
+      const taskIds = [...(selectedSprint.task_ids || [])];
+      const currentIndex = taskIds.indexOf(taskId);
+      
+      if (currentIndex === -1) return; // 任务不在冲刺中
+      
+      let newIndex;
+      if (direction === 'up' && currentIndex > 0) {
+        newIndex = currentIndex - 1;
+      } else if (direction === 'down' && currentIndex < taskIds.length - 1) {
+        newIndex = currentIndex + 1;
+      } else {
+        return; // 无法移动
+      }
+      
+      // 更改顺序
+      taskIds.splice(currentIndex, 1);
+      taskIds.splice(newIndex, 0, taskId);
+      
+      const response = await fetch(`/api/teams/agile/sprint/${selectedSprint.id}/tasks`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ taskIds }),
+      });
+      
+      if (!response.ok) throw new Error('调整任务优先级失败');
+      
+      // 更新本地状态
+      const updatedSprint = await response.json();
+      setSelectedSprint(updatedSprint);
+      
+      // 重新排序当前显示的任务
+      const orderedTasks = [];
+      for (const id of taskIds) {
+        const task = sprintTasks.find(t => t.id === id);
+        if (task) orderedTasks.push(task);
+      }
+      setSprintTasks(orderedTasks);
+    } catch (error) {
+      console.error('调整任务优先级失败:', error);
+      toast.error(t('moveTaskError'));
     }
-    
-    const newIndex = direction === 'up' ? taskIndex - 1 : taskIndex + 1;
-    const task = tasks[taskIndex];
-    
-    // 移除任务
-    tasks.splice(taskIndex, 1);
-    // 在新位置插入任务
-    tasks.splice(newIndex, 0, task);
-    
-    setBacklogTasks(tasks);
-    
-    // 在实际应用中，这里应该调用API保存到数据库
+  };
+
+  // 检查agileMembers中的角色ID并获取详细信息
+  useEffect(() => {
+    if (agileMembers.length > 0 && agileRoles.length > 0) {
+      // 收集所有角色ID
+      const roleIds = [...new Set(agileMembers.map(member => member.role_id).filter(Boolean))];
+      
+      // 检查哪些角色ID在agileRoles中找不到对应信息
+      const missingRoleIds = roleIds.filter(roleId => 
+        !agileRoles.some(role => role && role.id && roleId && role.id.toString() === roleId.toString())
+      );
+      
+      
+      // 为缺失的角色ID获取详细信息
+      missingRoleIds.forEach(roleId => {
+        if (roleId) {
+          dispatch(fetchAgileRoleById(roleId));
+        }
+      });
+    }
+  }, [agileMembers, agileRoles, dispatch]);
+
+  // 自定义成员更新处理函数
+  const handleUpdateMembers = () => {
+    if (selectedSprint && selectedSprint.id && typeof onUpdateMembers === 'function') {
+      onUpdateMembers(selectedSprint.id);
+    }
   };
 
   // 渲染创建冲刺对话框
@@ -345,7 +571,19 @@ const SprintPlanning = ({
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {newSprint.startDate ? format(newSprint.startDate, "yyyy-MM-dd") : t('selectDate')}
+                  {newSprint.startDate ? 
+                    (() => {
+                      const dateValue = newSprint.startDate;
+                      if (typeof dateValue === 'string') {
+                        if (dateValue.includes(' ')) {
+                          return dateValue.split(' ')[0];
+                        } else if (dateValue.includes('T')) {
+                          return dateValue.split('T')[0];
+                        }
+                      }
+                      return dateValue;
+                    })()
+                    : t('selectDate')}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -389,7 +627,21 @@ const SprintPlanning = ({
             <div className="space-y-2">
               <Label>{t('endDate')}</Label>
               <Input 
-                value={format(calculateEndDate(newSprint.startDate, newSprint.duration), "yyyy-MM-dd")} 
+                value={newSprint.startDate && newSprint.duration ? 
+                  (() => {
+                    const endDate = calculateEndDate(newSprint.startDate, newSprint.duration);
+                    if (typeof endDate === 'string') {
+                      // 如果包含空格，取前面部分
+                      if (endDate.includes(' ')) {
+                        return endDate.split(' ')[0];
+                      }
+                      // 如果包含T，取前面部分
+                      if (endDate.includes('T')) {
+                        return endDate.split('T')[0];
+                      }
+                    }
+                    return endDate;
+                  })() : ""} 
                 readOnly 
               />
             </div>
@@ -421,6 +673,100 @@ const SprintPlanning = ({
     </Dialog>
   );
 
+  // 渲染基于当前选择和状态的内容
+  const renderContent = () => {
+    // 处理没有选中sprint的情况
+    if (!selectedSprint) {
+      return (
+        <div className="text-center p-8">
+          {sprints.length === 0 ? (
+            // 如果没有任何Sprint，显示创建Sprint按钮
+            <div>
+              <p className="mb-4">{t('noSprintsFound')}</p>
+            </div>
+          ) : (
+            // 如果有Sprint但没有选中，可能是因为筛选条件
+            <div>
+              <p className="mb-4">{t('noSprintsFound')}</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 调试日期格式
+    if (selectedSprint.startDate) {
+      console.log('--- 日期调试信息 ---');
+      console.log('Sprint ID:', selectedSprint.id);
+      console.log('原始开始日期:', selectedSprint.startDate);
+      console.log('开始日期类型:', typeof selectedSprint.startDate);
+      
+      // 检查开始日期格式
+      let formattedStartDate = selectedSprint.startDate;
+      if (typeof selectedSprint.startDate === 'string') {
+        if (selectedSprint.startDate.includes(' ')) {
+          formattedStartDate = selectedSprint.startDate.split(' ')[0];
+          console.log('空格日期格式，处理后:', formattedStartDate);
+        } else if (selectedSprint.startDate.includes('T')) {
+          formattedStartDate = selectedSprint.startDate.split('T')[0];
+          console.log('ISO日期格式，处理后:', formattedStartDate);
+        } else {
+          console.log('其他字符串格式，保持原样:', formattedStartDate);
+        }
+      }
+      
+      // 打印结束日期信息
+      if (selectedSprint.endDate) {
+        console.log('原始结束日期:', selectedSprint.endDate);
+        console.log('结束日期类型:', typeof selectedSprint.endDate);
+        
+        let formattedEndDate = selectedSprint.endDate;
+        if (typeof selectedSprint.endDate === 'string') {
+          if (selectedSprint.endDate.includes(' ')) {
+            formattedEndDate = selectedSprint.endDate.split(' ')[0];
+            console.log('空格结束日期格式，处理后:', formattedEndDate);
+          } else if (selectedSprint.endDate.includes('T')) {
+            formattedEndDate = selectedSprint.endDate.split('T')[0];
+            console.log('ISO结束日期格式，处理后:', formattedEndDate);
+          } else {
+            console.log('其他字符串格式结束日期，保持原样:', formattedEndDate);
+          }
+        }
+      }
+      
+      console.log('--- 日期调试信息结束 ---');
+    }
+
+    // 根据所选冲刺状态和类型显示不同组件
+    if (selectedType === 'RETROSPECTIVE') {
+      return (
+        <SprintRetrospective 
+          sprint={selectedSprint} 
+          agileMembers={agileMembers}
+        />
+      );
+    } else if (selectedType === 'PENDING' || selectedType === 'PLANNING') {
+      return (
+        <>
+          <RoleAssignment 
+            teamId={teamId}
+            agileId={selectedSprint.id}
+            agileRoles={Array.isArray(agileRoles) ? agileRoles : []}
+            agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
+            onUpdateMembers={handleUpdateMembers}
+          />
+          <SprintBoard 
+            sprint={selectedSprint} 
+            tasks={sprintTasks}
+            agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
+          />
+        </>
+      );
+    }
+    
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       {/* 冲刺选择和操作区 */}
@@ -428,7 +774,7 @@ const SprintPlanning = ({
         <div className="flex items-center space-x-2">
           <Label className="text-sm font-medium">{t('type')}:</Label>
           <Select 
-              value={selectedType ? selectedType : 'pending'} 
+              value={selectedType ? selectedType : 'PENDING'} 
               onValueChange={(value) => {
                 setSelectedType(value)
               }}
@@ -437,13 +783,13 @@ const SprintPlanning = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem key="pending" value="pending">
+                <SelectItem key="PENDING" value="PENDING">
                   {t('pending')}
                 </SelectItem>
-                <SelectItem key="planning" value="planning">
+                <SelectItem key="PLANNING" value="PLANNING">
                   {t('planning')}
                 </SelectItem>
-                <SelectItem key="retrospective" value="retrospective">
+                <SelectItem key="RETROSPECTIVE" value="RETROSPECTIVE">
                   {t('retrospective')}
                 </SelectItem>
               </SelectContent>
@@ -460,53 +806,47 @@ const SprintPlanning = ({
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder={t('selectSprintPlan')} />
             </SelectTrigger>
-            {selectedType === 'pending' && (
+            {selectedType === 'PENDING' && (
               <SelectContent>
-
                 {/* only can display inProgress sprint */}
                 {sprints.map(sprint  => (
-                  sprint.status === 'in_progress' && (
+                  sprint.status === 'PENDING' && (
                     <SelectItem key={sprint.id} value={sprint.id.toString() }>
                       {sprint.name} 
                     </SelectItem>
                   )
                 ))}
-              
               </SelectContent>
             )}
-             {selectedType === 'planning' && (
+             {selectedType === 'PLANNING' && (
               <SelectContent>
-
                 {/* only can display planning sprint */}
                 {sprints.map(sprint  => (
-                  (sprint.status === 'planning') && (
+                  (sprint.status === 'PLANNING') && (
                     <SelectItem key={sprint.id} value={sprint.id.toString() }>
                       {sprint.name} 
                     </SelectItem>
                   )
                 ))}
-              
               </SelectContent>
             )}
-            {selectedType === 'retrospective' && (
+            {selectedType === 'RETROSPECTIVE' && (
               <SelectContent>
-
                 {/* only can display completed sprint */}
                 {sprints.map(sprint  => (
-                  sprint.status === 'completed' && (
+                  sprint.status === 'RETROSPECTIVE' && (
                     <SelectItem key={sprint.id} value={sprint.id.toString() }>
                       {sprint.name} 
                     </SelectItem>
                   )
                 ))}
-              
               </SelectContent>
             )}
           </Select>
         </div>
         
         <div className="flex space-x-2">
-          {selectedType === 'planning' && !selectedSprint && (
+          {selectedType === 'PLANNING' && !selectedSprint && (
             <Button 
               variant="outline" 
               onClick={() => setCreateDialogOpen(true)}
@@ -515,7 +855,7 @@ const SprintPlanning = ({
               {t('createSprint')}
             </Button>
           )}
-          {selectedSprint && (selectedSprint.status === 'planning') && (
+          {selectedSprint && (selectedSprint.status === 'PLANNING') && (
             <>
               <Button 
                 variant="outline" 
@@ -547,9 +887,15 @@ const SprintPlanning = ({
               </div>
             </div>
 
-            {selectedSprint && (selectedSprint.status === 'in_progress') && (
+            {selectedSprint && (selectedSprint.status === 'PENDING') && (
               <div>
-                {renderSprintActionButton()}
+                <Button 
+                  variant="outline" //themeColor 
+                  onClick={() => onCompleteSprint(selectedSprint.id)}
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  {t('completeSprint')}
+                </Button>
               </div>
             )}
                 
@@ -564,19 +910,71 @@ const SprintPlanning = ({
               <div>
                 <p className="text-sm font-medium">{t('status')}:</p>
                 <p>
-                  {selectedSprint.status === 'planning' && t('planning')}
-                  {selectedSprint.status === 'in_progress' && t('inProgress')}
-                  {selectedSprint.status === 'completed' && t('completed')}
+                  {selectedSprint.status === 'PLANNING' && t('planning')}
+                  {selectedSprint.status === 'PENDING' && t('inProgress')}
+                  {selectedSprint.status === 'RETROSPECTIVE' && t('completed')}
                 </p>
               </div>
               
               <div>
                 <p className="text-sm font-medium">{t('startDate')}:</p>
-                <p>{format(new Date(selectedSprint.startDate), "yyyy-MM-dd")}</p>
+                <p>
+                  {(() => {
+                    // 获取日期字段，兼容start_date和startDate两种命名
+                    const dateValue = selectedSprint.startDate || selectedSprint.start_date;
+                    console.log('开始日期字段:', dateValue);
+                    
+                    if (!dateValue) return "-";
+                    
+                    let formattedDate = dateValue;
+                    
+                    // 处理不同格式的日期字符串
+                    if (typeof dateValue === 'string') {
+                      // 如果包含空格，取前面部分
+                      if (dateValue.includes(' ')) {
+                        formattedDate = dateValue.split(' ')[0];
+                        console.log('渲染：含空格的日期，处理为:', formattedDate);
+                      }
+                      // 如果包含T，取前面部分
+                      else if (dateValue.includes('T')) {
+                        formattedDate = dateValue.split('T')[0];
+                        console.log('渲染：ISO格式的日期，处理为:', formattedDate);
+                      }
+                    }
+                    
+                    return formattedDate;
+                  })()}
+                </p>
               </div>
               <div>
                 <p className="text-sm font-medium">{t('endDate')}:</p>
-                <p>{format(new Date(selectedSprint.endDate), "yyyy-MM-dd")}</p>
+                <p>
+                  {(() => {
+                    // 获取开始日期和持续时间
+                    const startDateValue = selectedSprint.startDate || selectedSprint.start_date;
+                    const duration = selectedSprint.duration;
+                    
+                    // 如果没有开始日期或持续时间，显示默认值
+                    if (!startDateValue || !duration) return "-";
+                    
+                    // 计算结束日期
+                    const endDate = calculateEndDate(startDateValue, duration);
+                    if (!endDate) return "-";
+                    
+                    // 格式化日期显示
+                    if (endDate instanceof Date) {
+                      return endDate.toISOString().split('T')[0];
+                    } else if (typeof endDate === 'string') {
+                      if (endDate.includes(' ')) {
+                        return endDate.split(' ')[0];
+                      } else if (endDate.includes('T')) {
+                        return endDate.split('T')[0];
+                      }
+                      return endDate;
+                    }
+                    return "-";
+                  })()}
+                </p>
               </div>
               <div>
                 <p className="text-sm font-medium">{t('duration')}:</p>
@@ -592,31 +990,10 @@ const SprintPlanning = ({
           )}
         </BodyContent>
       )}
-      {(selectedType === 'pending' || selectedType === 'planning') && (
-        <>
-          <RoleAssignment 
-            teamId={teamId}
-            projectId={projectId}
-          />
-          {(selectedSprint) && (
-            <SprintBoard 
-              teamId={teamId}
-              projectId={projectId}
-              currentSprint={currentSprint}
-              sprints={sprints}
-            />
-          )}
-        </>
-      )}
-      {selectedType === 'retrospective' && (
-        <>
-          <SprintRetrospective 
-            teamId={teamId}
-            projectId={projectId}
-            sprints={sprints.filter(s => s.status === 'completed')}
-          />
-        </>
-      )}      
+      
+      {/* 主要内容区域 */}
+      {renderContent()}
+      
       {renderCreateSprintDialog()}
     </div>
   );

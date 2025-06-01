@@ -31,7 +31,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const dispatch = useDispatch()
   const { projects } = useSelector((state) => state.projects)
-  const project = projects.find(p => String(p.id) === String(projectId))
+  const project = projects && projectId ? projects.find(p => p && String(p.id) === String(projectId)) : null
   const [themeColor, setThemeColor] = useState('#64748b');
   const [formErrors, setFormErrors] = useState({});
   const [validationSchema, setValidationSchema] = useState(null);
@@ -340,13 +340,11 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                               <div className="flex items-center">
                                 {field.value === 'invite_only' && <Lock className="w-4 h-4 mr-2 text-gray-500" />}
                                 {field.value === 'can_edit' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
-                                {field.value === 'can_check' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
-                                {field.value === 'can_view' && <Unlock className="w-4 h-4 mr-2 text-gray-500" />}
+                                {field.value === 'can_view' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
                                 <span>
                                   {field.value === 'invite_only' && t('inviteOnly')}
-                                  {field.value === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}
-                                  {field.value === 'can_check' && t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}
-                                  {field.value === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project.project_name })}
+                                  {field.value === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project?.project_name || t('thisProject') })}
+                                  {field.value === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project?.project_name || t('thisProject') })}
                                 </span>
                               </div>
                             </div>
@@ -372,29 +370,18 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                         <div className="flex items-center w-full">
                           <Pencil className="w-5 h-5 mr-3 text-gray-500" />
                           <div className="flex-1">
-                            <div className="font-medium">{t('everyoneAt{projectName}CanEdit', { projectName: project.project_name })}</div>
+                            <div className="font-medium">{t('everyoneAt{projectName}CanEdit', { projectName: project?.project_name || t('thisProject') })}</div>
                             <div className="text-xs text-gray-500 mt-0.5">
                               {t('everyoneCanEditDescription')}
                             </div>
                           </div>
                         </div>
                       </SelectItem>
-                      <SelectItem value="can_check" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                      <SelectItem value="can_view" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
                         <div className="flex items-center w-full">
                           <Eye className="w-5 h-5 mr-3 text-gray-500" />
                           <div className="flex-1">
-                            <div className="font-medium">{t('everyoneAt{projectName}CanCheck', { projectName: project.project_name })}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {t('everyoneCanCheckDescription')}
-                            </div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="can_view" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
-                        <div className="flex items-center w-full">
-                          <Unlock className="w-5 h-5 mr-3 text-gray-500" />
-                          <div className="flex-1">
-                            <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName: project.project_name })}</div>
+                            <div className="font-medium">{t('everyoneAt{projectName}CanView', { projectName: project?.project_name || t('thisProject') })}</div>
                             <div className="text-xs text-gray-500 mt-0.5">
                               {t('everyoneCanViewDescription')}
                             </div>

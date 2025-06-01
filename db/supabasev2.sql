@@ -1,4 +1,4 @@
--- 用户表
+-- user table
 CREATE TABLE "user" (
   "id" UUID PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
@@ -34,11 +34,15 @@ CREATE TABLE "user" (
   "github_refresh_token" VARCHAR(2048)
 );
 
--- 添加索引以提高查询性能
-CREATE INDEX IF NOT EXISTS idx_user_google_provider_id ON "user" (google_provider_id) WHERE google_provider_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_user_github_provider_id ON "user" (github_provider_id) WHERE github_provider_id IS NOT NULL;
+-- Create a user_heartbeats table to track user activity
+CREATE TABLE IF NOT EXISTS "user_heartbeats" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "user_id" UUID NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  "last_heartbeat" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
--- 默认字段表
+-- default field table
 CREATE TABLE "default" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
@@ -47,20 +51,21 @@ CREATE TABLE "default" (
   "edited_by" UUID NULL REFERENCES "user"("id") ON DELETE CASCADE
 );
 
--- 项目表
+-- project table
 CREATE TABLE "project" (
   "id" SERIAL PRIMARY KEY,
   "project_name" VARCHAR(255) NOT NULL,
   "description" TEXT,
   "visibility" VARCHAR(20) NOT NULL,
   "theme_color" VARCHAR(20) DEFAULT 'white',
+  "archived" BOOL DEFAULT FALSE,
   "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD')) DEFAULT 'PENDING',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 团队表
+-- team table
 CREATE TABLE "team" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
@@ -76,7 +81,7 @@ CREATE TABLE "team" (
   "archive" BOOL DEFAULT FALSE
 );
 
--- 用户与团队的关系表（多对多）
+-- user and team relationship table (many-to-many)
 CREATE TABLE "user_team" (
   "id" SERIAL PRIMARY KEY,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -87,7 +92,7 @@ CREATE TABLE "user_team" (
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
 );
 
--- 团队邀请表
+-- team invitation table
 CREATE TABLE "user_team_invitation" (
   "id" SERIAL PRIMARY KEY,
   "user_email" VARCHAR(255) NOT NULL,
@@ -100,7 +105,7 @@ CREATE TABLE "user_team_invitation" (
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
 );
 
--- 项目章节表
+-- project section table
 CREATE TABLE "section" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
@@ -112,7 +117,50 @@ CREATE TABLE "section" (
   "order_index" INT DEFAULT 0
 );
 
--- 任务表
+-- Create the notion_page table for storing knowledge base pages
+CREATE TABLE IF NOT EXISTS "notion_page" (
+  "id" SERIAL PRIMARY KEY,
+  "parent_id" INT REFERENCES "notion_page"("id") ON DELETE CASCADE, -- For hierarchical structure
+  "icon" VARCHAR(255), -- Emoji or URL for page icon
+  "cover_image" VARCHAR(255), -- URL for cover image
+  "is_archived" BOOLEAN DEFAULT FALSE,
+  "order_index" INT DEFAULT 0, -- For ordering pages in the same level
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "last_edited_by" UUID REFERENCES "user"("id") ON DELETE SET NULL
+);
+
+-- Table for page collaborators (for access control at page level if needed)
+CREATE TABLE IF NOT EXISTS "notion_page_collaborator" (
+  "page_id" INT NOT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "permission" TEXT NOT NULL CHECK ("permission" IN ('CAN_EDIT', 'CAN_COMMENT', 'CAN_VIEW')),
+  "added_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "added_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("page_id", "user_id")
+);
+
+-- Table for page comments
+CREATE TABLE IF NOT EXISTS "notion_page_comment" (
+  "id" SERIAL PRIMARY KEY,
+  "page_id" INT NOT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "content" TEXT NOT NULL,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "resolved" BOOLEAN DEFAULT FALSE
+);
+
+-- Table for page favorites/bookmarks
+CREATE TABLE IF NOT EXISTS "notion_page_favorite" (
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "page_id" INT NOT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("user_id", "page_id")
+);
+
+-- task table
 CREATE TABLE "task" (
   "id" SERIAL PRIMARY KEY,
   "tag_values" JSONB DEFAULT '{}',
@@ -124,7 +172,7 @@ CREATE TABLE "task" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 标签表
+-- tag table
 CREATE TABLE "tag" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
@@ -136,19 +184,7 @@ CREATE TABLE "tag" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 任务时间记录表（用于时间跟踪）
-CREATE TABLE "time_entry" (
-  "id" SERIAL PRIMARY KEY,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "start_time" TIMESTAMP NOT NULL,
-  "end_time" TIMESTAMP,
-  "duration" INT, -- 以秒为单位
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 自定义字段模板表
+-- custom field template table
 CREATE TABLE "custom_field" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
@@ -160,7 +196,7 @@ CREATE TABLE "custom_field" (
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
 );
 
--- 团队与自定义字段的关联表（多对多）
+-- team and custom field association table (many-to-many)
 CREATE TABLE "team_custom_field" (
   "id" SERIAL PRIMARY KEY,
   "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
@@ -172,7 +208,7 @@ CREATE TABLE "team_custom_field" (
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
 );
 
--- 任务自定义字段值表
+-- task custom field value table
 CREATE TABLE "team_custom_field_value" (
   "id" SERIAL PRIMARY KEY,
   "team_custom_field_id" INT NOT NULL REFERENCES "team_custom_field"("id") ON DELETE CASCADE,
@@ -195,46 +231,58 @@ CREATE TABLE "team_post" (
   "attachment_id" INT[] DEFAULT '{}', -- Array of attachments associated with the post
   "is_pinned" BOOLEAN DEFAULT FALSE,
   "reactions" JSONB DEFAULT '{}', -- Store reactions as {emoji: [user_ids]} format
-  "comment_id" INT[] DEFAULT '{}', -- Array of comments associated with the post
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create indexes for better performance
-CREATE INDEX idx_team_post_team_id ON "team_post"("team_id");
-CREATE INDEX idx_team_post_attachment_id ON "team_post"("attachment_id");
-CREATE INDEX idx_team_post_created_by ON "team_post"("created_by");
-CREATE INDEX idx_team_post_created_at ON "team_post"("created_at");
-CREATE INDEX idx_team_post_is_pinned ON "team_post"("is_pinned");
-CREATE INDEX idx_team_post_reactions ON "team_post" USING GIN("reactions");
-
--- 任务模板表（用于创建任务模板）
-CREATE TABLE "task_template" (
+CREATE TABLE "agile_role" (
   "id" SERIAL PRIMARY KEY,
-  "title" VARCHAR(255) NOT NULL,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
   "description" TEXT,
-  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
-  "priority" TEXT NOT NULL CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
-  "team_custom_field_id" INT NOT NULL REFERENCES "team_custom_field"("id") ON DELETE CASCADE,
-  "tag_values" JSONB DEFAULT '{}', 
-  "depends_on_task_ids" INT[] DEFAULT '{}', -- 存储依赖的任务ID数组
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 任务评论表
+CREATE TABLE "team_agile" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
+  "start_date" TIMESTAMP NOT NULL,
+  "duration" INT DEFAULT 2,
+  "goal" TEXT,
+  "task_ids" JSONB DEFAULT '{}',
+  "status" TEXT NOT NULL CHECK ("status" IN ('PLANNING', 'PENDING', 'RETROSPECTIVE')) DEFAULT 'PENDING',
+  "whatWentWell" JSONB,
+  "toImprove" JSONB,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "agile_member" (
+  "id" SERIAL PRIMARY KEY,
+  "agile_id" INT NOT NULL REFERENCES "team_agile"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "role_id" INT NOT NULL REFERENCES "agile_role"("id") ON DELETE CASCADE,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- task comment table
 CREATE TABLE "comment" (
   "id" SERIAL PRIMARY KEY,
   "text" TEXT NOT NULL,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
+  "post_id" INT NOT NULL REFERENCES "team_post"("id") ON DELETE CASCADE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 任务附件表
+-- task attachment table
 CREATE TABLE "attachment" (
   "id" SERIAL PRIMARY KEY,
   "file_url" VARCHAR(255) NOT NULL,
@@ -242,10 +290,25 @@ CREATE TABLE "attachment" (
   "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
   "uploaded_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "file_path" VARCHAR(255) DEFAULT '/',
+  "file_type" VARCHAR(100),
+  "size" BIGINT
+);
+
+-- Create file_folders table for folder structure
+CREATE TABLE IF NOT EXISTS "file_folders" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
+  "parent_path" VARCHAR(255) NOT NULL DEFAULT '/',
+  "full_path" VARCHAR(255) NOT NULL,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 个人日历事件表
+-- personal calendar event table
 CREATE TABLE "personal_calendar_event" (
   "id" SERIAL PRIMARY KEY,
   "title" VARCHAR(255) NOT NULL,
@@ -260,11 +323,7 @@ CREATE TABLE "personal_calendar_event" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 创建个人日历事件索引
-CREATE INDEX idx_personal_calendar_event_user ON "personal_calendar_event"("user_id");
-CREATE INDEX idx_personal_calendar_event_time ON "personal_calendar_event"("start_time", "end_time");
-
--- 通知表
+-- notification table
 CREATE TABLE "notification" (
   "id" SERIAL PRIMARY KEY,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -280,7 +339,7 @@ CREATE TABLE "notification" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 聊天会话表（用于管理私聊和群聊会话）
+-- chat session table (for managing private and group chat sessions)
 CREATE TABLE "chat_session" (
   "id" SERIAL PRIMARY KEY,
   "type" TEXT NOT NULL CHECK ("type" IN ('PRIVATE', 'GROUP', 'AI')),
@@ -291,7 +350,7 @@ CREATE TABLE "chat_session" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 聊天参与者表
+-- chat participant table
 CREATE TABLE "chat_participant" (
   "session_id" INT NOT NULL REFERENCES "chat_session"("id") ON DELETE CASCADE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -300,7 +359,7 @@ CREATE TABLE "chat_participant" (
   PRIMARY KEY ("session_id", "user_id")
 );
 
--- 聊天消息表
+-- chat message table
 CREATE TABLE "chat_message" (
   "id" SERIAL PRIMARY KEY,
   "session_id" INT NOT NULL REFERENCES "chat_session"("id") ON DELETE CASCADE,
@@ -313,9 +372,7 @@ CREATE TABLE "chat_message" (
   "is_deleted" BOOLEAN DEFAULT FALSE
 );
 
-CREATE INDEX IF NOT EXISTS chat_message_mentions_idx ON chat_message USING GIN (mentions);
-
--- 聊天消息已读状态表
+-- chat message read status table
 CREATE TABLE "chat_message_read_status" (
   "message_id" INT NOT NULL REFERENCES "chat_message"("id") ON DELETE CASCADE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -323,7 +380,7 @@ CREATE TABLE "chat_message_read_status" (
   PRIMARY KEY ("message_id", "user_id")
 );
 
--- AI聊天历史表
+-- AI chat history table
 CREATE TABLE "ai_chat_message" (
   "id" SERIAL PRIMARY KEY,
   "session_id" INT REFERENCES "chat_session"("id") ON DELETE CASCADE,
@@ -336,12 +393,8 @@ CREATE TABLE "ai_chat_message" (
   "metadata" JSONB -- 存储额外的元数据
 );
 
--- AI聊天历史索引
-CREATE INDEX idx_ai_chat_message_user ON "ai_chat_message"("user_id");
-CREATE INDEX idx_ai_chat_message_conversation ON "ai_chat_message"("conversation_id");
-CREATE INDEX idx_ai_chat_message_timestamp ON "ai_chat_message"("timestamp");
 
--- 聊天附件表
+-- chat attachment table
 CREATE TABLE "chat_attachment" (
   "id" SERIAL PRIMARY KEY,
   "message_id" INT NOT NULL REFERENCES "chat_message"("id") ON DELETE CASCADE,
@@ -353,7 +406,7 @@ CREATE TABLE "chat_attachment" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 操作日志表
+-- action log table
 CREATE TABLE "action_log" (
   "id" SERIAL PRIMARY KEY,
   "user_id" UUID REFERENCES "user"("id") ON DELETE SET NULL,
@@ -384,12 +437,6 @@ CREATE TABLE IF NOT EXISTS workflows (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Create index for faster queries
-CREATE INDEX IF NOT EXISTS idx_workflows_created_by ON workflows (created_by);
-CREATE INDEX IF NOT EXISTS idx_workflows_type ON workflows (type);
-CREATE INDEX IF NOT EXISTS idx_workflows_is_public ON workflows (is_public);
-CREATE INDEX IF NOT EXISTS idx_workflows_is_deleted ON workflows (is_deleted);
-
 -- Create the workflow_executions table to track execution history
 CREATE TABLE IF NOT EXISTS workflow_executions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -405,66 +452,49 @@ CREATE TABLE IF NOT EXISTS workflow_executions (
     api_responses JSONB DEFAULT '{}'::jsonb
 );
 
--- Create index for faster queries
-CREATE INDEX IF NOT EXISTS idx_workflow_executions_workflow_id ON workflow_executions (workflow_id);
-CREATE INDEX IF NOT EXISTS idx_workflow_executions_user_id ON workflow_executions (user_id);
-CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions (status);
+-- subscription plan table
+CREATE TABLE "subscription_plan" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(50) NOT NULL,
+  "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
+  "price" DECIMAL(10, 2) NOT NULL,
+  "billing_interval" TEXT CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY') OR "billing_interval" IS NULL),
+  "description" TEXT,
+  "features" JSONB NOT NULL, -- 存储计划包含的功能列表
+  "max_projects" INT NOT NULL, -- 最大项目数
+  "max_teams" INT NOT NULL, -- 最大团队数
+  "max_members" INT NOT NULL, -- 最大团队成员数
+  "max_ai_chat" INT NOT NULL, -- 最大AI聊天数
+  "max_ai_task" INT NOT NULL, -- 最大AI任务数
+  "max_ai_workflow" INT NOT NULL, -- 最大AI工作流数
+  "max_storage" INT NOT NULL DEFAULT 0, -- 最大存储空间(GB)
+  "is_active" BOOLEAN DEFAULT TRUE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Function to check if a user can access a workflow
-CREATE OR REPLACE FUNCTION can_access_workflow(workflow_id UUID, user_id UUID)
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1 FROM workflows
-        WHERE id = workflow_id 
-        AND (created_by = user_id OR is_public)
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER; 
+-- user subscription plan table
+CREATE TABLE "user_subscription_plan" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
+  "status" TEXT NULL,
+  "start_date" TIMESTAMP NOT NULL,
+  "end_date" TIMESTAMP,
+  -- 使用统计
+  "current_projects" INT DEFAULT 0 NULL,
+  "current_teams" INT DEFAULT 0 NULL,
+  "current_members" INT DEFAULT 0 NULL,
+  "current_ai_chat" INT DEFAULT 0 NULL,
+  "current_ai_task" INT DEFAULT 0 NULL,
+  "current_ai_workflow" INT DEFAULT 0 NULL,
+  "current_storage" INT DEFAULT 0 NULL,
+  -- 时间戳
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-  -- 订阅计划表
-  CREATE TABLE "subscription_plan" (
-    "id" SERIAL PRIMARY KEY,
-    "name" VARCHAR(50) NOT NULL,
-    "type" TEXT NOT NULL CHECK ("type" IN ('FREE', 'PRO', 'ENTERPRISE')),
-    "price" DECIMAL(10, 2) NOT NULL,
-    "billing_interval" TEXT CHECK ("billing_interval" IN ('MONTHLY', 'YEARLY') OR "billing_interval" IS NULL),
-    "description" TEXT,
-    "features" JSONB NOT NULL, -- 存储计划包含的功能列表
-    "max_projects" INT NOT NULL, -- 最大项目数
-    "max_teams" INT NOT NULL, -- 最大团队数
-    "max_members" INT NOT NULL, -- 最大团队成员数
-    "max_ai_chat" INT NOT NULL, -- 最大AI聊天数
-    "max_ai_task" INT NOT NULL, -- 最大AI任务数
-    "max_ai_workflow" INT NOT NULL, -- 最大AI工作流数
-    "max_storage" INT NOT NULL DEFAULT 0, -- 最大存储空间(GB)
-    "is_active" BOOLEAN DEFAULT TRUE,
-    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 用户订阅计划表
-  CREATE TABLE "user_subscription_plan" (
-    "id" SERIAL PRIMARY KEY,
-    "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-    "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
-    "status" TEXT CHECK ("status" IN ('ACTIVE', 'CANCELED', 'EXPIRED') OR "status" IS NULL),
-    "start_date" TIMESTAMP NOT NULL,
-    "end_date" TIMESTAMP,
-    -- 使用统计
-    "current_projects" INT DEFAULT 0 NULL,
-    "current_teams" INT DEFAULT 0 NULL,
-    "current_members" INT DEFAULT 0 NULL,
-    "current_ai_chat" INT DEFAULT 0 NULL,
-    "current_ai_task" INT DEFAULT 0 NULL,
-    "current_ai_workflow" INT DEFAULT 0 NULL,
-    "current_storage" INT DEFAULT 0 NULL,
-    -- 时间戳
-    "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
-
--- 促销码表
+-- promo code table
 CREATE TABLE "promo_code" (
   "id" SERIAL PRIMARY KEY,
   "code" VARCHAR(50) UNIQUE NOT NULL,
@@ -480,7 +510,7 @@ CREATE TABLE "promo_code" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 联系表（用于存储联系表单提交）
+-- contact table (for storing contact form submissions)
 CREATE TABLE "contact" (
   "id" SERIAL PRIMARY KEY,
   "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE', 'DOWNGRADE')), -- 添加 DOWNGRADE 类型
@@ -498,7 +528,21 @@ CREATE TABLE "contact" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Downgrade Request Table
+-- admin table - store system admin information
+CREATE TABLE "admin_user" (
+  "id" SERIAL PRIMARY KEY,
+  "username" VARCHAR(255) UNIQUE NOT NULL,
+  "email" VARCHAR(255) UNIQUE NOT NULL,
+  "password_hash" VARCHAR(255) NOT NULL,
+  "full_name" VARCHAR(255),
+  "avatar_url" VARCHAR(255),
+  "is_active" BOOLEAN DEFAULT TRUE,
+  "last_login" TIMESTAMP,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- downgrade request table
 CREATE TABLE "downgrade_request" (
   "id" SERIAL PRIMARY KEY,
   "contact_id" INT NOT NULL REFERENCES "contact"("id") ON DELETE CASCADE,
@@ -514,13 +558,6 @@ CREATE TABLE "downgrade_request" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create indexes for downgrade_request
-CREATE INDEX idx_downgrade_request_user_id ON "downgrade_request"("user_id");
-CREATE INDEX idx_downgrade_request_contact_id ON "downgrade_request"("contact_id");
-CREATE INDEX idx_downgrade_request_current_subscription ON "downgrade_request"("current_subscription_id");
-CREATE INDEX idx_downgrade_request_target_plan ON "downgrade_request"("target_plan_id");
-CREATE INDEX idx_downgrade_request_status ON "downgrade_request"("status");
-
 -- Support Contact Reply Table (integrates with existing contact table)
 CREATE TABLE "contact_reply" (
   "id" SERIAL PRIMARY KEY,
@@ -535,26 +572,7 @@ CREATE TABLE "contact_reply" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create indexes for better performance
-CREATE INDEX idx_contact_reply_contact_id ON "contact_reply"("contact_id");
-CREATE INDEX idx_contact_reply_admin_id ON "contact_reply"("admin_id");
-CREATE INDEX idx_contact_reply_created_at ON "contact_reply"("created_at");
-
--- 管理员表 - 存储系统管理员信息
-CREATE TABLE "admin_user" (
-  "id" SERIAL PRIMARY KEY,
-  "username" VARCHAR(255) UNIQUE NOT NULL,
-  "email" VARCHAR(255) UNIQUE NOT NULL,
-  "password_hash" VARCHAR(255) NOT NULL,
-  "full_name" VARCHAR(255),
-  "avatar_url" VARCHAR(255),
-  "is_active" BOOLEAN DEFAULT TRUE,
-  "last_login" TIMESTAMP,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 管理员权限表 - 定义系统中的各种权限
+-- admin permission table - define various permissions in the system
 CREATE TABLE "admin_permission" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) UNIQUE NOT NULL,
@@ -562,7 +580,7 @@ CREATE TABLE "admin_permission" (
   "category" TEXT
 );
 
--- 管理员角色权限关联表 - 将每个管理员与权限关联
+-- admin role permission association table - associate each admin with permissions
 CREATE TABLE "admin_role_permission" (
   "id" SERIAL PRIMARY KEY,
   "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
@@ -571,13 +589,7 @@ CREATE TABLE "admin_role_permission" (
   UNIQUE ("admin_id", "permission_id")
 );
 
-
--- 创建索引提升查询性能
-CREATE INDEX idx_admin_role_permission_admin_id ON "admin_role_permission"("admin_id");
-CREATE INDEX idx_admin_role_permission_permission_id ON "admin_role_permission"("permission_id");
-
-
--- 管理员会话表 - 跟踪管理员登录会话
+-- admin session table - track admin login sessions
 CREATE TABLE "admin_session" (
   "id" SERIAL PRIMARY KEY,
   "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
@@ -588,7 +600,7 @@ CREATE TABLE "admin_session" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 管理员活动日志表 - 记录管理员的所有操作
+-- admin activity log table - record all admin operations
 CREATE TABLE "admin_activity_log" (
   "id" SERIAL PRIMARY KEY,
   "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
@@ -601,19 +613,19 @@ CREATE TABLE "admin_activity_log" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 系统设置表 - 存储全局系统配置
+-- system settings table - store global system configurations
 CREATE TABLE "system_settings" (
   "id" SERIAL PRIMARY KEY,
   "key" VARCHAR(255) UNIQUE NOT NULL,
   "value" TEXT,
   "description" TEXT,
-  "is_public" BOOLEAN DEFAULT FALSE, -- 是否可以公开给前端
+  "is_public" BOOLEAN DEFAULT FALSE, -- whether it can be publicly accessed by the frontend
   "updated_by" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 管理员通知表 - 存储发送给管理员的通知
+-- admin notification table - store notifications sent to admins
 CREATE TABLE "admin_notification" (
   "id" SERIAL PRIMARY KEY,
   "admin_id" INT NOT NULL REFERENCES "admin_user"("id") ON DELETE CASCADE,
@@ -625,102 +637,21 @@ CREATE TABLE "admin_notification" (
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 团队自定义字段值索引
-CREATE INDEX idx_team_custom_field_value_field ON "team_custom_field_value"("team_custom_field_id");
-
--- 团队自定义字段索引
-CREATE INDEX idx_team_custom_field_team ON "team_custom_field"("team_id");
-CREATE INDEX idx_team_custom_field_field ON "team_custom_field"("custom_field_id");
-
--- 用户索引
-CREATE INDEX idx_user_email ON "user"("email");
-
--- 时间记录索引
-CREATE INDEX idx_time_entry_task_id ON "time_entry"("task_id");
-CREATE INDEX idx_time_entry_user_id ON "time_entry"("user_id");
-
--- 通知索引
-CREATE INDEX idx_notification_user_id ON "notification"("user_id");
-CREATE INDEX idx_notification_read ON "notification"("is_read");
-CREATE INDEX idx_notification_created_at ON "notification"("created_at"); 
-
--- 聊天索引
-CREATE INDEX idx_chat_message_session ON "chat_message"("session_id");
-CREATE INDEX idx_chat_message_created ON "chat_message"("created_at");
-CREATE INDEX idx_chat_participant_user ON "chat_participant"("user_id");
-CREATE INDEX idx_chat_session_team ON "chat_session"("team_id");
-
--- 为操作日志表创建索引
-CREATE INDEX idx_action_log_user ON "action_log"("user_id");
-CREATE INDEX idx_action_log_entity ON "action_log"("entity_type", "entity_id");
-CREATE INDEX idx_action_log_created ON "action_log"("created_at");
-
--- 为邀请表创建索引
-CREATE INDEX idx_team_invitation_email ON "user_team_invitation"("user_email");
-CREATE INDEX idx_team_invitation_team ON "user_team_invitation"("team_id");
-CREATE INDEX idx_team_invitation_status ON "user_team_invitation"("status");
-
--- 为订阅相关表创建索引
-CREATE INDEX idx_user_subscription_plan_user_id ON "user_subscription_plan"("user_id");
-CREATE INDEX idx_user_subscription_plan_plan_id ON "user_subscription_plan"("plan_id");
-CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
-CREATE INDEX idx_user_subscription_user ON "user_subscription_plan"("user_id");
-CREATE INDEX idx_user_subscription_status ON "user_subscription_plan"("status");
-
-CREATE INDEX idx_promo_code_code ON "promo_code"("code");
-CREATE INDEX idx_promo_code_active ON "promo_code"("is_active");
-
--- 联系表索引
-CREATE INDEX idx_contact_type ON "contact"("type");
-CREATE INDEX idx_contact_email ON "contact"("email");
-CREATE INDEX idx_contact_status ON "contact"("status");
-CREATE INDEX idx_contact_created_at ON "contact"("created_at");
-
--- 管理员表索引
-CREATE INDEX idx_admin_user_email ON "admin_user"("email");
-
--- 管理员会话表索引
-CREATE INDEX idx_admin_session_admin ON "admin_session"("admin_id");
-CREATE INDEX idx_admin_session_expires ON "admin_session"("expires_at");
-
--- 管理员活动日志表索引
-CREATE INDEX idx_admin_activity_log_admin ON "admin_activity_log"("admin_id");
-CREATE INDEX idx_admin_activity_log_action ON "admin_activity_log"("action");
-CREATE INDEX idx_admin_activity_log_created ON "admin_activity_log"("created_at");
-
--- 管理员通知表索引
-CREATE INDEX idx_admin_notification_admin ON "admin_notification"("admin_id");
-CREATE INDEX idx_admin_notification_read ON "admin_notification"("is_read");
-
--- 落地页章节表
+-- landing page section table
 CREATE TABLE "landing_page_section" (
   "id" SERIAL PRIMARY KEY,
   "name" VARCHAR(255) NOT NULL,
   "sort_order" INT NOT NULL DEFAULT 0
 );
 
--- 落地页内容表
+-- landing page content table
 CREATE TABLE "landing_page_content" (
   "id" SERIAL PRIMARY KEY,
   "section_id" INT NOT NULL REFERENCES "landing_page_section"("id") ON DELETE CASCADE,
   "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('h1', 'h2', 'span', 'video', 'image', 'solution_card')),
-  "content" TEXT NOT NULL, -- 文本内容或媒体URL
+  "content" TEXT NOT NULL, -- text content or media URL
   "sort_order" INT NOT NULL DEFAULT 0
 );
-
--- 创建存储桶策略，允许公开访问媒体文件
--- 注意：这需要在 Supabase Dashboard 中手动创建存储桶 'landing-page-media'
--- 并配置以下策略：
-/*
-CREATE POLICY "Public Access"
-ON storage.objects FOR SELECT
-USING (bucket_id = 'landing-page-media');
-*/
-
--- 落地页相关索引
-CREATE INDEX idx_landing_page_section_sort ON "landing_page_section"("sort_order");
-CREATE INDEX idx_landing_page_content_section ON "landing_page_content"("section_id");
-CREATE INDEX idx_landing_page_content_sort ON "landing_page_content"("sort_order");
 
 -- Payment table for Stripe integration
 CREATE TABLE "payment" (
@@ -742,12 +673,6 @@ CREATE TABLE "payment" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create index for order_id
-CREATE INDEX idx_payment_order_id ON "payment"("order_id");
-
--- For better performance when querying payment by user
-CREATE INDEX idx_payment_user_id ON "payment"("user_id");
-
 CREATE TABLE task_links (
     id SERIAL PRIMARY KEY,  -- 自增主键
     source_task_id INT NOT NULL,
@@ -758,3 +683,275 @@ CREATE TABLE task_links (
     FOREIGN KEY (source_task_id) REFERENCES task(id) ON DELETE CASCADE,
     FOREIGN KEY (target_task_id) REFERENCES task(id) ON DELETE CASCADE
 );
+
+-- Create mytasks table for user's personal task tracking
+CREATE TABLE "mytasks" (
+  "id" SERIAL PRIMARY KEY,
+  "task_id" INT REFERENCES "task"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "title" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
+  "priority" TEXT CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
+  "expected_completion_date" TIMESTAMP,
+  "expected_start_time" TIMESTAMP,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- create bucket policy to allow public access to media files
+-- note: this needs to be manually created in the Supabase Dashboard
+-- and configured with the following policy:
+/*
+CREATE POLICY "Public Access"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'landing-page-media');
+*/
+
+-- Function to check if a user can access a workflow
+CREATE OR REPLACE FUNCTION can_access_workflow(workflow_id UUID, user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM workflows
+        WHERE id = workflow_id 
+        AND (created_by = user_id OR is_public)
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER; 
+
+-- Create a function to recursively delete folders
+CREATE OR REPLACE FUNCTION delete_folder_cascade()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Delete all child folders
+    DELETE FROM file_folders 
+    WHERE parent_path LIKE OLD.full_path || '%';
+    
+    -- Update attachments to move them to the parent folder
+    UPDATE attachment
+    SET file_path = OLD.parent_path
+    WHERE file_path = OLD.full_path;
+    
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a trigger to handle folder deletion
+CREATE TRIGGER before_delete_folder
+BEFORE DELETE ON file_folders
+FOR EACH ROW
+EXECUTE FUNCTION delete_folder_cascade(); 
+
+-- Create a function to update the user's online status
+CREATE OR REPLACE FUNCTION update_user_online_status()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Update the user's online status and last_seen_at in the user table
+  UPDATE "user"
+  SET is_online = TRUE, last_seen_at = NEW.last_heartbeat
+  WHERE id = NEW.user_id;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a trigger to update user status when heartbeat is updated
+DROP TRIGGER IF EXISTS update_user_status_on_heartbeat ON "user_heartbeats";
+CREATE TRIGGER update_user_status_on_heartbeat
+AFTER INSERT OR UPDATE ON "user_heartbeats"
+FOR EACH ROW
+EXECUTE FUNCTION update_user_online_status();
+
+-- Create a function to check for inactive users and set them offline
+CREATE OR REPLACE FUNCTION check_inactive_users()
+RETURNS void AS $$
+DECLARE
+  inactive_threshold INTERVAL := '2 minutes'; -- Configure this based on your needs
+BEGIN
+  -- Update users to offline if their last heartbeat is older than the threshold
+  UPDATE "user" u
+  SET is_online = FALSE
+  FROM "user_heartbeats" h
+  WHERE u.id = h.user_id
+    AND u.is_online = TRUE
+    AND h.last_heartbeat < (NOW() - inactive_threshold);
+END;
+$$ LANGUAGE plpgsql; 
+
+-- Add a notification type for mentions
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT FROM pg_type 
+    WHERE typname = 'notification_type_enum' 
+    AND typtype = 'e'
+    AND 'MENTION' = ANY(enum_range(NULL::notification_type_enum)::text[])
+  ) THEN
+    ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'MENTION';
+  END IF;
+EXCEPTION
+  WHEN others THEN
+    RAISE NOTICE 'Type MENTION already exists in notification_type_enum';
+END $$;
+
+-- Create a comment on the mentions column to document its structure
+COMMENT ON COLUMN chat_message.mentions IS 
+'Stores mention data in the format:
+[
+  {
+    "type": "user|project|task",
+    "id": "uuid",
+    "name": "string",
+    "startIndex": integer,
+    "endIndex": integer,
+    "projectName": "string" (only for tasks)
+  }
+]'; 
+
+-- Create an index for faster lookups by user_id
+CREATE INDEX IF NOT EXISTS idx_user_heartbeats_user_id ON "user_heartbeats" (user_id);
+
+-- add index to improve query performance
+CREATE INDEX IF NOT EXISTS idx_user_google_provider_id ON "user" (google_provider_id) WHERE google_provider_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_user_github_provider_id ON "user" (github_provider_id) WHERE github_provider_id IS NOT NULL;
+
+-- team custom field value index
+CREATE INDEX idx_team_custom_field_value_field ON "team_custom_field_value"("team_custom_field_id");
+
+-- team custom field index
+CREATE INDEX idx_team_custom_field_team ON "team_custom_field"("team_id");
+CREATE INDEX idx_team_custom_field_field ON "team_custom_field"("custom_field_id");
+
+-- Index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_notion_page_parent ON "notion_page"("parent_id");
+CREATE INDEX IF NOT EXISTS idx_notion_page_created_by ON "notion_page"("created_by");
+
+-- Index for faster comment lookups
+CREATE INDEX IF NOT EXISTS idx_notion_page_comment_page ON "notion_page_comment"("page_id");
+
+-- Create indexes for better performance
+CREATE INDEX idx_team_post_team_id ON "team_post"("team_id");
+CREATE INDEX idx_team_post_attachment_id ON "team_post"("attachment_id");
+CREATE INDEX idx_team_post_created_by ON "team_post"("created_by");
+CREATE INDEX idx_team_post_created_at ON "team_post"("created_at");
+CREATE INDEX idx_team_post_is_pinned ON "team_post"("is_pinned");
+CREATE INDEX idx_team_post_reactions ON "team_post" USING GIN("reactions");
+
+CREATE INDEX IF NOT EXISTS chat_message_mentions_idx ON chat_message USING GIN (mentions);
+
+-- create personal calendar event index
+CREATE INDEX idx_personal_calendar_event_user ON "personal_calendar_event"("user_id");
+CREATE INDEX idx_personal_calendar_event_time ON "personal_calendar_event"("start_time", "end_time");
+
+-- user index
+CREATE INDEX idx_user_email ON "user"("email");
+
+-- AI chat history index
+CREATE INDEX idx_ai_chat_message_user ON "ai_chat_message"("user_id");
+CREATE INDEX idx_ai_chat_message_conversation ON "ai_chat_message"("conversation_id");
+CREATE INDEX idx_ai_chat_message_timestamp ON "ai_chat_message"("timestamp");
+
+-- notification index
+CREATE INDEX idx_notification_user_id ON "notification"("user_id");
+CREATE INDEX idx_notification_read ON "notification"("is_read");
+CREATE INDEX idx_notification_created_at ON "notification"("created_at"); 
+
+-- chat index
+CREATE INDEX idx_chat_message_session ON "chat_message"("session_id");
+CREATE INDEX idx_chat_message_created ON "chat_message"("created_at");
+CREATE INDEX idx_chat_participant_user ON "chat_participant"("user_id");
+CREATE INDEX idx_chat_session_team ON "chat_session"("team_id");
+
+-- create index for action log table
+CREATE INDEX idx_action_log_user ON "action_log"("user_id");
+CREATE INDEX idx_action_log_entity ON "action_log"("entity_type", "entity_id");
+CREATE INDEX idx_action_log_created ON "action_log"("created_at");
+
+-- create index for team invitation table
+CREATE INDEX idx_team_invitation_email ON "user_team_invitation"("user_email");
+CREATE INDEX idx_team_invitation_team ON "user_team_invitation"("team_id");
+CREATE INDEX idx_team_invitation_status ON "user_team_invitation"("status");
+
+-- create index for user subscription plan table
+CREATE INDEX idx_user_subscription_plan_user_id ON "user_subscription_plan"("user_id");
+CREATE INDEX idx_user_subscription_plan_plan_id ON "user_subscription_plan"("plan_id");
+CREATE INDEX idx_subscription_plan_type ON "subscription_plan"("type");
+CREATE INDEX idx_user_subscription_user ON "user_subscription_plan"("user_id");
+CREATE INDEX idx_user_subscription_status ON "user_subscription_plan"("status");
+
+CREATE INDEX idx_promo_code_code ON "promo_code"("code");
+CREATE INDEX idx_promo_code_active ON "promo_code"("is_active");
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_workflows_created_by ON workflows (created_by);
+CREATE INDEX IF NOT EXISTS idx_workflows_type ON workflows (type);
+CREATE INDEX IF NOT EXISTS idx_workflows_is_public ON workflows (is_public);
+CREATE INDEX IF NOT EXISTS idx_workflows_is_deleted ON workflows (is_deleted);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_workflow_id ON workflow_executions (workflow_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_user_id ON workflow_executions (user_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions (status);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_file_folders_task_id ON "file_folders"("task_id");
+CREATE INDEX IF NOT EXISTS idx_file_folders_parent_path ON "file_folders"("parent_path");
+CREATE INDEX IF NOT EXISTS idx_attachment_file_path ON "attachment"("file_path");
+
+-- Create indexes for downgrade_request
+CREATE INDEX idx_downgrade_request_user_id ON "downgrade_request"("user_id");
+CREATE INDEX idx_downgrade_request_contact_id ON "downgrade_request"("contact_id");
+CREATE INDEX idx_downgrade_request_current_subscription ON "downgrade_request"("current_subscription_id");
+CREATE INDEX idx_downgrade_request_target_plan ON "downgrade_request"("target_plan_id");
+CREATE INDEX idx_downgrade_request_status ON "downgrade_request"("status");
+
+-- Create indexes for better performance
+CREATE INDEX idx_contact_reply_contact_id ON "contact_reply"("contact_id");
+CREATE INDEX idx_contact_reply_admin_id ON "contact_reply"("admin_id");
+CREATE INDEX idx_contact_reply_created_at ON "contact_reply"("created_at");
+
+-- create index to improve query performance
+CREATE INDEX idx_admin_role_permission_admin_id ON "admin_role_permission"("admin_id");
+CREATE INDEX idx_admin_role_permission_permission_id ON "admin_role_permission"("permission_id");
+
+-- Create an index on the mentions column for better query performance
+CREATE INDEX IF NOT EXISTS chat_message_mentions_idx ON chat_message USING GIN (mentions);
+
+-- create index for contact table
+CREATE INDEX idx_contact_type ON "contact"("type");
+CREATE INDEX idx_contact_email ON "contact"("email");
+CREATE INDEX idx_contact_status ON "contact"("status");
+CREATE INDEX idx_contact_created_at ON "contact"("created_at");
+
+-- create index for admin user table
+CREATE INDEX idx_admin_user_email ON "admin_user"("email");
+
+-- create index for admin session table
+CREATE INDEX idx_admin_session_admin ON "admin_session"("admin_id");
+CREATE INDEX idx_admin_session_expires ON "admin_session"("expires_at");
+
+-- create index for admin activity log table
+CREATE INDEX idx_admin_activity_log_admin ON "admin_activity_log"("admin_id");
+CREATE INDEX idx_admin_activity_log_action ON "admin_activity_log"("action");
+CREATE INDEX idx_admin_activity_log_created ON "admin_activity_log"("created_at");
+
+-- create index for admin notification table
+CREATE INDEX idx_admin_notification_admin ON "admin_notification"("admin_id");
+CREATE INDEX idx_admin_notification_read ON "admin_notification"("is_read");
+
+-- create index for landing page section table
+CREATE INDEX idx_landing_page_section_sort ON "landing_page_section"("sort_order");
+CREATE INDEX idx_landing_page_content_section ON "landing_page_content"("section_id");
+CREATE INDEX idx_landing_page_content_sort ON "landing_page_content"("sort_order");
+
+-- create index for payment table
+CREATE INDEX idx_payment_order_id ON "payment"("order_id");
+
+-- create index for payment table
+CREATE INDEX idx_payment_user_id ON "payment"("user_id");
+
+-- create index for mytasks table
+CREATE INDEX idx_mytasks_task_id ON "mytasks"("task_id");
+CREATE INDEX idx_mytasks_user_id ON "mytasks"("user_id");
+CREATE INDEX idx_mytasks_status ON "mytasks"("status");

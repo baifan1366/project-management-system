@@ -394,7 +394,7 @@ function WorkflowNode({ data, selected, id }) {
             
             {/* Email Recipients */}
             <div className="mt-2">
-              <p className="font-semibold mb-1 flex justify-between items-center dark:text-gray-200">
+              <div className="font-semibold mb-1 flex justify-between items-center dark:text-gray-200">
                 {t('emailSettings') || 'Email Settings'}
                 {!isEditing ? (
                   <Button
@@ -425,7 +425,7 @@ function WorkflowNode({ data, selected, id }) {
                     </Button>
                   </div>
                 )}
-              </p>
+              </div>
               
               {!isEditing ? (
                 <div className="bg-gray-50 dark:bg-[#2a2526] p-2 rounded text-xs space-y-1 border border-gray-100 dark:border-[#3a3536]">
@@ -645,7 +645,7 @@ function WorkflowNode({ data, selected, id }) {
       case 'api':
         return (
           <div className="mt-2 text-xs">
-            <p className="font-semibold mb-1 flex justify-between items-center dark:text-gray-200">
+            <div className="font-semibold mb-1 flex justify-between items-center dark:text-gray-200">
               {t('apiRequest')}
               {!isEditing ? (
                 <Button
@@ -676,7 +676,7 @@ function WorkflowNode({ data, selected, id }) {
                   </Button>
                 </div>
               )}
-            </p>
+            </div>
             {!isEditing ? (
               <div className="bg-gray-50 dark:bg-[#252329] p-2 rounded text-xs space-y-1 border border-gray-100 dark:border-[#353339]">
                 <div className="flex items-center">
@@ -790,7 +790,7 @@ function WorkflowNode({ data, selected, id }) {
             
             {/* Message Template */}
             <div className="mt-2">
-              <p className="font-semibold mb-1 flex justify-between items-center dark:text-gray-200">
+              <div className="font-semibold mb-1 flex justify-between items-center dark:text-gray-200">
                 {t('messageTemplate') || 'Message Template'}
                 {!isEditing ? (
                   <Button
@@ -821,7 +821,7 @@ function WorkflowNode({ data, selected, id }) {
                     </Button>
                   </div>
                 )}
-              </p>
+              </div>
               {!isEditing ? (
                 <div className="bg-gray-50 dark:bg-[#25293d] p-1 rounded text-xs overflow-auto max-h-20 border border-gray-100 dark:border-[#35394d]">
                   <pre className="dark:text-gray-300">{messageTemplate || 'Hello, this is an automated message from the workflow system:\n\n{{content}}'}</pre>
@@ -843,7 +843,7 @@ function WorkflowNode({ data, selected, id }) {
       default:
         return (
           <div className="mt-2 text-xs">
-            <p className="font-semibold mb-1 flex justify-between items-center dark:text-gray-200">
+            <div className="font-semibold mb-1 flex justify-between items-center dark:text-gray-200">
               {t('jsonFormat')}
               {!isEditing ? (
                 <Button
@@ -874,7 +874,7 @@ function WorkflowNode({ data, selected, id }) {
                   </Button>
                 </div>
               )}
-            </p>
+            </div>
             {!isEditing ? (
               <div className="bg-gray-50 dark:bg-[#1f2920] p-1 rounded text-xs overflow-auto max-h-20 border border-gray-100 dark:border-[#2f3930]">
                 <pre className="dark:text-gray-300">{jsonFormat || '{\n  "title": "Example",\n  "content": "Content here"\n}'}</pre>

@@ -1,11 +1,16 @@
 import { openai } from '../../api/ai/task-manager-agent/config';
-import { safeParseJSON, executeApiRequest, createDocxTemplate } from './utils';
+import { safeParseJSON, executeApiRequest } from './utils';
 import { supabase } from '@/lib/supabase';
-import PizZip from 'pizzip';
-import Docxtemplater from 'docxtemplater';
-import pptxgenjs from 'pptxgenjs';
 import { v4 as uuidv4 } from 'uuid';
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import JSZip from 'jszip';
+import PptxGenJS from 'pptxgenjs';
+import Docxtemplater from 'docxtemplater';
+import PizZip from 'pizzip';
+import { promises as fsPromises } from 'fs';
 
 // Get available AI models
 const getAvailableModels = () => {
@@ -306,27 +311,54 @@ async function getWorkflow(workflowId) {
 
 // 将文件上传到 Supabase Storage
 async function uploadFileToStorage(fileBuffer, fileName, contentType, userId) {
-  try {
-    const filePath = `workflows/${userId}/${fileName}`;
-    
-    const { data, error } = await supabase.storage
-      .from("workflow-files")
-      .upload(filePath, fileBuffer, {
-        contentType,
-        upsert: true
-      });
-    
-    if (error) throw error;
-    
-    // 获取文件的公共URL
-    const { data: urlData } = supabase.storage
-      .from("workflow-files")
-      .getPublicUrl(filePath);
-    
-    return urlData.publicUrl;
-  } catch (error) {
-    console.error(`Error uploading file to storage: ${error.message}`);
-    throw new Error(`Failed to upload file: ${error.message}`);
+  const maxRetries = 3;
+  let lastError = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`尝试上传文件到存储 (尝试 ${attempt + 1}/${maxRetries}): ${fileName}`);
+      const filePath = `workflows/${userId}/${fileName}`;
+      
+      const { data, error } = await supabase.storage
+        .from("workflow-files")
+        .upload(filePath, fileBuffer, {
+          contentType,
+          upsert: true
+        });
+      
+      if (error) throw error;
+      
+      // 获取文件的公共URL
+      const { data: urlData } = supabase.storage
+        .from("workflow-files")
+        .getPublicUrl(filePath);
+      
+      console.log(`文件上传成功: ${fileName}`);
+      return urlData.publicUrl;
+    } catch (error) {
+      lastError = error;
+      console.error(`文件上传尝试 ${attempt + 1} 失败: ${error.message}`);
+      
+      // 如果是连接超时或网络错误，等待后重试
+      if (error.message && (error.message.includes('timeout') || 
+                            error.message.includes('network') ||
+                            error.message.includes('connection') ||
+                            error.code === 'UND_ERR_CONNECT_TIMEOUT')) {
+        const retryDelay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+        console.log(`等待 ${retryDelay}ms 后重试...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        // 继续下一次重试
+      } else {
+        // 对于其他错误，立即抛出
+        throw error;
+      }
+    }
+  }
+  
+  // 如果经过所有重试后仍然失败
+  if (lastError) {
+    console.error(`上传文件失败，已达最大重试次数 (${maxRetries}): ${lastError.message}`);
+    throw new Error(`Failed to upload file after ${maxRetries} attempts: ${lastError.message}`);
   }
 }
 
@@ -335,512 +367,199 @@ async function generatePPTX(content, userId) {
   try {
     console.log("Generating PPTX with content:", JSON.stringify(content, null, 2).substring(0, 500) + "...");
     
-    // Create a new presentation
-    const pres = new pptxgenjs();
+    // Check if content has an error
+    if (content.error) {
+      console.error("Cannot generate PPTX from error content:", content.error);
+      return { error: content.error };
+    }
     
-    // Set presentation properties
-    pres.layout = 'LAYOUT_16x9';
-    
-    // Define design themes - SlideGo inspired designs
-    const designThemes = {
-      professional: {
-        title: { color: '0064D2', fontSize: 36, bold: true, fontFace: 'Arial' },
-        subtitle: { color: '404040', fontSize: 20, fontFace: 'Arial' },
-        content: { color: '333333', fontSize: 16, fontFace: 'Arial' },
-        bullets: { color: '333333', fontSize: 16, fontFace: 'Arial' },
-        background: { type: 'solid', color: 'FFFFFF' },
-        accent: { color: '0064D2' },
-        chartColors: ['0064D2', '00B050', 'FF6600', 'FFCC00', '9933CC']
-      },
-      creative: {
-        title: { color: 'FF5733', fontSize: 40, bold: true, fontFace: 'Calibri' },
-        subtitle: { color: '404040', fontSize: 22, fontFace: 'Calibri' },
-        content: { color: '333333', fontSize: 18, fontFace: 'Calibri' },
-        bullets: { color: '333333', fontSize: 18, fontFace: 'Calibri' },
-        background: { 
-          type: 'gradient', 
-          color1: 'FFFFFF',
-          color2: 'FFF5F0',
-          angle: 45
-        },
-        accent: { color: 'FF5733' },
-        chartColors: ['FF5733', '33A8FF', 'FFCC00', '33FF57', 'CC33FF']
-      },
-      minimal: {
-        title: { color: '202020', fontSize: 38, bold: true, fontFace: 'Helvetica' },
-        subtitle: { color: '606060', fontSize: 24, fontFace: 'Helvetica' },
-        content: { color: '404040', fontSize: 16, fontFace: 'Helvetica' },
-        bullets: { color: '404040', fontSize: 16, fontFace: 'Helvetica' },
-        background: { type: 'solid', color: 'FFFFFF' },
-        accent: { color: '202020' },
-        chartColors: ['202020', '606060', 'A0A0A0', 'D0D0D0', 'F0F0F0']
-      },
-      colorful: {
-        title: { color: '4A0D67', fontSize: 42, bold: true, fontFace: 'Trebuchet MS' },
-        subtitle: { color: '4A0D67', fontSize: 24, fontFace: 'Trebuchet MS' },
-        content: { color: '333333', fontSize: 18, fontFace: 'Trebuchet MS' },
-        bullets: { color: '333333', fontSize: 18, fontFace: 'Trebuchet MS' },
-        background: { 
-          type: 'gradient', 
-          color1: 'FFFFFF',
-          color2: 'F0E6F5',
-          angle: 90
-        },
-        accent: { color: '4A0D67' },
-        chartColors: ['4A0D67', '84E6F8', 'FFB677', 'ADFFBC', 'FF7777']
-      }
+    // Helper function to safely convert any value to string
+    const safeToString = (value) => {
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'string') return value;
+      if (typeof value === 'object') return JSON.stringify(value);
+      return String(value);
     };
     
-    // Choose a design theme (can be random or based on content type)
-    const designKeys = Object.keys(designThemes);
-    const designTheme = designThemes[designKeys[Math.floor(Math.random() * designKeys.length)]];
-    
-    // Apply theme to master slide
-    pres.defineSlideMaster({
-      title: 'MASTER_SLIDE',
-      background: designTheme.background,
-      objects: [
-        // Add accent line or shape based on theme
-        { 
-          rect: { 
-            x: 0, 
-            y: 0, 
-            w: '100%', 
-            h: 0.3, 
-            fill: { color: designTheme.accent.color } 
-          } 
-        },
-        // Add subtle footer
-        { 
-          text: { 
-            text: 'Generated with AI Workflow',  
-            options: { 
-              x: 0.5, 
-              y: '95%', 
-              w: '90%', 
-              h: 0.3, 
-              align: 'center',
-              fontSize: 10,
-              color: '808080'
-            } 
-          } 
-        }
-      ],
-      slideNumber: { x: '90%', y: '95%' }
-    });
-    
-    // Check for ppt_generation specific structure or use content directly
+    // Check the content structure
     let pptContent = content;
-    
-    // If the content has a ppt_generation property, use that instead
     if (content.ppt_generation && typeof content.ppt_generation === 'object') {
       console.log("Using ppt_generation key from response");
       pptContent = content.ppt_generation;
     }
     
-    // Check if content has error
-    if (pptContent.error) {
-      console.log("Content has error, using default presentation");
-      // Create a default presentation with error information
-      pres.title = 'Error in Presentation Generation';
-      
-      // Add title slide
-      const slide1 = pres.addSlide({ masterName: 'MASTER_SLIDE' });
-      slide1.addText('Error in Presentation Generation', {
-        x: 0.5, y: 0.5, w: '90%', h: 1, 
-        fontSize: designTheme.title.fontSize, 
-        bold: designTheme.title.bold,
-        color: 'FF0000',
-        fontFace: designTheme.title.fontFace
-      });
-      slide1.addText(`An error occurred: ${pptContent.error}`, {
-        x: 0.5, y: 1.7, w: '90%', h: 1,
-        fontSize: designTheme.subtitle.fontSize,
-        color: '666666',
-        fontFace: designTheme.subtitle.fontFace
-      });
-      
-      // Add information slide
-      const slide2 = pres.addSlide({ masterName: 'MASTER_SLIDE' });
-      slide2.addText('Troubleshooting', {
-        x: 0.5, y: 0.5, w: '90%', h: 1,
-        fontSize: designTheme.title.fontSize,
-        bold: designTheme.title.bold,
-        color: designTheme.title.color,
-        fontFace: designTheme.title.fontFace
-      });
-      slide2.addText('Possible solutions:', {
-        x: 0.5, y: 1.5, w: '90%', h: 4,
-        fontSize: designTheme.subtitle.fontSize,
-        color: designTheme.subtitle.color,
-        fontFace: designTheme.subtitle.fontFace
-      });
-      const bullets = [
-        '• Try again with a different prompt',
-        '• Use a different AI model',
-        '• Check if your input is clear and specific',
-        '• Ensure the system has permissions to generate content'
-      ];
-      slide2.addText(bullets.join('\n'), {
-        x: 0.5, y: 2.5, w: '90%', h: 4,
-        fontSize: designTheme.bullets.fontSize,
-        color: designTheme.bullets.color,
-        fontFace: designTheme.bullets.fontFace
+    // Setup title and slides
+    const title = safeToString(pptContent.title || 'Presentation');
+    const slides = Array.isArray(pptContent.slides) ? pptContent.slides : [];
+    
+    // Create a new presentation
+    const pres = new PptxGenJS();
+    
+    // Set presentation properties
+    pres.layout = 'LAYOUT_16x9';
+    pres.author = 'AI Workflow';
+    pres.title = title;
+    pres.company = 'Generated by AI';
+    pres.revision = '1';
+    
+    // Add title slide
+    const titleSlide = pres.addSlide();
+    titleSlide.background = { color: 'FFFFFF' };
+    titleSlide.addText(title, { 
+      x: 1, 
+      y: 1.5, 
+      w: '80%', 
+      h: 1.5, 
+      fontSize: 44, 
+      color: '0066CC', 
+      bold: true, 
+      align: 'center' 
+    });
+    
+    titleSlide.addText('Generated Presentation', { 
+      x: 1, 
+      y: 3.5, 
+      w: '80%', 
+      h: 0.8, 
+      fontSize: 28, 
+      color: '666666', 
+      align: 'center' 
+    });
+    
+    // Add date at bottom
+    titleSlide.addText(`Created: ${new Date().toLocaleDateString()}`, {
+      x: 1,
+      y: 5,
+      w: '80%',
+      h: 0.5,
+      fontSize: 14,
+      color: '999999',
+      align: 'center'
+    });
+    
+    // Add content slides
+    if (slides && slides.length > 0) {
+      slides.forEach((slide, idx) => {
+        const slideTitle = safeToString(slide.title || `Slide ${idx + 1}`);
+        const slideContent = safeToString(slide.content || '');
+        const slideBullets = Array.isArray(slide.bullets) 
+          ? slide.bullets.map(bullet => safeToString(bullet))
+          : [];
+        
+        // Create a new slide
+        const newSlide = pres.addSlide();
+        newSlide.background = { color: 'FFFFFF' };
+        
+        // Add colored top bar
+        newSlide.addShape('rect', {
+          x: 0, y: 0, w: '100%', h: 0.5, fill: { color: '0066CC' }
+        });
+        
+        // Add title
+        newSlide.addText(slideTitle, { 
+          x: 0.5, 
+          y: 0.7, 
+          w: '90%', 
+          h: 0.8, 
+          fontSize: 32, 
+          color: '0066CC', 
+          bold: true 
+        });
+        
+        // Add content if available
+        if (slideContent) {
+          newSlide.addText(slideContent, { 
+            x: 0.5, 
+            y: 1.8, 
+            w: '90%', 
+            h: 1.5, 
+            fontSize: 20, 
+            color: '333333' 
+          });
+        }
+        
+        // Add bullets if available
+        if (slideBullets.length > 0) {
+          const bulletPoints = slideBullets.map(bullet => ({ text: bullet }));
+          
+          newSlide.addText(bulletPoints, { 
+            x: 0.5, 
+            y: slideContent ? 3.5 : 1.8, 
+            w: '90%', 
+            h: 3, 
+            color: '333333', 
+            bullet: { type: 'bullet' }, 
+            fontSize: 18
+          });
+        }
+        
+        // Add slide number
+        newSlide.addText(`${idx + 1}`, {
+          x: '90%',
+          y: '95%',
+          w: 0.5,
+          h: 0.3,
+          fontSize: 12,
+          color: '999999'
+        });
       });
     } else {
-      // Set title from the content
-      pres.title = pptContent.title || 'Presentation';
-      console.log(`Setting presentation title: "${pres.title}"`);
+      // Add a default slide if no slides available
+      const defaultSlide = pres.addSlide();
+      defaultSlide.background = { color: 'FFFFFF' };
       
-      // If no slides are found, create a default slide
-      if (!pptContent.slides || !Array.isArray(pptContent.slides) || pptContent.slides.length === 0) {
-        console.log("No slides found in content, creating default slide");
-        const defaultSlide = pres.addSlide({ masterName: 'MASTER_SLIDE' });
-        
-        // Add title to default slide
-        defaultSlide.addText(pptContent.title || "Presentation", {
-          x: 0.5,
-          y: 0.5,
-          w: '90%',
-          h: 1,
-          fontSize: designTheme.title.fontSize,
-          bold: designTheme.title.bold,
-          color: designTheme.title.color,
-          fontFace: designTheme.title.fontFace
-        });
-        
-        // Add explanation text
-        defaultSlide.addText("This is an automatically generated presentation.", {
-          x: 0.5,
-          y: 2,
-          w: '90%',
-          h: 1,
-          fontSize: designTheme.subtitle.fontSize,
-          color: designTheme.subtitle.color,
-          fontFace: designTheme.subtitle.fontFace
-        });
-        
-        // Add any content as text if available
-        if (typeof pptContent === 'object') {
-          const contentKeys = Object.keys(pptContent).filter(key => key !== 'title' && key !== 'slides');
-          if (contentKeys.length > 0) {
-            let contentText = "Content summary:\n";
-            contentKeys.forEach(key => {
-              if (typeof pptContent[key] === 'string') {
-                contentText += `• ${key}: ${pptContent[key].substring(0, 100)}...\n`;
-              } else if (Array.isArray(pptContent[key])) {
-                contentText += `• ${key}: ${pptContent[key].length} items\n`;
-              }
-            });
-            
-            defaultSlide.addText(contentText, {
-              x: 0.5,
-              y: 3,
-              w: '90%',
-              h: 3,
-              fontSize: designTheme.content.fontSize,
-              color: designTheme.content.color,
-              fontFace: designTheme.content.fontFace
-            });
-          }
-        }
-      } else {
-        // Process each slide
-        console.log(`Processing ${pptContent.slides.length} slides`);
-        pptContent.slides.forEach((slide, index) => {
-          console.log(`Creating slide ${index + 1}: ${slide.title || 'Untitled'}`);
-          
-          // Add a new slide with master
-          const currentSlide = pres.addSlide({ masterName: 'MASTER_SLIDE' });
-          
-          // Add visual design elements based on the slide type and theme
-          
-          // Add decorative element (varies by theme and slide position)
-          if (index === 0) {
-            // Title slide gets special treatment
-            currentSlide.addShape('RECTANGLE', { 
-              x: 0, 
-              y: 0, 
-              w: '100%', 
-              h: '100%', 
-              fill: { 
-                type: 'solid',
-                color: designTheme.background.type === 'gradient' 
-                  ? designTheme.background.color1 
-                  : designTheme.background.color
-              }
-            });
-            
-            // Add accent shapes based on design theme
-            if (designTheme === designThemes.professional) {
-              // Add blue accent bar
-              currentSlide.addShape('RECTANGLE', {
-                x: 0,
-                y: 0,
-                w: 2,
-                h: '100%',
-                fill: { color: designTheme.accent.color }
-              });
-            } else if (designTheme === designThemes.creative) {
-              // Add circular accents
-              for (let i = 0; i < 5; i++) {
-                currentSlide.addShape('OVAL', {
-                  x: 8 + (i * 0.5),
-                  y: 0.5 + (i * 0.8),
-                  w: 1,
-                  h: 1,
-                  fill: { color: designTheme.accent.color },
-                  opacity: 0.7 - (i * 0.1)
-                });
-              }
-            } else if (designTheme === designThemes.colorful) {
-              // Add gradient overlay
-              currentSlide.addShape('RECTANGLE', {
-                x: 0,
-                y: 0,
-                w: '30%',
-                h: '100%',
-                fill: { 
-                  type: 'gradient',
-                  color1: designTheme.accent.color,
-                  color2: 'FFFFFF',
-                  angle: 90
-                },
-                opacity: 0.2
-              });
-            }
-          } else {
-            // Content slides get different decorative elements
-            if (designTheme === designThemes.professional) {
-              // Add header bar
-              currentSlide.addShape('RECTANGLE', {
-                x: 0,
-                y: 0,
-                w: '100%',
-                h: 0.8,
-                fill: { color: designTheme.accent.color },
-                opacity: 0.1
-              });
-            } else if (designTheme === designThemes.creative) {
-              // Add corner accent
-              currentSlide.addShape('OVAL', {
-                x: 9,
-                y: -1,
-                w: 3,
-                h: 3,
-                fill: { color: designTheme.accent.color },
-                opacity: 0.2
-              });
-            } else if (designTheme === designThemes.minimal) {
-              // Add subtle line
-              currentSlide.addShape('LINE', {
-                x: 0.5,
-                y: 1.3,
-                w: 9,
-                h: 0,
-                line: { color: designTheme.accent.color, width: 1 }
-              });
-            }
-          }
-          
-          // Set slide title
-          if (slide.title) {
-            let titleY = 0.5;
-            if (index === 0) {
-              // Title slide gets special title positioning
-              titleY = designTheme === designThemes.professional ? 2.5 : 
-                      designTheme === designThemes.creative ? 3 : 2;
-            }
-            
-            currentSlide.addText(slide.title, { 
-              x: index === 0 && designTheme === designThemes.colorful ? 3.5 : 0.5, 
-              y: titleY, 
-              w: '90%', 
-              h: 1, 
-              fontSize: index === 0 ? designTheme.title.fontSize + 4 : designTheme.title.fontSize,
-              bold: designTheme.title.bold,
-              color: designTheme.title.color,
-              fontFace: designTheme.title.fontFace
-            });
-          }
-          
-          // Process content based on slide type
-          switch (slide.slide_type) {
-            case 'title_slide':
-              // Add subtitle if available
-              if (slide.content) {
-                currentSlide.addText(slide.content, { 
-                  x: designTheme === designThemes.colorful ? 3.5 : 0.5, 
-                  y: designTheme === designThemes.professional ? 3.5 : 
-                     designTheme === designThemes.creative ? 4 : 3,
-                  w: '90%', 
-                  h: 1, 
-                  fontSize: designTheme.subtitle.fontSize,
-                  color: designTheme.subtitle.color,
-                  fontFace: designTheme.subtitle.fontFace
-                });
-              }
-              break;
-              
-            case 'bullet_slide':
-              // Ensure bullets is an array
-              let bullets = [];
-              if (slide.bullets && Array.isArray(slide.bullets)) {
-                bullets = slide.bullets;
-              } else if (slide.bullets && typeof slide.bullets === 'string') {
-                // Try to convert string to array if it looks like JSON
-                try {
-                  const parsed = JSON.parse(slide.bullets);
-                  if (Array.isArray(parsed)) {
-                    bullets = parsed;
-                  } else {
-                    // Split by newlines or commas if not valid JSON array
-                    bullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
-                  }
-                } catch (e) {
-                  // Split by newlines or commas if not valid JSON
-                  bullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
-                }
-              }
-              
-              // Ensure we have at least one bullet point
-              if (bullets.length === 0 && slide.content) {
-                bullets = [slide.content];
-              }
-              
-              // If we have bullets, add them to the slide with styling
-              if (bullets.length > 0) {
-                // Style bullets in a visually appealing way based on the theme
-                currentSlide.addText(bullets, { 
-                  x: 0.5, 
-                  y: 1.8, 
-                  w: '90%', 
-                  h: 5, 
-                  fontSize: designTheme.bullets.fontSize,
-                  color: designTheme.bullets.color,
-                  fontFace: designTheme.bullets.fontFace,
-                  bullet: true,
-                  bulletType: designTheme === designThemes.minimal ? 'DEFAULT' : 'BULLET',
-                  bulletColor: designTheme.accent.color
-                });
-              } else if (slide.content) {
-                // If no bullets but content is available
-                currentSlide.addText(slide.content, { 
-                  x: 0.5, 
-                  y: 1.8, 
-                  w: '90%', 
-                  h: 4, 
-                  fontSize: designTheme.content.fontSize,
-                  color: designTheme.content.color,
-                  fontFace: designTheme.content.fontFace
-                });
-              } else {
-                // Add a default bullet if nothing else is available
-                currentSlide.addText(["No content available"], { 
-                  x: 0.5, 
-                  y: 1.8, 
-                  w: '90%', 
-                  h: 4, 
-                  fontSize: designTheme.bullets.fontSize,
-                  color: designTheme.bullets.color,
-                  fontFace: designTheme.bullets.fontFace,
-                  bullet: true
-                });
-              }
-              break;
-              
-            case 'content_slide':
-            case 'conclusion_slide':
-            default:
-              // Add regular content with styling
-              if (slide.content) {
-                currentSlide.addText(slide.content, { 
-                  x: 0.5, 
-                  y: 1.8, 
-                  w: '90%', 
-                  h: 4, 
-                  fontSize: designTheme.content.fontSize,
-                  color: designTheme.content.color,
-                  fontFace: designTheme.content.fontFace
-                });
-              }
-              
-              // Add bullets if available - with same validation as bullet slides
-              let contentBullets = [];
-              if (slide.bullets && Array.isArray(slide.bullets)) {
-                contentBullets = slide.bullets;
-              } else if (slide.bullets && typeof slide.bullets === 'string') {
-                // Try to convert string to array if it looks like JSON
-                try {
-                  const parsed = JSON.parse(slide.bullets);
-                  if (Array.isArray(parsed)) {
-                    contentBullets = parsed;
-                  } else {
-                    // Split by newlines or commas if not valid JSON array
-                    contentBullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
-                  }
-                } catch (e) {
-                  // Split by newlines or commas if not valid JSON
-                  contentBullets = slide.bullets.split(/[\n,]+/).map(b => b.trim()).filter(b => b);
-                }
-              }
-              
-              // If we have bullets, add them to the slide with styling
-              if (contentBullets.length > 0) {
-                // Position bullets after content or at standard position if no content
-                const bulletY = slide.content ? 3 : 1.8;
-                
-                currentSlide.addText(contentBullets, { 
-                  x: 0.5, 
-                  y: bulletY, 
-                  w: '90%', 
-                  h: 5, 
-                  fontSize: designTheme.bullets.fontSize,
-                  color: designTheme.bullets.color,
-                  fontFace: designTheme.bullets.fontFace,
-                  bullet: true,
-                  bulletType: designTheme === designThemes.minimal ? 'DEFAULT' : 'BULLET',
-                  bulletColor: designTheme.accent.color
-                });
-              }
-              
-              // For conclusion slides, add a special footer or graphic
-              if (slide.slide_type === 'conclusion_slide') {
-                currentSlide.addText('Thank You!', {
-                  x: 0.5,
-                  y: 5,
-                  w: '90%',
-                  h: 1,
-                  fontSize: 28,
-                  bold: true,
-                  color: designTheme.accent.color,
-                  fontFace: designTheme.title.fontFace,
-                  align: 'center'
-                });
-              }
-              break;
-          }
-        });
-      }
+      // Add colored top bar
+      defaultSlide.addShape('rect', {
+        x: 0, y: 0, w: '100%', h: 0.5, fill: { color: '0066CC' }
+      });
+      
+      defaultSlide.addText('No Slides Available', { 
+        x: 0.5, 
+        y: 0.7, 
+        w: '90%', 
+        h: 0.8, 
+        fontSize: 32, 
+        color: '0066CC', 
+        bold: true 
+      });
+      
+      defaultSlide.addText('This presentation doesn\'t contain any slides.', { 
+        x: 0.5, 
+        y: 1.8, 
+        w: '90%', 
+        h: 1.5, 
+        fontSize: 20, 
+        color: '333333' 
+      });
+      
+      // Add slide number
+      defaultSlide.addText('1', {
+        x: '90%',
+        y: '95%',
+        w: 0.5,
+        h: 0.3,
+        fontSize: 12,
+        color: '999999'
+      });
     }
+    
+    // Generate the PPTX file
+    const pptxBuffer = await pres.write('nodebuffer');
     
     // Generate a unique filename
     const fileName = `presentation_${uuidv4()}.pptx`;
     
-    // Write the PPT to a buffer
-    const pptBuffer = await pres.writeBuffer();
-    
     // Upload to Supabase Storage
-    const pptxUrl = await uploadFileToStorage(
-      pptBuffer,
+    const fileUrl = await uploadFileToStorage(
+      pptxBuffer,
       fileName,
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       userId
     );
     
-    console.log(`PPTX uploaded to: ${pptxUrl}`);
+    console.log(`Presentation PPTX uploaded to: ${fileUrl}`);
     
-    return pptxUrl;
+    return fileUrl;
   } catch (error) {
     console.error(`Error generating PPTX: ${error.message}`);
     throw new Error(`Failed to generate presentation: ${error.message}`);
@@ -852,105 +571,29 @@ async function generateDOCX(content, userId) {
   try {
     console.log("Generating DOCX with content:", JSON.stringify(content, null, 2).substring(0, 500) + "...");
     
-    // Read the template file
-    const fs = require('fs');
-    const path = require('path');
-    const templatePath = path.resolve(process.cwd(), 'app/api/ai/workflow-agent/templates/document_template.docx');
-    
-    // Check if template exists, if not create it
-    if (!fs.existsSync(templatePath)) {
-      console.log('Document template not found, creating a new one...');
-      await createDocxTemplate();
+    // Check if content has an error
+    if (content.error) {
+      console.error("Cannot generate DOCX from error content:", content.error);
+      return { error: content.error };
     }
     
-    // Read the template
-    const content_buffer = fs.readFileSync(templatePath, 'binary');
-    const zip = new PizZip(content_buffer);
-    
-    // Create a new instance of Docxtemplater using the updated API
-    const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true
-    });
-    
-    // Helper function to recursively stringify objects
-    function stringifyObjectValues(obj) {
-      if (obj === null || obj === undefined) return "";
-      
-      // If it's already a string, return it
-      if (typeof obj === 'string') return obj;
-      
-      // If it's a primitive, convert to string
-      if (typeof obj !== 'object') return String(obj);
-      
-      // If it's an array, stringify each item
-      if (Array.isArray(obj)) {
-        return obj.map(item => {
-          if (typeof item === 'object' && item !== null) {
-            return JSON.stringify(item, null, 2);
-          }
-          return String(item);
-        });
-      }
-      
-      // It's an object, process each property
-      const result = {};
-      for (const key in obj) {
-        if (Object.prototype.hasOwnProperty.call(obj, key)) {
-          const value = obj[key];
-          
-          if (Array.isArray(value)) {
-            // Handle arrays
-            result[key] = stringifyObjectValues(value);
-          } else if (typeof value === 'object' && value !== null) {
-            // For nested objects, stringify them
-            if (key === 'subsections') {
-              // Special handling for subsections - keep structure but stringify content
-              result[key] = value.map(subsection => {
-                const processed = {...subsection};
-                if (typeof processed.content === 'object') {
-                  processed.content = JSON.stringify(processed.content, null, 2);
-                }
-                if (Array.isArray(processed.bullets)) {
-                  processed.bullets = processed.bullets.map(bullet => 
-                    typeof bullet === 'object' ? JSON.stringify(bullet, null, 2) : String(bullet)
-                  );
-                }
-                return processed;
-              });
-            } else {
-              // For other objects, convert to JSON string
-              result[key] = JSON.stringify(value, null, 2);
-            }
-          } else {
-            // For primitives, convert to string
-            result[key] = String(value);
-          }
-        }
-      }
-      return result;
-    }
+    // Helper function to safely convert any value to string
+    const safeToString = (value) => {
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'string') return value;
+      if (typeof value === 'object') return JSON.stringify(value);
+      return String(value);
+    };
     
     // Process title
-    const title = typeof content.title === 'string' ? content.title : 
-                  (typeof content.title === 'object' ? JSON.stringify(content.title, null, 2) : "Document");
+    const title = safeToString(content.title || 'Document');
     
-    // Create a document structure if we have raw data
+    // Create document structure
     let documentSections = [];
     
-    // Check if content is not already in the expected format
     if (!content.sections && typeof content === 'object') {
       console.log("Content is not in expected format, creating a structured document from raw data");
       
-      // Convert raw data to a document format
-      documentSections = [{
-        heading: "Generated Content",
-        content: JSON.stringify(content, null, 2),
-        bullets: [],
-        subsections: []
-      }];
-      
-      // Try to create a more structured document by extracting keys from content
       if (Object.keys(content).length > 0) {
         documentSections = Object.keys(content).map(key => {
           const value = content[key];
@@ -960,7 +603,7 @@ async function generateDOCX(content, userId) {
           if (typeof value === 'string') {
             sectionContent = value;
           } else if (Array.isArray(value)) {
-            sectionBullets = value.map(item => typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item));
+            sectionBullets = value.map(item => safeToString(item));
           } else if (typeof value === 'object' && value !== null) {
             sectionContent = JSON.stringify(value, null, 2);
           } else {
@@ -974,83 +617,265 @@ async function generateDOCX(content, userId) {
             subsections: []
           };
         });
+      } else {
+        documentSections = [{
+          heading: "Generated Content",
+          content: "No content available",
+          bullets: [],
+          subsections: []
+        }];
       }
-    }
-    // Process sections if available in the expected format
-    else if (content.sections && Array.isArray(content.sections)) {
-      // Use the existing sections but process them to handle objects
+    } else if (content.sections && Array.isArray(content.sections)) {
       documentSections = content.sections.map(section => {
         return {
-          heading: section.heading || "",
-          content: typeof section.content === 'object' ? JSON.stringify(section.content, null, 2) : (section.content || ""),
-          bullets: Array.isArray(section.bullets) ? section.bullets.map(bullet => 
-            typeof bullet === 'object' ? JSON.stringify(bullet, null, 2) : String(bullet)
-          ) : [],
-          subsections: Array.isArray(section.subsections) ? section.subsections.map(subsection => ({
-            heading: subsection.heading || "",
-            content: typeof subsection.content === 'object' ? JSON.stringify(subsection.content, null, 2) : (subsection.content || ""),
-            bullets: Array.isArray(subsection.bullets) ? subsection.bullets.map(bullet => 
-              typeof bullet === 'object' ? JSON.stringify(bullet, null, 2) : String(bullet)
-            ) : []
-          })) : []
+          heading: safeToString(section.heading || ""),
+          content: safeToString(section.content || ""),
+          bullets: Array.isArray(section.bullets) 
+            ? section.bullets.map(bullet => safeToString(bullet)) 
+            : [],
+          subsections: Array.isArray(section.subsections) 
+            ? section.subsections.map(subsection => ({
+                heading: safeToString(subsection.heading || ""),
+                content: safeToString(subsection.content || ""),
+                bullets: Array.isArray(subsection.bullets) 
+                  ? subsection.bullets.map(bullet => safeToString(bullet)) 
+                  : []
+              })) 
+            : []
         };
       });
     }
     
-    // Apply our recursive stringify to ensure everything is properly formatted
-    const processedSections = stringifyObjectValues({sections: documentSections}).sections;
+    // Create a basic Word document template with proper structure
+    const zip = new JSZip();
+
+    // Add basic Word document structure files
+    // [Content_Types].xml
+    zip.file("[Content_Types].xml", 
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+      '<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>' +
+      '<Override PartName="/word/webSettings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml"/>' +
+      '<Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>' +
+      '<Override PartName="/word/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>' +
+      '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>' +
+      '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>' +
+      '</Types>'
+    );
+
+    // _rels/.rels
+    zip.file("_rels/.rels", 
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>' +
+      '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>' +
+      '</Relationships>'
+    );
+
+    // word/_rels/document.xml.rels
+    zip.file("word/_rels/document.xml.rels", 
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>' +
+      '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings" Target="webSettings.xml"/>' +
+      '<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>' +
+      '<Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>' +
+      '</Relationships>'
+    );
+
+    // docProps/app.xml
+    zip.file("docProps/app.xml", 
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">' +
+      '<Application>AI Workflow Generator</Application>' +
+      '<AppVersion>1.0.0</AppVersion>' +
+      '</Properties>'
+    );
+
+    // docProps/core.xml
+    zip.file("docProps/core.xml", 
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" ' +
+      'xmlns:dc="http://purl.org/dc/elements/1.1/" ' +
+      'xmlns:dcterms="http://purl.org/dc/terms/" ' +
+      'xmlns:dcmitype="http://purl.org/dc/dcmitype/" ' +
+      'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
+      `<dc:title>${title}</dc:title>` +
+      '<dc:creator>AI Workflow</dc:creator>' +
+      `<dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>` +
+      `<dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>` +
+      '</cp:coreProperties>'
+    );
+
+    // Add required Word files
+    // word/styles.xml
+    zip.file("word/styles.xml", 
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      '<w:docDefaults>' +
+      '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:eastAsia="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="24"/></w:rPr></w:rPrDefault>' +
+      '</w:docDefaults>' +
+      '<w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr/><w:rPr/></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="Heading 1"/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="120"/></w:pPr><w:rPr><w:color w:val="0066CC"/><w:sz w:val="36"/><w:b/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="Heading 2"/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="120"/></w:pPr><w:rPr><w:color w:val="0066CC"/><w:sz w:val="32"/><w:b/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="Heading 3"/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="120"/></w:pPr><w:rPr><w:color w:val="0066CC"/><w:sz w:val="28"/><w:b/></w:rPr></w:style>' +
+      '</w:styles>'
+    );
+
+    // word/settings.xml
+    zip.file("word/settings.xml",
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      '<w:zoom w:percent="100"/>' +
+      '</w:settings>'
+    );
+
+    // word/webSettings.xml
+    zip.file("word/webSettings.xml",
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      '</w:webSettings>'
+    );
+
+    // word/fontTable.xml
+    zip.file("word/fontTable.xml",
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      '<w:font w:name="Calibri"><w:panose1 w:val="020F0502020204030204"/><w:charset w:val="00"/><w:family w:val="swiss"/><w:pitch w:val="variable"/><w:sig w:usb0="E0002AFF" w:usb1="C000247B" w:usb2="00000009" w:usb3="00000000" w:csb0="000001FF" w:csb1="00000000"/></w:font>' +
+      '</w:fonts>'
+    );
+
+    // word/theme/theme1.xml
+    zip.file("word/theme/theme1.xml",
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme">' +
+      '<a:themeElements><a:clrScheme name="Office"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F497D"/></a:dk2><a:lt2><a:srgbClr val="EEECE1"/></a:lt2><a:accent1><a:srgbClr val="4F81BD"/></a:accent1><a:accent2><a:srgbClr val="C0504D"/></a:accent2><a:accent3><a:srgbClr val="9BBB59"/></a:accent3><a:accent4><a:srgbClr val="8064A2"/></a:accent4><a:accent5><a:srgbClr val="4BACC6"/></a:accent5><a:accent6><a:srgbClr val="F79646"/></a:accent6><a:hlink><a:srgbClr val="0000FF"/></a:hlink><a:folHlink><a:srgbClr val="800080"/></a:folHlink></a:clrScheme><a:fontScheme name="Office"><a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:gradFill><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"/></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"/></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"/></a:gs></a:gsLst></a:gradFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>'
+    );
+
+    // Create document.xml with our content
+    let documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<w:body>';
+
+    // Add title
+    documentXml += 
+      '<w:p>' +
+      '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>' +
+      '<w:r><w:t>' + title + '</w:t></w:r>' +
+      '</w:p>';
     
-    // Prepare the template data
-    const templateData = {
-      title: title,
-      sections: processedSections,
-      current_date: new Date().toLocaleDateString(),
-      has_sections: processedSections.length > 0
-    };
+    // Add date
+    documentXml += 
+      '<w:p>' +
+      '<w:r><w:rPr><w:color w:val="666666"/><w:sz w:val="20"/></w:rPr><w:t>Date: ' + new Date().toLocaleDateString() + '</w:t></w:r>' +
+      '</w:p>';
     
-    // Log the template data for debugging
-    console.log("Template data structure:", JSON.stringify({
-      titleType: typeof title,
-      sectionsCount: processedSections.length,
-      sampleSection: processedSections.length > 0 ? {
-        heading: processedSections[0].heading,
-        contentType: typeof processedSections[0].content,
-        contentPreview: typeof processedSections[0].content === 'string' ? 
-                         processedSections[0].content.substring(0, 50) : 'Not a string',
-        bulletsCount: processedSections[0].bullets ? processedSections[0].bullets.length : 0,
-        subsectionsCount: processedSections[0].subsections ? processedSections[0].subsections.length : 0
-      } : 'No sections'
-    }, null, 2));
+    // Add separator
+    documentXml += '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="DDDDDD"/></w:pBdr></w:pPr><w:r><w:t></w:t></w:r></w:p>';
     
-    // Set the template variables
-    doc.setData(templateData);
-    
-    // Render the document
-    try {
-      doc.render();
-    } catch (error) {
-      console.error('Error rendering document:', error);
-      throw new Error(`Error rendering document: ${error.message}`);
-    }
-    
-    // Get the rendered content
-    const buffer = doc.getZip().generate({
-      type: 'nodebuffer',
-      compression: 'DEFLATE'
+    // Add all sections
+    documentSections.forEach(section => {
+      // Add section heading
+      documentXml +=
+        '<w:p>' +
+        '<w:pPr><w:pStyle w:val="Heading2"/></w:pPr>' +
+        '<w:r><w:t>' + section.heading + '</w:t></w:r>' +
+        '</w:p>';
+      
+      // Add section content
+      if (section.content) {
+        documentXml +=
+          '<w:p>' +
+          '<w:r><w:t>' + section.content + '</w:t></w:r>' +
+          '</w:p>';
+      }
+      
+      // Add section bullets
+      if (section.bullets && section.bullets.length > 0) {
+        section.bullets.forEach(bullet => {
+          documentXml +=
+            '<w:p>' +
+            '<w:pPr>' +
+            '<w:pStyle w:val="ListParagraph"/>' +
+            '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>' +
+            '<w:ind w:left="720" w:hanging="360"/>' +
+            '</w:pPr>' +
+            '<w:r><w:t>' + bullet + '</w:t></w:r>' +
+            '</w:p>';
+        });
+      }
+      
+      // Add subsections
+      if (section.subsections && section.subsections.length > 0) {
+        section.subsections.forEach(subsection => {
+          // Add subsection heading
+          documentXml +=
+            '<w:p>' +
+            '<w:pPr><w:pStyle w:val="Heading3"/></w:pPr>' +
+            '<w:r><w:t>' + subsection.heading + '</w:t></w:r>' +
+            '</w:p>';
+          
+          // Add subsection content
+          if (subsection.content) {
+            documentXml +=
+              '<w:p>' +
+              '<w:r><w:t>' + subsection.content + '</w:t></w:r>' +
+              '</w:p>';
+          }
+          
+          // Add subsection bullets
+          if (subsection.bullets && subsection.bullets.length > 0) {
+            subsection.bullets.forEach(bullet => {
+              documentXml +=
+                '<w:p>' +
+                '<w:pPr>' +
+                '<w:pStyle w:val="ListParagraph"/>' +
+                '<w:numPr><w:ilvl w:val="1"/><w:numId w:val="1"/></w:numPr>' +
+                '<w:ind w:left="1440" w:hanging="360"/>' +
+                '</w:pPr>' +
+                '<w:r><w:t>' + bullet + '</w:t></w:r>' +
+                '</w:p>';
+            });
+          }
+        });
+      }
+      
+      // Add separator after each section
+      documentXml += '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="DDDDDD"/></w:pBdr></w:pPr><w:r><w:t></w:t></w:r></w:p>';
     });
     
-    // Generate unique filename
-    const filename = `document_${uuidv4()}.docx`;
+    // Add a section break at the end
+    documentXml += '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>';
+    
+    // Close document
+    documentXml += '</w:body></w:document>';
+    
+    // Add document to zip
+    zip.file("word/document.xml", documentXml);
+    
+    // Generate the DOCX file
+    const docxBuffer = await zip.generateAsync({ type: "nodebuffer" });
+    
+    // Generate a unique filename
+    const fileName = `document_${uuidv4()}.docx`;
     
     // Upload to Supabase Storage
     const fileUrl = await uploadFileToStorage(
-      buffer, 
-      filename, 
+      docxBuffer,
+      fileName,
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       userId
     );
     
     console.log('Document generated successfully:', fileUrl);
+    
+    // Return the URL directly instead of an object
     return fileUrl;
   } catch (error) {
     console.error('Error generating DOCX:', error);
@@ -1427,13 +1252,146 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
         let docContent = results['document'] || { error: "No valid document content generated" };
         
         const docUrl = await generateDOCX(docContent, userId);
+        // Store the URL directly for consistency
         documentUrls['document'] = docUrl;
+        
+        // Add doc alias for backwards compatibility
+        documentUrls['docxUrl'] = docUrl;
+        
+        // 添加文档信息到结果中
+        documentUrls['documentInfo'] = {
+          type: 'Professional Document',
+          features: [
+            'Clean document formatting with consistent styling',
+            'Hierarchical heading structure with navigation-friendly layout',
+            'Professional typography with blue headings and proper spacing',
+            'Properly formatted bullet points for better readability',
+            'Custom sections and subsections with structured content'
+          ]
+        };
+        
         console.log('文档生成成功:', docUrl);
       } catch (error) {
         console.error('生成文档时出错:', error);
         documentUrls['document_error'] = error.message;
       }
     }
+    
+    // 创建一个映射，跟踪哪些文档节点连接到哪些电子邮件和聊天节点
+    const docToNodeConnections = {};
+    
+    // 通过connectionMap分析节点连接关系
+    for (const sourceId in connectionMap) {
+      const targetNodes = connectionMap[sourceId] || [];
+      
+      // 检查源节点是否为PPT或文档节点
+      const sourceSettings = outputSettings[sourceId] || {};
+      
+      console.log(`分析节点连接: 源节点 ${sourceId} (类型: ${sourceSettings.type || 'unknown'}) -> 目标节点: [${targetNodes.join(', ')}]`);
+      
+      // 更智能的节点类型检测：
+      // 1. 通过outputSettings中的明确类型
+      // 2. 通过节点ID中的关键词猜测
+      // 3. 如果节点ID是node_1等标准名称，且在输出格式中有document或ppt，则认为是对应类型
+      let isDocumentNode = false;
+      
+      if (sourceSettings.type === 'ppt' || sourceSettings.type === 'document') {
+        // 通过明确设置的类型识别
+        isDocumentNode = true;
+      } else if (sourceId.includes('doc') || sourceId.includes('document') || sourceId.includes('ppt') || sourceId.includes('presentation')) {
+        // 通过ID中的关键词猜测
+        isDocumentNode = true;
+        console.log(`根据ID猜测 ${sourceId} 为文档节点`);
+      } else if (/node_\d+/.test(sourceId)) {
+        // 如果是node_1这样的标准节点名，检查是否处理了document或ppt格式
+        if (outputFormats.includes('document') || outputFormats.includes('ppt')) {
+          console.log(`将 ${sourceId} 视为潜在的文档节点，因为工作流包含文档/PPT输出格式`);
+          
+          // 如果有node_1指向node_2，且我们处理了文档格式，则假设node_1是文档节点
+          const firstNodePattern = /node_1/i;
+          if (firstNodePattern.test(sourceId)) {
+            isDocumentNode = true;
+            console.log(`将节点 ${sourceId} 标记为文档节点，因为它是流程中的第一个节点且工作流生成了文档`);
+          }
+        }
+      }
+      
+      if (isDocumentNode) {
+        // 用检测到的类型更新源节点的类型，如果之前没有设置
+        if (!sourceSettings.type) {
+          // 判断更可能是哪种文档类型
+          const detectedType = outputFormats.includes('ppt') ? 'ppt' : 'document';
+          console.log(`将节点 ${sourceId} 的类型设置为 ${detectedType}`);
+          
+          // 更新outputSettings以便后续处理使用
+          if (!outputSettings[sourceId]) {
+            outputSettings[sourceId] = {};
+          }
+          outputSettings[sourceId].type = detectedType;
+        }
+        
+        // 收集可能的目标节点 - 过滤出邮件和聊天节点
+        const potentialTargets = targetNodes.filter(targetId => {
+          const targetSettings = outputSettings[targetId] || {};
+          
+          // 检查明确的类型设置
+          if (targetSettings.type === 'email' || targetSettings.type === 'chat') {
+            return true;
+          }
+          
+          // 通过ID中的关键词猜测
+          if (targetId.includes('email') || targetId.includes('mail') || 
+              targetId.includes('chat') || targetId.includes('message')) {
+            
+            // 更新目标节点的类型，如果之前没有设置
+            if (!targetSettings.type) {
+              const guessedType = targetId.includes('email') || targetId.includes('mail') ? 'email' : 'chat';
+              console.log(`根据ID猜测 ${targetId} 为 ${guessedType} 节点`);
+              
+              if (!outputSettings[targetId]) {
+                outputSettings[targetId] = {};
+              }
+              outputSettings[targetId].type = guessedType;
+            }
+            return true;
+          }
+          
+          // 如果node_1指向node_2，且node_2没有确定类型，但我们有email或chat格式
+          if (/node_\d+/.test(targetId)) {
+            if (outputFormats.includes('email') || outputFormats.includes('chat')) {
+              console.log(`将 ${targetId} 视为潜在的邮件/聊天节点`);
+              
+              // 根据位置和输出格式猜测类型
+              if (!targetSettings.type) {
+                const guessedType = outputFormats.includes('email') ? 'email' : 'chat';
+                
+                if (!outputSettings[targetId]) {
+                  outputSettings[targetId] = {};
+                }
+                outputSettings[targetId].type = guessedType;
+                console.log(`将节点 ${targetId} 的类型设置为 ${guessedType}`);
+              }
+              return true;
+            }
+          }
+          
+          return false;
+        });
+        
+        // 保存连接关系
+        if (potentialTargets.length > 0) {
+          docToNodeConnections[sourceId] = potentialTargets;
+          console.log(`文档节点 ${sourceId} 连接到以下节点: [${potentialTargets.join(', ')}]`);
+        }
+      }
+    }
+    
+    // 输出在文档生成之后所检测到的所有连接关系
+    console.log('检测到的文档节点连接关系:', JSON.stringify(docToNodeConnections));
+    console.log('节点类型设置:', JSON.stringify(Object.entries(outputSettings).map(([id, settings]) => ({
+      id,
+      type: settings.type
+    }))));
     
     // 处理任务创建
     if (outputFormats.includes('task')) {
@@ -1526,6 +1484,36 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
                 contentStr = String(contentToSend);
               }
               
+              // 检查是否有连接到此聊天节点的文档节点
+              const connectedDocuments = [];
+              
+              // 查找连接到此聊天节点的所有文档节点
+              for (const docNodeId in docToNodeConnections) {
+                if (docToNodeConnections[docNodeId].includes(nodeId)) {
+                  const docNodeType = outputSettings[docNodeId].type;
+                  let docUrl = '';
+                  
+                  // 获取文档URL
+                  if (docNodeType === 'ppt' && documentUrls['ppt']) {
+                    docUrl = documentUrls['ppt'];
+                    connectedDocuments.push({ type: 'presentation', url: docUrl });
+                  } else if (docNodeType === 'document' && documentUrls['document']) {
+                    docUrl = documentUrls['document'];
+                    connectedDocuments.push({ type: 'document', url: docUrl });
+                  }
+                }
+              }
+              
+              // 将文档URL添加到消息内容中
+              if (connectedDocuments.length > 0) {
+                let docLinksStr = '\n\nAttachment:\n';
+                connectedDocuments.forEach((doc, index) => {
+                  docLinksStr += `${index + 1}. ${doc.type === 'presentation' ? 'PowerPoint' : 'Word'}: ${doc.url}\n`;
+                });
+                contentStr += docLinksStr;
+                console.log(`已将 ${connectedDocuments.length} 个文档链接添加到聊天消息中`);
+              }
+              
               // 替换模板中的内容占位符
               const finalMessage = messageTemplate.replace('{{content}}', contentStr);
               
@@ -1570,6 +1558,42 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
             if (nodeSettings.recipients) {
               // 使用AI生成的内容
               let content = results['email'] || results['json'] || results['text'] || results['document'] || results['chat'] || { content: 'No content was generated.' };
+              
+              // 检查是否有连接到此邮件节点的文档节点
+              const connectedDocuments = [];
+              
+              // 查找连接到此邮件节点的所有文档节点
+              for (const docNodeId in docToNodeConnections) {
+                if (docToNodeConnections[docNodeId].includes(nodeId)) {
+                  const docNodeType = outputSettings[docNodeId].type;
+                  let docUrl = '';
+                  
+                  // 获取文档URL
+                  if (docNodeType === 'ppt' && documentUrls['ppt']) {
+                    docUrl = documentUrls['ppt'];
+                    connectedDocuments.push({ type: 'presentation', url: docUrl });
+                  } else if (docNodeType === 'document' && documentUrls['document']) {
+                    docUrl = documentUrls['document'];
+                    connectedDocuments.push({ type: 'document', url: docUrl });
+                  }
+                }
+              }
+              
+              // 如果连接了文档，将文档URL添加到内容中
+              if (connectedDocuments.length > 0 && typeof content === 'object') {
+                if (!content.attachedFiles) {
+                  content.attachedFiles = [];
+                }
+                
+                connectedDocuments.forEach(doc => {
+                  content.attachedFiles.push({
+                    type: doc.type,
+                    url: doc.url
+                  });
+                });
+                
+                console.log(`已将 ${connectedDocuments.length} 个文档添加到邮件内容中`);
+              }
               
               // 发送邮件
               console.log(`Sending email to recipients: ${nodeSettings.recipients}`);
@@ -1866,8 +1890,36 @@ Based on the above API data, please ${userPrompt}`;
     
     console.log(`向模型 ${model} 发送请求，格式: ${format}`);
     
-    // 使用特定格式的提示执行AI请求
-    const completion = await openai.chat.completions.create(requestConfig);
+    // 实现指数退避重试逻辑
+    const maxRetries = 3;
+    let lastError = null;
+    let completion = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // 使用特定格式的提示执行AI请求
+        completion = await openai.chat.completions.create(requestConfig);
+        // 如果成功则退出循环
+        break;
+      } catch (error) {
+        lastError = error;
+        // 检查是否为速率限制错误
+        if (error.status === 429) {
+          const retryDelay = Math.pow(2, attempt) * 1000 + Math.random() * 1000; // 指数退避 + 随机抖动
+          console.log(`遇到速率限制，等待 ${retryDelay}ms 后重试 (尝试 ${attempt + 1}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          // 继续下一次重试
+        } else {
+          // 对于其他错误，立即抛出
+          throw error;
+        }
+      }
+    }
+    
+    // 如果经过所有重试后仍然失败
+    if (!completion && lastError) {
+      throw lastError;
+    }
     
     // Add diagnostic logging
     console.log(`从模型 ${model} 收到响应:`, JSON.stringify(completion).substring(0, 300) + '...');
@@ -2056,20 +2108,38 @@ async function sendEmail(emailSettings, content, userId) {
     
     // Convert content to string if it's an object
     let contentStr = '';
+    let attachedFiles = [];
+    
     if (typeof content === 'object') {
       try {
+        // Check if there are attached files
+        if (content.attachedFiles && Array.isArray(content.attachedFiles) && content.attachedFiles.length > 0) {
+          attachedFiles = content.attachedFiles;
+          console.log(`Found ${attachedFiles.length} attached files in content`);
+        }
+        
         // Try to extract a 'content' field if it exists
         if (content.content) {
           contentStr = content.content;
         } else {
-          // Otherwise stringify the whole object
-          contentStr = JSON.stringify(content, null, 2);
+          // Otherwise stringify the whole object without the attachedFiles field
+          const contentCopy = { ...content };
+          delete contentCopy.attachedFiles;
+          contentStr = JSON.stringify(contentCopy, null, 2);
         }
       } catch (error) {
         contentStr = String(content);
       }
     } else {
       contentStr = String(content);
+    }
+    
+    // Add file links to the content if there are any attached files
+    if (attachedFiles.length > 0) {
+      contentStr += '\n\nAttachments:\n';
+      attachedFiles.forEach((file, index) => {
+        contentStr += `${index + 1}. ${file.type === 'presentation' ? 'PowerPoint 演示文稿' : 'Word 文档'}: ${file.url}\n`;
+      });
     }
     
     // Replace placeholder with actual content
@@ -2145,7 +2215,8 @@ async function sendEmail(emailSettings, content, userId) {
       sentCount: recipientsList.length,
       recipients: recipientsList.join(', '),
       subject: emailSettings.subject,
-      usedCustomSmtp: emailSettings.useCustomSmtp
+      usedCustomSmtp: emailSettings.useCustomSmtp,
+      includedFiles: attachedFiles.length
     };
   } catch (error) {
     console.error('Error sending email:', error);

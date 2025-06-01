@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from "@/lib/utils";
 import { FolderKanban, CheckSquare, Search, Loader, Calendar, MessageSquare, Plus } from 'lucide-react';
@@ -23,10 +23,14 @@ export function MainNav() {
   const pathname = usePathname();
   const t = useTranslations();
   const locale = useLocale();
+  const router = useRouter();
   const dispatch = useDispatch();
   const { projects, status } = useSelector((state) => state.projects);
   const { user , error } = useGetUser();
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
+
+  // 过滤未归档的项目
+  const activeProjects = projects.filter(project => project && !project.archived);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -126,6 +130,18 @@ export function MainNav() {
       : "bg-black text-white hover:bg-black/90";
   };
 
+  // 处理项目导航点击
+  const handleProjectClick = (e, projectId) => {
+    // 检查项目是否存在于Redux存储中
+    const projectExists = projects.some(p => String(p.id) === String(projectId));
+    
+    if (!projectExists) {
+      e.preventDefault();
+      // 立即重定向到项目列表页面
+      router.replace(`/${locale}/projects`);
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full">
@@ -156,7 +172,7 @@ export function MainNav() {
         </nav>
         <div className="mt-4 px-2">
           <div className="space-y-1">
-            {status === 'loading' ?(
+            {status === 'loading' ? (
               <div className="flex items-center justify-center p-2">
                 <Loader className="w-5 h-5 animate-spin text-muted-foreground" />
               </div>
@@ -164,7 +180,7 @@ export function MainNav() {
               <div className="text-sm text-red-500 px-2">error...</div>
             ): (
               <>
-                {projects.filter(project => project.id && project.project_name)
+                {activeProjects.filter(project => project.id && project.project_name)
                   .slice(0, 3)
                   .map((project) => (
                   <Tooltip key={`project-${project.id}`}>
@@ -177,6 +193,7 @@ export function MainNav() {
                             ? "bg-accent text-accent-foreground"
                             : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
                         )}
+                        onClick={(e) => handleProjectClick(e, project.id)}
                       >
                         <div 
                           className={cn(

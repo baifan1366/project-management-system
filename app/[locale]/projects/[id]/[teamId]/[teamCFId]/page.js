@@ -53,6 +53,7 @@ const selectTeamUsers = createSelector(
 
 const TeamCustomFieldPage = () => {
   const t = useTranslations('CreateTask');
+  const tProjects = useTranslations('Projects');
   const dispatch = useDispatch();
   const params = useParams();
   const tConfirm = useTranslations('confirmation');
@@ -64,6 +65,10 @@ const TeamCustomFieldPage = () => {
   // 使用记忆化的选择器
   const teamsError = useSelector(selectTeamError);
   const selectedTeam = useSelector(state => selectTeamById(state, teamId));
+  // 从Redux获取项目数据
+  const project = useSelector(state => 
+    state.projects.projects ? state.projects.projects.find(p => p && String(p.id) === String(projectId)) : null
+  );
   const { user } = useGetUser();
   const { confirm } = useConfirm();
   const { currentItem, status: cfStatus, error: cfError } = useSelector((state) => state.teamCF);
@@ -77,11 +82,14 @@ const TeamCustomFieldPage = () => {
   const [addButtonText, setAddButtonText] = useState('addTask');  
   const [onClose, setOnClose] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showVisibilityDialog, setShowVisibilityDialog] = useState(false);
   // 将 star 状态直接从 selectedTeam 中获取，无需额外的 useEffect
   const isStarred = selectedTeam?.star || false;
   
   // 添加一个新状态用于控制团队不存在的警告对话框
   const [showTeamNotFound, setShowTeamNotFound] = useState(false);
+  // 添加状态用于控制项目已归档的警告对话框
+  const [showArchivedDialog, setShowArchivedDialog] = useState(false);
   
   // 添加新状态，防止重复加载
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -176,6 +184,15 @@ const TeamCustomFieldPage = () => {
       try {
         setIsLoading(true);
         
+        // 检查项目是否已归档
+        if (project && project.archived) {
+          if (isMounted) {
+            setShowArchivedDialog(true);
+            setIsLoading(false);
+          }
+          return;
+        }
+
         // 先加载团队数据
         const teamResult = await dispatch(fetchTeamById(teamId)).unwrap();
 
@@ -189,6 +206,22 @@ const TeamCustomFieldPage = () => {
           await dispatch(fetchProjectTeams(projectId)).unwrap();
         }
 
+        // 检查项目是否已归档（API获取的数据）
+        try {
+          const projectResponse = await fetch(`/api/projects?projectId=${projectId}`);
+          const projectData = await projectResponse.json();
+
+          if (projectData.length > 0 && projectData[0].archived) {
+            if (isMounted) {
+              setShowArchivedDialog(true);
+              setIsLoading(false);
+            }
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking project status:', error);
+        }
+        
         // 标记数据已加载
         if (isMounted) {
           setDataLoaded(true);
@@ -207,7 +240,7 @@ const TeamCustomFieldPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [dispatch, projectId, teamId, teamCFId, dataLoaded]);
+  }, [dispatch, projectId, teamId, teamCFId, dataLoaded, project]);
 
   // 单独的useEffect加载团队成员数据
   useEffect(() => {
@@ -295,7 +328,7 @@ const TeamCustomFieldPage = () => {
 
   const handleCloseTeamNotFound = () => {
     setShowTeamNotFound(false);
-    router.replace(`/projects/${projectId}`);
+    router.replace(`/${params.locale}/projects/${projectId}`);
   };
 
   // 使用 useMemo 缓存自定义字段内容渲染结果
@@ -368,14 +401,49 @@ const TeamCustomFieldPage = () => {
     );
   }
 
-  // 移除原有的团队不存在检测，现在使用弹窗代替
-  // if (!selectedTeam && !isLoading) {
-  //   return (
-  //     <div className="flex items-center justify-center h-screen">
-  //       <div className="text-lg">Team not found</div>
-  //     </div>
-  //   );
-  // }
+  // 处理归档项目对话框关闭
+  const handleArchivedDialogClose = () => {
+    setShowArchivedDialog(false);
+    router.replace(`/${params.locale}/projects`);
+  };
+
+  // 如果团队不存在，显示警告对话框
+  if (showTeamNotFound) {
+    return (
+      <AlertDialog open={showTeamNotFound} onOpenChange={setShowTeamNotFound}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tConfirm.warning}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {tConfirm.teamNotFound}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleCloseTeamNotFound}>{tConfirm.close}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
+  
+  // 如果项目已归档，显示归档警告对话框
+  if (showArchivedDialog) {
+    return (
+      <AlertDialog open={showArchivedDialog} onOpenChange={setShowArchivedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tProjects('projectArchived')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {tProjects('projectArchivedDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleArchivedDialogClose}>{tProjects('close')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
 
   const handleStarClick = async () => {
     const newStarStatus = !selectedTeam.star;
@@ -436,25 +504,6 @@ const TeamCustomFieldPage = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      {/* 添加团队不存在警告对话框 */}
-      <AlertDialog open={showTeamNotFound} onOpenChange={setShowTeamNotFound}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('teamNotFound')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('noAccessToTeam')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={handleCloseTeamNotFound}>
-              {t('close')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
       <div className="max-w-full border-0 bg-background text-foreground flex flex-col flex-grow">
         <div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 gap-2">
@@ -609,7 +658,18 @@ const TeamCustomFieldPage = () => {
             </div>
             <div className="flex items-center self-end sm:self-auto gap-2 mt-1 sm:mt-0">
               {isCurrentUserOwner() && (
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(true)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    if (project?.visibility === 'public') {
+                      setOpen(true);
+                    } else {
+                      setShowVisibilityDialog(true);
+                    }
+                  }}
+                >
                   <Share2 className="h-4 w-4" />
                 </Button>
               )}
@@ -632,14 +692,14 @@ const TeamCustomFieldPage = () => {
           </div>
         </div>
         <div className="w-full p-0">
-          { currentItem?.custom_field?.type !== 'AGILE' && (
+          { currentItem?.custom_field?.type !== 'AGILE' &&
+          currentItem?.custom_field?.type !== 'OVERVIEW' && (
             <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex">
                 {/* if currentItem?.custom_field?.type !== 'FILES' and POSTS */}
                 {currentItem?.custom_field?.type !== 'FILES' && 
-                 currentItem?.custom_field?.type !== 'POSTS' && 
-                 currentItem?.custom_field?.type !== 'OVERVIEW' && (
+                 currentItem?.custom_field?.type !== 'POSTS' && (
                   <>
                     <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
                       <Plus className="h-4 w-4 mr-1" />
@@ -687,6 +747,7 @@ const TeamCustomFieldPage = () => {
                 <span className="hidden md:inline">{t('group')}</span>
               </Button>
             </div>
+            
           </div>
           )}
           
@@ -703,6 +764,21 @@ const TeamCustomFieldPage = () => {
         onSuccess={handleEditSuccess}
         projectId={projectId}
       />
+      <AlertDialog open={showVisibilityDialog} onOpenChange={setShowVisibilityDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tProjects('projectNotPublic')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {tProjects('projectNotPublicDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowVisibilityDialog(false)}>
+              {tProjects('ok')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

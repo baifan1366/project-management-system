@@ -307,6 +307,13 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
     return currentUserTeamMember?.role === 'OWNER';
   };
 
+  // 添加函数检查当前用户是否为团队创建者
+  const isCurrentUserCreator = () => {
+    const team = useSelector(state => state.teams.teams.find(t => String(t.id) === String(teamId)));
+    if (!team || !user?.id) return false;
+    return String(team.created_by) === String(user.id);
+  };
+
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full shadow-sm rounded-md bg-background">
       <DragDropContext onDragEnd={onDragEnd}>
@@ -360,8 +367,8 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
                           ) : (
                             <>
                               <div className="flex items-center px-3 py-2 text-sm cursor-not-allowed">
-                                <Icons.Pen className="mr-2 h-4 w-4 text-gray-800" />
-                                <span className="text-gray-800">{t('edit')}</span>
+                                <Icons.Pen className="mr-2 h-4 w-4 text-foreground" />
+                                <span className="text-foreground">{t('edit')}</span>
                               </div>
                               <div className="flex items-center px-3 py-2 text-sm cursor-not-allowed">
                                 <Icons.Trash className="mr-2 h-4 w-4 text-red-500" />
@@ -376,14 +383,16 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
                 );
               })}
               {provided.placeholder}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="ml-1 flex-shrink-0 hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                onClick={() => setIsDialogOpen(true)}
-              >
-                <Icons.Plus className="h-4 w-4" />
-              </Button>
+              {isCurrentUserCreator() && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="ml-1 flex-shrink-0 hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                  onClick={() => setIsDialogOpen(true)}
+                >
+                  <Icons.Plus className="h-4 w-4" />
+                </Button>
+              )}
               <CustomField 
                 key="custom-field-dialog"
                 isDialogOpen={isDialogOpen} 

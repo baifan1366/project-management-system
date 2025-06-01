@@ -43,7 +43,9 @@ function ChatLayout({ children }) {
     setChatMode,
     loading: chatLoading,
     fetchChatSessions,
-    fetchMessages
+    fetchMessages,
+    setMessages,
+    deleteChatSession
   } = useChat();
   
   // Notification mute state
@@ -51,6 +53,9 @@ function ChatLayout({ children }) {
   
   // Add state for hidden sessions
   const [hiddenSessions, setHiddenSessions] = useState({});
+  
+  // Add state to control showing all hidden sessions
+  const [showAllHidden, setShowAllHidden] = useState(false);
   
   // Calculate total unread count excluding muted sessions
   const totalUnreadCount = useMemo(() => {
@@ -121,6 +126,8 @@ function ChatLayout({ children }) {
         console.error('搜索消息错误:', messageError);
       }
       
+      const filteredMessageResults = messageResults || [];
+      
       // 获取会话信息
       const { data: sessionData, error: sessionDataError } = await supabase
         .from('chat_session')
@@ -164,7 +171,7 @@ function ChatLayout({ children }) {
         }
         
         // 获取该会话中匹配的消息
-        const matchedMessages = messageResults?.filter(msg => msg.session_id === session.id) || [];
+        const matchedMessages = filteredMessageResults?.filter(msg => msg.session_id === session.id) || [];
         
         return {
           ...session,
@@ -296,40 +303,28 @@ function ChatLayout({ children }) {
     e.stopPropagation();
     
     confirm({
-      title: t('hideChat'),
+      title: t('deleteChat'),
       description: t('deleteChatConfirm'),
       variant: 'destructive',
       confirmText: t('delete'),
       cancelText: t('cancel'),
       onConfirm: async () => {
         try {
-          // Update hidden sessions in state
-          setHiddenSessions(prev => ({
-            ...prev,
-            [sessionId]: true
-          }));
+          // Call the deleteChatSession function from the ChatContext
+          const result = await deleteChatSession(sessionId);
           
-          // Update localStorage
-          try {
-            const savedHidden = JSON.parse(localStorage.getItem('hidden_sessions') || '{}');
-            savedHidden[sessionId] = true;
-            localStorage.setItem('hidden_sessions', JSON.stringify(savedHidden));
-          } catch (error) {
-            console.error('Error saving hidden sessions to localStorage:', error);
+          if (result.success) {
+            // If this was the current session, it's already handled in deleteChatSession
+            toast.success(t('chatDeleted'));
+            
+            // Refresh sessions
+            fetchChatSessions();
+          } else {
+            // Updated error message
+            toast.error(result.error === '无权操作' ? t('errors.deleteNotAllowed') : t('errors.deleteFailed'));
           }
-          
-          // If this was the current session, clear it
-          if (currentSession?.id === sessionId) {
-            setCurrentSession(null);
-          }
-          
-          // Update the sessions list in UI
-          toast.success(t('chatDeleted'));
-          
-          // Refresh sessions
-          fetchChatSessions();
         } catch (error) {
-          console.error('Error hiding chat session:', error);
+          console.error('Error deleting chat session:', error);
           toast.error(t('errors.deleteFailed'));
         }
       }
@@ -392,46 +387,57 @@ function ChatLayout({ children }) {
       );
   }, [sessions, hiddenSessions]);
 
-  // Add this function to handle clearing chat history
-  const handleClearChatHistory = async (sessionId) => {
-    try {
-      confirm({
-        title: t('clearChatHistory'),
-        description: t('clearChatHistoryConfirm'),
-        variant: 'warning',
-        confirmText: t('clear'),
-        cancelText: t('cancel'),
-        onConfirm: async () => {
+  // Get all hidden sessions for the "Show All Hidden" section
+  const allHiddenSessions = useMemo(() => {
+    return sessions
+      .filter(session => hiddenSessions[session.id])
+      .sort((a, b) => 
+        new Date(b.lastMessage?.created_at || 0) - new Date(a.lastMessage?.created_at || 0)
+      );
+  }, [sessions, hiddenSessions]);
+
+  // Function to hide chat session
+  const handleHideSession = async (e, sessionId) => {
+    e.stopPropagation();
+    
+    confirm({
+      title: t('hideChat'),
+      description: t('hideChatConfirm'),
+      confirmText: t('hide'),
+      cancelText: t('cancel'),
+      onConfirm: async () => {
+        try {
+          // Update hidden sessions in state
+          setHiddenSessions(prev => ({
+            ...prev,
+            [sessionId]: true
+          }));
+          
+          // Update localStorage
           try {
-            // Store cleared chat history in localStorage
-            const currentCleared = JSON.parse(localStorage.getItem('cleared_chat_history') || '{}');
-            
-            // Update cleared history with timestamp
-            const updatedCleared = {
-              ...currentCleared,
-              [sessionId]: new Date().toISOString()
-            };
-            
-            // Save to localStorage
-            localStorage.setItem('cleared_chat_history', JSON.stringify(updatedCleared));
-            
-            toast.success(t('chatHistoryCleared'));
-            
-            // If this is the current session, refresh messages
-            if (currentSession?.id === sessionId) {
-              // Refresh messages to apply the cleared history filter
-              fetchMessages(sessionId);
-            }
+            const savedHidden = JSON.parse(localStorage.getItem('hidden_sessions') || '{}');
+            savedHidden[sessionId] = true;
+            localStorage.setItem('hidden_sessions', JSON.stringify(savedHidden));
           } catch (error) {
-            console.error('Error clearing chat history:', error);
-            toast.error(t('errors.clearHistoryFailed'));
+            console.error('Error saving hidden sessions to localStorage:', error);
           }
+          
+          // If this was the current session, clear it
+          if (currentSession?.id === sessionId) {
+            setCurrentSession(null);
+          }
+          
+          // Update the sessions list in UI
+          toast.success(t('chatHidden'));
+          
+          // Refresh sessions
+          fetchChatSessions();
+        } catch (error) {
+          console.error('Error hiding chat session:', error);
+          toast.error(t('errors.hideFailed'));
         }
-      });
-    } catch (error) {
-      console.error('Error in clear chat history:', error);
-      toast.error(t('errors.clearHistoryFailed'));
-    }
+      }
+    });
   };
 
   return (
@@ -523,7 +529,7 @@ function ChatLayout({ children }) {
                   
                 return (
                   <div
-                    key={`hidden-${session.id}`}
+                    key={`${session.id}-${new Date(session.created_at || 0).getTime()}`}
                     className="flex items-center gap-3 p-3 hover:bg-accent/50 transition-colors relative group border-l-4 border-blue-500 mx-2 my-1 rounded-md bg-accent/20"
                   >
                     <div className="relative flex-shrink-0">
@@ -569,12 +575,88 @@ function ChatLayout({ children }) {
                         </button>
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {session.lastMessage?.content}
+                        {session.lastMessage?.content || t('noRecentMessages')}
                       </p>
                     </div>
                   </div>
                 );
               })}
+              
+              {/* Add section to show all hidden chats with toggle button */}
+              {allHiddenSessions.length > 0 && (
+                <div className="mt-2">
+                  <div className="px-4 pt-2 pb-1 flex justify-between items-center">
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                      {t('allHiddenChats') || 'All Hidden Chats'}
+                    </h3>
+                    <button 
+                      onClick={() => setShowAllHidden(prev => !prev)}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      {showAllHidden ? (t('hide') || 'Hide') : (t('show') || 'Show')}
+                    </button>
+                  </div>
+                  
+                  {showAllHidden && allHiddenSessions.map((session) => {
+                    const sessionName = session.type === 'PRIVATE' 
+                      ? session.participants[0]?.name
+                      : session.name;
+                      
+                    const avatar = session.type === 'PRIVATE' 
+                      ? session.participants[0]?.avatar_url 
+                      : null;
+                      
+                    return (
+                      <div
+                        key={`${session.id}-${new Date(session.created_at || 0).getTime()}`}
+                        className="flex items-center gap-3 p-3 hover:bg-accent/50 transition-colors relative group mx-2 my-1 rounded-md"
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center text-muted-foreground font-medium overflow-hidden">
+                            {session.type === 'AI' ? (
+                              <div className="w-full h-full">
+                                <Image 
+                                  src={PengyImage} 
+                                  alt={t('aiAssistant')}
+                                  className="w-full h-full object-cover rounded-lg"
+                                />
+                              </div>
+                            ) : session.type === 'PRIVATE' ? (
+                              avatar && avatar !== '' ? (
+                                <img 
+                                  src={avatar} 
+                                  alt={sessionName || t('privateChat')}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span>{sessionName?.charAt(0) || '?'}</span>
+                              )
+                            ) : (
+                              <span>{sessionName?.charAt(0) || '?'}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline justify-between">
+                            <h3 className="font-medium truncate text-sm">
+                              {sessionName}
+                            </h3>
+                            <button
+                              onClick={() => handleUnhideSession(session.id)}
+                              className="text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 py-1 px-2 rounded-full"
+                            >
+                              {t('unhide') || 'Unhide'}
+                            </button>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {session.lastMessage?.content || t('noRecentMessages')}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               
               {filteredSessions.length > 0 && hiddenSessionsWithMessages.length > 0 && (
                 <div className="px-4 py-1 mt-2">
@@ -598,7 +680,7 @@ function ChatLayout({ children }) {
                   
                 return (
                   <div
-                    key={session.id}
+                    key={`${session.id}-${new Date(session.created_at || 0).getTime()}`}
                     className={`flex items-center gap-3 p-4 hover:bg-accent/50 cursor-pointer transition-colors relative group ${
                       currentSession?.id === session.id ? 'bg-accent' : ''
                     }`}
@@ -660,8 +742,8 @@ function ChatLayout({ children }) {
                       <div className="flex items-center justify-between mt-1">
                         <p className={`text-sm truncate ${session.unreadCount > 0 && !mutedSessions[session.id] ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
                           {lastMessageContent
-                            ? (session.lastMessage?.role === 'assistant' ? `🤖 ${lastMessageContent}` : lastMessageContent)
-                            : t('noMessages')}
+                              ? (session.lastMessage?.role === 'assistant' ? `🤖 ${lastMessageContent}` : lastMessageContent)
+                              : t('noRecentMessages')}
                         </p>
                         {session.unreadCount > 0 && !mutedSessions[session.id] && currentSession?.id !== session.id && (
                           <div className="ml-2 w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"
@@ -718,30 +800,24 @@ function ChatLayout({ children }) {
                               </>
                             )}
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleClearChatHistory(session.id);
-                            }}
-                            className="flex items-center gap-2 cursor-pointer"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                              <path d="M3 6h18"></path>
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                              <line x1="10" y1="11" x2="10" y2="17"></line>
-                              <line x1="14" y1="11" x2="14" y2="17"></line>
-                            </svg>
-                            <span>{t('clearChatHistory')}</span>
-                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onClick={(e) => handleDeleteSession(e, session.id)}
-                            className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                            onClick={(e) => handleHideSession(e, session.id)}
+                            className="flex items-center gap-2 cursor-pointer"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <X className="h-4 w-4" />
                             <span>{t('hideChat')}</span>
                           </DropdownMenuItem>
+                          {/* Only show delete option if user is the chat creator */}
+                          {session.created_by === currentUser?.id && (
+                            <DropdownMenuItem 
+                              onClick={(e) => handleDeleteSession(e, session.id)}
+                              className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span>{t('deleteChat')}</span>
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

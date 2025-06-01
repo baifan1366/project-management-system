@@ -62,7 +62,7 @@ export async function POST() {
       
       // Set cookie with improved settings
       const cookieOptions = {
-        httpOnly: true,
+        httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
         maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
         path: '/',
@@ -106,7 +106,7 @@ export async function POST() {
               
               // Set cookie with improved settings
               const cookieOptions = {
-                httpOnly: true,
+                httpOnly: false,
                 secure: process.env.NODE_ENV === 'production',
                 maxAge: 7 * 24 * 60 * 60,
                 path: '/',

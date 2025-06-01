@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { format, addHours, parseISO, isSameDay, isBefore, isAfter, isSameHour } from 'date-fns';
+import { format, addHours, parseISO, isSameDay, isBefore, isAfter, isSameHour, addMinutes, differenceInMinutes, set } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Video, UserIcon, MapPin, Clock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,6 +21,8 @@ export default function DayView({
   personalEvents = [],
   tasks = [],
   googleCalendarColors,
+  handleEventClick,
+  onEventUpdate, // Keeping the prop for compatibility
 }) {
   // Format the current date for display
   const formattedDate = format(currentDate, 'EEEE, MMMM d, yyyy');
@@ -62,7 +64,9 @@ export default function DayView({
             location: event.location || '',
             description: event.description || '',
             hangoutLink: event.hangoutLink,
-            attendees: event.attendees || []
+            attendees: event.attendees || [],
+            originalEvent: event, // Keep original event data for updates
+            uniqueId: `google-${event.id}` // Keep unique ID for identification
           });
         } catch (err) {
           console.error('Failed to process Google event:', err, event);
@@ -96,6 +100,8 @@ export default function DayView({
             allDay: event.all_day || false,
             location: event.location || '',
             description: event.description || '',
+            originalEvent: event, // Keep original event data for updates
+            uniqueId: `personal-${event.id}` // Keep unique ID for identification
           });
         } catch (err) {
           console.error('Failed to process personal event:', err, event);
@@ -106,29 +112,47 @@ export default function DayView({
     // Process tasks with due dates
     if (tasks && tasks.length) {
       tasks.forEach(task => {
-        if (task.due_date) {
-          try {
-            // Parse dates
-            const taskDate = parseISO(task.due_date);
-            
-            // Only include tasks for this day
-            if (!isSameDay(taskDate, currentDate)) {
-              return;
-            }
-            
-            events.push({
-              id: `task-${task.id}`,
-              title: task.title,
-              start: taskDate,
-              end: addHours(taskDate, 1), // Make it 1 hour duration for display
-              color: '#FF9800', // Orange
-              type: 'task',
-              allDay: true
-            });
-          } catch (err) {
-            console.error('Failed to process task:', err, task);
-          }
+        // 跳过没有日期的任务
+        if (!task.due_date && !task.expected_completion_date) return null;
+        
+        // 确定日期（优先使用due_date，然后是expected_completion_date）
+        const taskDate = task.due_date || task.expected_completion_date;
+        const taskDay = parseISO(taskDate);
+        
+        // 如果不是当前显示的日期，则跳过
+        if (!isSameDay(taskDay, currentDate)) {
+          return null;
         }
+        
+        // 确定任务的开始时间（优先使用expected_start_time，否则使用当天开始时间）
+        const startTime = task.expected_start_time 
+          ? parseISO(task.expected_start_time)
+          : set(taskDay, { hours: 0, minutes: 0, seconds: 0 });
+        
+        // 确定任务的结束时间（使用due_date或expected_completion_date）
+        const endTime = parseISO(taskDate);
+        
+        // 任务的ID（用于标识）
+        const taskId = `task-${task.my_task_id || task.id}`;
+        
+        // 原始事件数据
+        const originalEvent = {
+          ...task,
+          id: taskId,
+          type: 'task'
+        };
+        
+        events.push({
+          id: taskId,
+          title: task.title || t('noTitle'),
+          start: startTime,
+          end: endTime,
+          color: '#FF9800', // Orange
+          type: 'task',
+          allDay: false, // Changed to false to show as a timed event
+          originalEvent: originalEvent,
+          uniqueId: taskId
+        });
       });
     }
     
@@ -213,8 +237,15 @@ export default function DayView({
     });
   }, [timedEvents]);
   
-  // Handle event click
-  const handleEventClick = (event) => {
+  // Update the handleEventClick function
+  const onEventClick = (event) => {
+    // Call the parent component's handler if provided
+    if (handleEventClick) {
+      handleEventClick(event, event.type);
+      return;
+    }
+    
+    // Fallback to old behavior if no handler is provided
     // For Google Meet events, open the hangout link
     if (event.type === 'google' && event.hangoutLink) {
       window.open(event.hangoutLink, '_blank');
@@ -268,7 +299,7 @@ export default function DayView({
                 backgroundColor: `${event.color}15`,
                 borderLeft: `3px solid ${event.color}`
               }}
-              onClick={() => handleEventClick(event)}
+              onClick={() => onEventClick(event)}
             >
               <div className="flex items-center">
                 <span className="truncate">{event.title}</span>
@@ -313,7 +344,7 @@ export default function DayView({
         {/* Events */}
         {positionedEvents.map((event) => (
           <div
-            key={`${event.type}-${event.id}`}
+            key={event.uniqueId}
             className={cn(
               "absolute rounded-md border p-2 text-sm overflow-hidden cursor-pointer transition-opacity hover:opacity-90",
               event.type === 'google' ? "border-green-300 dark:border-green-700" : "border-purple-300 dark:border-purple-700",
@@ -327,7 +358,7 @@ export default function DayView({
               backgroundColor: `${event.color}15`,
               borderLeft: `4px solid ${event.color}`
             }}
-            onClick={() => handleEventClick(event)}
+            onClick={() => onEventClick(event)}
           >
             <div className="h-full flex flex-col">
               <div className="font-medium leading-tight truncate flex items-center">
@@ -396,7 +427,7 @@ export default function DayView({
                   <div 
                     key={`sidebar-${event.type}-${event.id}`}
                     className="p-2 rounded-md text-sm cursor-pointer hover:bg-accent/5 transition-colors"
-                    onClick={() => handleEventClick(event)}
+                    onClick={() => onEventClick(event)}
                   >
                     <div className="flex items-center">
                       <div 

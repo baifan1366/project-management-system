@@ -323,7 +323,9 @@ const RichEditor = ({
         >
           <Heading2 className="h-4 w-4" />
         </button>
-        
+
+        <div className="w-px h-5 bg-border mx-1 self-center" />
+
         <button
           type="button"
           onClick={() => editor.chain().focus().setParagraph().run()}
@@ -342,6 +344,16 @@ const RichEditor = ({
           title="Blockquote"
         >
           <Quote className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleHighlight().run()}
+          className={cn("p-1 rounded hover:bg-muted-foreground/10", 
+            editor.isActive('highlight') ? 'bg-muted-foreground/20' : '')}
+          title="Highlight"
+        >
+          <Highlighter className="h-4 w-4" />
         </button>
         
         <div className="w-px h-5 bg-border mx-1 self-center" />
@@ -364,48 +376,6 @@ const RichEditor = ({
           title="Ordered List"
         >
           <ListOrdered className="h-4 w-4" />
-        </button>
-        
-        <div className="w-px h-5 bg-border mx-1 self-center" />
-        
-        <button
-          type="button"
-          onClick={() => {
-            const url = window.prompt('URL');
-            if (url) {
-              editor.chain().focus().setLink({ href: url }).run();
-            }
-          }}
-          className={cn("p-1 rounded hover:bg-muted-foreground/10", 
-            editor.isActive('link') ? 'bg-muted-foreground/20' : '')}
-          title="Link"
-        >
-          <LinkIcon className="h-4 w-4" />
-        </button>
-        
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleHighlight().run()}
-          className={cn("p-1 rounded hover:bg-muted-foreground/10", 
-            editor.isActive('highlight') ? 'bg-muted-foreground/20' : '')}
-          title="Highlight"
-        >
-          <Highlighter className="h-4 w-4" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            const url = window.prompt('Image URL');
-            if (url) {
-              editor.chain().focus().setImage({ src: url }).run();
-            }
-          }}
-          className={cn("p-1 rounded hover:bg-muted-foreground/10", 
-            editor.isActive('image') ? 'bg-muted-foreground/20' : '')}
-          title="Image"
-        >
-          <ImageIcon className="h-4 w-4" />
         </button>
       </div>
     </div>
