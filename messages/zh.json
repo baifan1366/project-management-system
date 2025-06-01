@@ -1261,5 +1261,15 @@
     "pendingRemoval": "待移除",
     "undoRemoval": "撤销移除",
     "undoRoleChange": "撤销角色变更"
+  },
+  "Payment": {
+    "validationError": "支付会话无效或已过期。请重试。",
+    "sessionExpired": "支付会话已过期。请重试。",
+    "processingPayment": "处理支付中...",
+    "selectPaymentMethod": "选择支付方式",
+    "sessionExpiringTitle": "会话即将到期",
+    "sessionExpiresIn": "会话将在以下时间后到期",
+    "pleaseCompletePayment": "请完成您的支付",
+    "pleaseCompletePaymentNow": "请立即完成您的支付"
   }
 }

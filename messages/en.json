@@ -2334,5 +2334,15 @@
     "selectSprintPlan": "Select Sprint Plan",
     "retrospective": "Retrospective",
     "board": "Board"  
+  },
+  "Payment": {
+    "validationError": "Invalid or expired payment session. Please try again.",
+    "sessionExpired": "Payment session expired. Please try again.",
+    "processingPayment": "Processing payment...",
+    "selectPaymentMethod": "Select Payment Method",
+    "sessionExpiringTitle": "Session expiring soon",
+    "sessionExpiresIn": "Session expires in",
+    "pleaseCompletePayment": "Please complete your payment",
+    "pleaseCompletePaymentNow": "Please complete your payment now"
   }
 }

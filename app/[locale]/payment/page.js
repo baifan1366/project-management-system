@@ -14,6 +14,8 @@ import useGetUser from '@/lib/hooks/useGetUser';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 import PaymentValidation from './PaymentValidation'
+import { useTimer } from './TimerContext'
+import PaymentTimer from './PaymentTimer'
 
 // Initialize Stripe outside the component
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -25,7 +27,7 @@ export default function PaymentPage() {
   const locale = params.locale || 'en';
   const [loading, setLoading] = useState(true);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
-
+  
   // 使用 useGetUser hook 获取用户信息
   const { user, isAuthenticated } = useGetUser();
 
@@ -43,6 +45,7 @@ export default function PaymentPage() {
 
   const dispatch = useDispatch()
   const { status, error: reduxError, metadata } = useSelector(state => state.payment)
+  const validationTimestamp = useSelector(state => state.payment.validationTimestamp);
 
   const [isPromoLoading, setIsPromoLoading] = useState(false);
   const [discount, setDiscount] = useState(0);
@@ -594,7 +597,7 @@ export default function PaymentPage() {
       <div className="min-h-screen relative">
         {/* 加载状态 */}
         {status === 'loading' && (
-          <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-40">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
               <p className="mt-4 text-gray-700">Processing payment...</p>
@@ -615,6 +618,9 @@ export default function PaymentPage() {
                 />
                 <span className="text-lg">Team Sync</span>
               </div>
+
+              {/* 在订阅信息前添加倒计时组件 */}
+              <PaymentTimer validationTimestamp={validationTimestamp} />
 
               <div className="mb-8">
                 <h1 className="text-3xl font-bold mb-2">
@@ -882,7 +888,6 @@ export default function PaymentPage() {
                       </div>
                     ) : getPaymentButtonText()}
                   </button>
-
                 </div>
               </div>
             </div>
@@ -890,5 +895,5 @@ export default function PaymentPage() {
         </div>
       </div>
     </PaymentValidation>
-  )
+  );
 }
