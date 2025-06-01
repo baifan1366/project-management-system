@@ -7,10 +7,12 @@ import { supabase } from '@/lib/supabase';
 import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine, FaBell } from 'react-icons/fa';
 import { useDispatch, useSelector } from 'react-redux';
 import { Skeleton } from '@/components/ui/skeleton';
+import RecentActivityModal from '@/components/admin/RecentActivityModal';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const dispatch = useDispatch();
+  const [ShowRecentActivityModal, setShowRecentActivityModal] = useState(false);  
   const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -22,6 +24,19 @@ export default function AdminDashboard() {
   const [recentActivity, setRecentActivity] = useState([]);
 
   const permissions = useSelector((state) => state.admin.permissions);
+
+  // Helper function to safely render any value, including objects
+  const safeRender = (value) => {
+    if (value === null || value === undefined) {
+      return '—';
+    }
+    
+    if (typeof value === 'object') {
+      return JSON.stringify(value);
+    }
+    
+    return String(value);
+  };
 
   // initialize the page
   useEffect(() => {
@@ -202,7 +217,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {hasPermission('view_users') && (
             <Link href={`/admin/userManagement`}>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6  hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
@@ -308,9 +323,11 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/*Admins Recent Activity */}
+          {/*Admins Recent Activity Preview Modal*/}
           {hasPermission('view_admins') && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8 transition-all duration-200 hover:shadow-lg hover:translate-y-[-4px] hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+            onClick = {() => setShowRecentActivityModal(true)}
+          >
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Admin Recent Activity</h3>
             
             {recentActivity.length > 0 ? (
@@ -331,7 +348,7 @@ export default function AdminDashboard() {
                           {activity.admin_user?.full_name || activity.admin_user?.username || 'Unknown'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 capitalize">
-                          {activity.action.replace(/_/g, ' ')}
+                          {typeof activity.action === 'string' ? activity.action.replace(/_/g, ' ') : '—'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                           {activity.entity_type ? (
@@ -343,7 +360,7 @@ export default function AdminDashboard() {
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
-                          {formatDate(activity.created_at)}
+                          {activity.created_at ? formatDate(activity.created_at) : '—'}
                         </td>
                       </tr>
                     ))}
@@ -353,12 +370,6 @@ export default function AdminDashboard() {
             ) : (
               <p className="text-gray-500 dark:text-gray-400 text-center py-4">No recent activity found</p>
             )}
-            
-            <div className="mt-4 text-right">
-              <Link href={`/admin/adminActivity`} className="text-sm text-indigo-500 dark:text-indigo-400 hover:underline">
-                View all activity →
-              </Link>
-            </div>
           </div>
           )}
           
@@ -389,6 +400,12 @@ export default function AdminDashboard() {
               </Link>
             </div>
           </div>
+
+
+          {/*Recent Activity Modal*/}
+          {ShowRecentActivityModal && (
+            <RecentActivityModal onClose={() => setShowRecentActivityModal(false)} />
+          )}
         </main>
       </div>
     </div>
