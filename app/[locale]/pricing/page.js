@@ -37,6 +37,16 @@ export default function PricingPage() {
   // 处理计划选择
   const handlePlanSelection = async (plan) => {
     try {
+      // 检查是否是当前计划，如果是则重定向到仪表板
+      if (currentUserPlan) {
+        const currentPlanId = currentUserPlan.id || currentUserPlan.plan_id;
+        if (Number(currentPlanId) === Number(plan.id)) {
+          // 如果是当前计划，直接去仪表板
+          router.push(`/${locale}/dashboard`);
+          return;
+        }
+      }
+      
       if (!user) {
         console.log('用户未登录，重定向到登录页面');
         const loginParams = new URLSearchParams({
