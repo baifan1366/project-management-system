@@ -37,12 +37,25 @@ export default function PricingPage() {
   // 处理计划选择
   const handlePlanSelection = async (plan) => {
     try {
+      // Special handling for Enterprise plans - redirect to contact us page
+      if (plan.type === 'ENTERPRISE') {
+        router.push(`/${locale}/contactUs?form=enterprise`);
+        return;
+      }
+
       // 检查是否是当前计划，如果是则重定向到仪表板
       if (currentUserPlan) {
         const currentPlanId = currentUserPlan.id || currentUserPlan.plan_id;
         if (Number(currentPlanId) === Number(plan.id)) {
           // 如果是当前计划，直接去仪表板
           router.push(`/${locale}/dashboard`);
+          return;
+        }
+        
+        // 检查是否是降级操作，如果是则重定向到联系我们页面
+        if (Number(currentPlanId) > Number(plan.id)) {
+          // 降级操作，重定向到联系我们页面，并默认选择降级表单
+          router.push(`/${locale}/contactUs?form=downgrade&from=${currentPlanId.toString()}&to=${plan.id.toString()}`);
           return;
         }
       }
@@ -156,6 +169,11 @@ export default function PricingPage() {
 
   // 获取每个计划的CTA文本
   const getPlanCtaText = (plan) => {
+    // Special handling for Enterprise plans
+    if (plan.type === 'ENTERPRISE') {
+      return 'Contact Us';
+    }
+
     // 如果用户未登录或没有计划数据
     if (!currentUserPlan) {
       if(plan.id === 1){

@@ -1,7 +1,7 @@
 'use client'; // 使用客户端组件
 import React, {useState, useEffect} from 'react';
 import Link from 'next/link';
-import {useRouter} from 'next/navigation';
+import {useRouter, useSearchParams} from 'next/navigation';
 import clsx from 'clsx';
 import { useSelector } from 'react-redux';
 import { supabase } from '@/lib/supabase';
@@ -9,16 +9,49 @@ import { useGetUser } from '../../../lib/hooks/useGetUser';
 import { toast } from 'sonner';
 import { selectCurrentPlan } from '@/lib/redux/features/planSlice';
 
+// Constants for form options
+const roles = [
+    { id: 1, name: 'Product Manager' },
+    { id: 2, name: 'Project Manager' },
+    { id: 3, name: 'Developer' },
+    { id: 4, name: 'Designer' },
+    { id: 5, name: 'Business Owner' },
+    { id: 6, name: 'Other' }
+];
+
+const timeLines = [
+    { id: 1, name: 'Immediately' },
+    { id: 2, name: 'Within a month' },
+    { id: 3, name: 'Within 3 months' },
+    { id: 4, name: 'Just exploring' }
+];
+
+const userQty = [
+    { id: 1, name: '1-10' },
+    { id: 2, name: '11-50' },
+    { id: 3, name: '51-200' },
+    { id: 4, name: '201-500' },
+    { id: 5, name: '500+' }
+];
+
 export default function ContactUs(){
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { user, isLoading: userLoading } = useGetUser();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [userSubscription, setUserSubscription] = useState(null);
     const [availablePlans, setAvailablePlans] = useState([]);
     const currentUserPlan = useSelector(selectCurrentPlan);
 
+    // 从URL参数获取初始表单类型
+    const defaultForm = searchParams.get('form');
+    
     // Move all state declarations to the top
-    const [selectedOption, setSelectedOption] = useState('general');
+    const [selectedOption, setSelectedOption] = useState(
+        defaultForm === 'downgrade' ? 'downgrade' : 
+        defaultForm === 'enterprise' ? 'enterprise' : 
+        'general'
+    );
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
     const [firstName, setFirstName] = useState('');
@@ -30,8 +63,14 @@ export default function ContactUs(){
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [messageSent, setMessageSent] = useState(false);
-    const [targetPlan, setTargetPlan] = useState('');
+    const [targetPlan, setTargetPlan] = useState(searchParams.get('to') ? searchParams.get('to').toString() : '');
     const [reason, setReason] = useState('');
+    const [fromPlan, setFromPlan] = useState(searchParams.get('from') ? searchParams.get('from').toString() : '');
+
+    // Debug effect for targetPlan
+    useEffect(() => {
+        console.log('targetPlan changed:', targetPlan, typeof targetPlan);
+    }, [targetPlan]);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -46,7 +85,15 @@ export default function ContactUs(){
                             subscription_plan:plan_id (
                                 id,
                                 type,
-                                name
+                                name,
+                                price,
+                                max_projects,
+                                max_teams,
+                                max_members,
+                                max_ai_chat,
+                                max_ai_task,
+                                max_ai_workflow,
+                                max_storage
                             )
                         `)
                         .eq('user_id', user.id)
@@ -59,15 +106,125 @@ export default function ContactUs(){
                         // Fetch available downgrade plans based on current plan type
                         if (subscriptionData.subscription_plan) {
                             const currentPlanType = subscriptionData.subscription_plan.type;
+                            const currentPlanId = subscriptionData.subscription_plan.id;
+                            console.log('Current plan:', subscriptionData.subscription_plan);
+                            
                             const { data: plans, error: plansError } = await supabase
                                 .from('subscription_plan')
-                                .select('id, name, type')
+                                .select(`
+                                    id, 
+                                    name, 
+                                    type, 
+                                    price,
+                                    max_projects,
+                                    max_teams,
+                                    max_members,
+                                    max_ai_chat,
+                                    max_ai_task,
+                                    max_ai_workflow,
+                                    max_storage
+                                `)
                                 .eq('is_active', true)
                                 .in('type', getAvailableDowngradePlans(currentPlanType))
                                 .order('price', { ascending: true });
 
                             if (!plansError && plans) {
-                                setAvailablePlans(plans);
+                                console.log('Available downgrade plans before filtering:', plans);
+                                
+                                // Additional filtering: only include plans with lower ID than current plan
+                                // This ensures proper downgrade hierarchy
+                                const filteredPlans = plans.filter(plan => {
+                                    // Always include FREE plans as downgrade options
+                                    if (plan.type === 'FREE') return true;
+                                    
+                                    // Special case for "daniel" plan (ID 13)
+                                    if (Number(currentPlanId) === 13 && plan.name !== 'daniel') {
+                                        // Allow all other plans as downgrade options except itself
+                                        return true;
+                                    }
+                                    
+                                    // Never show ENTERPRISE plans as downgrade options from PRO plans
+                                    if (currentPlanType === 'PRO' && plan.type === 'ENTERPRISE') {
+                                        return false;
+                                    }
+                                    
+                                    // Compare resource limits - a plan is a downgrade if it has lower limits in most categories
+                                    const currentPlan = subscriptionData.subscription_plan;
+                                    
+                                    // Calculate how many resource limits are lower in the potential downgrade plan
+                                    const limitFields = [
+                                        'max_projects', 
+                                        'max_teams', 
+                                        'max_members', 
+                                        'max_ai_chat', 
+                                        'max_ai_task', 
+                                        'max_ai_workflow', 
+                                        'max_storage'
+                                    ];
+                                    
+                                    // Count how many limits are lower in the potential downgrade plan
+                                    let lowerLimitsCount = 0;
+                                    let totalNonZeroFields = 0;
+                                    let hasSignificantDowngrade = false;
+                                    
+                                    limitFields.forEach(field => {
+                                        // Only count fields where current plan has non-zero values
+                                        const currentValue = Number(currentPlan[field]);
+                                        const planValue = Number(plan[field]);
+                                        
+                                        // Special handling for "unlimited" values (represented as 0)
+                                        const isCurrentUnlimited = currentValue === 0;
+                                        const isPlanUnlimited = planValue === 0;
+                                        
+                                        // If current plan has unlimited value for this field
+                                        if (isCurrentUnlimited) {
+                                            totalNonZeroFields++;
+                                            // If potential plan is not unlimited, it's a downgrade
+                                            if (!isPlanUnlimited) {
+                                                lowerLimitsCount++;
+                                                hasSignificantDowngrade = true; // Going from unlimited to limited is significant
+                                            }
+                                        } 
+                                        // Normal comparison for non-zero values
+                                        else if (currentValue > 0) {
+                                            totalNonZeroFields++;
+                                            
+                                            // If plan is unlimited, it's not a downgrade for this field
+                                            if (isPlanUnlimited) {
+                                                // Not counted as lower
+                                            }
+                                            // Normal comparison
+                                            else if (planValue < currentValue) {
+                                                lowerLimitsCount++;
+                                                
+                                                // Check if this is a significant downgrade (50% or more reduction)
+                                                if (planValue <= currentValue * 0.5) {
+                                                    hasSignificantDowngrade = true;
+                                                }
+                                            }
+                                        }
+                                    });
+                                    
+                                    // Consider it a downgrade if:
+                                    // 1. Price is lower AND
+                                    // 2. At least half of the resource limits are lower OR there's at least one significant downgrade
+                                    const isPriceLower = Number(plan.price) < Number(currentPlan.price);
+                                    const isResourceDowngrade = totalNonZeroFields > 0 && 
+                                        (lowerLimitsCount / totalNonZeroFields >= 0.5 || hasSignificantDowngrade);
+                                    
+                                    // Special case for PRO plans with same name but different billing interval
+                                    if (plan.name === currentPlan.name && plan.type === currentPlan.type && isPriceLower) {
+                                        // Allow downgrade between same plan types with different billing intervals
+                                        return true;
+                                    }
+                                    
+                                    console.log(`Plan ${plan.name} comparison: Price lower: ${isPriceLower}, Resource downgrade: ${isResourceDowngrade}, Lower limits: ${lowerLimitsCount}/${totalNonZeroFields}, Has significant downgrade: ${hasSignificantDowngrade}`);
+                                    
+                                    return isPriceLower && isResourceDowngrade;
+                                });
+                                
+                                console.log('Available downgrade plans after filtering:', filteredPlans);
+                                setAvailablePlans(filteredPlans);
                             }
                         }
 
@@ -84,23 +241,42 @@ export default function ContactUs(){
                 setUserSubscription(null);
                 setAvailablePlans([]);
             }
+            
+            // 如果URL中有form参数，强制选择对应表单
+            if (defaultForm === 'downgrade') {
+                setSelectedOption('downgrade');
+                
+                // 设置from和to计划ID
+                if (searchParams.get('from')) {
+                    setFromPlan(searchParams.get('from').toString());
+                }
+                
+                if (searchParams.get('to')) {
+                    const toParam = searchParams.get('to').toString();
+                    setTargetPlan(toParam);
+                    console.log('Setting target plan from URL:', toParam);
+                }
+            } else if (defaultForm === 'enterprise') {
+                setSelectedOption('enterprise');
+            }
         };
 
         // Only run checkAuth if user loading is complete
         if (!userLoading) {
             checkAuth();
         }
-    }, [user, userLoading]);
+    }, [user, userLoading, defaultForm, searchParams]);
 
     // Helper function to determine available downgrade plans
     const getAvailableDowngradePlans = (currentPlanType) => {
+        console.log('Current plan type:', currentPlanType);
         switch (currentPlanType) {
             case 'ENTERPRISE':
                 return ['PRO', 'FREE'];
             case 'PRO':
-                return ['FREE'];
+                return ['FREE', 'PRO']; // Include PRO plans as they'll be filtered by price later
             default:
-                return [];
+                return ['FREE']; // Default to at least FREE plans
         }
     };
 
@@ -138,7 +314,7 @@ export default function ContactUs(){
 
                 formData.userId = user.id;
                 formData.currentSubscriptionId = userSubscription.id;
-                formData.targetPlanId = targetPlan;
+                formData.targetPlanId = targetPlan.toString();
                 formData.reason = reason;
             }
 
@@ -487,11 +663,16 @@ export default function ContactUs(){
                         required
                         >
                             <option value="">Select desired plan</option>
-                            {availablePlans.map((plan) => (
-                                <option key={plan.id} value={plan.id}>
-                                    {plan.name} ({plan.type})
-                                </option>
-                            ))}
+                            {availablePlans.map((plan) => {
+                                // Compare as strings for exact matching
+                                const isSelected = targetPlan === plan.id.toString();
+                                console.log(`Option: plan.id=${plan.id}, isSelected=${isSelected}, targetPlan=${targetPlan}`);
+                                return (
+                                    <option key={plan.id} value={plan.id.toString()}>
+                                        {plan.name} ({plan.type})
+                                    </option>
+                                );
+                            })}
                         </select>
                     </div>
 
