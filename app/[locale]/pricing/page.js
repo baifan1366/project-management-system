@@ -204,11 +204,52 @@ export default function PricingPage() {
     return 'Change Plan';
   };
 
+  // 渲染骨架屏加载状态
+  const renderSkeletonLoader = () => {
+    return (
+      <div className="container mx-auto px-4 py-16">
+        <div className="animate-pulse">
+          {/* 标题骨架 */}
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-3/4 mx-auto mb-4"></div>
+          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-lg w-2/4 mx-auto mb-8"></div>
+          
+          {/* 计费周期切换骨架 */}
+          <div className="flex justify-center mb-8">
+            <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-full w-64"></div>
+          </div>
+          
+          {/* 计划卡片骨架 */}
+          <div className="grid md:grid-cols-3 gap-8">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="border rounded-lg p-6 shadow-lg">
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-4"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6"></div>
+                
+                {/* 功能列表骨架 */}
+                <div className="space-y-3 mb-8">
+                  {[1, 2, 3, 4].map((j) => (
+                    <div key={j} className="flex items-center">
+                      <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded-full mr-2"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 按钮骨架 */}
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-full mt-auto"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // 显示加载状态
   if (status === 'loading') {
-    return <div className="flex justify-center items-center min-h-screen">
-      <div>Loading...</div>
-    </div>
+    return renderSkeletonLoader();
   }
 
   // 显示错误状态
