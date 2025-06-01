@@ -53,6 +53,7 @@ export default function ContactUs(){
         'general'
     );
     const [email, setEmail] = useState('');
+    const [accountEmail, setAccountEmail] = useState(''); // User's actual account email
     const [message, setMessage] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -85,6 +86,16 @@ export default function ContactUs(){
         
         // Only reset targetPlan and fromPlan if not provided in URL
         if (selectedOption === 'downgrade') {
+            // For downgrade form, ensure we have the account email
+            if (!accountEmail && user?.email) {
+                setAccountEmail(user.email);
+            }
+            
+            // Set email to accountEmail to ensure consistency
+            if (accountEmail) {
+                setEmail(accountEmail);
+            }
+            
             if (!targetPlan && searchParams.get('to')) {
                 setTargetPlan(searchParams.get('to').toString());
             }
@@ -99,7 +110,7 @@ export default function ContactUs(){
         }
         
         setMessageSent(false);
-    }, [selectedOption, searchParams, targetPlan, fromPlan]);
+    }, [selectedOption, searchParams, targetPlan, fromPlan, accountEmail, user]);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -259,6 +270,7 @@ export default function ContactUs(){
 
                         if (user.email) {
                             setEmail(user.email);
+                            setAccountEmail(user.email); // Set the account email
                         }
                     }
                 } catch (error) {
@@ -354,6 +366,7 @@ export default function ContactUs(){
                 formData.currentSubscriptionId = userSubscription.id;
                 formData.targetPlanId = targetPlan.toString();
                 formData.reason = reason;
+                formData.email = accountEmail;
             }
 
             console.log('Sending form data:', formData);
@@ -374,7 +387,7 @@ export default function ContactUs(){
             const result = await response.json();
             setMessageSent(true);
             
-            // Reset form fields except email
+            // Reset form fields except email and accountEmail
             setMessage('');
             setFirstName('');
             setLastName('');
@@ -384,6 +397,11 @@ export default function ContactUs(){
             setSelectedUserQty('');
             setTargetPlan('');
             setReason('');
+            
+            // Only reset email for non-downgrade forms
+            if (selectedOption !== 'downgrade') {
+                // Optionally reset email for other forms if needed
+            }
 
             toast.success('Your message has been sent successfully!');
 
@@ -668,12 +686,11 @@ export default function ContactUs(){
                     <span className="text-2xl font-bold mb-6">Request Plan Downgrade</span>
                     
                     <div>
-                        <label htmlFor="email" className="block mb-2">Email</label>
+                        <label htmlFor="accountEmail" className="block mb-2">Account Email</label>
                         <input
                         type="email"
-                        id="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        id="accountEmail"
+                        value={accountEmail}
                         className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
                         required
                         placeholder="Your account email"
