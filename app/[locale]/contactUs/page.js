@@ -71,6 +71,35 @@ export default function ContactUs(){
     useEffect(() => {
         console.log('targetPlan changed:', targetPlan, typeof targetPlan);
     }, [targetPlan]);
+    
+    // Effect to handle form type changes while preserving email
+    useEffect(() => {
+        // Reset form fields except email when form type changes
+        setMessage('');
+        setFirstName('');
+        setLastName('');
+        setCompanyName('');
+        setSelectedRole('');
+        setSelectedTimeline('');
+        setSelectedUserQty('');
+        
+        // Only reset targetPlan and fromPlan if not provided in URL
+        if (selectedOption === 'downgrade') {
+            if (!targetPlan && searchParams.get('to')) {
+                setTargetPlan(searchParams.get('to').toString());
+            }
+            if (!fromPlan && searchParams.get('from')) {
+                setFromPlan(searchParams.get('from').toString());
+            }
+        } else {
+            // Reset these fields when not in downgrade form
+            setTargetPlan('');
+            setFromPlan('');
+            setReason('');
+        }
+        
+        setMessageSent(false);
+    }, [selectedOption, searchParams, targetPlan, fromPlan]);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -295,6 +324,15 @@ export default function ContactUs(){
             if(selectedOption === 'general'){
                 formData.message = message;
             } else if(selectedOption === 'enterprise'){
+                // Validate required fields for enterprise form
+                if (!firstName) throw new Error('First name is required');
+                if (!lastName) throw new Error('Last name is required');
+                if (!email) throw new Error('Email is required');
+                if (!companyName) throw new Error('Company name is required');
+                if (!selectedRole) throw new Error('Please select your role');
+                if (!selectedTimeline) throw new Error('Please select your timeline');
+                if (!selectedUserQty) throw new Error('Please select number of users');
+                
                 formData.firstName = firstName;
                 formData.lastName = lastName;
                 formData.companyName = companyName;
@@ -336,8 +374,7 @@ export default function ContactUs(){
             const result = await response.json();
             setMessageSent(true);
             
-            // Reset form fields
-            setEmail('');
+            // Reset form fields except email
             setMessage('');
             setFirstName('');
             setLastName('');
@@ -391,7 +428,14 @@ export default function ContactUs(){
                     {options.map((option) => (
                         <button
                             key={option.id}
-                            onClick={() => setSelectedOption(option.id)}
+                            onClick={() => {
+                                // Preserve current email when switching form types
+                                const currentEmail = email;
+                                setSelectedOption(option.id);
+                                if (currentEmail) {
+                                    setEmail(currentEmail);
+                                }
+                            }}
                             className={clsx(
                                 'relative z-10 px-8 py-2 rounded-full transition-colors duration-200 min-w-[121px]',
                                 selectedOption === option.id
@@ -550,7 +594,7 @@ export default function ContactUs(){
 
                     {/*what is your role?*/}
                     <div>
-                        <label htmlFor="" className="block mb-2">What is your role?</label>
+                        <label htmlFor="" className="block mb-2">What is your role? <span className="text-pink-500">*</span></label>
                         <div className="flex flex-wrap gap-2">
                                 
                                 {roles.map((item)=>(
@@ -567,11 +611,11 @@ export default function ContactUs(){
                                     </div>
                                 ))}
                         </div>
-
+                        {!selectedRole && <p className="text-xs text-pink-500 mt-1">Please select your role</p>}
                     </div>
                     {/*timeline of making purchase decision*/}
                     <div>
-                        <label htmlFor="" className="block mb-2">What is your timeline of making a purchase decision</label>
+                        <label htmlFor="" className="block mb-2">What is your timeline of making a purchase decision <span className="text-pink-500">*</span></label>
                         <div className="flex flex-wrap gap-2">
                             {timeLines.map(item => (
                                 <div 
@@ -586,11 +630,12 @@ export default function ContactUs(){
                                 </div>
                             ))}
                         </div>
+                        {!selectedTimeline && <p className="text-xs text-pink-500 mt-1">Please select your timeline</p>}
                     </div>
 
                     {/*how many users are you looking to onboard?*/}
                     <div>
-                        <label htmlFor="" className="block mb-2">How many users are you looking to onboard?</label>
+                        <label htmlFor="" className="block mb-2">How many users are you looking to onboard? <span className="text-pink-500">*</span></label>
                         <div className="flex flex-wrap gap-2">
                             {userQty.map(item=>(
                                 <div key={item.id} className={clsx(
@@ -603,6 +648,7 @@ export default function ContactUs(){
                                 </div>
                             ))}
                         </div>
+                        {!selectedUserQty && <p className="text-xs text-pink-500 mt-1">Please select number of users</p>}
                     </div>
 
                     <button
