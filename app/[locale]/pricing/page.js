@@ -221,7 +221,10 @@ export default function PricingPage() {
           {/* 计划卡片骨架 */}
           <div className="grid md:grid-cols-3 gap-8">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="border rounded-lg p-6 shadow-lg">
+              <div key={i} className="border rounded-lg p-6 shadow-lg relative">
+                {/* Plan Type 标签骨架 */}
+                <div className="absolute -top-3 right-6 w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                
                 <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
                 <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-4"></div>
                 <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
@@ -325,8 +328,20 @@ export default function PricingPage() {
             <div className={clsx(
               'border rounded-lg p-6 shadow-lg',
               'flex flex-col h-full',
-              'animate-heightIn'
+              'animate-heightIn',
+              'relative'
             )}>
+              {/* Plan Type 标签 */}
+              <div className={clsx(
+                'absolute -top-3 right-6 px-3 py-1 rounded-full text-xs font-semibold',
+                plan.type === 'FREE' ? 'bg-green-100 text-green-800' :
+                plan.type === 'PRO' ? 'bg-indigo-100 text-indigo-800' :
+                plan.type === 'ENTERPRISE' ? 'bg-purple-100 text-purple-800' :
+                'bg-gray-100 text-gray-800'
+              )}>
+                {plan.type}
+              </div>
+              
               <div className="flex-grow">
                 <h2 className="text-2xl font-bold mb-4">{plan.name}</h2>
                 <p className="text-gray-600 mb-4">{plan.description}</p>
