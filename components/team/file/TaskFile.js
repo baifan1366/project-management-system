@@ -1068,9 +1068,9 @@ export default function TaskFile({ taskId, teamId }) {
       // If file URL exists, use directly
       if (file.file_url) {
         // Set downloading prompt
-        toast.loading(t('downloadStarted'), {
-          description: t('downloadingFile')
-        });
+        // toast.loading(t('downloadStarted'), {
+        //   description: t('downloadingFile')
+        // });
         
         // Get file content from URL
         const response = await fetch(file.file_url)
@@ -1104,9 +1104,9 @@ export default function TaskFile({ taskId, teamId }) {
       }
     } catch (error) {
       console.error('Error downloading file:', error)
-      toast.error(t('errorDownloadingFile'), {
-        description: error.message
-      });
+      // toast.error(t('errorDownloadingFile'), {
+      //   description: error.message
+      // });
     }
   }
 
