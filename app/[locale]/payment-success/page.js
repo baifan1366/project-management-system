@@ -121,31 +121,19 @@ export default function PaymentSuccess() {
       // Calculate end date based on billing interval
       let endDate = null;
       if (planData.type !== 'FREE') {  // Only set end date for non-free plans
-        endDate = new Date();
         if (planData.billing_interval === 'MONTHLY') {
+          endDate = new Date();
           endDate.setMonth(endDate.getMonth() + 1);
+          endDate = endDate.toISOString();
         } else if (planData.billing_interval === 'YEARLY') {
+          endDate = new Date();
           endDate.setFullYear(endDate.getFullYear() + 1);
+          endDate = endDate.toISOString();
+        } else {
+          // For NULL or undefined billing_interval, keep end date as null
+          endDate = null;
         }
-        endDate = endDate.toISOString();
       }
-      
-      // Update subscription
-      const updateData = {
-        user_id: userId,
-        plan_id: planId,
-        status: 'ACTIVE',
-        start_date: startDate,
-        end_date: endDate,  // Can be null
-        current_projects: 0,
-        current_teams: 0,
-        current_members: 0,
-        current_ai_chat: 0,
-        current_ai_task: 0,
-        current_ai_workflow: 0,
-        current_storage: 0,
-        updated_at: new Date().toISOString()
-      };
       
       // First, check if a record already exists
       const { data: existingData, error: checkError } = await supabase
@@ -160,16 +148,49 @@ export default function PaymentSuccess() {
       const now = new Date().toISOString();
       
       if (existingData) {
-        // Update existing record
+        // Update existing record but preserve current usage values
+        const updateData = {
+          user_id: userId,
+          plan_id: planId,
+          status: 'ACTIVE',
+          start_date: startDate,
+          end_date: endDate,  // Can be null
+          // Preserve existing usage values
+          current_projects: existingData.current_projects,
+          current_teams: existingData.current_teams,
+          current_members: existingData.current_members,
+          current_ai_chat: existingData.current_ai_chat,
+          current_ai_task: existingData.current_ai_task,
+          current_ai_workflow: existingData.current_ai_workflow,
+          current_storage: existingData.current_storage,
+          updated_at: new Date().toISOString()
+        };
+        
         result = await supabase
           .from('user_subscription_plan')
           .update(updateData)
           .eq('user_id', userId);
       } else {
-        // Insert new record
+        // Insert new record with default values for usage
+        const newData = {
+          user_id: userId,
+          plan_id: planId,
+          status: 'ACTIVE',
+          start_date: startDate,
+          end_date: endDate,  // Can be null
+          current_projects: 0,
+          current_teams: 0,
+          current_members: 0,
+          current_ai_chat: 0,
+          current_ai_task: 0,
+          current_ai_workflow: 0,
+          current_storage: 0,
+          updated_at: new Date().toISOString()
+        };
+        
         result = await supabase
           .from('user_subscription_plan')
-          .insert(updateData);
+          .insert(newData);
       }
       
       if (result.error) throw result.error;
