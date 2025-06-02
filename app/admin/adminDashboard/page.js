@@ -94,7 +94,7 @@ export default function AdminDashboard() {
       startOfMonth.setHours(0, 0, 0, 0);
       
       const { data: payments, error: paymentsError } = await supabase
-        .from('subscription_payment')
+        .from('payment')
         .select('amount')
         .eq('status', 'COMPLETED')
         .gte('created_at', startOfMonth.toISOString());
