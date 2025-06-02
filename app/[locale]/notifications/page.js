@@ -160,9 +160,9 @@ export default function NotificationsPage() {
                       variant={activeTab === 'unread' ? 'default' : 'outline'} 
                       size="sm" 
                       onClick={() => setActiveTab('unread')}
-                      className="justify-start"
+                      className="justify-start dark:text-black"
                     >
-                      <Badge variant="outline" className="mr-2">{unreadCount}</Badge>
+                      <Badge variant="outline" className="mr-2 dark:text-black">{unreadCount}</Badge>
                       {t('common.unread')}
                     </Button>
                   </div>
