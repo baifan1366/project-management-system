@@ -63,6 +63,10 @@ export default function AdminAnalytics() {
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
   const [activePaymentView, setActivePaymentView] = useState('count');
+  const [activePlanView, setActivePlanView] = useState('count');
+  const [planDetails, setPlanDetails] = useState([]);
+  const [paymentTotals, setPaymentTotals] = useState({ transactions: 0, volume: 0 });
+  const [planTotals, setPlanTotals] = useState({ subscribers: 0, revenue: 0 });
 
   // initialize the page
   useEffect(() => {
@@ -306,15 +310,27 @@ export default function AdminAnalytics() {
           .join(' ');
       };
       
+      // Calculate totals
+      let totalTransactions = 0;
+      let totalVolume = 0;
+      
       data.forEach(payment => {
         const method = payment.payment_method;
         const amount = parseFloat(payment.amount);
         
         // Count transactions per method
         paymentMethods[method] = (paymentMethods[method] || 0) + 1;
+        totalTransactions += 1;
         
         // Sum amount per method
         paymentAmounts[method] = (paymentAmounts[method] || 0) + amount;
+        totalVolume += amount;
+      });
+      
+      // Update totals
+      setPaymentTotals({
+        transactions: totalTransactions,
+        volume: totalVolume
       });
       
       // Prepare chart data
@@ -366,54 +382,125 @@ export default function AdminAnalytics() {
   // 获取订阅计划分布
   const fetchPlanDistribution = async (startDate, endDate) => {
     try {
-      // 获取用户订阅计划统计
-      const { data, error } = await supabase
+      // First, get all subscription plans to have their details
+      const { data: planData, error: planError } = await supabase
+        .from('subscription_plan')
+        .select('id, name, type, price');
+        
+      if (planError) throw planError;
+      
+      // Create a map of plans by ID for quick lookup
+      const plansById = {};
+      planData.forEach(plan => {
+        plansById[plan.id] = {
+          ...plan,
+          subscribers: 0,
+          revenue: 0
+        };
+      });
+      
+      // Now get active subscriptions without grouping
+      const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('user_subscription_plan')
-        .select(`
-          subscription_plan:plan_id (
-            name,
-            type
-          ),
-          count
-        `)
+        .select('plan_id')
         .eq('status', 'ACTIVE')
         .not('plan_id', 'is', null)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
         
-      if (error) throw error;
+      if (subscriptionError) throw subscriptionError;
       
-      // 处理计划分布
-      const planCounts = {};
+      // Process subscription data - count occurrences manually
+      let totalSubscribers = 0;
+      let totalRevenue = 0;
       
-      data.forEach(subscription => {
-        if (subscription.subscription_plan) {
-          const planName = subscription.subscription_plan.name;
-          planCounts[planName] = (planCounts[planName] || 0) + 1;
+      subscriptionData.forEach(subscription => {
+        const planId = subscription.plan_id;
+        if (plansById[planId]) {
+          plansById[planId].subscribers += 1;
+          plansById[planId].revenue += parseFloat(plansById[planId].price || 0);
+          
+          totalSubscribers += 1;
+          totalRevenue += parseFloat(plansById[planId].price || 0);
         }
       });
       
-      // 准备图表数据
-      const chartData = {
-        labels: Object.keys(planCounts),
+      // Update totals
+      setPlanTotals({
+        subscribers: totalSubscribers,
+        revenue: totalRevenue
+      });
+      
+      // Convert to array and sort by subscribers
+      const planDetailsArray = Object.values(plansById)
+        .filter(plan => plan.subscribers > 0)
+        .sort((a, b) => b.subscribers - a.subscribers);
+      
+      // Set plan details for table display
+      setPlanDetails(planDetailsArray);
+      
+      // Prepare chart data
+      const labels = planDetailsArray.map(plan => plan.name);
+      const subscriberCounts = planDetailsArray.map(plan => plan.subscribers);
+      const revenueValues = planDetailsArray.map(plan => plan.revenue);
+      
+      // Define colors for plans
+      const planColors = [
+        'rgba(255, 159, 64, 0.7)',
+        'rgba(75, 192, 192, 0.7)',
+        'rgba(54, 162, 235, 0.7)',
+        'rgba(153, 102, 255, 0.7)',
+        'rgba(255, 99, 132, 0.7)',
+        'rgba(201, 203, 207, 0.7)',
+        'rgba(255, 205, 86, 0.7)',
+        'rgba(100, 120, 140, 0.7)'
+      ];
+      
+      // Ensure we have enough colors
+      const backgroundColors = planColors.slice(0, labels.length);
+      
+      // Create chart data for subscribers
+      const countChartData = {
+        labels,
         datasets: [
           {
-            data: Object.values(planCounts),
-            backgroundColor: [
-              'rgba(255, 159, 64, 0.7)',
-              'rgba(75, 192, 192, 0.7)',
-              'rgba(54, 162, 235, 0.7)',
-              'rgba(153, 102, 255, 0.7)',
-            ],
-            borderWidth: 1
+            label: 'Subscribers',
+            data: subscriberCounts,
+            backgroundColor: backgroundColors,
+            borderWidth: 1,
+            hoverOffset: 4
           }
         ]
       };
       
-      setPlanDistributionData(chartData);
+      // Create chart data for revenue
+      const revenueChartData = {
+        labels,
+        datasets: [
+          {
+            label: 'Revenue',
+            data: revenueValues,
+            backgroundColor: backgroundColors,
+            borderWidth: 1,
+            hoverOffset: 4
+          }
+        ]
+      };
+      
+      // Update state with both datasets
+      setPlanDistributionData({
+        count: countChartData,
+        revenue: revenueChartData
+      });
       
     } catch (error) {
       console.error('Error fetching plan distribution:', error);
+      // Set empty data to avoid rendering errors
+      setPlanDistributionData({
+        count: { labels: [], datasets: [] },
+        revenue: { labels: [], datasets: [] }
+      });
+      setPlanDetails([]);
     }
   };
   
@@ -582,6 +669,21 @@ export default function AdminAnalytics() {
       }
     },
     cutout: '50%'
+  };
+  
+  // Create separate options for plan distribution chart
+  const planPieOptions = {
+    ...pieOptions,
+    plugins: {
+      ...pieOptions.plugins,
+      title: {
+        display: true,
+        text: 'Plan Distribution',
+        font: {
+          size: 16
+        }
+      }
+    }
   };
   
   return (
@@ -768,7 +870,17 @@ export default function AdminAnalytics() {
                     
                     {paymentMethodData && paymentMethodData.count && paymentMethodData.count.labels.length > 0 ? (
                       <div>
-                        <div className="flex justify-end mb-4">
+                        <div className="flex justify-between mb-4">
+                          <div className="flex space-x-4">
+                            <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Total Transactions</p>
+                              <p className="text-lg font-semibold text-gray-800 dark:text-white">{paymentTotals.transactions}</p>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Total Volume</p>
+                              <p className="text-lg font-semibold text-gray-800 dark:text-white">{formatCurrency(paymentTotals.volume)}</p>
+                            </div>
+                          </div>
                           <div className="inline-flex rounded-md shadow-sm" role="group">
                             <button
                               type="button"
@@ -828,9 +940,77 @@ export default function AdminAnalytics() {
                   
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
                     <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Plan Distribution</h3>
-                    {planDistributionData.labels.length > 0 ? (
-                      <div className="h-80">
-                        <Pie data={planDistributionData} options={pieOptions} />
+                    {planDistributionData && planDistributionData.count && planDistributionData.count.labels.length > 0 ? (
+                      <div>
+                        <div className="flex justify-between mb-4">
+                          <div className="flex space-x-4">
+                            <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Total Subscribers</p>
+                              <p className="text-lg font-semibold text-gray-800 dark:text-white">{planTotals.subscribers}</p>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Total Revenue</p>
+                              <p className="text-lg font-semibold text-gray-800 dark:text-white">{formatCurrency(planTotals.revenue)}</p>
+                            </div>
+                          </div>
+                          <div className="inline-flex rounded-md shadow-sm" role="group">
+                            <button
+                              type="button"
+                              onClick={() => setActivePlanView('count')}
+                              className={`px-4 py-2 text-sm font-medium ${
+                                activePlanView === 'count' 
+                                  ? 'bg-blue-600 text-white' 
+                                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                              } border border-gray-200 rounded-l-lg`}
+                            >
+                              Subscribers
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActivePlanView('revenue')}
+                              className={`px-4 py-2 text-sm font-medium ${
+                                activePlanView === 'revenue' 
+                                  ? 'bg-blue-600 text-white' 
+                                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                              } border border-gray-200 rounded-r-lg`}
+                            >
+                              Revenue
+                            </button>
+                          </div>
+                        </div>
+                        <div className="h-80">
+                          <Pie 
+                            data={activePlanView === 'count' ? planDistributionData.count : planDistributionData.revenue} 
+                            options={planPieOptions} 
+                          />
+                        </div>
+                        
+                        <div className="mt-6 overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-800">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Plan Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subscribers</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                              {planDetails.map((plan) => (
+                                <tr key={plan.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{plan.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                    {plan.type.charAt(0).toUpperCase() + plan.type.slice(1).toLowerCase()}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatCurrency(plan.price)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{plan.subscribers}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">{formatCurrency(plan.revenue)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     ) : (
                       <div className="h-80 flex items-center justify-center">
