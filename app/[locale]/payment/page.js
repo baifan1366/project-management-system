@@ -9,7 +9,7 @@ import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 //react redux
 import { useSelector, useDispatch } from 'react-redux'
-import { createPaymentIntent, setPaymentMetadata, setFinalTotal } from '@/lib/redux/features/paymentSlice'
+import { createPaymentIntent, setPaymentMetadata, setFinalTotal, setSessionId } from '@/lib/redux/features/paymentSlice'
 import useGetUser from '@/lib/hooks/useGetUser';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
@@ -330,6 +330,9 @@ export default function PaymentPage() {
   const handleAlipayPayment = async () => {
     if (!planDetails || !planDetails.price || !planDetails.name || !user?.id) {
       console.log('Missing required details for payment');
+      toast.error('Missing payment details', {
+        description: 'Please ensure all payment details are complete.'
+      });
       return;
     }
     
@@ -341,7 +344,22 @@ export default function PaymentPage() {
     dispatch(setFinalTotal(finalAmount));
     
     setIsProcessing(true);
+    
+    // Show processing toast
+    const processingToastId = toast.loading('Processing payment...', {
+      description: 'Preparing your Alipay payment. Please wait.'
+    });
+    
     try {
+      console.log('Sending Alipay payment request with data:', {
+        planName: planDetails.name,
+        price: planDetails.price,
+        finalAmount: finalAmount,
+        email: email,
+        userId: user.id,
+        planId: planId
+      });
+      
       const response = await fetch('/api/create-alipay-session', {
         method: 'POST',
         headers: {
@@ -349,7 +367,7 @@ export default function PaymentPage() {
         },
         body: JSON.stringify({
           planName: planDetails.name,
-          price: finalAmount, // Use the final amount here
+          price: planDetails.price,
           quantity: 1,
           email: email,
           userId: user.id,
@@ -360,27 +378,83 @@ export default function PaymentPage() {
         }),
       });
       
+      // Dismiss the processing toast
+      toast.dismiss(processingToastId);
+      
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Alipay error:', errorText);
+        console.error('Alipay error response:', errorText);
+        console.error('Response status:', response.status);
+        
+        let errorMessage = `Payment error (${response.status})`;
         try {
+          // Try to parse as JSON to get error details
           const errorJson = JSON.parse(errorText);
-          throw new Error(errorJson.error || `Server error: ${response.status}`);
+          errorMessage = errorJson.error || `Server error: ${response.status}`;
+          console.error('Parsed error:', errorJson);
+          
+          toast.error('Payment failed', {
+            description: errorMessage
+          });
+          
+          throw new Error(errorMessage);
         } catch (e) {
+          // If parsing fails, use the raw error text
+          console.error('Error parsing error response:', e);
+          
+          toast.error('Payment failed', {
+            description: `Server error: ${response.status}`
+          });
+          
           throw new Error(`Server error: ${response.status}`);
         }
       }
       
       const data = await response.json();
+      console.log('Alipay session created:', data);
       
       if (data && data.url) {
-        // 重定向到 Alipay 支付页面
-        window.location.href = data.url;
+        // Store the session ID in Redux if available
+        if (data.sessionId) {
+          console.log('Storing session ID in Redux:', data.sessionId);
+          dispatch(setSessionId(data.sessionId));
+        } else {
+          // Extract session ID from URL if not directly provided
+          const sessionId = new URL(data.url).searchParams.get('session_id');
+          if (sessionId) {
+            console.log('Extracted session ID from URL:', sessionId);
+            dispatch(setSessionId(sessionId));
+          }
+        }
+        
+        toast.success('Redirecting to Alipay', {
+          description: 'You will be redirected to complete your payment.'
+        });
+        
+        // Short delay before redirect to ensure toast is visible
+        setTimeout(() => {
+          // Redirect to Alipay payment page
+          window.location.href = data.url;
+        }, 1000);
       } else {
+        console.error('Invalid response from server:', data);
+        toast.error('Payment setup failed', {
+          description: 'Unable to initialize Alipay payment. Please try again.'
+        });
         throw new Error('Invalid response from server');
       }
     } catch (error) {
-      console.error('Alipay error:', error);
+      console.error('Alipay payment error:', error);
+      
+      // Only show toast if not already shown above
+      if (!toast.isActive(processingToastId)) {
+        toast.error('Payment failed', {
+          description: error.message || 'An unexpected error occurred. Please try again.'
+        });
+      } else {
+        toast.dismiss(processingToastId);
+      }
+      
       setIsProcessing(false);
     }
   };
@@ -853,6 +927,11 @@ export default function PaymentPage() {
 
                       {selectedPaymentMethod === 'alipay' && (
                         <div className="p-4 border-t">
+                          <div className="mb-4 text-sm text-gray-600">
+                            <p>Payment will be processed in Chinese Yuan (CNY).</p>
+                            <p>Approximate amount: ¥{(calculateFinalTotal() * 7.2).toFixed(2)} CNY</p>
+                            <p className="text-xs text-gray-500 mt-1">Exchange rate: 1 USD ≈ 7.2 CNY</p>
+                          </div>
                           <button
                             onClick={handleAlipayPayment}
                             disabled={isProcessing}

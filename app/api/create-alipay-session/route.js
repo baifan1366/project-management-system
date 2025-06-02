@@ -1,65 +1,106 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Initialize Stripe with your secret key
-const stripe = new Stripe(process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY);
-
 export async function POST(req) {
   try {
-    // 验证 Stripe 密钥
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('Stripe secret key is missing. Check your environment variables.');
+    // Log environment variables (without exposing full key)
+    const stripeKeyExists = !!process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY;
+    console.log(`NEXT_PUBLIC_STRIPE_SECRET_KEY exists: ${stripeKeyExists}`);
+    if (stripeKeyExists) {
+      const keyPreview = process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY.substring(0, 7) + '...';
+      console.log(`NEXT_PUBLIC_STRIPE_SECRET_KEY preview: ${keyPreview}`);
     }
     
-    // 从请求中获取数据
-    const { planName, price, quantity, email, userId, planId, payment_method } = await req.json();
+    // Validate Stripe key
+    if (!process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY) {
+      console.error('Stripe secret key is missing');
+      return NextResponse.json({ error: 'Stripe secret key is missing. Check your environment variables.' }, { status: 500 });
+    }
     
-    // 验证必要参数
+    // Initialize Stripe with the secret key
+    const stripe = new Stripe(process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY);
+    
+    // Parse request body
+    const body = await req.json();
+    console.log('Request body:', JSON.stringify(body, null, 2));
+    
+    const { planName, price, quantity, email, userId, planId, promoCode, discount, finalAmount } = body;
+    
+    // Validate required parameters
     if (!price || price <= 0) {
+      console.error('Invalid price provided:', price);
       return NextResponse.json({ error: 'Valid price is required' }, { status: 400 });
     }
     
     if (!quantity || quantity < 1) {
+      console.error('Invalid quantity provided:', quantity);
       return NextResponse.json({ error: 'Quantity must be at least 1' }, { status: 400 });
     }
     
     if (!planName) {
+      console.error('Plan name is missing');
       return NextResponse.json({ error: 'Plan name is required' }, { status: 400 });
     }
     
-    // 创建 Alipay 会话
+    // Calculate the amount to charge (use finalAmount if provided, otherwise use price)
+    const amountToCharge = finalAmount || price;
+    console.log(`Creating Alipay session for ${planName}, amount: ${amountToCharge}`);
+    
+    // Convert USD to CNY (approximate exchange rate, in production you'd use a real-time rate)
+    // As of 2024, roughly 1 USD = 7.2 CNY
+    const exchangeRate = 7.2;
+    const amountInCNY = Math.round(amountToCharge * exchangeRate * 100); // Convert to CNY cents
+    
+    console.log(`Converting ${amountToCharge} USD to CNY: ${amountInCNY/100} CNY`);
+    
+    // Create Alipay session with CNY currency
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['alipay'],
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'cny', // Using CNY which is fully supported by Alipay
             product_data: {
               name: planName,
               description: `${planName} Subscription`,
             },
-            unit_amount: Math.round(price * 100), // 转换为分
+            unit_amount: amountInCNY, // Amount in CNY cents
           },
           quantity: quantity,
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/en/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/en/payment`,
       customer_email: email,
       metadata: {
         planName: planName,
         quantity: quantity.toString(),
         userId: userId,
         planId: planId,
-        payment_method: payment_method || 'alipay'
+        payment_method: 'alipay',
+        promoCode: promoCode || '',
+        discount: discount ? discount.toString() : '0',
+        finalAmount: amountToCharge.toString(),
+        originalCurrency: 'usd',
+        convertedCurrency: 'cny',
+        exchangeRate: exchangeRate.toString()
       },
     });
     
-    // 返回重定向 URL
-    return NextResponse.json({ url: session.url });
+    console.log('Alipay session created successfully, redirecting to:', session.url);
+    
+    // Return redirect URL and session ID
+    return NextResponse.json({ 
+      url: session.url,
+      sessionId: session.id
+    });
   } catch (error) {
     console.error('Error creating Alipay session:', error);
+    console.error('Error details:', error.message);
+    if (error.type) {
+      console.error('Stripe error type:', error.type);
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 } 
