@@ -706,6 +706,7 @@
     "pleaseWait": "Please wait while we create your task.",
     "createSuccess": "Success!",
     "taskCreated": "Your task has been created successfully.",
+    "projectCreatedSuccess": "Your project has been created successfully.",
     "createError": "Error creating task.",
     "pleaseTryAgain": "Something went wrong. Please try again.",
     "enterNewTaskName": "Enter new task name",
@@ -1651,7 +1652,8 @@
     },
     "emailVerification": {
       "title": "Email Verification",
-      "loading": "Verifying your email..."
+      "loading": "Verifying your email...",
+      "redirecting": "Redirecting you to login page..."
     },
     "signup": {
       "title": "Sign up",
@@ -1859,6 +1861,10 @@
       "data_analysis": "Data Analysis",
       "document_generation": "Document Generation",
       "email_message": "Email Message",
+      "email_template": "Email Template",
+      "meeting_summary": "Meeting Summary",
+      "task_automation": "Task Automation",
+      "idea_generation": "Idea Generation",
       "learning_content": "Learning Content",
       "ppt_generation": "PowerPoint Generation"
     },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,27 @@ export default function TaskManagerAgent({ userId, projectId }) {
   const [instruction, setInstruction] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const [shouldNavigate, setShouldNavigate] = useState(false);
+  const [navigateToId, setNavigateToId] = useState(null);
+  const [shouldRefresh, setShouldRefresh] = useState(false);
   const router = useRouter();
   const t = useTranslations();
+  
+  // Effect for handling navigation after render
+  useEffect(() => {
+    if (shouldNavigate && navigateToId) {
+      router.push(`/projects/${navigateToId}`);
+      setShouldNavigate(false);
+    }
+  }, [shouldNavigate, navigateToId, router]);
+
+  // Effect for handling page refresh after render
+  useEffect(() => {
+    if (shouldRefresh) {
+      router.refresh();
+      setShouldRefresh(false);
+    }
+  }, [shouldRefresh, router]);
   
   // Predefined prompt templates
   const promptTemplates = [
@@ -119,15 +138,17 @@ export default function TaskManagerAgent({ userId, projectId }) {
         
         toast.success(successMessage);
         
-        // 如果在现有项目中添加任务，不需要重定向
+        // Set navigation state instead of using setTimeout
         if (data.projectId && !projectId) {
+          // Schedule navigation to project page
+          setNavigateToId(data.projectId);
           setTimeout(() => {
-            router.push(`/projects/${data.projectId}`);
+            setShouldNavigate(true);
           }, 1500);
         } else if (projectId) {
-          // 如果添加到现有项目，刷新页面以显示新任务
+          // Schedule page refresh
           setTimeout(() => {
-            router.refresh();
+            setShouldRefresh(true);
           }, 1500);
         }
       }
