@@ -6,6 +6,7 @@ import { Upload, X, File, Paperclip, FileText, Sheet, Film, Music, Eye, ChevronL
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import useGetUser from '@/lib/hooks/useGetUser';
+import { useTranslations } from 'next-intl';
 
 export default function FileUploader({ 
   onUploadComplete, 
@@ -22,6 +23,7 @@ export default function FileUploader({
   buttonClassName = "", // 按钮样式类
   children // 子元素，用于自定义按钮内容
 }) {
+  const t = useTranslations('FileUploader');
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -43,7 +45,7 @@ export default function FileUploader({
     );
     
     if (invalidFiles.length > 0) {
-      setError(`文件大小不能超过 ${maxFileSize}MB`);
+      setError(t('fileSizeError', { size: maxFileSize }));
       return;
     }
     
@@ -111,7 +113,7 @@ export default function FileUploader({
     );
     
     if (invalidFiles.length > 0) {
-      setError(`文件大小不能超过 ${maxFileSize}MB`);
+      setError(t('fileSizeError', { size: maxFileSize }));
       return;
     }
     
@@ -210,7 +212,7 @@ export default function FileUploader({
               previewFile.type.includes('html') || 
               previewFile.type.includes('css')) {
       // 为文本文件创建预览
-      const [textContent, setTextContent] = useState('加载中...');
+      const [textContent, setTextContent] = useState(t('loading'));
       
       // 读取文本内容
       useEffect(() => {
@@ -219,7 +221,7 @@ export default function FileUploader({
           setTextContent(e.target.result);
         };
         reader.onerror = () => {
-          setTextContent('无法读取文件内容');
+          setTextContent(t('unableToReadFile'));
         };
         reader.readAsText(previewFile.file);
       }, [previewFile]);
@@ -240,7 +242,7 @@ export default function FileUploader({
           </div>
           <h3 className="text-xl font-medium mb-2">{previewFile.name}</h3>
           <p className="text-gray-500 mb-4">{formatFileSize(previewFile.size)}</p>
-          <p className="text-gray-500">无法预览此类型的文件，请下载后查看</p>
+          <p className="text-gray-500">{t('cannotPreview')}</p>
           <button
             className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md"
             onClick={() => {
@@ -252,7 +254,7 @@ export default function FileUploader({
               document.body.removeChild(a);
             }}
           >
-            下载文件
+            {t('downloadFile')}
           </button>
         </div>
       );
@@ -271,16 +273,16 @@ export default function FileUploader({
     try {
       // 确保用户ID和会话ID存在
       if (!userId || !sessionId) {
-        throw new Error('缺少用户ID或会话ID');
+        throw new Error(t('missingUserOrSession'));
       }
 
       // 使用外部获取的currentUser
       if (!currentUser) {
-        throw new Error('用户未登录或会话已过期');
+        throw new Error(t('userNotLoggedIn'));
       }
       
       if (currentUser.id !== userId) {
-        throw new Error('用户ID不匹配，没有上传权限');
+        throw new Error(t('noPermission'));
       }
       
       for (let i = 0; i < files.length; i++) {
@@ -299,8 +301,8 @@ export default function FileUploader({
           });
           
         if (uploadError) {
-          console.error('上传错误:', uploadError);
-          throw new Error(`上传失败: ${uploadError.message}`);
+          console.error('Upload error:', uploadError);
+          throw new Error(`${t('uploadFailed')}: ${uploadError.message}`);
         }
         
         // 获取公共URL
@@ -338,8 +340,8 @@ export default function FileUploader({
       setShowDialog(false); 
       
     } catch (error) {
-      console.error('上传过程中出错:', error);
-      setError(error.message || '上传失败');
+      console.error('Error during upload:', error);
+      setError(error.message || t('uploadFailed'));
     } finally {
       setUploading(false);
       setMessage(''); // 清空消息
@@ -376,7 +378,7 @@ export default function FileUploader({
           onClick={triggerFileInput}
           className={cn("p-2 rounded-full hover:bg-accent/50 disabled:opacity-50", buttonClassName)}
           disabled={uploading || isPending}
-          title="上传文件"
+          title={t('uploadFile')}
         >
           {children || <Paperclip className="h-4 w-4 text-muted-foreground" />}
         </button>
@@ -401,7 +403,7 @@ export default function FileUploader({
               ) : (
                 <>
                   <div className="flex items-center justify-between p-4 border-b">
-                    <h2 className="text-lg font-semibold">上传文件</h2>
+                    <h2 className="text-lg font-semibold">{t('uploadFile')}</h2>
                     <button 
                       onClick={handleClose}
                       className="p-1 rounded-full hover:bg-accent/50"
@@ -425,7 +427,7 @@ export default function FileUploader({
                     >
                       <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground">
-                        点击或拖拽文件至此处上传 (最大 {maxFileSize}MB)
+                        {t('dragAndDropFiles', { size: maxFileSize })}
                       </p>
                       {error && (
                         <p className="text-sm text-red-500 mt-2">{error}</p>
@@ -437,7 +439,7 @@ export default function FileUploader({
                       <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        placeholder="添加消息（可选）"
+                        placeholder={t('addMessage')}
                         className="w-full bg-accent/50 rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
                         rows={2}
                       />
@@ -445,7 +447,7 @@ export default function FileUploader({
 
                     {/* 文件列表 */}
                     <div className="mt-4 space-y-2">
-                      <p className="text-sm font-medium">已选择的文件</p>
+                      <p className="text-sm font-medium">{t('selectedFiles')}</p>
                       <div className="space-y-2 max-h-64 overflow-y-auto p-1">
                         {files.length > 0 ? (
                           files.map(file => (
@@ -478,14 +480,14 @@ export default function FileUploader({
                                 <button
                                   onClick={() => openPreview(file)}
                                   className="p-1 rounded-full hover:bg-accent mr-1"
-                                  title="预览"
+                                  title={t('preview')}
                                 >
                                   <Eye className="h-4 w-4" />
                                 </button>
                                 <button 
                                   onClick={() => removeFile(file.id)}
                                   className="p-1 rounded-full hover:bg-accent"
-                                  title="删除"
+                                  title={t('deleteFile')}
                                 >
                                   <X className="h-4 w-4" />
                                 </button>
@@ -494,7 +496,7 @@ export default function FileUploader({
                           ))
                         ) : (
                           <div className="text-center py-3 text-sm text-muted-foreground">
-                            暂无文件，请选择或拖拽文件
+                            {t('noFiles')}
                           </div>
                         )}
                       </div>
@@ -510,7 +512,7 @@ export default function FileUploader({
                           />
                         </div>
                         <p className="text-xs text-muted-foreground text-center mt-1">
-                          上传中 {progress}%
+                          {t('uploading', { progress })}
                         </p>
                       </div>
                     )}
@@ -522,14 +524,14 @@ export default function FileUploader({
                         className="px-4 py-2 text-sm rounded-md hover:bg-accent"
                         disabled={uploading}
                       >
-                        取消
+                        {t('cancel')}
                       </button>
                       <button
                         onClick={uploadFiles}
                         className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
                         disabled={files.length === 0 || uploading}
                       >
-                        上传
+                        {t('upload')}
                       </button>
                     </div>
                   </div>
@@ -565,7 +567,7 @@ export default function FileUploader({
         ) : (
           <>
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">上传文件</h2>
+              <h2 className="text-lg font-semibold">{t('uploadFile')}</h2>
               <button 
                 onClick={handleClose}
                 className="p-1 rounded-full hover:bg-accent/50"
@@ -598,7 +600,7 @@ export default function FileUploader({
                 />
                 <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  点击或拖拽文件至此处上传 (最大 {maxFileSize}MB)
+                  {t('dragAndDropFiles', { size: maxFileSize })}
                 </p>
                 {error && (
                   <p className="text-sm text-red-500 mt-2">{error}</p>
@@ -610,7 +612,7 @@ export default function FileUploader({
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="添加消息（可选）"
+                  placeholder={t('addMessage')}
                   className="w-full bg-accent/50 rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
                   rows={2}
                 />
@@ -619,7 +621,7 @@ export default function FileUploader({
               {/* 文件列表 */}
               {files.length > 0 && (
                 <div className="mt-4 space-y-2">
-                  <p className="text-sm font-medium">已选择的文件</p>
+                  <p className="text-sm font-medium">{t('selectedFiles')}</p>
                   <div className="space-y-2 max-h-64 overflow-y-auto p-1">
                     {files.map(file => (
                       <div key={file.id} className="flex items-center justify-between bg-accent/50 rounded-lg p-2">
@@ -651,14 +653,14 @@ export default function FileUploader({
                           <button
                             onClick={() => openPreview(file)}
                             className="p-1 rounded-full hover:bg-accent mr-1"
-                            title="预览"
+                            title={t('preview')}
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           <button 
                             onClick={() => removeFile(file.id)}
                             className="p-1 rounded-full hover:bg-accent"
-                            title="删除"
+                            title={t('deleteFile')}
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -679,7 +681,7 @@ export default function FileUploader({
                     />
                   </div>
                   <p className="text-xs text-muted-foreground text-center mt-1">
-                    上传中 {progress}%
+                    {t('uploading', { progress })}
                   </p>
                 </div>
               )}
@@ -691,14 +693,14 @@ export default function FileUploader({
                   className="px-4 py-2 text-sm rounded-md hover:bg-accent"
                   disabled={uploading}
                 >
-                  取消
+                  {t('cancel')}
                 </button>
                 <button
                   onClick={uploadFiles}
                   className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
                   disabled={files.length === 0 || uploading}
                 >
-                  上传
+                  {t('upload')}
                 </button>
               </div>
             </div>

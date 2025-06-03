@@ -339,6 +339,7 @@ const MemoizedMessage = memo(function Message({
             <div className="pr-7">
               <GoogleTranslator 
                 content={msg.content}
+                targetLang={currentUser.language}
                 showButton={false}
                 ref={ref => {
                   if (ref) translatorRefs.current[`translator-${msg.id}`] = ref;

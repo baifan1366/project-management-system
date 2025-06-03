@@ -37,6 +37,29 @@ export default function PricingPage() {
   // 处理计划选择
   const handlePlanSelection = async (plan) => {
     try {
+      // Special handling for Enterprise plans - redirect to contact us page
+      if (plan.type === 'ENTERPRISE') {
+        router.push(`/${locale}/contactUs?form=enterprise`);
+        return;
+      }
+
+      // 检查是否是当前计划，如果是则重定向到仪表板
+      if (currentUserPlan) {
+        const currentPlanId = currentUserPlan.id || currentUserPlan.plan_id;
+        if (Number(currentPlanId) === Number(plan.id)) {
+          // 如果是当前计划，直接去仪表板
+          router.push(`/${locale}/dashboard`);
+          return;
+        }
+        
+        // 检查是否是降级操作，如果是则重定向到联系我们页面
+        if (Number(currentPlanId) > Number(plan.id)) {
+          // 降级操作，重定向到联系我们页面，并默认选择降级表单
+          router.push(`/${locale}/contactUs?form=downgrade&from=${currentPlanId.toString()}&to=${plan.id.toString()}`);
+          return;
+        }
+      }
+      
       if (!user) {
         console.log('用户未登录，重定向到登录页面');
         const loginParams = new URLSearchParams({
@@ -146,6 +169,11 @@ export default function PricingPage() {
 
   // 获取每个计划的CTA文本
   const getPlanCtaText = (plan) => {
+    // Special handling for Enterprise plans
+    if (plan.type === 'ENTERPRISE') {
+      return 'Contact Us';
+    }
+
     // 如果用户未登录或没有计划数据
     if (!currentUserPlan) {
       if(plan.id === 1){
@@ -176,11 +204,55 @@ export default function PricingPage() {
     return 'Change Plan';
   };
 
+  // 渲染骨架屏加载状态
+  const renderSkeletonLoader = () => {
+    return (
+      <div className="container mx-auto px-4 py-16">
+        <div className="animate-pulse">
+          {/* 标题骨架 */}
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-3/4 mx-auto mb-4"></div>
+          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-lg w-2/4 mx-auto mb-8"></div>
+          
+          {/* 计费周期切换骨架 */}
+          <div className="flex justify-center mb-8">
+            <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-full w-64"></div>
+          </div>
+          
+          {/* 计划卡片骨架 */}
+          <div className="grid md:grid-cols-3 gap-8">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="border rounded-lg p-6 shadow-lg relative">
+                {/* Plan Type 标签骨架 */}
+                <div className="absolute -top-3 right-6 w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-4"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6"></div>
+                
+                {/* 功能列表骨架 */}
+                <div className="space-y-3 mb-8">
+                  {[1, 2, 3, 4].map((j) => (
+                    <div key={j} className="flex items-center">
+                      <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded-full mr-2"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 按钮骨架 */}
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-full mt-auto"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // 显示加载状态
   if (status === 'loading') {
-    return <div className="flex justify-center items-center min-h-screen">
-      <div>Loading...</div>
-    </div>
+    return renderSkeletonLoader();
   }
 
   // 显示错误状态
@@ -256,8 +328,20 @@ export default function PricingPage() {
             <div className={clsx(
               'border rounded-lg p-6 shadow-lg',
               'flex flex-col h-full',
-              'animate-heightIn'
+              'animate-heightIn',
+              'relative'
             )}>
+              {/* Plan Type 标签 */}
+              <div className={clsx(
+                'absolute -top-3 right-6 px-3 py-1 rounded-full text-xs font-semibold',
+                plan.type === 'FREE' ? 'bg-green-100 text-green-800' :
+                plan.type === 'PRO' ? 'bg-indigo-100 text-indigo-800' :
+                plan.type === 'ENTERPRISE' ? 'bg-purple-100 text-purple-800' :
+                'bg-gray-100 text-gray-800'
+              )}>
+                {plan.type}
+              </div>
+              
               <div className="flex-grow">
                 <h2 className="text-2xl font-bold mb-4">{plan.name}</h2>
                 <p className="text-gray-600 mb-4">{plan.description}</p>
