@@ -2652,5 +2652,15 @@
       "chatCreationFailed": "Failed to create chat",
       "onlyOwnerCanEditName": "Only the group owner can edit the group name"
     }
+  },
+  "Payment": {
+    "validationError": "Sesi pembayaran tidak sah atau telah tamat tempoh. Sila cuba lagi.",
+    "sessionExpired": "Sesi pembayaran telah tamat tempoh. Sila cuba lagi.",
+    "processingPayment": "Memproses pembayaran...",
+    "selectPaymentMethod": "Pilih Kaedah Pembayaran",
+    "sessionExpiringTitle": "Sesi hampir tamat",
+    "sessionExpiresIn": "Sesi akan tamat dalam",
+    "pleaseCompletePayment": "Sila selesaikan pembayaran anda",
+    "pleaseCompletePaymentNow": "Sila selesaikan pembayaran anda sekarang"
   }
 }

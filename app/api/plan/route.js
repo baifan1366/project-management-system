@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { useGetUser } from '@/lib/hooks/useGetUser';
 
-const supabaseUrl = 'https://xvvuzblglnbbsrmzgexp.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2dnV6YmxnbG5iYnNybXpnZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4NjA4NjgsImV4cCI6MjA1NTQzNjg2OH0.S9--0XYykXk_lyTIcaSuF2psp9Zeb69U0orCys8SD7U'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 // GET: Fetch all subscription plans
 export async function GET() {

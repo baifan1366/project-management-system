@@ -22,6 +22,7 @@ import { Line, Bar, Pie } from 'react-chartjs-2';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 import { toast } from 'sonner';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 // 注册Chart.js组件
 ChartJS.register(
@@ -34,7 +35,8 @@ ChartJS.register(
   Title, 
   Tooltip, 
   Legend,
-  Filler
+  Filler,
+  ChartDataLabels
 );
 
 export default function AdminAnalytics() {
@@ -47,7 +49,10 @@ export default function AdminAnalytics() {
   const [dateRange, setDateRange] = useState('30');  // 默认30天
   const [revenueData, setRevenueData] = useState({ labels: [], datasets: [] });
   const [userGrowthData, setUserGrowthData] = useState({ labels: [], datasets: [] });
-  const [paymentMethodData, setPaymentMethodData] = useState({ labels: [], datasets: [] });
+  const [paymentMethodData, setPaymentMethodData] = useState({ 
+    count: { labels: [], datasets: [] },
+    volume: { labels: [], datasets: [] }
+  });
   const [planDistributionData, setPlanDistributionData] = useState({ labels: [], datasets: [] });
   const [summaryStats, setSummaryStats] = useState({
     totalRevenue: 0,
@@ -57,6 +62,11 @@ export default function AdminAnalytics() {
   });
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
+  const [activePaymentView, setActivePaymentView] = useState('count');
+  const [activePlanView, setActivePlanView] = useState('count');
+  const [planDetails, setPlanDetails] = useState([]);
+  const [paymentTotals, setPaymentTotals] = useState({ transactions: 0, volume: 0 });
+  const [planTotals, setPlanTotals] = useState({ subscribers: 0, revenue: 0 });
 
   // initialize the page
   useEffect(() => {
@@ -111,7 +121,10 @@ export default function AdminAnalytics() {
       // Clear existing data
       setRevenueData({ labels: [], datasets: [] });
       setUserGrowthData({ labels: [], datasets: [] });
-      setPaymentMethodData({ labels: [], datasets: [] });
+      setPaymentMethodData({ 
+        count: { labels: [], datasets: [] },
+        volume: { labels: [], datasets: [] }
+      });
       setPlanDistributionData({ labels: [], datasets: [] });
       setSummaryStats({
         totalRevenue: 0,
@@ -267,7 +280,7 @@ export default function AdminAnalytics() {
     try {
       const { data, error } = await supabase
         .from('payment')
-        .select('payment_method, count')
+        .select('payment_method, amount, status')
         .eq('status', 'COMPLETED')
         .not('payment_method', 'is', null)
         .gte('created_at', startDate.toISOString())
@@ -277,32 +290,89 @@ export default function AdminAnalytics() {
       
       // 处理支付方法统计
       const paymentMethods = {};
+      const paymentAmounts = {};
+      const paymentColors = {
+        'credit_card': 'rgba(255, 99, 132, 0.7)',
+        'paypal': 'rgba(54, 162, 235, 0.7)',
+        'bank_transfer': 'rgba(255, 206, 86, 0.7)',
+        'apple_pay': 'rgba(75, 192, 192, 0.7)',
+        'google_pay': 'rgba(153, 102, 255, 0.7)',
+        'wechat_pay': 'rgba(255, 159, 64, 0.7)',
+        'alipay': 'rgba(201, 203, 207, 0.7)',
+        'other': 'rgba(100, 120, 140, 0.7)'
+      };
       
-      data.forEach(row => {
-        const method = row.payment_method;
+      // Format payment method names for better display
+      const formatMethodName = (method) => {
+        return method
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+      };
+      
+      // Calculate totals
+      let totalTransactions = 0;
+      let totalVolume = 0;
+      
+      data.forEach(payment => {
+        const method = payment.payment_method;
+        const amount = parseFloat(payment.amount);
+        
+        // Count transactions per method
         paymentMethods[method] = (paymentMethods[method] || 0) + 1;
+        totalTransactions += 1;
+        
+        // Sum amount per method
+        paymentAmounts[method] = (paymentAmounts[method] || 0) + amount;
+        totalVolume += amount;
       });
       
-      // 准备图表数据
-      const labels = Object.keys(paymentMethods);
+      // Update totals
+      setPaymentTotals({
+        transactions: totalTransactions,
+        volume: totalVolume
+      });
+      
+      // Prepare chart data
+      const labels = Object.keys(paymentMethods).map(formatMethodName);
+      const backgroundColors = Object.keys(paymentMethods).map(method => 
+        paymentColors[method] || 'rgba(100, 120, 140, 0.7)' // Default color if not in mapping
+      );
+      
       const chartData = {
         labels: labels,
         datasets: [
           {
+            label: 'Transaction Count',
             data: Object.values(paymentMethods),
-            backgroundColor: [
-              'rgba(255, 99, 132, 0.7)',
-              'rgba(54, 162, 235, 0.7)',
-              'rgba(255, 206, 86, 0.7)',
-              'rgba(75, 192, 192, 0.7)',
-              'rgba(153, 102, 255, 0.7)',
-            ],
-            borderWidth: 1
+            backgroundColor: backgroundColors,
+            borderColor: backgroundColors.map(color => color.replace('0.7', '1')),
+            borderWidth: 1,
+            hoverOffset: 4
           }
         ]
       };
       
-      setPaymentMethodData(chartData);
+      // Add a second dataset with payment amounts
+      const amountChartData = {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Payment Volume',
+            data: Object.keys(paymentMethods).map(method => paymentAmounts[method]),
+            backgroundColor: backgroundColors,
+            borderColor: backgroundColors.map(color => color.replace('0.7', '1')),
+            borderWidth: 1,
+            hoverOffset: 4
+          }
+        ]
+      };
+      
+      // Update state with both datasets
+      setPaymentMethodData({
+        count: chartData,
+        volume: amountChartData
+      });
       
     } catch (error) {
       console.error('Error fetching payment method distribution:', error);
@@ -312,54 +382,125 @@ export default function AdminAnalytics() {
   // 获取订阅计划分布
   const fetchPlanDistribution = async (startDate, endDate) => {
     try {
-      // 获取用户订阅计划统计
-      const { data, error } = await supabase
+      // First, get all subscription plans to have their details
+      const { data: planData, error: planError } = await supabase
+        .from('subscription_plan')
+        .select('id, name, type, price');
+        
+      if (planError) throw planError;
+      
+      // Create a map of plans by ID for quick lookup
+      const plansById = {};
+      planData.forEach(plan => {
+        plansById[plan.id] = {
+          ...plan,
+          subscribers: 0,
+          revenue: 0
+        };
+      });
+      
+      // Now get active subscriptions without grouping
+      const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('user_subscription_plan')
-        .select(`
-          subscription_plan:plan_id (
-            name,
-            type
-          ),
-          count
-        `)
+        .select('plan_id')
         .eq('status', 'ACTIVE')
         .not('plan_id', 'is', null)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
         
-      if (error) throw error;
+      if (subscriptionError) throw subscriptionError;
       
-      // 处理计划分布
-      const planCounts = {};
+      // Process subscription data - count occurrences manually
+      let totalSubscribers = 0;
+      let totalRevenue = 0;
       
-      data.forEach(subscription => {
-        if (subscription.subscription_plan) {
-          const planName = subscription.subscription_plan.name;
-          planCounts[planName] = (planCounts[planName] || 0) + 1;
+      subscriptionData.forEach(subscription => {
+        const planId = subscription.plan_id;
+        if (plansById[planId]) {
+          plansById[planId].subscribers += 1;
+          plansById[planId].revenue += parseFloat(plansById[planId].price || 0);
+          
+          totalSubscribers += 1;
+          totalRevenue += parseFloat(plansById[planId].price || 0);
         }
       });
       
-      // 准备图表数据
-      const chartData = {
-        labels: Object.keys(planCounts),
+      // Update totals
+      setPlanTotals({
+        subscribers: totalSubscribers,
+        revenue: totalRevenue
+      });
+      
+      // Convert to array and sort by subscribers
+      const planDetailsArray = Object.values(plansById)
+        .filter(plan => plan.subscribers > 0)
+        .sort((a, b) => b.subscribers - a.subscribers);
+      
+      // Set plan details for table display
+      setPlanDetails(planDetailsArray);
+      
+      // Prepare chart data
+      const labels = planDetailsArray.map(plan => plan.name);
+      const subscriberCounts = planDetailsArray.map(plan => plan.subscribers);
+      const revenueValues = planDetailsArray.map(plan => plan.revenue);
+      
+      // Define colors for plans
+      const planColors = [
+        'rgba(255, 159, 64, 0.7)',
+        'rgba(75, 192, 192, 0.7)',
+        'rgba(54, 162, 235, 0.7)',
+        'rgba(153, 102, 255, 0.7)',
+        'rgba(255, 99, 132, 0.7)',
+        'rgba(201, 203, 207, 0.7)',
+        'rgba(255, 205, 86, 0.7)',
+        'rgba(100, 120, 140, 0.7)'
+      ];
+      
+      // Ensure we have enough colors
+      const backgroundColors = planColors.slice(0, labels.length);
+      
+      // Create chart data for subscribers
+      const countChartData = {
+        labels,
         datasets: [
           {
-            data: Object.values(planCounts),
-            backgroundColor: [
-              'rgba(255, 159, 64, 0.7)',
-              'rgba(75, 192, 192, 0.7)',
-              'rgba(54, 162, 235, 0.7)',
-              'rgba(153, 102, 255, 0.7)',
-            ],
-            borderWidth: 1
+            label: 'Subscribers',
+            data: subscriberCounts,
+            backgroundColor: backgroundColors,
+            borderWidth: 1,
+            hoverOffset: 4
           }
         ]
       };
       
-      setPlanDistributionData(chartData);
+      // Create chart data for revenue
+      const revenueChartData = {
+        labels,
+        datasets: [
+          {
+            label: 'Revenue',
+            data: revenueValues,
+            backgroundColor: backgroundColors,
+            borderWidth: 1,
+            hoverOffset: 4
+          }
+        ]
+      };
+      
+      // Update state with both datasets
+      setPlanDistributionData({
+        count: countChartData,
+        revenue: revenueChartData
+      });
       
     } catch (error) {
       console.error('Error fetching plan distribution:', error);
+      // Set empty data to avoid rendering errors
+      setPlanDistributionData({
+        count: { labels: [], datasets: [] },
+        revenue: { labels: [], datasets: [] }
+      });
+      setPlanDetails([]);
     }
   };
   
@@ -485,15 +626,64 @@ export default function AdminAnalytics() {
   
   const pieOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top',
+        position: 'right',
+        labels: {
+          padding: 20,
+          boxWidth: 10,
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
       },
       title: {
         display: true,
         text: 'Payment Methods',
+        font: {
+          size: 16
+        }
       },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            const percentage = Math.round((value / total) * 100);
+            return `${label}: ${value} (${percentage}%)`;
+          }
+        }
+      },
+      datalabels: {
+        display: true,
+        color: '#fff',
+        font: {
+          weight: 'bold'
+        },
+        formatter: (value, context) => {
+          const total = context.dataset.data.reduce((a, b) => a + b, 0);
+          const percentage = Math.round((value / total) * 100);
+          return percentage > 5 ? `${percentage}%` : '';
+        }
+      }
     },
+    cutout: '50%'
+  };
+  
+  // Create separate options for plan distribution chart
+  const planPieOptions = {
+    ...pieOptions,
+    plugins: {
+      ...pieOptions.plugins,
+      title: {
+        display: true,
+        text: 'Plan Distribution',
+        font: {
+          size: 16
+        }
+      }
+    }
   };
   
   return (
@@ -677,38 +867,154 @@ export default function AdminAnalytics() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
                     <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Payment Methods</h3>
-                    {paymentMethodData.labels.length > 0 ? (
-                      <div className="h-80">
-                        <Pie data={paymentMethodData} options={pieOptions} />
+                    
+                    {paymentMethodData && paymentMethodData.count && paymentMethodData.count.labels.length > 0 ? (
+                      <div>
+                        <div className="flex justify-between mb-4">
+                          <div className="flex space-x-4">
+                            <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Total Transactions</p>
+                              <p className="text-lg font-semibold text-gray-800 dark:text-white">{paymentTotals.transactions}</p>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Total Volume</p>
+                              <p className="text-lg font-semibold text-gray-800 dark:text-white">{formatCurrency(paymentTotals.volume)}</p>
+                            </div>
+                          </div>
+                          <div className="inline-flex rounded-md shadow-sm" role="group">
+                            <button
+                              type="button"
+                              onClick={() => setActivePaymentView('count')}
+                              className={`px-4 py-2 text-sm font-medium ${
+                                activePaymentView === 'count' 
+                                  ? 'bg-blue-600 text-white' 
+                                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                              } border border-gray-200 rounded-l-lg`}
+                            >
+                              Transaction Count
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActivePaymentView('volume')}
+                              className={`px-4 py-2 text-sm font-medium ${
+                                activePaymentView === 'volume' 
+                                  ? 'bg-blue-600 text-white' 
+                                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                              } border border-gray-200 rounded-r-lg`}
+                            >
+                              Payment Volume
+                            </button>
+                          </div>
+                        </div>
+                        <div className="h-80">
+                          <Pie data={activePaymentView === 'count' ? paymentMethodData.count : paymentMethodData.volume} options={pieOptions} />
+                        </div>
+                        
+                        <div className="mt-6 overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-800">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payment Method</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Transactions</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Volume</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                              {paymentMethodData.count.labels.map((label, index) => (
+                                <tr key={label}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{label}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{paymentMethodData.count.datasets[0].data[index]}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">{formatCurrency(paymentMethodData.volume.datasets[0].data[index])}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     ) : (
                       <div className="h-80 flex items-center justify-center">
-                        <p className="text-gray-500 dark:text-gray-400">No payment method data available</p>
+                        <p className="text-gray-500 dark:text-gray-400">No payment method data available for the selected period</p>
                       </div>
                     )}
                   </div>
                   
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Subscription Plan Distribution</h3>
-                    {planDistributionData.labels.length > 0 ? (
-                      <div className="h-80">
-                        <Pie 
-                          data={planDistributionData} 
-                          options={{
-                            ...pieOptions,
-                            plugins: {
-                              ...pieOptions.plugins,
-                              title: {
-                                ...pieOptions.plugins.title,
-                                text: 'Subscription Plans'
-                              }
-                            }
-                          }} 
-                        />
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Plan Distribution</h3>
+                    {planDistributionData && planDistributionData.count && planDistributionData.count.labels.length > 0 ? (
+                      <div>
+                        <div className="flex justify-between mb-4">
+                          <div className="flex space-x-4">
+                            <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Total Subscribers</p>
+                              <p className="text-lg font-semibold text-gray-800 dark:text-white">{planTotals.subscribers}</p>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Total Revenue</p>
+                              <p className="text-lg font-semibold text-gray-800 dark:text-white">{formatCurrency(planTotals.revenue)}</p>
+                            </div>
+                          </div>
+                          <div className="inline-flex rounded-md shadow-sm" role="group">
+                            <button
+                              type="button"
+                              onClick={() => setActivePlanView('count')}
+                              className={`px-4 py-2 text-sm font-medium ${
+                                activePlanView === 'count' 
+                                  ? 'bg-blue-600 text-white' 
+                                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                              } border border-gray-200 rounded-l-lg`}
+                            >
+                              Subscribers
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActivePlanView('revenue')}
+                              className={`px-4 py-2 text-sm font-medium ${
+                                activePlanView === 'revenue' 
+                                  ? 'bg-blue-600 text-white' 
+                                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                              } border border-gray-200 rounded-r-lg`}
+                            >
+                              Revenue
+                            </button>
+                          </div>
+                        </div>
+                        <div className="h-80">
+                          <Pie 
+                            data={activePlanView === 'count' ? planDistributionData.count : planDistributionData.revenue} 
+                            options={planPieOptions} 
+                          />
+                        </div>
+                        
+                        <div className="mt-6 overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-800">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Plan Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subscribers</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                              {planDetails.map((plan) => (
+                                <tr key={plan.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{plan.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                    {plan.type.charAt(0).toUpperCase() + plan.type.slice(1).toLowerCase()}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatCurrency(plan.price)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{plan.subscribers}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">{formatCurrency(plan.revenue)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     ) : (
                       <div className="h-80 flex items-center justify-center">
-                        <p className="text-gray-500 dark:text-gray-400">No subscription plan data available</p>
+                        <p className="text-gray-500 dark:text-gray-400">No plan distribution data available for the selected period</p>
                       </div>
                     )}
                   </div>
@@ -717,9 +1023,7 @@ export default function AdminAnalytics() {
             )}
           </div>
         ) : (
-          <div className="min-h-screen flex items-center justify-center w-full">
-            <AccessRestrictedModal />
-          </div>
+          <AccessRestrictedModal />
         )}
       </div>
     </div>
