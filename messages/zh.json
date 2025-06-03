@@ -651,6 +651,17 @@
     "projectUsageDescription": "您已使用 {currentValue} 个项目,超出 {limit} 个项目的限制。请升级到更高计划以创建更多项目。"
   },
   "CreateTask": {
+    "assignees": "指派人",
+    "nameMinLength": "名称必须至少2个字符。",
+    "nameMaxLength": "名称不能超过100个字符。",
+    "editTabName": "编辑视图名称",
+    "saving": "保存中...",
+    "deleteTabTitle": "删除视图",
+    "deleteTabConfirm": "您确定要删除此视图吗？此操作无法撤消。",
+    "cannotDeleteTab": "无法删除视图",
+    "protectedTabMessage": "这是一个系统默认视图，无法删除。请创建并使用新的视图。",
+    "understand": "我理解",
+    "cannotDelete": "无法删除",
     "edit": "编辑",
     "teamNotFound": "团队未找到",
     "noAccessToTeam": "没有访问权限",
@@ -1971,6 +1982,8 @@
     "durationRequired": "持续时间是必填的。"
   },
   "Team": {
+    "add_assignee": "添加指派人",
+    "no_available_members": "没有可用成员",
     "details": "详情",
     "unassigned": "未分配",
     "assigned_users": "分配给",

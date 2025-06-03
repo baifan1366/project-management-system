@@ -680,6 +680,17 @@
     "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
   },
   "CreateTask": {
+    "assignees": "Assignees",
+    "nameMinLength": "Name must be at least 2 characters.",
+    "nameMaxLength": "Name cannot exceed 100 characters.",
+    "editTabName": "Edit View Name",
+    "saving": "Saving...",
+    "deleteTabTitle": "Delete View",
+    "deleteTabConfirm": "Are you sure you want to delete this view? This action cannot be undone.",
+    "cannotDeleteTab": "Cannot Delete View",
+    "protectedTabMessage": "This is a system default view and cannot be deleted. Please create and use new views instead.",
+    "understand": "I understand",
+    "cannotDelete": "Cannot Delete",
     "edit": "Edit",
     "teamNotFound": "Team Not Found",
     "noAccessToTeam": "No access to team",
@@ -1490,7 +1501,7 @@
     "tagAdded": "Tag added",
     "tagAddedDescription": "Successfully added tag \"{tag}\"",
     "tagAddFailed": "Failed to add tag",
-    "tagAddFailedDescription": "Failed to add tag \"{tag}\""
+    "tagAddFailedDescription": "Failed to add tag \"{tag}\""  
   },
   "notificationCenter": {
     "title": "Notification Center",
@@ -2032,6 +2043,8 @@
     "durationRequired": "Duration is required."
   },
   "Team": {
+    "add_assignee": "Add Assignee",
+    "no_available_members": "No available members",
     "details": "Details",
     "unassigned": "Unassigned",
     "assigned_users": "Assigned Users",

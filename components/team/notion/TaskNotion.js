@@ -58,11 +58,21 @@ import {
 import { Label } from '@/components/ui/label'
 
 // 创建部分对话框组件
-function CreateSectionDialog({ isOpen, setIsOpen, teamId, onSectionCreated }) {
+function CreateSectionDialog({ projectId, isOpen, setIsOpen, teamId, onSectionCreated }) {
   const t = useTranslations('Notion')
   const { user } = useGetUser()
   const [name, setName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [projectThemeColor, setProjectThemeColor] = useState('#ffffff');
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
+  
+  useEffect(() => {
+    if (project?.theme_color) {
+      setProjectThemeColor(project.theme_color);
+    }
+  }, [project]);
   
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -111,7 +121,7 @@ function CreateSectionDialog({ isOpen, setIsOpen, teamId, onSectionCreated }) {
   
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[350px]">
         <DialogHeader>
           <DialogTitle>{t('createSection')}</DialogTitle>
           <DialogDescription>
@@ -120,20 +130,19 @@ function CreateSectionDialog({ isOpen, setIsOpen, teamId, onSectionCreated }) {
         </DialogHeader>
         
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                {t('sectionName')} *
-              </Label>
+          <div className="grid gap-1">
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('sectionNamePlaceholder')}
-                className="col-span-3"
                 required
+                maxLength={50}
+                autoFocus
               />
-            </div>
+              <div className="text-xs text-muted-foreground text-right mb-4">
+                {name.trim().length}/50
+              </div>
           </div>
           
           <DialogFooter>
@@ -145,7 +154,7 @@ function CreateSectionDialog({ isOpen, setIsOpen, teamId, onSectionCreated }) {
             >
               {t('cancel')}
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} variant={projectThemeColor}>
               {isSubmitting ? t('creating') : t('create')}
             </Button>
           </DialogFooter>
@@ -155,7 +164,7 @@ function CreateSectionDialog({ isOpen, setIsOpen, teamId, onSectionCreated }) {
   )
 }
 
-export default function TaskNotion({ teamId }) {
+export default function TaskNotion({ projectId, teamId }) {
   const t = useTranslations('Notion')
   const { user: currentUser } = useGetUser()
   const { confirm } = useConfirm();
@@ -530,6 +539,18 @@ export default function TaskNotion({ teamId }) {
       page.title.toLowerCase().includes(searchQuery.toLowerCase())
     )
     
+    return pageHierarchy
+  }, [pageHierarchy, pages, searchQuery]);
+  
+  // 使用useEffect处理搜索时展开节点的逻辑
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    
+    // Filter pages based on search query
+    const filtered = pages.filter(page => 
+      page.title.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    
     // Function to find all parents of a page
     const findParents = (pageId) => {
       const page = pages.find(p => p.id === pageId)
@@ -551,9 +572,7 @@ export default function TaskNotion({ teamId }) {
     })
     
     setExpandedNodes(newExpandedNodes)
-    
-    return pageHierarchy
-  }, [pageHierarchy, pages, searchQuery, expandedNodes])
+  }, [searchQuery, pages]);
   
   // Handler for toggling node expansion
   const toggleNodeExpansion = (pageId) => {
@@ -1478,6 +1497,7 @@ export default function TaskNotion({ teamId }) {
       
       {/* Create Section dialog */}
       <CreateSectionDialog
+        projectId={projectId}
         isOpen={isCreateSectionOpen}
         setIsOpen={setIsCreateSectionOpen}
         teamId={teamId}

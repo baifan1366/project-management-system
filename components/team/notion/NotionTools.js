@@ -577,58 +577,6 @@ export default function NotionTools({
               </Select>
             </div>
             
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="icon" className="text-right">
-                {t('icon')}
-              </Label>
-              <div className="col-span-3 flex items-center gap-2">
-                <Input
-                  id="icon"
-                  value={icon}
-                  onChange={(e) => setIcon(e.target.value)}
-                  placeholder={t('iconPlaceholder')}
-                  className="flex-1"
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="icon"
-                  onClick={() => {
-                    // Emoji picker would go here in a more complex implementation
-                    toast.info(t('emojiPickerNotImplemented'))
-                  }}
-                >
-                  <Smile className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="coverImage" className="text-right">
-                {t('coverImage')}
-              </Label>
-              <div className="col-span-3 flex items-center gap-2">
-                <Input
-                  id="coverImage"
-                  value={coverImage}
-                  onChange={(e) => setCoverImage(e.target.value)}
-                  placeholder={t('coverImageUrlPlaceholder')}
-                  className="flex-1"
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="icon"
-                  onClick={() => {
-                    // Image upload would go here in a more complex implementation
-                    toast.info(t('imageUploadNotImplemented'))
-                  }}
-                >
-                  <Image className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="content" className="text-right pt-2">
                 {t('content')}
