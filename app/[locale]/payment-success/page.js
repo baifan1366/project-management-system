@@ -140,6 +140,8 @@ export default function PaymentSuccess() {
         .from('user_subscription_plan')
         .select('*')
         .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
       
       if (checkError) throw checkError;
@@ -148,28 +150,37 @@ export default function PaymentSuccess() {
       const now = new Date().toISOString();
       
       if (existingData) {
-        // Update existing record but preserve current usage values
-        const updateData = {
+        // Deactivate the current subscription plan
+        await supabase
+          .from('user_subscription_plan')
+          .update({
+            status: 'DEACTIVATED',
+            updated_at: now
+          })
+          .eq('id', existingData.id);
+        
+        // Create a new subscription plan with migrated usage data
+        const newData = {
           user_id: userId,
           plan_id: planId,
           status: 'ACTIVE',
           start_date: startDate,
           end_date: endDate,  // Can be null
-          // Preserve existing usage values
-          current_projects: existingData.current_projects,
-          current_teams: existingData.current_teams,
-          current_members: existingData.current_members,
-          current_ai_chat: existingData.current_ai_chat,
-          current_ai_task: existingData.current_ai_task,
-          current_ai_workflow: existingData.current_ai_workflow,
-          current_storage: existingData.current_storage,
-          updated_at: new Date().toISOString()
+          // Migrate current usage values
+          current_projects: existingData.current_projects || 0,
+          current_teams: existingData.current_teams || 0,
+          current_members: existingData.current_members || 0,
+          current_ai_chat: existingData.current_ai_chat || 0,
+          current_ai_task: existingData.current_ai_task || 0,
+          current_ai_workflow: existingData.current_ai_workflow || 0,
+          current_storage: existingData.current_storage || 0,
+          created_at: now,
+          updated_at: now
         };
         
         result = await supabase
           .from('user_subscription_plan')
-          .update(updateData)
-          .eq('user_id', userId);
+          .insert(newData);
       } else {
         // Insert new record with default values for usage
         const newData = {
@@ -185,7 +196,8 @@ export default function PaymentSuccess() {
           current_ai_task: 0,
           current_ai_workflow: 0,
           current_storage: 0,
-          updated_at: new Date().toISOString()
+          created_at: now,
+          updated_at: now
         };
         
         result = await supabase

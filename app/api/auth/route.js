@@ -138,6 +138,54 @@ async function handleLogin(data) {
       .order('created_at', { ascending: false })
       .limit(1);
 
+    // Check subscription expiration
+    if (subscription?.[0]) {
+      const currentPlan = subscription[0];
+      
+      // Check subscription status and expiration date
+      if (currentPlan.end_date && new Date(currentPlan.end_date) < new Date()) {
+        // Subscription expired, update status
+        await supabase
+          .from('user_subscription_plan')
+          .update({ status: 'expired' })
+          .eq('id', currentPlan.id);
+          
+        // Create new free plan subscription while preserving usage stats
+        const now = new Date();
+        const { data: currentUsage } = await supabase
+          .from('user_subscription_plan')
+          .select('current_projects, current_teams, current_members, current_ai_chat, current_ai_task, current_ai_workflow, current_storage')
+          .eq('id', currentPlan.id)
+          .single();
+          
+        await supabase
+          .from('user_subscription_plan')
+          .insert([{
+            user_id: user.id,
+            plan_id: 1, // Free plan ID
+            status: 'active',
+            start_date: now.toISOString(),
+            end_date: null, // Free plan has no end date
+            // Preserve current usage data
+            ...currentUsage
+          }]);
+          
+        // Get the newly created subscription
+        const { data: newSubscription } = await supabase
+          .from('user_subscription_plan')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        // Update the subscription for response
+        if (newSubscription?.[0]) {
+          currentPlan.status = 'expired';
+          subscription[0] = newSubscription[0];
+        }
+      }
+    }
+
     // Set cookie with improved settings
     const cookieOptions = {
       httpOnly: false, // Better security by not allowing JavaScript access
