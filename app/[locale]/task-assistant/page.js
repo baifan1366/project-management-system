@@ -11,32 +11,18 @@ export default function TaskAssistantPage() {
   const t = useTranslations();
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { user:data, error } = useGetUser();
+  const { user, error, isLoading } = useGetUser();
   
   useEffect(() => {
-    async function getUserInfo() {
-      try {
-        setLoading(true);
-        
-        if (error) {
-          console.error('Error getting user:', error);
-          return;
-        }
-        
-        if (data) {
-          setUserId(data.id);
-        }
-      } catch (error) {
-        console.error('Failed to get user info:', error);
-      } finally {
-        setLoading(false);
+    if (!isLoading) {
+      if (user) {
+        setUserId(user.id);
       }
+      setLoading(false);
     }
-    
-    getUserInfo();
-  }, [data]);
+  }, [user, isLoading]);
   
-  if (loading) {
+  if (loading || isLoading) {
     return (
       <div className="flex items-center justify-center h-[70vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

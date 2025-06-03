@@ -1081,7 +1081,7 @@ export default function AIWorkflow() {
                       <div className={isPanelCollapsed ? 'hidden' : 'block'}>
                         <div className="font-medium dark:text-gray-200">{workflow.name}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {t(`workflowTypes.${workflow.type}`) || workflow.type}
+                          {(t(`workflowTypes.${workflow.type}`, {fallback: workflow.type})) || workflow.type}
                         </div>
                       </div>
                     </div>

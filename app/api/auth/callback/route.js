@@ -392,8 +392,25 @@ export async function GET(request) {
         
         // Create free subscription plan for the user
         const now = new Date();
-        const oneYearFromNow = new Date(now);
-        oneYearFromNow.setFullYear(now.getFullYear() + 1);
+        
+        // 获取 plan_id=1 的 billing interval
+        const { data: planData, error: planError } = await supabase
+          .from('subscription_plan')
+          .select('billing_interval')
+          .eq('id', 1)
+          .single();
+
+        if (planError) {
+          console.error('Error fetching plan details:', planError);
+        }
+
+        // 检查 billing_interval 是否为 NULL
+        let endDate = null;
+        if (planData && planData.billing_interval) {
+          const oneYearFromNow = new Date(now);
+          oneYearFromNow.setFullYear(now.getFullYear() + 1);
+          endDate = oneYearFromNow.toISOString();
+        }
         
         try {
           console.log('Creating free subscription plan for OAuth user:', userId);
@@ -405,7 +422,7 @@ export async function GET(request) {
                 plan_id: 1, // Free plan ID
                 status: 'active',
                 start_date: now.toISOString(),
-                end_date: oneYearFromNow.toISOString()
+                end_date: endDate // 如果 billing_interval 为 NULL，end_date 也为 NULL
               },
             ])
             .select();

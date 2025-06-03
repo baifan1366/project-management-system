@@ -717,6 +717,7 @@
     "pleaseWait": "Please wait while we create your task.",
     "createSuccess": "Success!",
     "taskCreated": "Your task has been created successfully.",
+    "projectCreatedSuccess": "Your project has been created successfully.",
     "createError": "Error creating task.",
     "pleaseTryAgain": "Something went wrong. Please try again.",
     "enterNewTaskName": "Enter new task name",
@@ -1662,7 +1663,8 @@
     },
     "emailVerification": {
       "title": "Email Verification",
-      "loading": "Verifying your email..."
+      "loading": "Verifying your email...",
+      "redirecting": "Redirecting you to login page..."
     },
     "signup": {
       "title": "Sign up",
@@ -1870,6 +1872,10 @@
       "data_analysis": "Data Analysis",
       "document_generation": "Document Generation",
       "email_message": "Email Message",
+      "email_template": "Email Template",
+      "meeting_summary": "Meeting Summary",
+      "task_automation": "Task Automation",
+      "idea_generation": "Idea Generation",
       "learning_content": "Learning Content",
       "ppt_generation": "PowerPoint Generation"
     },
@@ -2008,6 +2014,38 @@
     "errorUpdatingTask": "Error occurred while updating task",
     "nameRequired": "Name is required",
     "taskIdRequired": "Task ID is required"
+  },
+  "FileUploader": {
+    "uploadFile": "Upload File",
+    "fileSizeError": "File size cannot exceed {size}MB",
+    "loading": "Loading...",
+    "unableToReadFile": "Unable to read file content",
+    "dragAndDropFiles": "Click or drag files here to upload (max {size}MB)",
+    "addMessage": "Add message (optional)",
+    "selectedFiles": "Selected files",
+    "noFiles": "No files yet, please select or drag files",
+    "uploading": "Uploading {progress}%",
+    "cancel": "Cancel",
+    "upload": "Upload",
+    "preview": "Preview",
+    "cannotPreview": "Cannot preview this type of file, please download to view",
+    "downloadFile": "Download file",
+    "uploadFiles": "Upload Files",
+    "uploadToFolder": "Upload to folder",
+    "errorCheckingPermission": "Error checking permission",
+    "missingUserOrSession": "Missing user ID or session ID",
+    "userNotLoggedIn": "User not logged in or session expired",
+    "noPermission": "You don't have permission to upload",
+    "maxFileSizeExceeded": "Maximum file size exceeded",
+    "attachmentAdded": "Attachment added",
+    "uploadComplete": "Upload complete",
+    "uploadFailed": "Upload failed",
+    "fileType": "File type",
+    "fileName": "File name",
+    "fileSize": "File size",
+    "deleteFile": "Delete file",
+    "viewFile": "View file",
+    "closePreview": "Close preview"
   },
   "validationRules": {
     "teamNameMin": "Team Name must be at least 2 characters.",
@@ -2633,5 +2671,15 @@
       "chatCreationFailed": "Failed to create chat",
       "onlyOwnerCanEditName": "Only the group owner can edit the group name"
     }
+  },
+  "Payment": {
+    "validationError": "Invalid or expired payment session. Please try again.",
+    "sessionExpired": "Payment session expired. Please try again.",
+    "processingPayment": "Processing payment...",
+    "selectPaymentMethod": "Select Payment Method",
+    "sessionExpiringTitle": "Session expiring soon",
+    "sessionExpiresIn": "Session expires in",
+    "pleaseCompletePayment": "Please complete your payment",
+    "pleaseCompletePaymentNow": "Please complete your payment now"
   }
 }

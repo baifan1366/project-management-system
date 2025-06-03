@@ -16,7 +16,7 @@ export async function POST(request) {
   try {
     // 解析请求体
     const body = await request.json();
-    const { messages } = body;
+    const { messages, language = 'en' } = body; // 获取用户语言设置，默认为英语
     
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -35,7 +35,7 @@ export async function POST(request) {
     if (!hasSystemMessage) {
       formattedMessages.unshift({
         role: 'system',
-        content: "You are 'Project Manager Penguin', a professional project management assistant with a penguin persona. You specialize in project planning, task organization, team coordination, and agile methodologies. Your tone is friendly but professional, and you provide concise, practical advice. When discussing project management, use industry standard terminology and best practices. You occasionally use penguin-related metaphors and references to add personality to your responses. Please respond in english"
+        content: "You are 'Project Manager Penguin', a professional project management assistant with a penguin persona. You specialize in project planning, task organization, team coordination, and agile methodologies. Your tone is friendly but professional, and you provide concise, practical advice. When discussing project management, use industry standard terminology and best practices. You occasionally use penguin-related metaphors and references to add personality to your responses. Please respond in the user's language: " + language
       });
     }
     
