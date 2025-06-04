@@ -283,8 +283,8 @@ export default function InvitationDialog({ open, onClose }) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="flex space-x-5">
+        <div className="">
+          {/* <div className="flex space-x-5"> */}
             {/* <button 
               className={`flex items-center transition-colors ${!showEmailForm ? 'text-blue-500' : 'text-foreground hover:text-accent-foreground'}`}
               onClick={() => setShowEmailForm(false)}
@@ -293,14 +293,14 @@ export default function InvitationDialog({ open, onClose }) {
               <span className="text-sm">{t('shareLink')}</span>
             </button> */}
               
-            <button 
+            {/* <button 
               className={`flex items-center transition-colors ${showEmailForm ? 'text-blue-500' : 'text-foreground hover:text-accent-foreground'}`}
               onClick={() => setShowEmailForm(true)}
             > 
               <Mail className={`w-4 h-4 mr-2 ${showEmailForm ? 'text-blue-500' : ''}`} />
               <span className="text-sm">{t('email')}</span>
-            </button>
-          </div>
+            </button> */}
+          {/* </div> */}
 
           {/* {showEmailForm ? ( */}
             <form onSubmit={handleSendInvite} className="space-y-4">

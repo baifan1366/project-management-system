@@ -11,6 +11,7 @@ import { useTheme } from 'next-themes';
 import { useDispatch } from 'react-redux';
 import { updateUserPreference } from '@/lib/redux/features/usersSlice';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function PreferencesPage() {
   const t = useTranslations('profile');
@@ -18,6 +19,8 @@ export default function PreferencesPage() {
   const dispatch = useDispatch();
   const { user: currentUser, isLoading: userLoading } = useGetUser();
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
   const [formData, setFormData] = useState({
     language: 'en',
     timezone: 'UTC+0',
@@ -67,6 +70,14 @@ export default function PreferencesPage() {
       
       if (updateUserPreference.fulfilled.match(resultAction)) {
         toast.success(t('saved'));
+        
+        // If language was changed, redirect to the new locale version of the page
+        const currentLocale = pathname.split('/')[1]; // Extract current locale from URL
+        if (formData.language !== currentLocale) {
+          // Replace current locale with new language in URL and navigate
+          const newPath = pathname.replace(`/${currentLocale}/`, `/${formData.language}/`);
+          router.push(newPath);
+        }
       } else {
         throw new Error(resultAction.error);
       }
