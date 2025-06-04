@@ -60,6 +60,8 @@
     "settings": "Settings",
     "createProject": "Create project",
     "retry": "Retry",
+    "unknown": "Unknown",
+    "notAvailable": "Not Available",
     "confirmDialog": {
       "confirm": "Confirm",
       "cancel": "Cancel",
@@ -212,40 +214,106 @@
     },
     "subscription": {
       "title": "Subscription",
-      "description": "Manage your subscription and billing",
-      "upgrading": "Processing upgrade request",
-      "upgradePending": "Upgrade request received, redirecting to payment",
+      "description": "Manage your subscription and payment methods",
       "tabs": {
         "currentPlan": "Current Plan",
         "usageStats": "Usage Stats",
         "paymentHistory": "Payment History",
         "upgradeOptions": "Upgrade Options"
       },
-      "currentPlan": {
-        "title": "Current Plan",
-        "status": "Status",
-        "validUntil": "Valid Until",
-        "features": "Features",
-        "upgrade": "Upgrade Plan"
+      "viewPlans": "View Plans",
+      "status": {
+        "title": "Subscription Status",
+        "noActive": "You don't have an active subscription.",
+        "plan": "Plan",
+        "expiresOn": "Expires on",
+        "expiringSoon": "Your subscription is expiring soon. Enable auto-renewal to continue using your subscription without interruption.",
+        "freePlan": "This is a free plan that does not require renewal."
+      },
+      "planType": "Plan Type",
+      "billingInterval": "Billing Interval",
+      "timezone": "Timezone",
+      "noRecurring": "No recurring billing",
+      "nextPaymentDate": "Next Payment Date",
+      "noRenewal": "No scheduled renewal",
+      "autoRenewal": {
+        "title": "Auto-Renewal",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "toggle": "Toggle auto-renewal",
+        "willRenew": "Your subscription will automatically renew on {date}.",
+        "willNotRenew": "Your subscription will expire at the end of the current billing period.",
+        "error": "Failed to update auto-renewal setting",
+        "needsPaymentMethod": "You need to add a payment method to enable auto-renewal"
+      },
+      "expirationReminder": {
+        "title": "Subscription Expiring Soon",
+        "description": "Your subscription is about to expire. Take action now to avoid service interruption.",
+        "expirationDate": "Expiration Date",
+        "expirationWarning": "After this date, your access to premium features will be restricted.",
+        "autoRenewalBenefit": "Benefits of Auto-Renewal",
+        "renewalDescription": "With auto-renewal enabled, your subscription will continue without interruption, and you'll maintain access to all features.",
+        "enableAutoRenewal": "Enable Auto-Renewal",
+        "remindLater": "Remind Me Later",
+        "viewPlans": "View Upgrade Options",
+        "daysRemaining": "{days} days remaining",
+        "manageSubscription": "Manage Subscription"
+      },
+      "payments": {
+        "title": "Payment Methods",
+        "description": "Manage your payment methods for subscription auto-renewal",
+        "fetchError": "Failed to load payment methods",
+        "stripeNotInitialized": "Stripe has not been initialized",
+        "cardElementNotFound": "Card element not found",
+        "saveError": "Failed to save payment method",
+        "addSuccess": "Payment method added successfully",
+        "addError": "Failed to add payment method",
+        "defaultError": "Failed to set as default payment method",
+        "defaultSuccess": "Default payment method updated",
+        "confirmDelete": "Are you sure you want to remove this payment method?",
+        "deleteError": "Failed to delete payment method",
+        "deleteSuccess": "Payment method removed",
+        "card": "Card",
+        "default": "Default",
+        "expires": "Expires",
+        "setDefault": "Set as default",
+        "remove": "Remove",
+        "noMethods": "No payment methods found.",
+        "cardInformation": "Card Information",
+        "processing": "Processing...",
+        "addMethod": "Add Payment Method"
       },
       "usageStats": {
         "title": "Usage Statistics",
         "users": "Users",
-        "workspaces": "Workspaces",
+        "projects": "Projects",
+        "teams": "Teams",
         "storage": "Storage",
-        "aiCredits": "AI Credits"
+        "aiCredits": "AI Credits",
+        "current": "Current",
+        "limit": "Limit",
+        "usage": "Usage",
+        "percentage": "Percentage",
+        "refresh": "Refresh Stats",
+        "lastUpdated": "Last Updated"
       },
       "paymentHistory": {
         "title": "Payment History",
         "date": "Date",
         "amount": "Amount",
         "status": "Status",
-        "invoice": "Invoice"
+        "invoice": "Invoice",
+        "noHistory": "No payment history",
+        "downloadInvoice": "Download Invoice",
+        "paymentMethod": "Payment Method",
+        "loadingPayments": "Loading payment history..."
       },
       "upgradeOptions": {
         "title": "Upgrade Options",
         "compare": "Compare Plans",
-        "contactSales": "Contact Sales"
+        "contactSales": "Contact Sales",
+        "upgradeNow": "Upgrade Now",
+        "currentPlan": "Current Plan"
       },
       "limits": {
         "back": "Back",

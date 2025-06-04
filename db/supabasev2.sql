@@ -31,7 +31,10 @@ CREATE TABLE "user" (
   "google_refresh_token" VARCHAR(2048),
   "google_token_expires_at" BIGINT,
   "github_access_token" VARCHAR(2048),
-  "github_refresh_token" VARCHAR(2048)
+  "github_refresh_token" VARCHAR(2048),
+  "stripe_customer_id" VARCHAR(255),
+  "default_payment_method_id" VARCHAR(255),
+  "auto_renew_enabled" BOOLEAN DEFAULT FALSE
 );
 
 -- Create a user_heartbeats table to track user activity
@@ -481,6 +484,11 @@ CREATE TABLE "user_subscription_plan" (
   "status" TEXT NULL,
   "start_date" TIMESTAMP NOT NULL,
   "end_date" TIMESTAMP,
+  "auto_renew" BOOLEAN DEFAULT FALSE,
+  "renewal_reminder_sent" BOOLEAN DEFAULT FALSE,
+  "last_renewal_attempt" TIMESTAMP,
+  "renewal_failure_count" INT DEFAULT 0,
+  "payment_method_id" VARCHAR(255),
   -- 使用统计
   "current_projects" INT DEFAULT 0 NULL,
   "current_teams" INT DEFAULT 0 NULL,
@@ -669,6 +677,20 @@ CREATE TABLE "payment" (
   "stripe_payment_id" VARCHAR(255),
   "metadata" JSONB,
   "is_processed" BOOLEAN DEFAULT FALSE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Store user payment methods for automatic renewal
+CREATE TABLE "payment_methods" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "stripe_payment_method_id" VARCHAR(255) NOT NULL,
+  "card_last4" VARCHAR(4),
+  "card_brand" VARCHAR(50),
+  "card_exp_month" INT,
+  "card_exp_year" INT,
+  "is_default" BOOLEAN DEFAULT FALSE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
