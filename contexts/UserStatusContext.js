@@ -42,10 +42,10 @@ export function UserStatusProvider({ children }) {
     if (!userId) return;
     
     try {
-      // Get user's auto-renew preference
+      // Get user's auto-renew preference and timezone
       const { data: userData, error: userError } = await supabase
         .from('user')
-        .select('auto_renew_enabled')
+        .select('auto_renew_enabled, timezone')
         .eq('id', userId)
         .single();
         
@@ -125,7 +125,8 @@ export function UserStatusProvider({ children }) {
           isExpiringSoon,
           lastRenewalAttempt: subscription.last_renewal_attempt,
           renewalFailureCount: subscription.renewal_failure_count || 0,
-          renewalStatus
+          renewalStatus,
+          timezone: userData.timezone || 'UTC+0'
         });
       } else {
         // No active subscription
@@ -137,7 +138,8 @@ export function UserStatusProvider({ children }) {
           isExpiringSoon: false,
           lastRenewalAttempt: null,
           renewalFailureCount: 0,
-          renewalStatus: null
+          renewalStatus: null,
+          timezone: userData.timezone || 'UTC+0'
         });
       }
     } catch (error) {
@@ -151,7 +153,8 @@ export function UserStatusProvider({ children }) {
         isExpiringSoon: false,
         lastRenewalAttempt: null,
         renewalFailureCount: 0,
-        renewalStatus: null
+        renewalStatus: null,
+        timezone: 'UTC+0'
       });
     }
   };

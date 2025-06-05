@@ -131,6 +131,34 @@ export default function SubscriptionStatus() {
     return interval.charAt(0).toUpperCase() + interval.slice(1).toLowerCase();
   };
 
+  // Format timezone string to ensure consistent format (UTC+X)
+  const formatTimezone = (timezone) => {
+    if (!timezone) return 'UTC+0';
+    
+    // Check if it already has the correct format
+    const utcFormatRegex = /^UTC[+-]\d+$/;
+    if (utcFormatRegex.test(timezone)) {
+      return timezone;
+    }
+    
+    // Try to extract offset from other formats
+    try {
+      // For formats like "UTC+08:00" or similar
+      const extendedFormatMatch = timezone.match(/^UTC([+-])(\d{1,2}):?(\d{2})?$/);
+      if (extendedFormatMatch) {
+        const sign = extendedFormatMatch[1];
+        const hours = parseInt(extendedFormatMatch[2], 10);
+        return `UTC${sign}${hours}`;
+      }
+      
+      // Default fallback
+      return 'UTC+0';
+    } catch (error) {
+      console.error('Error formatting timezone:', error);
+      return 'UTC+0';
+    }
+  };
+
   const getStatusBadge = (status) => {
     if (!status) return null;
     
@@ -256,7 +284,7 @@ export default function SubscriptionStatus() {
             <div>
               <p className="text-muted-foreground">{t('subscription.timezone')}</p>
               <p className="font-medium text-foreground">
-                {subscriptionStatus.timezone || 'UTC+0'}
+                {formatTimezone(subscriptionStatus.timezone)}
               </p>
             </div>
           </div>
@@ -292,25 +320,6 @@ export default function SubscriptionStatus() {
                   </p>
                 </div>
               </div>
-              
-              {/* Last renewal attempt info */}
-              {subscriptionStatus.lastRenewalAttempt && (
-                <div className="flex items-start">
-                  <History className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-muted-foreground">Last Renewal Attempt</p>
-                      {subscriptionStatus.renewalStatus && getRenewalStatusBadge(subscriptionStatus.renewalStatus)}
-                    </div>
-                    <p className="font-medium text-foreground">{formatDateTime(subscriptionStatus.lastRenewalAttempt)}</p>
-                    {subscriptionStatus.renewalFailureCount > 0 && (
-                      <p className="text-xs text-red-500 mt-1">
-                        Failed attempts: {subscriptionStatus.renewalFailureCount}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
