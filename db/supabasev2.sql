@@ -521,7 +521,7 @@ CREATE TABLE "promo_code" (
 -- contact table (for storing contact form submissions)
 CREATE TABLE "contact" (
   "id" SERIAL PRIMARY KEY,
-  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE', 'DOWNGRADE')), -- 添加 DOWNGRADE 类型
+  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE', 'REFUND')), -- Contact form types
   "email" VARCHAR(255) NOT NULL,
   "message" TEXT, -- 用于一般查询的消息
   -- 企业查询特有字段
@@ -550,17 +550,21 @@ CREATE TABLE "admin_user" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- downgrade request table
-CREATE TABLE "downgrade_request" (
+-- refund request table
+CREATE TABLE "refund_request" (
   "id" SERIAL PRIMARY KEY,
   "contact_id" INT NOT NULL REFERENCES "contact"("id") ON DELETE CASCADE,
+  "payment_id" INT NOT NULL REFERENCES "payment"("id") ON DELETE CASCADE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "current_subscription_id" INT NOT NULL REFERENCES "user_subscription_plan"("id") ON DELETE CASCADE,
-  "target_plan_id" INT NOT NULL REFERENCES "subscription_plan"("id") ON DELETE CASCADE,
-  "reason" TEXT NOT NULL,
+  "first_name" VARCHAR(255) NOT NULL,
+  "last_name" VARCHAR(255) NOT NULL,
+  "reason" VARCHAR(255) NOT NULL,
+  "details" TEXT NOT NULL,
   "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'APPROVED', 'REJECTED')) DEFAULT 'PENDING',
   "processed_by" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
   "processed_at" TIMESTAMP,
+  "refund_amount" DECIMAL(10, 2),
   "notes" TEXT,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -921,12 +925,12 @@ CREATE INDEX IF NOT EXISTS idx_file_folders_task_id ON "file_folders"("task_id")
 CREATE INDEX IF NOT EXISTS idx_file_folders_parent_path ON "file_folders"("parent_path");
 CREATE INDEX IF NOT EXISTS idx_attachment_file_path ON "attachment"("file_path");
 
--- Create indexes for downgrade_request
-CREATE INDEX idx_downgrade_request_user_id ON "downgrade_request"("user_id");
-CREATE INDEX idx_downgrade_request_contact_id ON "downgrade_request"("contact_id");
-CREATE INDEX idx_downgrade_request_current_subscription ON "downgrade_request"("current_subscription_id");
-CREATE INDEX idx_downgrade_request_target_plan ON "downgrade_request"("target_plan_id");
-CREATE INDEX idx_downgrade_request_status ON "downgrade_request"("status");
+-- Create indexes for refund_request
+CREATE INDEX idx_refund_request_user_id ON "refund_request"("user_id");
+CREATE INDEX idx_refund_request_contact_id ON "refund_request"("contact_id");
+CREATE INDEX idx_refund_request_current_subscription ON "refund_request"("current_subscription_id");
+CREATE INDEX idx_refund_request_status ON "refund_request"("status");
+CREATE INDEX idx_refund_request_created_at ON "refund_request"("created_at");
 
 -- Create indexes for better performance
 CREATE INDEX idx_contact_reply_contact_id ON "contact_reply"("contact_id");
