@@ -25,7 +25,8 @@ import {
   DialogContent, 
   DialogFooter, 
   DialogHeader, 
-  DialogTitle 
+  DialogTitle,
+  DialogDescription 
 } from '@/components/ui/dialog';
 import { format, parseISO } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
@@ -38,6 +39,7 @@ import RoleAssignment from './RoleAssignment';
 import SprintRetrospective from './SprintRetrospective';
 import { Card } from '@/components/ui/card';
 import { useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { fetchAgileRoleById, fetchAgileMembers } from '@/lib/redux/features/agileSlice';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 
@@ -55,6 +57,9 @@ const SprintPlanning = ({
 }) => {
     const t = useTranslations('Agile');
     const dispatch = useDispatch();
+    const team = useSelector(state => state.teams.teams.find(t => t.id.toString() === teamId?.toString()));
+    const {user} = useGetUser();
+    const isTeamCreator = user?.id && team?.created_by && user.id.toString() === team.created_by.toString();
     
   // 辅助函数 - 解析日期
   const parseDateSafely = (dateString) => {
@@ -100,10 +105,10 @@ const SprintPlanning = ({
   const [backlogTasks, setBacklogTasks] = useState([]);
   const [sprintTasks, setSprintTasks] = useState([]);
   const [selectedSprint, setSelectedSprint] = useState(null);
-  const [selectedType, setSelectedType] = useState('PENDING');
+  const [selectedType, setSelectedType] = useState('PLANNING');
   const [loading, setLoading] = useState(true);
   const [isSprintInfoExpanded, setIsSprintInfoExpanded] = useState(false);
-  const {user} = useGetUser();
+
   // 新冲刺表单状态
   const [newSprint, setNewSprint] = useState({
     name: '',
@@ -113,6 +118,33 @@ const SprintPlanning = ({
     goal: '',
     created_by: user?.id
   });
+
+  // 表单验证状态
+  const [formErrors, setFormErrors] = useState({
+    name: '',
+    goal: ''
+  });
+
+  // 重置表单数据
+  const resetForm = () => {
+    setNewSprint({
+      name: '',
+      startDate: null,
+      endDate: null,
+      duration: '2', // 默认2周
+      goal: '',
+      created_by: user?.id
+    });
+    setFormErrors({});
+  };
+
+  // 处理对话框状态变化
+  const handleDialogChange = (open) => {
+    setCreateDialogOpen(open);
+    if (!open) {
+      resetForm();
+    }
+  };
 
   // 根据类型过滤冲刺
   const filteredSprints = sprints.filter(sprint => {
@@ -342,9 +374,45 @@ const SprintPlanning = ({
 
   // 处理创建新冲刺
   const handleCreateNewSprint = () => {
-    if (!newSprint.name || !newSprint.startDate || !newSprint.duration) {
+    // 验证表单
+    const errors = {};
+    
+    // 验证冲刺名称
+    if (!newSprint.name) {
+      errors.name = t('sprintNameRequired');
+    } else if (newSprint.name.length < 2) {
+      errors.name = t('sprintNameTooShort');
+    } else if (newSprint.name.length > 50) {
+      errors.name = t('sprintNameTooLong');
+    }
+    
+    // 验证冲刺目标
+    if (newSprint.goal && (newSprint.goal.length < 10 || newSprint.goal.length > 1000)) {
+      if (newSprint.goal.length < 10) {
+        errors.goal = t('sprintGoalTooShort');
+      } else {
+        errors.goal = t('sprintGoalTooLong');
+      }
+    }
+    
+    // 验证开始日期
+    if (!newSprint.startDate) {
+      errors.startDate = t('startDateRequired');
+    }
+    
+    // 验证持续时间
+    if (!newSprint.duration) {
+      errors.duration = t('durationRequired');
+    }
+    
+    // 如果有错误，更新错误状态并返回
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
+    
+    // 重置错误状态
+    setFormErrors({});
     
     // 确保获取到所有必要参数
     if (!user?.id) {
@@ -374,14 +442,7 @@ const SprintPlanning = ({
       if (createdSprint) {
         setCreateDialogOpen(false);
         // 重置表单
-        setNewSprint({
-          name: '',
-          startDate: null,
-          endDate: null,
-          duration: '2',
-          goal: '',
-          created_by: user?.id
-        });
+        resetForm();
         
         // 显示成功消息
         
@@ -542,32 +603,47 @@ const SprintPlanning = ({
 
   // 渲染创建冲刺对话框
   const renderCreateSprintDialog = () => (
-    <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+    <Dialog open={createDialogOpen} onOpenChange={handleDialogChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('createNewSprint')}</DialogTitle>
+          <DialogDescription>{t('fillSprintDetails')}</DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="sprintName">{t('sprintName')}</Label>
+            <Label htmlFor="sprintName">{t('sprintName')} <span className="text-red-500">*</span></Label>
             <Input 
               id="sprintName" 
               value={newSprint.name} 
-              onChange={(e) => setNewSprint({...newSprint, name: e.target.value})}
+              onChange={(e) => {
+                setNewSprint({...newSprint, name: e.target.value});
+                // 清除错误提示
+                if (formErrors.name) {
+                  setFormErrors({...formErrors, name: ''});
+                }
+              }}
               placeholder={t('eg')}
+              className={formErrors.name ? "border-red-500" : ""}
+              maxLength={50}
             />
+            <div className="flex justify-between">
+              {formErrors.name && <p className="text-red-500 text-xs">{formErrors.name}</p>}
+              <p/>
+              <p className="text-xs text-muted-foreground">{newSprint.name ? newSprint.name.trim().length : 0}/50</p>
+            </div>
           </div>
           
           <div className="space-y-2">
-            <Label>{t('startDate')}</Label>
+            <Label>{t('startDate')} <span className="text-red-500">*</span></Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal",
-                    !newSprint.startDate && "text-muted-foreground"
+                    !newSprint.startDate && "text-muted-foreground",
+                    formErrors.startDate && "border-red-500"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -580,8 +656,14 @@ const SprintPlanning = ({
                         } else if (dateValue.includes('T')) {
                           return dateValue.split('T')[0];
                         }
+                        return dateValue;
                       }
-                      return dateValue;
+                      // 如果是Date对象，格式化为字符串
+                      if (dateValue instanceof Date) {
+                        return format(dateValue, 'yyyy-MM-dd');
+                      }
+                      // 默认情况下返回空字符串
+                      return '';
                     })()
                     : t('selectDate')}
                 </Button>
@@ -589,29 +671,36 @@ const SprintPlanning = ({
               <PopoverContent className="w-auto p-0">
                 <Calendar
                   mode="single"
-                  selected={newSprint.startDate}
+                  selected={typeof newSprint.startDate === 'string' ? parseDateSafely(newSprint.startDate) : newSprint.startDate}
                   onSelect={(date) => setNewSprint({
                     ...newSprint, 
                     startDate: date,
                     endDate: calculateEndDate(date, newSprint.duration)
                   })}
                   initialFocus
+                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                 />
               </PopoverContent>
             </Popover>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="duration">{t('duration')}</Label>
+            <Label htmlFor="duration">{t('duration')} <span className="text-red-500">*</span></Label>
             <Select 
               value={newSprint.duration} 
-              onValueChange={(value) => setNewSprint({
-                ...newSprint, 
-                duration: value,
-                endDate: calculateEndDate(newSprint.startDate, value)
-              })}
+              onValueChange={(value) => {
+                setNewSprint({
+                  ...newSprint, 
+                  duration: value,
+                  endDate: calculateEndDate(newSprint.startDate, value)
+                });
+                // 清除错误提示
+                if (formErrors.duration) {
+                  setFormErrors({...formErrors, duration: ''});
+                }
+              }}
             >
-              <SelectTrigger>
+              <SelectTrigger className={formErrors.duration ? "border-red-500" : ""}>
                 <SelectValue placeholder={t('selectDuration')} />
               </SelectTrigger>
               <SelectContent>
@@ -630,7 +719,9 @@ const SprintPlanning = ({
                 value={newSprint.startDate && newSprint.duration ? 
                   (() => {
                     const endDate = calculateEndDate(newSprint.startDate, newSprint.duration);
-                    if (typeof endDate === 'string') {
+                    if (endDate instanceof Date) {
+                      return format(endDate, 'yyyy-MM-dd');
+                    } else if (typeof endDate === 'string') {
                       // 如果包含空格，取前面部分
                       if (endDate.includes(' ')) {
                         return endDate.split(' ')[0];
@@ -639,8 +730,9 @@ const SprintPlanning = ({
                       if (endDate.includes('T')) {
                         return endDate.split('T')[0];
                       }
+                      return endDate;
                     }
-                    return endDate;
+                    return '';
                   })() : ""} 
                 readOnly 
               />
@@ -652,9 +744,22 @@ const SprintPlanning = ({
             <Input 
               id="goal" 
               value={newSprint.goal} 
-              onChange={(e) => setNewSprint({...newSprint, goal: e.target.value})}
+              onChange={(e) => {
+                setNewSprint({...newSprint, goal: e.target.value});
+                // 清除错误提示
+                if (formErrors.goal) {
+                  setFormErrors({...formErrors, goal: ''});
+                }
+              }}
               placeholder={t('setASprintGoal')}
+              className={formErrors.goal ? "border-red-500" : ""}
+              maxLength={1000}
             />
+            <div className="flex justify-between">
+              {formErrors.goal && <p className="text-red-500 text-xs">{formErrors.goal}</p>}
+              <p/>
+              <p className="text-xs text-muted-foreground">{newSprint.goal ? newSprint.goal.trim().length : 0}/1000</p>
+            </div>
           </div>
         </div>
         
@@ -748,13 +853,15 @@ const SprintPlanning = ({
     } else if (selectedType === 'PENDING' || selectedType === 'PLANNING') {
       return (
         <>
-          <RoleAssignment 
-            teamId={teamId}
-            agileId={selectedSprint.id}
-            agileRoles={Array.isArray(agileRoles) ? agileRoles : []}
-            agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
-            onUpdateMembers={handleUpdateMembers}
-          />
+          {isTeamCreator && (
+            <RoleAssignment 
+              teamId={teamId}
+              agileId={selectedSprint.id}
+              agileRoles={Array.isArray(agileRoles) ? agileRoles : []}
+              agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
+              onUpdateMembers={handleUpdateMembers}
+            />
+          )}
           <SprintBoard 
             sprint={selectedSprint} 
             tasks={sprintTasks}

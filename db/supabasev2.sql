@@ -131,27 +131,6 @@ CREATE TABLE IF NOT EXISTS "notion_page" (
   "last_edited_by" UUID REFERENCES "user"("id") ON DELETE SET NULL
 );
 
--- Table for page collaborators (for access control at page level if needed)
-CREATE TABLE IF NOT EXISTS "notion_page_collaborator" (
-  "page_id" INT NOT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "permission" TEXT NOT NULL CHECK ("permission" IN ('CAN_EDIT', 'CAN_COMMENT', 'CAN_VIEW')),
-  "added_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "added_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY ("page_id", "user_id")
-);
-
--- Table for page comments
-CREATE TABLE IF NOT EXISTS "notion_page_comment" (
-  "id" SERIAL PRIMARY KEY,
-  "page_id" INT NOT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "content" TEXT NOT NULL,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "resolved" BOOLEAN DEFAULT FALSE
-);
-
 -- Table for page favorites/bookmarks
 CREATE TABLE IF NOT EXISTS "notion_page_favorite" (
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
