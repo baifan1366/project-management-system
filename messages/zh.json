@@ -59,6 +59,8 @@
     "settings": "设置",
     "createProject": "创建项目",
     "retry": "重试",
+    "unknown": "未知",
+    "notAvailable": "不可用",
     "confirmDialog": {
       "confirm": "确认",
       "cancel": "取消",
@@ -198,11 +200,11 @@
     "disconnectProviderFailed": "断开连接{provider}失败",
     "googleAuthError": "Google授权错误: {error}",
     "authError": "{provider}授权错误: {error}",
-    "authorizationStarted": "{provider}授权开始,请在弹出窗口中继续",
+    "authorizationStarted": "{provider}授权已开始，请在弹出窗口中继续",
     "refresh": "刷新",
     "download": "下载",
-    "refreshingStats": "刷新使用统计",
-    "statsRefreshed": "使用统计已刷新",
+    "refreshingStats": "刷新使用统计信息",
+    "statsRefreshed": "使用统计信息已刷新",
     "preparingInvoice": "准备下载发票",
     "invoiceReady": "发票已准备好下载",
     "contactingSupport": "联系支持团队",
@@ -212,50 +214,116 @@
     },
     "subscription": {
       "title": "订阅",
-      "description": "管理您的订阅和账单",
-      "upgrading": "处理升级请求",
-      "upgradePending": "升级请求已收到,正在重定向到支付",
+      "description": "管理您的订阅和付款方式",
       "tabs": {
         "currentPlan": "当前计划",
         "usageStats": "使用统计",
         "paymentHistory": "支付历史",
         "upgradeOptions": "升级选项"
       },
-      "currentPlan": {
-        "title": "当前计划",
-        "status": "状态",
-        "validUntil": "有效期至",
-        "features": "功能",
-        "upgrade": "升级计划"
+      "viewPlans": "查看计划",
+      "status": {
+        "title": "订阅状态",
+        "noActive": "您没有活跃的订阅。",
+        "plan": "计划",
+        "expiresOn": "到期日",
+        "expiringSoon": "您的订阅即将到期。启用自动续订以继续使用您的订阅而不中断。",
+        "freePlan": "这是一个免费计划，不需要续订。"
+      },
+      "planType": "计划类型",
+      "billingInterval": "计费周期",
+      "timezone": "时区",
+      "noRecurring": "无定期计费",
+      "nextPaymentDate": "下次付款日期",
+      "noRenewal": "无计划续订",
+      "autoRenewal": {
+        "title": "自动续订",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "toggle": "切换自动续订",
+        "willRenew": "您的订阅将在{date}自动续订。",
+        "willNotRenew": "您的订阅将在当前计费周期结束时到期。",
+        "error": "更新自动续订设置失败",
+        "needsPaymentMethod": "您需要添加付款方式以启用自动续订"
+      },
+      "expirationReminder": {
+        "title": "订阅即将到期",
+        "description": "您的订阅即将到期。立即采取行动以避免服务中断。",
+        "expirationDate": "到期日",
+        "expirationWarning": "在此日期之后，您对高级功能的访问将受到限制。",
+        "autoRenewalBenefit": "自动续订的好处",
+        "renewalDescription": "启用自动续订后，您的订阅将不间断地继续，您将保持对所有功能的访问。",
+        "enableAutoRenewal": "启用自动续订",
+        "remindLater": "稍后提醒我",
+        "viewPlans": "查看升级选项",
+        "daysRemaining": "剩余{days}天",
+        "manageSubscription": "管理订阅"
+      },
+      "payments": {
+        "title": "付款方式",
+        "description": "管理您的订阅自动续订的付款方式",
+        "fetchError": "加载付款方式失败",
+        "stripeNotInitialized": "Stripe尚未初始化",
+        "cardElementNotFound": "找不到卡元素",
+        "saveError": "保存付款方式失败",
+        "addSuccess": "付款方式添加成功",
+        "addError": "添加付款方式失败",
+        "defaultError": "设置为默认付款方式失败",
+        "defaultSuccess": "默认付款方式已更新",
+        "confirmDelete": "您确定要删除此付款方式吗？",
+        "deleteError": "删除付款方式失败",
+        "deleteSuccess": "付款方式已删除",
+        "card": "卡",
+        "default": "默认",
+        "expires": "到期",
+        "setDefault": "设为默认",
+        "remove": "删除",
+        "noMethods": "未找到付款方式。",
+        "cardInformation": "卡信息",
+        "processing": "处理中...",
+        "addMethod": "添加付款方式"
       },
       "usageStats": {
         "title": "使用统计",
         "users": "用户",
-        "workspaces": "工作区",
+        "projects": "项目",
+        "teams": "团队",
         "storage": "存储",
-        "aiCredits": "AI信用"
+        "aiCredits": "AI积分",
+        "current": "当前",
+        "limit": "限制",
+        "usage": "使用量",
+        "percentage": "百分比",
+        "refresh": "刷新统计",
+        "lastUpdated": "最后更新"
       },
       "paymentHistory": {
         "title": "支付历史",
         "date": "日期",
         "amount": "金额",
         "status": "状态",
-        "invoice": "发票"
+        "invoice": "发票",
+        "noHistory": "无支付历史",
+        "downloadInvoice": "下载发票",
+        "paymentMethod": "支付方式",
+        "loadingPayments": "加载支付历史..."
       },
       "upgradeOptions": {
         "title": "升级选项",
         "compare": "比较计划",
-        "contactSales": "联系销售"
+        "contactSales": "联系销售",
+        "upgradeNow": "立即升级",
+        "currentPlan": "当前计划"
       },
       "limits": {
         "back": "返回",
         "subscriptionLimit": "订阅限制",
-        "currentUsage": "当前使用: {current} / {limit}",
+        "currentUsage": "当前使用量: {current} / {limit}",
         "upgradeSubscription": "升级订阅",
-        "operationLimited": "操作限制",
-        "createProjectLimited": "项目创建限制",
-        "inviteMemberLimited": "成员邀请限制",
-        "createTeamLimited": "团队创建限制"
+        "operationLimited": "操作受限",
+        "createProjectLimited": "项目创建受限",
+        "inviteMemberLimited": "成员邀请受限",
+        "createTeamLimited": "团队创建受限"
       }
     }
   },
@@ -680,6 +748,17 @@
     "projectUsageDescription": "您已使用 {currentValue} 个项目,超出 {limit} 个项目的限制。请升级到更高计划以创建更多项目。"
   },
   "CreateTask": {
+    "assignees": "指派人",
+    "nameMinLength": "名称必须至少2个字符。",
+    "nameMaxLength": "名称不能超过100个字符。",
+    "editTabName": "编辑视图名称",
+    "saving": "保存中...",
+    "deleteTabTitle": "删除视图",
+    "deleteTabConfirm": "您确定要删除此视图吗？此操作无法撤消。",
+    "cannotDeleteTab": "无法删除视图",
+    "protectedTabMessage": "这是一个系统默认视图，无法删除。请创建并使用新的视图。",
+    "understand": "我理解",
+    "cannotDelete": "无法删除",
     "edit": "编辑",
     "teamNotFound": "团队未找到",
     "noAccessToTeam": "没有访问权限",
@@ -2064,6 +2143,8 @@
     "durationRequired": "持续时间是必填的。"
   },
   "Team": {
+    "add_assignee": "添加指派人",
+    "no_available_members": "没有可用成员",
     "details": "详情",
     "unassigned": "未分配",
     "assigned_users": "分配给",

@@ -732,7 +732,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                           e.stopPropagation();
                                         });
                                       } else if (isPeopleColumn(tag)) {
-                                        return renderPeopleCell(currentValue);
+                                        return renderPeopleCell(currentValue, task.id, teamId);
                                       } else if (isDateColumn(tag) || (tagObj && isDateType(tagObj))) {
                                         return renderDateCell(currentValue, (value) => {
                                           // 直接更新日期值
@@ -851,10 +851,10 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                         return (
                                           <div onClick={(e) => e.stopPropagation()}>
                                             {typeof currentValue === 'string' 
-                                              ? renderPeopleCell(currentValue)
+                                              ? renderPeopleCell(currentValue, task.id, teamId)
                                               : Array.isArray(currentValue)
-                                                ? renderPeopleCell(currentValue)
-                                                : renderPeopleCell('')
+                                                ? renderPeopleCell(currentValue, task.id, teamId)
+                                                : renderPeopleCell('', task.id, teamId)
                                             }
                                           </div>
                                         );
@@ -1184,28 +1184,6 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                           {/* 添加操作按钮 - 只在编辑状态显示 */}
                           {(isEditing || isCurrentTaskBeingAdded) && (
                             <div className="flex items-center px-2 gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                                onClick={() => {
-                                  // 取消编辑
-                                  if (isCurrentTaskBeingAdded) {
-                                    // 如果是新任务，从列表中移除
-                                    setLocalTasks(prevTasks => ({
-                                      ...prevTasks,
-                                      [sectionId]: prevTasks[sectionId].filter(t => t.id !== task.id)
-                                    }));
-                                  }
-                                  // 清除编辑状态
-                                  setEditingTask(null);
-                                  setEditingTaskValues({});
-                                  setIsAddingTask(false);
-                                }}
-                                title={t('cancel')}
-                              >
-                                <X size={16} />
-                              </Button>
                               <Button
                                 size="sm"
                                 variant="ghost"

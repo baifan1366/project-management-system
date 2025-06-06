@@ -888,29 +888,47 @@ export default function TaskCalendar({ teamId }) {
 
   // Week view calendar
   const renderWeekView = () => {
-    // This would be a more complex implementation similar to the WeekView component in calendar/page.js
-    // For now, we'll return a placeholder
     return (
-      <Card className="p-6 flex items-center justify-center h-full">
-        <div className="text-center">
-          <h3 className="text-lg font-medium mb-2">{t('weekView')}</h3>
-          <p className="text-muted-foreground">{t('weekViewDescription')}</p>
-        </div>
-      </Card>
+      <WeekView
+        currentDate={currentDate}
+        handleOpenCreateEvent={handleOpenCreateTask}
+        t={t}
+        tasks={filteredTasks.map(task => ({
+          id: task.taskId,
+          title: task.name,
+          due_date: task.dueDate,
+          expected_completion_date: task.dueDate,
+          assignee: task.assigneeId
+        }))}
+        handleEventClick={(event) => {
+          if (event.type === 'task') {
+            handleTaskClick(event.originalEvent);
+          }
+        }}
+      />
     )
   }
 
   // Day view calendar
   const renderDayView = () => {
-    // This would be a more complex implementation similar to the DayView component in calendar/page.js
-    // For now, we'll return a placeholder
     return (
-      <Card className="p-6 flex items-center justify-center h-full">
-        <div className="text-center">
-          <h3 className="text-lg font-medium mb-2">{t('dayView')}</h3>
-          <p className="text-muted-foreground">{t('dayViewDescription')}</p>
-        </div>
-      </Card>
+      <DayView
+        currentDate={currentDate}
+        handleOpenCreateEvent={handleOpenCreateTask}
+        t={t}
+        tasks={filteredTasks.map(task => ({
+          id: task.taskId,
+          title: task.name,
+          due_date: task.dueDate,
+          expected_completion_date: task.dueDate,
+          assignee: task.assigneeId
+        }))}
+        handleEventClick={(event) => {
+          if (event.type === 'task') {
+            handleTaskClick(event.originalEvent);
+          }
+        }}
+      />
     )
   }
 
@@ -970,6 +988,11 @@ export default function TaskCalendar({ teamId }) {
     setSelectedDayTasks(tasks)
     setIsDayTasksOpen(true)
   }
+
+  useEffect(() => {
+    // 在视图变更后重置加载状态
+    setIsViewLoading(false)
+  }, [view, currentDate])
 
   if (isLoading) {
     return renderSkeletonCalendar()

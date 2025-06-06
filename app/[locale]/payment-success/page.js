@@ -135,8 +135,38 @@ export default function PaymentSuccess() {
         }
       }
       
-      // First, check if a record already exists
-      const { data: existingData, error: checkError } = await supabase
+      // First, find all active subscription plans for this user (both paid and free)
+      const { data: activeSubscriptions, error: activeSubError } = await supabase
+        .from('user_subscription_plan')
+        .select('id, plan_id, status')
+        .eq('user_id', userId)
+        .or('status.eq.ACTIVE,status.eq.active')
+        .order('created_at', { ascending: false });
+      
+      if (activeSubError) throw activeSubError;
+      
+      const now = new Date().toISOString();
+      
+      // Deactivate ALL active subscription plans
+      if (activeSubscriptions && activeSubscriptions.length > 0) {
+        console.log(`Deactivating ${activeSubscriptions.length} active subscription plans`);
+        
+        for (const subscription of activeSubscriptions) {
+          // Deactivate each active subscription plan
+          await supabase
+            .from('user_subscription_plan')
+            .update({
+              status: 'DEACTIVATED',
+              updated_at: now
+            })
+            .eq('id', subscription.id);
+            
+          console.log(`Deactivated subscription plan: ${subscription.id}`);
+        }
+      }
+      
+      // Find the most recent subscription to migrate usage data from
+      const { data: mostRecentSubscription, error: recentError } = await supabase
         .from('user_subscription_plan')
         .select('*')
         .eq('user_id', userId)
@@ -144,66 +174,48 @@ export default function PaymentSuccess() {
         .limit(1)
         .maybeSingle();
       
-      if (checkError) throw checkError;
-      
-      let result;
-      const now = new Date().toISOString();
-      
-      if (existingData) {
-        // Deactivate the current subscription plan
-        await supabase
-          .from('user_subscription_plan')
-          .update({
-            status: 'DEACTIVATED',
-            updated_at: now
-          })
-          .eq('id', existingData.id);
+      if (recentError) throw recentError;
         
         // Create a new subscription plan with migrated usage data
-        const newData = {
-          user_id: userId,
-          plan_id: planId,
-          status: 'ACTIVE',
-          start_date: startDate,
-          end_date: endDate,  // Can be null
-          // Migrate current usage values
-          current_projects: existingData.current_projects || 0,
-          current_teams: existingData.current_teams || 0,
-          current_members: existingData.current_members || 0,
-          current_ai_chat: existingData.current_ai_chat || 0,
-          current_ai_task: existingData.current_ai_task || 0,
-          current_ai_workflow: existingData.current_ai_workflow || 0,
-          current_storage: existingData.current_storage || 0,
-          created_at: now,
-          updated_at: now
+      let currentUsage = {
+        current_projects: 0,
+        current_teams: 0,
+        current_members: 0,
+        current_ai_chat: 0,
+        current_ai_task: 0,
+        current_ai_workflow: 0,
+        current_storage: 0
+      };
+      
+      // Migrate usage data if available from any recent subscription
+      if (mostRecentSubscription) {
+        currentUsage = {
+          current_projects: mostRecentSubscription.current_projects || 0,
+          current_teams: mostRecentSubscription.current_teams || 0,
+          current_members: mostRecentSubscription.current_members || 0,
+          current_ai_chat: mostRecentSubscription.current_ai_chat || 0,
+          current_ai_task: mostRecentSubscription.current_ai_task || 0,
+          current_ai_workflow: mostRecentSubscription.current_ai_workflow || 0,
+          current_storage: mostRecentSubscription.current_storage || 0
         };
-        
-        result = await supabase
-          .from('user_subscription_plan')
-          .insert(newData);
-      } else {
-        // Insert new record with default values for usage
-        const newData = {
-          user_id: userId,
-          plan_id: planId,
-          status: 'ACTIVE',
-          start_date: startDate,
-          end_date: endDate,  // Can be null
-          current_projects: 0,
-          current_teams: 0,
-          current_members: 0,
-          current_ai_chat: 0,
-          current_ai_task: 0,
-          current_ai_workflow: 0,
-          current_storage: 0,
-          created_at: now,
-          updated_at: now
-        };
-        
-        result = await supabase
-          .from('user_subscription_plan')
-          .insert(newData);
       }
+      
+      // Insert new subscription with the new plan
+        const newData = {
+          user_id: userId,
+          plan_id: planId,
+          status: 'ACTIVE',
+          start_date: startDate,
+          end_date: endDate,  // Can be null
+        auto_renew: planData.type !== 'FREE', // Enable auto-renew for paid plans by default
+        ...currentUsage, // Spread the current usage values
+          created_at: now,
+          updated_at: now
+        };
+        
+      const result = await supabase
+          .from('user_subscription_plan')
+          .insert(newData);
       
       if (result.error) throw result.error;
       

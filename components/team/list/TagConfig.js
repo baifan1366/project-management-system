@@ -11,6 +11,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchUserById } from '@/lib/redux/features/usersSlice';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
+import { fetchTaskById, updateTask } from '@/lib/redux/features/taskSlice';
 
 /**
  * 检查字段类型并返回类型常量
@@ -80,9 +82,6 @@ export function renderFileCell(fileName, onClick) {
       <div className="flex items-center gap-2">
         {getFileIcon(fileName)}
         <span>{fileName}</span>
-      </div>
-      <div className="cursor-pointer" onClick={onClick}>
-        <X size={16} className="text-gray-500 hover:text-red-500" />
       </div>
     </div>
   );
@@ -212,6 +211,7 @@ export function renderNumberCell(value, onIncrease, onDecrease, onChange) {
         className="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-gray-500 hover:text-primary"
         onClick={() => onDecrease(numValue)}
         aria-label="减少数值"
+        min={0}
       >
         -
       </button>
@@ -220,6 +220,7 @@ export function renderNumberCell(value, onIncrease, onDecrease, onChange) {
         className="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-gray-500 hover:text-primary"
         onClick={() => onIncrease(numValue)}
         aria-label="增加数值"
+        max={999}
       >
         +
       </button>
@@ -429,34 +430,285 @@ export function useUserData(userIdStr) {
 }
 
 /**
- * 呈现人员单元格的内容，包括头像和Popover
+ * 呈现人员单元格的内容，包括头像和负责人管理功能
  * @param {string} userIdStr - 用户ID或逗号分隔的多个用户ID
+ * @param {string} taskId - 任务ID，用于添加/删除负责人
+ * @param {string} teamId - 团队ID，用于获取团队成员列表
+ * @param {boolean} editable - 是否可编辑（允许添加/删除）
  * @returns {JSX.Element} 渲染的人员单元格组件
  */
-export function renderPeopleCell(userIdStr) {
+export function renderPeopleCell(userIdStr, taskId, teamId, editable = true) {
   const t = useTranslations('Team');
-  const userIds = parseUserIds(userIdStr);
+  const dispatch = useDispatch();
+  const [userIds, setUserIds] = useState(parseUserIds(userIdStr));
   
+  console.log("renderPeopleCell调用:", { userIdStr, taskId, teamId, userIds });
+  
+  // 添加useEffect监听userIdStr变化
+  useEffect(() => {
+    setUserIds(parseUserIds(userIdStr));
+  }, [userIdStr]);
+  
+  // 处理添加用户后的操作
+  const handleUserAdded = async () => {
+    if (taskId) {
+      await refreshAssignees();
+    }
+  };
+  
+  // 处理移除用户后的操作
+  const handleUserRemoved = async () => {
+    if (taskId) {
+      await refreshAssignees();
+    }
+  };
+  
+  // 刷新负责人列表
+  const refreshAssignees = async () => {
+    try {
+      const taskResult = await dispatch(fetchTaskById(taskId)).unwrap();
+      
+      // 获取最新的负责人列表
+      const tagValues = taskResult.tag_values || {};
+      const assigneeTagId = 2; // 负责人标签ID
+      const updatedUserIds = Array.isArray(tagValues[assigneeTagId]) ? tagValues[assigneeTagId] : [];
+      
+      // 更新本地状态
+      setUserIds(updatedUserIds);
+    } catch (error) {
+      console.error('刷新负责人列表失败:', error);
+    }
+  };
+  
+  // 无论editable设置如何，只要有teamId和taskId，就允许添加和删除负责人
+  
+  // 如果没有分配用户
   if (!userIds.length) {
     return (
-      <div className="flex items-center gap-2">
-        <Avatar className="h-6 w-6">
-          <AvatarFallback>
-            <User size={14} />
-          </AvatarFallback>
-        </Avatar>
-        <span className="text-muted-foreground text-sm">{t('unassigned')}</span>
+      <div className="flex flex-col gap-2 w-full">
+        <div className="flex items-center gap-2">
+          <Avatar className="h-6 w-6">
+            <AvatarFallback>
+              <User size={14} />
+            </AvatarFallback>
+          </Avatar>
+          <span className="text-muted-foreground text-sm">{t('unassigned')}</span>
+          {/* 始终显示添加用户按钮，无论editable如何 */}
+          {taskId && teamId && (
+            <AddUserToAssignee 
+              teamId={teamId} 
+              taskId={taskId} 
+              onAdded={handleUserAdded} 
+            />
+          )}
+        </div>
       </div>
     );
   }
   
   // 如果只有一个用户，显示单个用户
   if (userIds.length === 1) {
-    return <PeopleDisplay userId={userIds[0]} />;
+    return (
+      <div className="flex flex-col gap-2 w-full">
+        <div className="flex items-center justify-between w-full">
+          <PeopleDisplay userId={userIds[0]} />
+          {/* 始终允许删除负责人 */}
+          {taskId && (
+            <RemoveUserFromAssignee 
+              taskId={taskId} 
+              userIdToRemove={userIds[0]} 
+              onRemoved={handleUserRemoved} 
+            />
+          )}
+          {/* 始终允许添加更多负责人 */}
+          {taskId && teamId && (
+            <AddUserToAssignee 
+              teamId={teamId} 
+              taskId={taskId} 
+              onAdded={handleUserAdded} 
+            />
+          )}
+        </div>
+      </div>
+    );
   }
   
   // 显示多个用户
-  return <MultipleUsers userIds={userIds} />;
+  return (
+    <div className="flex flex-col gap-2 w-full">
+      <MultipleUsers userIds={userIds} />
+      
+      {/* 始终允许管理负责人 */}
+      {taskId && (
+        <div className="mt-1 space-y-1">
+          {userIds.map(userId => (
+            <div key={userId} className="flex items-center justify-between p-1 rounded-md hover:bg-accent/50">
+              <PeopleDisplay userId={userId} />
+              <RemoveUserFromAssignee 
+                taskId={taskId} 
+                userIdToRemove={userId} 
+                onRemoved={handleUserRemoved} 
+              />
+            </div>
+          ))}
+          
+          {teamId && (
+            <AddUserToAssignee 
+              teamId={teamId} 
+              taskId={taskId} 
+              onAdded={handleUserAdded} 
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 集成添加和删除功能的人员单元格渲染
+ * @param {Object} props - 组件属性
+ * @param {string} props.value - 用户ID或ID数组
+ * @param {string} props.taskId - 任务ID
+ * @param {string} props.teamId - 团队ID
+ * @param {boolean} props.editable - 是否可编辑
+ * @returns {JSX.Element} - 渲染的单元格组件
+ */
+export function EditablePeopleCell({ value, taskId, teamId, editable = true }) {
+  const t = useTranslations('Team');
+  const dispatch = useDispatch();
+  const [userIds, setUserIds] = useState(parseUserIds(value));
+  const [open, setOpen] = useState(false);
+  
+  console.log("EditablePeopleCell调用:", { value, taskId, teamId, userIds });
+  
+  // 添加useEffect监听value变化
+  useEffect(() => {
+    setUserIds(parseUserIds(value));
+  }, [value]);
+  
+  // 处理添加用户后的操作
+  const handleUserAdded = (userId) => {
+    console.log("用户已添加:", userId);
+    // 刷新任务数据并更新本地状态
+    refreshTaskData();
+    setOpen(false);
+  };
+  
+  // 处理移除用户后的操作
+  const handleUserRemoved = (userId) => {
+    console.log("用户已移除:", userId);
+    // 刷新任务数据并更新本地状态
+    refreshTaskData();
+  };
+  
+  // 刷新任务数据
+  const refreshTaskData = async () => {
+    try {
+      // 获取最新的任务信息
+      const taskResult = await dispatch(fetchTaskById(taskId)).unwrap();
+      console.log("刷新后的任务数据:", taskResult);
+      
+      // 获取最新的负责人列表
+      const tagValues = taskResult.tag_values || {};
+      const assigneeTagId = 2; // 负责人标签ID
+      const updatedUserIds = Array.isArray(tagValues[assigneeTagId]) ? tagValues[assigneeTagId] : [];
+      
+      // 更新本地状态
+      setUserIds(updatedUserIds);
+    } catch (error) {
+      console.error('获取任务数据失败:', error);
+    }
+  };
+  
+  // 如果不需要可编辑功能，直接使用简单显示
+  if (!editable) {
+    return (
+      <div className="flex items-center gap-2">
+        {userIds.length ? (
+          userIds.length === 1 ? (
+            <PeopleDisplay userId={userIds[0]} />
+          ) : (
+            <MultipleUsers userIds={userIds} />
+          )
+        ) : (
+          <>
+            <Avatar className="h-6 w-6">
+              <AvatarFallback>
+                <User size={14} />
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-muted-foreground text-sm">{t('unassigned')}</span>
+          </>
+        )}
+      </div>
+    );
+  }
+  
+  // 可编辑模式 - 显示当前负责人并允许通过Popover管理
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="flex items-center justify-between w-full p-1 rounded-md hover:bg-accent/50 cursor-pointer">
+          {userIds.length ? (
+            userIds.length === 1 ? (
+              <div className="flex-1">
+                <PeopleDisplay userId={userIds[0]} />
+              </div>
+            ) : (
+              <div className="flex-1">
+                <MultipleUsers userIds={userIds} />
+              </div>
+            )
+          ) : (
+            <div className="flex items-center gap-2">
+              <Avatar className="h-6 w-6">
+                <AvatarFallback>
+                  <User size={14} />
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-muted-foreground text-sm">{t('unassigned')}</span>
+            </div>
+          )}
+          <Button variant="ghost" size="icon" className="ml-auto">
+            <User size={16} />
+          </Button>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2" align="start">
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">{t('manage_assignees')}</h4>
+          
+          {/* 显示当前负责人并允许删除 */}
+          {userIds.length > 0 ? (
+            <div className="space-y-1 mt-2">
+              {userIds.map(userId => (
+                <div key={userId} className="flex items-center justify-between p-1 rounded-md hover:bg-accent/50">
+                  <PeopleDisplay userId={userId} />
+                  <RemoveUserFromAssignee 
+                    taskId={taskId} 
+                    userIdToRemove={userId} 
+                    onRemoved={handleUserRemoved}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground py-1">{t('no_assignees')}</div>
+          )}
+          
+          {/* 添加负责人按钮 */}
+          <div className="mt-2">
+            <AddUserToAssignee 
+              teamId={teamId} 
+              taskId={taskId} 
+              onAdded={handleUserAdded} 
+            />
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 /**
@@ -602,6 +854,462 @@ function MultipleUsers({ userIds }) {
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+//function add assignee
+//always show an Plus button
+//when clicked, open a popover that show the list of team members that have not yet been assigned to the task
+//after assgined, it should be update to the task based on the task id
+//find from tag table, tag name is assignee, record down the tag id
+//from the task table's tag_values column, find the tag id 
+//tag_values is saved as {"1": "task#1", "2": ["userId#1", "userId#2"]}
+//if the tag_values does not find the tag id, then add it to the tag_values
+//else if found, you should remain the original tag values
+//as if originally there is userId#1 saved in the following tag id, you have to continue save the new added assignee to the back
+//example: you find tag id of assignee is 2
+//then from the tag_values column you get "2"
+//then the ["userId#1", "userId#2"] is the assignee
+//you have to continue add userId#3 to the back of the array
+//so the tag_values should be {"1": "task#1", "2": ["userId#1", "userId#2", "userId#3"]}
+/**
+ * 从任务中移除指定负责人
+ * @param {string} taskId - 任务ID
+ * @param {string} userIdToRemove - 需要移除的用户ID
+ * @param {Function} onRemoved - 可选的回调函数，当用户成功移除后调用
+ * @returns {JSX.Element} - 移除按钮组件
+ */
+function RemoveUserFromAssignee({ taskId, userIdToRemove, onRemoved }) {
+  const dispatch = useDispatch();
+  const assigneeTagId = 2; // 负责人标签的ID
+  
+  // 处理用户移除操作
+  const handleRemoveUser = async () => {
+    if (!taskId || !userIdToRemove) {
+      console.log("Missing taskId or userIdToRemove:", { taskId, userIdToRemove });
+      return;
+    }
+    
+    try {
+      console.log("开始移除负责人:", userIdToRemove, "从任务:", taskId);
+      
+      // 获取当前任务信息
+      const taskResult = await dispatch(fetchTaskById(taskId)).unwrap();
+      console.log("获取到任务:", taskResult);
+      
+      // 获取当前负责人列表
+      const tagValues = taskResult.tag_values || {};
+      const currentAssignees = tagValues[assigneeTagId] || [];
+      
+      console.log("当前负责人:", currentAssignees);
+      
+      // 如果没有找到assignee标签值或者不是数组，则不执行操作
+      if (!Array.isArray(currentAssignees)) {
+        console.error('负责人数据格式错误', currentAssignees);
+        return;
+      }
+      
+      // 移除指定用户ID
+      const updatedAssignees = currentAssignees.filter(userId => userId !== userIdToRemove);
+      console.log("更新后负责人:", updatedAssignees);
+      
+      // 获取当前所有 tag_values
+      const allTagValues = taskResult.tag_values || {};
+      
+      // 合并更新，保留所有其他字段
+      const updatedTagValues = {
+        ...allTagValues,
+        [assigneeTagId]: updatedAssignees
+      };
+      
+      // 更新任务
+      console.log("更新任务，完整 tag_values:", updatedTagValues);
+      const updatedTask = await dispatch(updateTask({
+        taskId: taskId, 
+        taskData: {
+          tag_values: updatedTagValues
+        }
+      })).unwrap();
+      
+      console.log('成功移除负责人, 响应:', updatedTask);
+      
+      // 如果提供了回调函数，则调用
+      if (typeof onRemoved === 'function') {
+        onRemoved(userIdToRemove);
+      }
+      
+    } catch (error) {
+      console.error('移除负责人失败:', error);
+      alert('移除失败: ' + (error.message || '服务器错误'));
+    }
+  };
+  
+  return (
+    <Button 
+      size="icon" 
+      variant="ghost" 
+      onClick={handleRemoveUser}
+      className="h-6 w-6 rounded-full hover:bg-destructive/10 hover:text-destructive"
+      title="移除负责人"
+    >
+      <Trash className="w-3 h-3" />
+    </Button>
+  );
+}
+
+// 1. 创建防抖Hook - 添加到 hooks 文件夹
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  
+  return debouncedValue;
+}
+
+// 2. 创建缓存机制 - 全局缓存
+const teamMembersCache = new Map();
+const CACHE_TIME = 60000; // 缓存1分钟
+
+/**
+ * 添加负责人组件
+ * @param {Object} props - 组件参数
+ * @param {string} props.teamId - 团队ID
+ * @param {string} props.taskId - 任务ID
+ * @param {Function} props.onAdded - 可选的回调函数，当用户成功添加后调用
+ * @returns {JSX.Element} - 添加负责人组件
+ */
+function AddUserToAssignee({ teamId, taskId, onAdded }) {
+  const t = useTranslations('Team');
+  const assigneeTagId = 2; // 负责人标签ID
+  const dispatch = useDispatch();
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [assignedMembers, setAssignedMembers] = useState([]);
+  const [membersNotYetAssigned, setMembersNotYetAssigned] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastFetchedTeamId, setLastFetchedTeamId] = useState(null);
+  
+  console.log("AddUserToAssignee rendered with:", { teamId, taskId }); // 调试日志
+
+  // 使用useEffect进行防抖获取
+  useEffect(() => {
+    if (!teamId || !taskId) return;
+    
+    // 如果已经有数据且teamId没变，不重新获取
+    if (teamMembers.length > 0 && teamId === lastFetchedTeamId) return;
+    
+    const fetchTeamData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // 检查缓存中是否有最近的数据
+        const cacheKey = `team-${teamId}`;
+        const cachedData = teamMembersCache.get(cacheKey);
+        
+        if (cachedData && (Date.now() - cachedData.timestamp < CACHE_TIME)) {
+          console.log("使用缓存的团队数据:", cachedData.users.length);
+          setTeamMembers(cachedData.users);
+          setLastFetchedTeamId(teamId);
+          
+          // 此处仍需获取任务数据，因为任务数据可能变化
+          await fetchTaskData();
+          return;
+        }
+        
+        // 没有缓存或缓存过期，获取新数据
+        console.log("开始获取团队成员数据");
+        const teamResponse = await dispatch(fetchTeamUsers(teamId)).unwrap();
+        
+        // 处理响应数据
+        let users = extractUsers(teamResponse);
+        
+        // 将数据存入缓存
+        teamMembersCache.set(cacheKey, {
+          users,
+          timestamp: Date.now()
+        });
+        
+        setTeamMembers(users);
+        setLastFetchedTeamId(teamId);
+        
+        // 获取任务数据
+        await fetchTaskData(users);
+      } catch (err) {
+        console.error("获取团队成员失败:", err);
+        setError(err.message || "无法加载团队成员");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    // 抽取任务数据获取逻辑为单独函数
+    const fetchTaskData = async (users = teamMembers) => {
+      try {
+        const taskResponse = await dispatch(fetchTaskById(taskId)).unwrap();
+        
+        // 处理任务数据...
+        const tagValues = taskResponse?.tag_values || {};
+        const currentAssignees = Array.isArray(tagValues[assigneeTagId]) ? tagValues[assigneeTagId] : [];
+        setAssignedMembers(currentAssignees);
+        
+        // 计算未分配成员
+        const notYetAssigned = users.filter(member => !currentAssignees.includes(member.user_id));
+        setMembersNotYetAssigned(notYetAssigned);
+      } catch (err) {
+        console.error("获取任务数据失败:", err);
+        setError(err.message || "无法加载任务信息");
+      }
+    };
+    
+    // 创建防抖
+    const debounceTimer = setTimeout(fetchTeamData, 300);
+    return () => clearTimeout(debounceTimer);
+    
+  }, [teamId, taskId, dispatch]);
+  
+  // 提取用户数据的辅助函数
+  function extractUsers(response) {
+    if (Array.isArray(response)) return response;
+    if (response?.payload && Array.isArray(response.payload)) return response.payload;
+    if (response?.users && Array.isArray(response.users)) return response.users;
+    if (response && typeof response === 'object') {
+      const arrayProp = Object.values(response).find(value => Array.isArray(value));
+      if (arrayProp) return arrayProp;
+    }
+    return [];
+  }
+  
+  // 处理添加负责人操作
+  const handleAddUserToAssignee = async (userId) => {
+    if (!userId || !taskId) {
+      console.log("Missing userId or taskId in add operation:", { userId, taskId });
+      return;
+    }
+    
+    try {
+      console.log("开始添加负责人:", userId);
+      
+      // 先获取最新的任务信息，确保有最新的tag_values
+      const taskResponse = await dispatch(fetchTaskById(taskId)).unwrap();
+      const currentTagValues = taskResponse?.tag_values || {};
+      
+      // 添加新用户ID到现有负责人列表
+      const currentAssignees = Array.isArray(currentTagValues[assigneeTagId]) 
+        ? currentTagValues[assigneeTagId] 
+        : [];
+      const updatedAssignees = [...currentAssignees, userId];
+      
+      // 合并更新后的tag_values，保留其他字段
+      const updatedTagValues = {
+        ...currentTagValues,
+        [assigneeTagId]: updatedAssignees
+      };
+      
+      // 更新任务
+      console.log("更新任务, 完整tag_values:", updatedTagValues);
+      const result = await dispatch(updateTask({
+        taskId: taskId, 
+        taskData: {
+          tag_values: updatedTagValues
+        }
+      })).unwrap();
+      
+      console.log("添加负责人成功, 响应:", result);
+      
+      // 更新本地状态
+      setAssignedMembers(updatedAssignees);
+      
+      // 更新未分配成员列表
+      setMembersNotYetAssigned(prev => 
+        prev.filter(member => member.user_id !== userId)
+      );
+      
+      // 如果提供了回调函数，则调用
+      if (typeof onAdded === 'function') {
+        onAdded(userId);
+      }
+      
+    } catch (error) {
+      console.error('添加负责人失败:', error);
+      alert('添加失败: ' + (error.message || '服务器错误'));
+    }
+  };
+
+  return (
+    <div className="flex justify-center">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-1 h-7 border border-dashed border-primary/50 hover:border-primary"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-2">
+          <h4 className="text-sm font-medium mb-2">{t('add_assignee') || '添加负责人'}</h4>
+          
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+              <span className="ml-2 text-sm text-muted-foreground">{t('loading') || '加载中...'}</span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-2 text-sm text-destructive">
+              {error}
+            </div>
+          ) : membersNotYetAssigned.length > 0 ? (
+            <div className="max-h-60 overflow-y-auto">
+              {membersNotYetAssigned.map(member => (
+                <div 
+                  key={member.user_id} 
+                  className="flex items-center gap-2 p-2 hover:bg-accent/50 rounded-md cursor-pointer"
+                  onClick={() => handleAddUserToAssignee(member.user_id)}
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={member.avatar_url} />
+                    <AvatarFallback>{member.name?.[0] || <User size={14} />}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-medium">{member.user_id}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-2 text-sm text-muted-foreground">
+              {t('no_available_members') || '没有可添加的团队成员'}
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+/**
+ * 显示负责人管理组件，包含添加和移除功能
+ * @param {string} teamId - 团队ID
+ * @param {string} taskId - 任务ID
+ * @returns {JSX.Element} - 负责人管理组件
+ */
+export function AssigneeManager({ teamId, taskId }) {
+  const t = useTranslations('Team');
+  const dispatch = useDispatch();
+  const [assignees, setAssignees] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
+  const assigneeTagId = 2; // 负责人标签ID
+  
+  console.log("AssigneeManager初始化:", { teamId, taskId });
+  
+  // 加载当前任务负责人
+  useEffect(() => {
+    const loadAssignees = async () => {
+      if (!taskId) {
+        console.log("没有taskId，无法加载负责人");
+        setIsLoading(false);
+        return;
+      }
+      
+      setIsLoading(true);
+      
+      try {
+        console.log("开始获取任务:", taskId);
+        // 获取任务信息
+        const taskAction = await dispatch(fetchTaskById(taskId));
+        const taskData = taskAction.payload || {};
+        console.log("获取到任务数据:", taskData);
+        
+        // 获取任务中的负责人ID列表
+        const tagValues = taskData.tag_values || {};
+        const assigneeValues = tagValues[assigneeTagId] || [];
+        
+        // 确保assigneeValues是数组
+        const assigneeArray = Array.isArray(assigneeValues) ? assigneeValues : [];
+        console.log("设置负责人列表:", assigneeArray);
+        setAssignees(assigneeArray);
+      } catch (error) {
+        console.error('加载负责人失败:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadAssignees();
+    
+    // 添加lastRefreshTime作为依赖项，当它变化时重新加载数据
+  }, [dispatch, taskId, lastRefreshTime]);
+  
+  // 处理移除负责人的回调
+  const handleRemoveAssignee = () => {
+    // 触发刷新
+    setLastRefreshTime(Date.now());
+  };
+  
+  // 处理添加负责人的回调
+  const handleAddAssignee = () => {
+    // 触发刷新
+    setLastRefreshTime(Date.now());
+  };
+  
+  // 手动刷新函数
+  const forceRefresh = () => {
+    setLastRefreshTime(Date.now());
+  };
+  
+  // 渲染负责人列表和管理控件
+  return (
+    <div className="flex flex-col gap-2">
+      {isLoading ? (
+        <div className="flex items-center justify-center py-2">
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+          <span className="ml-2 text-sm text-muted-foreground">{t('loading') || '加载中...'}</span>
+        </div>
+      ) : (
+        <>
+          {/* 当前负责人列表 */}
+          {assignees.length > 0 ? (
+            <div className="space-y-1">
+              {assignees.map(userId => (
+                <div key={userId} className="flex items-center justify-between p-1 rounded-md hover:bg-accent/50 group">
+                  <PeopleDisplay userId={userId} />
+                  <RemoveUserFromAssignee 
+                    taskId={taskId} 
+                    userIdToRemove={userId} 
+                    onRemoved={handleRemoveAssignee}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground py-1 flex items-center gap-2">
+              <User size={14} className="text-muted-foreground" />
+              {t('unassigned') || '未分配'}
+            </div>
+          )}
+          
+          {/* 添加负责人按钮 */}
+          <div className="mt-1">
+            <AddUserToAssignee 
+              teamId={teamId} 
+              taskId={taskId} 
+              onAdded={handleAddAssignee}
+            />
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

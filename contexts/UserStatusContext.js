@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import useGetUser from '@/lib/hooks/useGetUser';
+import { toast } from 'sonner';
 
 const UserStatusContext = createContext();
 
@@ -12,6 +13,16 @@ export function UserStatusProvider({ children }) {
   const [lastSeen, setLastSeen] = useState(null);
   // 添加跟踪其他用户状态的状态
   const [usersStatus, setUsersStatus] = useState({});
+  // Add subscription status tracking
+  const [subscriptionStatus, setSubscriptionStatus] = useState({
+    isActive: false,
+    plan: null,
+    expiresAt: null,
+    autoRenewEnabled: false,
+    isExpiringSoon: false,
+    lastRenewalAttempt: null,
+    renewalStatus: null
+  });
   const { user } = useGetUser();
 
   // 获取当前用户信息
@@ -20,8 +31,133 @@ export function UserStatusProvider({ children }) {
       setCurrentUser(user);
       setIsOnline(user.is_online || false);
       setLastSeen(user.last_seen_at);
+      
+      // Check subscription status when user is set
+      checkSubscriptionStatus(user.id);
     }
   }, [user]);
+
+  // Check user's subscription status
+  const checkSubscriptionStatus = async (userId) => {
+    if (!userId) return;
+    
+    try {
+      // Get user's auto-renew preference and timezone
+      const { data: userData, error: userError } = await supabase
+        .from('user')
+        .select('auto_renew_enabled, timezone')
+        .eq('id', userId)
+        .single();
+        
+      if (userError) {
+        console.error('Error fetching user auto-renew preference:', userError);
+        return;
+      }
+
+      console.log('User data:', userData);
+
+      // Get user's active subscription - don't use single() to avoid 406 errors
+      const { data: subscriptions, error: subscriptionError } = await supabase
+        .from('user_subscription_plan')
+        .select(`
+          id, 
+          plan_id, 
+          status, 
+          start_date, 
+          end_date,
+          auto_renew,
+          last_renewal_attempt,
+          renewal_failure_count,
+          plan:plan_id (
+            name,
+            type,
+            price,
+            billing_interval
+          )
+        `)
+        .eq('user_id', userId)
+        .or('status.eq.ACTIVE,status.eq.active')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (subscriptionError) {
+        console.error('Error fetching subscription:', subscriptionError);
+        return;
+      }
+
+      console.log('Subscription query results:', {
+        userId,
+        subscriptions,
+        query: `SELECT * FROM user_subscription_plan WHERE user_id = '${userId}' AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1`
+      });
+
+      // Check if we have a subscription
+      if (subscriptions && subscriptions.length > 0) {
+        const subscription = subscriptions[0];
+        
+        // Calculate if subscription is expiring soon (within 7 days)
+        const endDate = new Date(subscription.end_date);
+        const now = new Date();
+        const sevenDaysFromNow = new Date();
+        sevenDaysFromNow.setDate(now.getDate() + 7);
+        
+        const isExpiringSoon = endDate <= sevenDaysFromNow && endDate > now;
+        
+        // Determine renewal status
+        let renewalStatus = 'PENDING';
+        if (subscription.renewal_failure_count > 0) {
+          renewalStatus = 'FAILED';
+        } else if (subscription.last_renewal_attempt) {
+          const lastAttempt = new Date(subscription.last_renewal_attempt);
+          const oneHourAgo = new Date();
+          oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+          
+          if (lastAttempt > oneHourAgo) {
+            renewalStatus = 'PROCESSING';
+          }
+        }
+        
+        setSubscriptionStatus({
+          isActive: true,
+          plan: subscription.plan,
+          expiresAt: subscription.end_date,
+          autoRenewEnabled: userData.auto_renew_enabled && subscription.auto_renew,
+          isExpiringSoon,
+          lastRenewalAttempt: subscription.last_renewal_attempt,
+          renewalFailureCount: subscription.renewal_failure_count || 0,
+          renewalStatus,
+          timezone: userData.timezone || 'UTC+0'
+        });
+      } else {
+        // No active subscription
+        setSubscriptionStatus({
+          isActive: false,
+          plan: null,
+          expiresAt: null,
+          autoRenewEnabled: userData?.auto_renew_enabled || false,
+          isExpiringSoon: false,
+          lastRenewalAttempt: null,
+          renewalFailureCount: 0,
+          renewalStatus: null,
+          timezone: userData.timezone || 'UTC+0'
+        });
+      }
+    } catch (error) {
+      console.error('Error checking subscription status:', error);
+      // Set default values in case of error
+      setSubscriptionStatus({
+        isActive: false,
+        plan: null,
+        expiresAt: null,
+        autoRenewEnabled: false,
+        isExpiringSoon: false,
+        lastRenewalAttempt: null,
+        renewalFailureCount: 0,
+        renewalStatus: null,
+        timezone: 'UTC+0'
+      });
+    }
+  };
 
   // 发送心跳信号
   const sendHeartbeat = async () => {
@@ -38,6 +174,11 @@ export function UserStatusProvider({ children }) {
       if (response.ok) {
         setIsOnline(true);
         setLastSeen(new Date().toISOString());
+        
+        // Periodically check subscription status (less frequently than heartbeat)
+        if (Math.random() < 0.1) { // 10% chance on each heartbeat to check subscription
+          checkSubscriptionStatus(currentUser.id);
+        }
       }
     } catch (error) {
       console.error('Failed to send heartbeat:', error);
@@ -123,6 +264,68 @@ export function UserStatusProvider({ children }) {
     }
   }, [usersStatus]);
 
+  // Toggle auto-renewal for subscriptions
+  const toggleAutoRenewal = async (enabled) => {
+    if (!currentUser?.id) return false;
+    
+    try {
+      console.log(`Attempting to set auto-renewal to ${enabled} for user ${currentUser.id}`);
+      
+      // First check if user has a payment method if enabling auto-renewal
+      if (enabled) {
+        const paymentMethodResponse = await fetch('/api/payment-methods');
+        const paymentMethodData = await paymentMethodResponse.json();
+        
+        console.log('Payment methods:', paymentMethodData);
+        
+        if (!paymentMethodResponse.ok || !paymentMethodData.payment_methods || paymentMethodData.payment_methods.length === 0) {
+          console.error('No payment methods available for auto-renewal');
+          toast.error('You need to add a payment method before enabling auto-renewal');
+          return false;
+        }
+      }
+      
+      const response = await fetch('/api/subscription/auto-renew', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled }),
+      });
+      
+      const responseText = await response.text();
+      console.log('Auto-renewal API response:', { 
+        status: response.status, 
+        ok: response.ok,
+        text: responseText 
+      });
+      
+      // Parse the response as JSON (if it is JSON)
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Error parsing response as JSON:', parseError);
+        throw new Error('Invalid response format');
+      }
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update auto-renewal preference');
+      }
+      
+      // Update local state with the returned value from the server
+      setSubscriptionStatus(prev => ({
+        ...prev,
+        autoRenewEnabled: result.auto_renew_enabled
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error('Error toggling auto-renewal:', error);
+      return false;
+    }
+  };
+
   // 定期更新用户在线状态
   useEffect(() => {
     if (!currentUser) return;
@@ -187,6 +390,28 @@ export function UserStatusProvider({ children }) {
     };
   }, []);
 
+  // Monitor subscription changes
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    
+    const subscriptionChannel = supabase
+      .channel('subscription_changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_subscription_plan',
+        filter: `user_id=eq.${currentUser.id}`,
+      }, () => {
+        // Refresh subscription status when changes occur
+        checkSubscriptionStatus(currentUser.id);
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(subscriptionChannel);
+    };
+  }, [currentUser]);
+
   return (
     <UserStatusContext.Provider 
       value={{ 
@@ -196,7 +421,10 @@ export function UserStatusProvider({ children }) {
         updateUserOnlineStatus,
         setUserOffline,
         getUserStatus,
-        usersStatus
+        usersStatus,
+        subscriptionStatus,
+        checkSubscriptionStatus,
+        toggleAutoRenewal
       }}
     >
       {children}
