@@ -144,7 +144,7 @@ CREATE TABLE "task" (
   "id" SERIAL PRIMARY KEY,
   "tag_values" JSONB DEFAULT '{}',
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
-  "like" UUID[] DEFAULT '{}',
+  "likes" UUID[] DEFAULT '{}',
   "page_id" INT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

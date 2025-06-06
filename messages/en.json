@@ -30,7 +30,7 @@
   },
   "common": {
     "processing": "Processing...",
-    "saving": "Saving...",  
+    "saving": "Saving...",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -474,7 +474,7 @@
       "workspace": "Workspace"
     },
     "dueDate": {
-      "label": "DUE DATE", 
+      "label": "DUE DATE",
       "createdBy": "Created by me"
     },
     "newTask": {
@@ -680,9 +680,12 @@
     "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
   },
   "CreateTask": {
-    "willBeDeleted":"will be deleted.",
-    "deleteTaskTitle":"Confirm Delete Task",
-    "deleteTaskDescription":"Are you sure you want to delete this task? This action cannot be undone.",
+    "noUsers": "No users",
+    "sectionNameRequired": "Section Name required.",
+    "taskNameRequired": "Task Name must contain at least 2 characters and not more than 50 characters.",
+    "willBeDeleted": "will be deleted.",
+    "deleteTaskTitle": "Confirm Delete Task",
+    "deleteTaskDescription": "Are you sure you want to delete this task? This action cannot be undone.",
     "assignees": "Assignees",
     "nameMinLength": "Name must be at least 2 characters.",
     "nameMaxLength": "Name cannot exceed 100 characters.",
@@ -1074,8 +1077,8 @@
     "chatUnhidden": "Chat is now visible",
     "allHiddenChats": "All Hidden Chats",
     "show": "Show",
-     "hide": "Hide",
-     "errors": {
+    "hide": "Hide",
+    "errors": {
       "deleteFailed": "Failed to delete chat",
       "hideFailed": "Failed to hide chat",
       "notLoggedIn": "You need to be logged in",
@@ -1505,7 +1508,7 @@
     "tagAdded": "Tag added",
     "tagAddedDescription": "Successfully added tag \"{tag}\"",
     "tagAddFailed": "Failed to add tag",
-    "tagAddFailedDescription": "Failed to add tag \"{tag}\""  
+    "tagAddFailedDescription": "Failed to add tag \"{tag}\""
   },
   "notificationCenter": {
     "title": "Notification Center",
