@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { processOutputs } from '@/app/[locale]/ai-workflow/workflow-service';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5 minute timeout
+export const maxDuration = 60; // 60 second timeout (max for hobby plan)
 
 // This function processes AI responses after user edits to generate final outputs
 export async function POST(request) {

@@ -1,5 +1,8 @@
 import { streamAIResponses } from '../../../../[locale]/ai-workflow/workflow-service';
 
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 second timeout (max for hobby plan)
+
 // This function handles the streaming of AI responses
 export async function POST(request) {
   try {
