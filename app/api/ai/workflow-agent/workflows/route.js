@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createWorkflow, updateWorkflow, getUserWorkflows, getWorkflow } from '../../../../[locale]/ai-workflow/workflow-service';
 
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 second timeout (max for hobby plan)
+
 // GET endpoint to fetch all workflows for a user
 export async function GET(request) {
   try {

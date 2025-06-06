@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { executeWorkflow, getUserWorkflows, createWorkflow, updateWorkflow, getWorkflow } from '../../../[locale]/ai-workflow/workflow-service';
 import { supabase } from '@/lib/supabase';
 
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 second timeout (max for hobby plan)
+
 export async function POST(request) {
   try {    
     console.log('Main API: POST request received');
