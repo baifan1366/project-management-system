@@ -25,7 +25,8 @@ import {
   DialogContent, 
   DialogFooter, 
   DialogHeader, 
-  DialogTitle 
+  DialogTitle,
+  DialogDescription 
 } from '@/components/ui/dialog';
 import { 
   HoverCard,
@@ -48,9 +49,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useGetUser } from '@/lib/hooks/useGetUser';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { updateRole, deleteRole } from '@/lib/redux/features/agileSlice';
 import RoleForm from './RoleForm';
+import { fetchAgileRoles } from '@/lib/redux/features/agileSlice';
+import { createRole } from '@/lib/redux/features/agileSlice';
 
 // 角色职责简述（保留，因为这些通常是固定的业务规则）
 const ROLE_RESPONSIBILITIES = {
@@ -105,8 +108,24 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleDescription, setNewRoleDescription] = useState('');
   const [error, setError] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
   const {user} = useGetUser();
   const userId = user?.id;
+  
+  // 从Redux获取团队信息
+  const team = useSelector(state => {
+    // 根据Redux状态结构，找到对应teamId的团队
+    if (!state.teams || typeof state.teams !== 'object') return null;
+    
+    // 检查teams是否是数组或对象
+    if (Array.isArray(state.teams)) {
+      // 如果是数组，查找匹配teamId的团队
+      return state.teams.find(t => t && t.id && t.id.toString() === teamId?.toString());
+    } else {
+      // 如果是对象，直接获取键为0的团队
+      return state.teams[0] || null;
+    }
+  });
   
   // 添加编辑和删除角色相关的状态
   const [editRoleDialogOpen, setEditRoleDialogOpen] = useState(false);
@@ -114,31 +133,50 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
   const [deleteRoleDialogOpen, setDeleteRoleDialogOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState(null);
   
+  // 添加调试日志
+  useEffect(() => {
+    console.log('RoleAssignment 调试信息:', {
+      teamId,
+      team,
+      teamCreatedBy: team?.created_by,
+      userId,
+      isCreator: team?.created_by && userId ? team.created_by.toString() === userId.toString() : false
+    });
+  }, [team, userId, teamId]);
+
   // 专门监听角色列表变化的effect
   useEffect(() => {
     // 当角色列表更新时重新渲染组件
     setLoading(false);
   }, [agileRoles]);
 
+  // 检查角色名称是否已存在
+  const checkRoleNameExists = (name) => {
+    if (!agileRoles || !Array.isArray(agileRoles)) return false;
+    
+    return agileRoles.some(role => 
+      role && 
+      role.name && 
+      role.name.trim().toLowerCase() === name.trim().toLowerCase()
+    );
+  };
+  
+  // 修改角色名称，如果存在重复则添加后缀
+  const getUniqueRoleName = (name) => {
+    if (!checkRoleNameExists(name)) return name;
+    
+    return `${name} (1)`;
+  };
+
   // 获取团队成员
   useEffect(() => {
-    // 无论agileMembers是否有用户信息，先将其存储起来
-    
-    // 如果agileMembers中包含了足够的用户信息，则不需要再获取teamMembers
-    const hasEnrichedMembers = agileMembers.length > 0 && 
-      agileMembers.some(member => member.name && member.email);
-      
-    if (hasEnrichedMembers) {
-      setLoading(false);
-      return;
-    }
-    
     if (teamId) {
       setLoading(true);
       // 从API获取团队成员
       fetch(`/api/teams/${teamId}/members`)
         .then(res => res.json())
         .then(data => {
+          console.log('获取到的团队成员:', data);
           setTeamMembers(data);
           setLoading(false);
         })
@@ -146,11 +184,12 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
           console.error('获取团队成员失败:', err);
           // 即使获取失败，也使用agileMembers数据
           if (agileMembers.length > 0) {
+            console.log('使用agileMembers作为后备:', agileMembers);
           }
           setLoading(false);
         });
     }
-  }, [teamId, agileMembers]);
+  }, [teamId, agileId]);
 
   // 获取角色信息
   const getRoleInfo = (roleId) => {
@@ -229,6 +268,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
             agile_id: agileId,
             user_id: memberId,
             role_id: selectedRole,
+            created_by: userId
           }),
         });
       }
@@ -257,31 +297,59 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
   
   // 创建新角色
   const createNewRole = async () => {
-    if (!newRoleName || !teamId) return;
+    // 验证表单
+    const validationErrors = {};
+    
+    // 验证角色名称
+    if (!newRoleName || newRoleName.trim() === '') {
+      validationErrors.name = t('roleNameRequired') || '请输入角色名称';
+    } else if (newRoleName.trim().length < 2) {
+      validationErrors.name = t('roleNameMinLength') || '角色名称最少需要2个字符';
+    } else if (newRoleName.trim().length > 50) {
+      validationErrors.name = t('roleNameMaxLength') || '角色名称最多允许50个字符';
+    }
+    
+    // 验证角色描述
+    if (!newRoleDescription || newRoleDescription.trim() === '') {
+      validationErrors.description = t('roleDescriptionRequired') || '请输入角色描述';
+    } else if (newRoleDescription.trim().length < 10) {
+      validationErrors.description = t('roleDescriptionMinLength') || '角色描述最少需要10个字符';
+    } else if (newRoleDescription.trim().length > 100) {
+      validationErrors.description = t('roleDescriptionMaxLength') || '角色描述最多允许100个字符';
+    }
+    
+    // 如果有验证错误，显示错误并中断提交
+    if (Object.keys(validationErrors).length > 0) {
+      setFormErrors(validationErrors);
+      return;
+    }
+    
+    if (!teamId) return;
     
     try {
       if (!userId) {
+        console.error('创建角色失败: 用户ID未找到');
         throw new Error('无法获取当前用户ID');
       }
       
+      console.log('准备创建角色，用户ID:', userId);
       setLoading(true); // 开始加载状态
       
-      const response = await fetch('/api/teams/agile/role', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          team_id: teamId,
-          name: newRoleName,
-          description: newRoleDescription,
-          created_by: userId
-        }),
-      });
+      const roleData = { 
+        team_id: teamId,
+        name: getUniqueRoleName(newRoleName),
+        description: newRoleDescription,
+        created_by: userId
+      };
+      
+      console.log('发送角色数据:', roleData);
+      
+      const response = await dispatch(createRole(roleData));
       
       if (!response.ok) throw new Error('创建角色失败');
       
       const newRoleData = await response.json();
+      console.log('角色创建成功，返回数据:', newRoleData);
       
       // 获取API返回的新角色数据
       const newRole = newRoleData.data || newRoleData;
@@ -417,19 +485,63 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
 
   // 渲染角色分配表格
   const renderRoleAssignmentTable = () => {
-    // 如果我们已经有了从API获取的敏捷成员，且敏捷成员已包含用户信息，则直接使用
-    const hasEnrichedMembers = agileMembers.length > 0 && 
-      agileMembers.some(member => member.name && member.email);
-
-    // 用于渲染的成员列表
-    let membersToRender = hasEnrichedMembers 
-      ? agileMembers 
-      : teamMembers;
+    // 添加调试信息
+    console.log('角色分配表格渲染:', {
+      teamMembers: teamMembers?.length,
+      agileMembers: agileMembers?.length,
+      teamMembersData: teamMembers,
+      agileMembersData: agileMembers
+    });
+    
+    // 创建一个更强大的去重函数
+    const getUniqueMembers = () => {
+      // 使用多个键值进行匹配
+      const membersByIds = new Map();
+      const membersByEmails = new Map();
+      const result = [];
       
-    // 如果两者都为空且有agileMembers数据，则使用agileMembers作为后备数据
-    if (membersToRender.length === 0 && agileMembers.length > 0) {
-      membersToRender = agileMembers;
-    }
+      // 首先处理 teamMembers
+      if (Array.isArray(teamMembers)) {
+        teamMembers.forEach(member => {
+          if (!member) return;
+          
+          const id = (member.id || member.user_id)?.toString();
+          const email = member.email?.toLowerCase();
+          
+          if (id) membersByIds.set(id, member);
+          if (email) membersByEmails.set(email, member);
+          
+          // 将成员添加到结果中
+          result.push(member);
+        });
+      }
+      
+      // 然后处理 agileMembers，仅添加新成员
+      if (Array.isArray(agileMembers)) {
+        agileMembers.forEach(member => {
+          if (!member) return;
+          
+          const id = (member.id || member.user_id)?.toString();
+          const email = member.email?.toLowerCase();
+          
+          // 检查这个成员是否已经存在（通过ID或邮箱）
+          if ((id && membersByIds.has(id)) || 
+              (email && membersByEmails.has(email))) {
+            return; // 已存在，跳过
+          }
+          
+          // 这是新成员，添加到映射和结果中
+          if (id) membersByIds.set(id, member);
+          if (email) membersByEmails.set(email, member);
+          result.push(member);
+        });
+      }
+      
+      return result;
+    };
+    
+    // 获取去重后的成员列表
+    const membersToRender = getUniqueMembers();
     
     // 如果没有任何成员数据，显示提示
     if (membersToRender.length === 0) {
@@ -468,16 +580,12 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
             }
             
             const roleId = getMemberRole(memberId);
-            // 添加调试信息
-            
-            // 记录agileRoles的状态
             
             // 直接尝试从agileRoles中查找roleId
             let roleInfo = null;
             if (roleId) {
               roleInfo = agileRoles.find(role => role && role.id && roleId && role.id.toString() === roleId.toString());
             }
-            
             
             return (
               <TableRow key={`member-${memberId}`}>
@@ -544,10 +652,18 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
   
   // 渲染创建角色对话框
   const renderCreateRoleDialog = () => (
-    <Dialog open={createRoleDialogOpen} onOpenChange={setCreateRoleDialogOpen}>
+    <Dialog open={createRoleDialogOpen} onOpenChange={(open) => {
+      setCreateRoleDialogOpen(open);
+      if (!open) {
+        setFormErrors({});
+        setNewRoleName('');
+        setNewRoleDescription('');
+      }
+    }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('createNewRole')}</DialogTitle>
+          <DialogDescription>{t('createNewRoleDescription')}</DialogDescription>
         </DialogHeader>
         
         <div className="py-4 space-y-4">
@@ -558,7 +674,16 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
               value={newRoleName} 
               onChange={(e) => setNewRoleName(e.target.value)}
               placeholder={t('roleNamePlaceholder')}
+              maxLength={50}
             />
+            <div className="flex justify-between">
+              <div>
+                {formErrors.name && <p className="text-sm text-destructive">{formErrors.name}</p>}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {newRoleName ? String(newRoleName).trim().length : 0}/50
+              </div>
+            </div>
           </div>
           
           <div className="space-y-2">
@@ -569,16 +694,25 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
               onChange={(e) => setNewRoleDescription(e.target.value)}
               placeholder={t('roleDescriptionPlaceholder')}
               rows={4}
+              maxLength={100}
             />
+            <div className="flex justify-between">
+              <div>
+                {formErrors.description && <p className="text-sm text-destructive">{formErrors.description}</p>}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {newRoleDescription ? String(newRoleDescription).trim().length : 0}/100
+              </div>
+            </div>
           </div>
         </div>
         
         <DialogFooter>
-          <Button variant="outline" onClick={() => setCreateRoleDialogOpen(false)}>
+          <Button variant="outline" onClick={() => setCreateRoleDialogOpen(false)} disabled={loading}>
             {t('cancel')}
           </Button>
-          <Button onClick={createNewRole}>
-            {t('create')}
+          <Button onClick={createNewRole} disabled={loading}>
+            {loading ? t('creating') || '创建中...' : t('create')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -591,6 +725,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('editRole')}</DialogTitle>
+          <DialogDescription>{t('editRoleDescription')}</DialogDescription>
         </DialogHeader>
         
         <div className="">
@@ -639,6 +774,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
           <DialogTitle>
             {t('assignRoleTo')} {selectedMember?.name}
           </DialogTitle>
+          <DialogDescription>{t('assignRoleToDescription')}</DialogDescription>
         </DialogHeader>
         
         <div className="py-4">
@@ -687,84 +823,86 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
   );
   
   return (
-    <Card className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-base font-medium ml-2">{t('roleAssignment')}</h3>
-        
-        <div className="flex items-center space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setIsRoleInfoExpanded(!isRoleInfoExpanded)}
-          >
-            <Info className="w-4 h-4 mr-1" />
-            {t('roleInfo')}
-            {isRoleInfoExpanded ? (
-              <ChevronUp className="ml-1 w-4 h-4" />
-            ) : (
-              <ChevronDown className="ml-1 w-4 h-4" />
-            )}
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setCreateRoleDialogOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            {t('createRole')}
-          </Button>
-        </div>
-      </div>
-      
-      {isRoleInfoExpanded && (
-        <div className="mb-4 p-2 bg-slate-50 rounded-md">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {agileRoles.map(role => (
-              role && role.id && (
-                <div key={role.id} className="p-2 bg-background border rounded-md relative">
-                  <div className="absolute top-2 right-2 flex space-x-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8" 
-                      onClick={() => handleEditRole(role)}
-                    >
-                      <Edit className="h-4 w-4" />
-                      <span className="sr-only">{t('edit')}</span>
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-8 w-8 text-red-500 hover:text-red-600" 
-                      onClick={() => handleDeleteRole(role)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">{t('delete')}</span>
-                    </Button>
-                  </div>
-                  <h5 className="font-medium pr-16">{role.name}</h5>
-                  <p className="text-sm text-gray-600 mt-1">{role.description}</p>
-                </div>
-              )
-            ))}
+    <>
+        <Card className="p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-base font-medium ml-2">{t('roleAssignment')}</h3>
+            
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsRoleInfoExpanded(!isRoleInfoExpanded)}
+              >
+                <Info className="w-4 h-4 mr-1" />
+                {t('roleInfo')}
+                {isRoleInfoExpanded ? (
+                  <ChevronUp className="ml-1 w-4 h-4" />
+                ) : (
+                  <ChevronDown className="ml-1 w-4 h-4" />
+                )}
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setCreateRoleDialogOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                {t('createRole')}
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
-      
-      {loading ? (
-        <div className="flex justify-center items-center h-40">
-          <p>{t('loading')}</p>
-        </div>
-      ) : (
-        renderRoleAssignmentTable()
-      )}
-      
-      {renderAssignRoleDialog()}
-      {renderCreateRoleDialog()}
-      {renderEditRoleDialog()}
-      {renderDeleteRoleDialog()}
-    </Card>
+          
+          {isRoleInfoExpanded && (
+            <div className="mb-4 p-2 bg-slate-50 rounded-md">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {agileRoles.map(role => (
+                  role && role.id && (
+                    <div key={role.id} className="p-2 bg-background border rounded-md relative">
+                      <div className="absolute top-2 right-2 flex space-x-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8" 
+                          onClick={() => handleEditRole(role)}
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">{t('edit')}</span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-600" 
+                          onClick={() => handleDeleteRole(role)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">{t('delete')}</span>
+                        </Button>
+                      </div>
+                      <h5 className="font-medium pr-16">{role.name}</h5>
+                      <p className="text-sm text-gray-600 mt-1">{role.description}</p>
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {loading ? (
+            <div className="flex justify-center items-center h-40">
+              <p>{t('loading')}</p>
+            </div>
+          ) : (
+            renderRoleAssignmentTable()
+          )}
+          
+          {renderAssignRoleDialog()}
+          {renderCreateRoleDialog()}
+          {renderEditRoleDialog()}
+          {renderDeleteRoleDialog()}
+        </Card>
+    </>
   );
 };
 
