@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -19,48 +19,14 @@ export default function AdminSupport() {
   const [tickets, setTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyText, setReplyText] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('new');
   const [searchQuery, setSearchQuery] = useState('');
   const [ticketReplies, setTicketReplies] = useState([]);
   const [isSendingReply, setIsSendingReply] = useState(false);
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
   const adminState = useSelector((state) => state.admin);
-  const [downgradeData, setDowngradeData] = useState(null);
-  const [usageComparison, setUsageComparison] = useState(null);
-
-  // initialize the page
-  useEffect(() => {
-    const initAdminSupport = async () => {
-      try {
-        setLoading(true);
-        
-        // Set admin data from redux store
-        if (adminState.admin) {
-          setAdminData(adminState.admin);
-        }
-        
-        // Fetch support tickets
-        await fetchSupportTickets();
-        
-      } catch (error) {
-        console.error('Errror in fetching support tickets:', error);
-        // Redirect to admin login
-        router.replace(`/admin/adminLogin`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    initAdminSupport();
-  }, [dispatch, router, adminState.admin]);
-  
-  // Add useEffect to fetch tickets when filter changes
-  useEffect(() => {
-    if (adminData) {
-      fetchSupportTickets();
-    }
-  }, [filter]);
+  const [refundData, setRefundData] = useState(null);
 
   // Add function to verify permission access
   const hasPermission = (permissionName) => {
@@ -68,8 +34,14 @@ export default function AdminSupport() {
   };
   
   // Fetch support tickets
-  const fetchSupportTickets = async () => {
+  const fetchSupportTickets = useCallback(async (showLoadingState = false) => {
     try {
+      // Only show loading state when explicitly requested
+      // This prevents UI flicker during auto-refresh
+      if (showLoadingState) {
+        setLoading(true);
+      }
+      
       let query = supabase
         .from('contact')
         .select('*')
@@ -84,12 +56,173 @@ export default function AdminSupport() {
       
       if (error) throw error;
       
+      // Update selected ticket data if it exists in the new data
+      if (selectedTicket) {
+        const updatedSelectedTicket = data?.find(ticket => ticket.id === selectedTicket.id);
+        if (updatedSelectedTicket && JSON.stringify(updatedSelectedTicket) !== JSON.stringify(selectedTicket)) {
+          setSelectedTicket(updatedSelectedTicket);
+        }
+      }
+      
       setTickets(data || []);
       
     } catch (error) {
       console.error('Error fetching support tickets:', error);
+    } finally {
+      if (showLoadingState) {
+        setLoading(false);
+      }
     }
-  };
+  }, [filter, selectedTicket]);
+
+  // Add this function after fetchSupportTickets
+  const fetchTicketReplies = useCallback(async (ticketId) => {
+    try {
+      console.log('Fetching replies for ticket:', ticketId);
+      
+      // First, get the admin user data
+      const { data: adminUserData, error: adminError } = await supabase
+        .from('admin_user')
+        .select('id, username, full_name')
+        .eq('id', adminData.id)
+        .single();
+        
+      if (adminError) {
+        console.error('Error fetching admin user data:', adminError);
+      } else {
+        console.log('Admin user data:', adminUserData);
+      }
+
+      // Then fetch the replies with admin user data
+      const { data, error } = await supabase
+        .from('contact_reply')
+        .select(`
+          *,
+          admin_user:admin_id (
+            username,
+            full_name
+          )
+        `)
+        .eq('contact_id', ticketId)
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching ticket replies:', error);
+        throw error;
+      }
+      
+      console.log('Fetched ticket replies:', data);
+      
+      // Update the state with all replies
+      setTicketReplies(data || []);
+      
+    } catch (error) {
+      console.error('Error in fetchTicketReplies:', error);
+      toast.error(`Failed to load replies: ${error.message}`);
+    }
+  }, [adminData]);
+
+  // Fetch refund request data for a contact
+  const fetchRefundData = useCallback(async (contactId) => {
+    try {
+      // Get the refund request with subscription details
+      const { data: requests, error: requestError } = await supabase
+        .from('refund_request')
+        .select(`
+          *,
+          current_subscription:current_subscription_id (
+            id,
+            subscription_plan:plan_id (
+              id,
+              type,
+              name,
+              price,
+              billing_interval
+            )
+          )
+        `)
+        .eq('contact_id', contactId)
+        .limit(1);
+      
+      if (requestError) {
+        console.error('Error fetching refund request:', requestError);
+        throw requestError;
+      }
+
+      // If we found a request, use the first one
+      const data = requests?.[0];
+      
+      if (data) {
+        setRefundData(data);
+      } else {
+        console.log('No refund request found for contact:', contactId);
+        setRefundData(null);
+      }
+    } catch (error) {
+      console.error('Error in fetchRefundData:', error);
+      toast.error('Failed to load refund request details');
+      setRefundData(null);
+    }
+  }, []);
+
+  // initialize the page
+  useEffect(() => {
+    const initAdminSupport = async () => {
+      try {
+        setLoading(true);
+        
+        // Set admin data from redux store
+        if (adminState.admin) {
+          setAdminData(adminState.admin);
+        }
+        
+        // Fetch support tickets with loading state for initial load
+        await fetchSupportTickets(true);
+        
+      } catch (error) {
+        console.error('Errror in fetching support tickets:', error);
+        // Redirect to admin login
+        router.replace(`/admin/adminLogin`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initAdminSupport();
+  }, [dispatch, router, adminState.admin, fetchSupportTickets]);
+  
+  // Add useEffect to fetch tickets when filter changes
+  useEffect(() => {
+    if (adminData) {
+      fetchSupportTickets();
+    }
+  }, [filter, adminData, fetchSupportTickets]);
+
+  // Add real-time ticket fetching every 10 seconds
+  useEffect(() => {
+    if (!adminData) return;
+    
+    // Initial fetch
+    fetchSupportTickets();
+    
+    // Set up interval for real-time updates
+    const intervalId = setInterval(() => {
+      fetchSupportTickets();
+      
+      // Also refresh replies if a ticket is selected
+      if (selectedTicket) {
+        fetchTicketReplies(selectedTicket.id);
+      
+        // Refresh refund data if applicable
+        if (selectedTicket.type === 'REFUND') {
+          fetchRefundData(selectedTicket.id);
+      }
+      }
+    }, 10000); // 10 seconds
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [adminData, selectedTicket, fetchSupportTickets, fetchTicketReplies, fetchRefundData]);
   
   // Handle filter change
   const handleFilterChange = (newFilter) => {
@@ -110,11 +243,11 @@ export default function AdminSupport() {
     // Fetch replies for this ticket
     await fetchTicketReplies(ticket.id);
     
-    // If it's a downgrade request, fetch the downgrade data
-    if (ticket.type === 'DOWNGRADE') {
-      await fetchDowngradeData(ticket.id);
+    // If it's a refund request, fetch the refund data
+    if (ticket.type === 'REFUND') {
+      await fetchRefundData(ticket.id);
     } else {
-      setDowngradeData(null);
+      setRefundData(null);
     }
     
     // Log activity
@@ -193,7 +326,7 @@ export default function AdminSupport() {
     
     try {
       setIsSendingReply(true);
-      const loadingToastId = toast.loading('Sending reply...'); // Store the loading toast ID
+      const loadingToastId = toast.loading('Sending reply...'); 
 
       // First save the reply to the database
       const { data: replyData, error: replyError } = await supabase
@@ -241,7 +374,7 @@ export default function AdminSupport() {
         await handleStatusChange('IN_PROGRESS');
       }
       
-      // Log the reply activity
+      // Log the activity
       if (adminData) {
         await supabase.from('admin_activity_log').insert({
           admin_id: adminData.id,
@@ -267,7 +400,7 @@ export default function AdminSupport() {
     } catch (error) {
       console.error('Error sending reply:', error);
       toast.dismiss(); // Dismiss any existing toasts
-      toast.error(`Error sending reply: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     } finally {
       setIsSendingReply(false); // Reset sending state
     }
@@ -315,337 +448,251 @@ export default function AdminSupport() {
     );
   });
   
-  // Add this function after fetchSupportTickets
-  const fetchTicketReplies = async (ticketId) => {
-    try {
-      console.log('Fetching replies for ticket:', ticketId);
-      
-      // First, get the admin user data
-      const { data: adminUserData, error: adminError } = await supabase
-        .from('admin_user')
-        .select('id, username, full_name')
-        .eq('id', adminData.id)
-        .single();
-        
-      if (adminError) {
-        console.error('Error fetching admin user data:', adminError);
-      } else {
-        console.log('Admin user data:', adminUserData);
-      }
-
-      // Then fetch the replies with admin user data
-      const { data, error } = await supabase
-        .from('contact_reply')
-        .select(`
-          *,
-          admin_user:admin_id (
-            username,
-            full_name
-          )
-        `)
-        .eq('contact_id', ticketId)
-        .order('created_at', { ascending: true });
-      
-      if (error) {
-        console.error('Error fetching ticket replies:', error);
-        throw error;
-      }
-      
-      console.log('Fetched ticket replies:', data);
-      
-      // Update the state with the replies
-      setTicketReplies(data || []);
-      
-    } catch (error) {
-      console.error('Error in fetchTicketReplies:', error);
-      toast.error(`Failed to load replies: ${error.message}`);
-    }
-  };
-  
-  // Update checkDowngradeEligibility to handle target plan data correctly
-  const checkDowngradeEligibility = async (userId, targetPlanData) => {
-    try {
-      console.log('Checking eligibility for user:', userId, 'target plan:', targetPlanData);
-      
-      if (!userId || !targetPlanData) {
-        throw new Error('Missing required parameters: userId or targetPlanData');
-      }
-
-      // Convert UUID string to UUID if needed
-      const userUUID = typeof userId === 'string' ? userId : userId.toString();
-
-      // Fetch user's current subscription with plan details
-      const { data: userSubscription, error: userSubError } = await supabase
-        .from('user_subscription_plan')
-        .select(`
-          id,
-          user_id,
-          status,
-          current_projects,
-          current_teams,
-          current_members,
-          current_ai_chat,
-          current_ai_task,
-          current_ai_workflow,
-          current_storage
-        `)
-        .eq('user_id', userUUID)
-        .eq('status', 'ACTIVE')
-        .limit(1)
-        .maybeSingle();
-
-      if (userSubError) {
-        console.error('Error fetching user subscription:', userSubError);
-        throw userSubError;
-      }
-
-      if (!userSubscription) {
-        throw new Error('No active subscription found for user');
-      }
-      
-      console.log('User subscription data:', userSubscription);
-
-      // Compare limits
-      const comparison = {
-        projects: {
-          current: userSubscription.current_projects || 0,
-          limit: targetPlanData.max_projects,
-          exceeds: (userSubscription.current_projects || 0) > targetPlanData.max_projects
-        },
-        teams: {
-          current: userSubscription.current_teams || 0,
-          limit: targetPlanData.max_teams,
-          exceeds: (userSubscription.current_teams || 0) > targetPlanData.max_teams
-        },
-        members: {
-          current: userSubscription.current_members || 0,
-          limit: targetPlanData.max_members,
-          exceeds: (userSubscription.current_members || 0) > targetPlanData.max_members
-        },
-        aiChat: {
-          current: userSubscription.current_ai_chat || 0,
-          limit: targetPlanData.max_ai_chat,
-          exceeds: (userSubscription.current_ai_chat || 0) > targetPlanData.max_ai_chat
-        },
-        aiTask: {
-          current: userSubscription.current_ai_task || 0,
-          limit: targetPlanData.max_ai_task,
-          exceeds: (userSubscription.current_ai_task || 0) > targetPlanData.max_ai_task
-        },
-        aiWorkflow: {
-          current: userSubscription.current_ai_workflow || 0,
-          limit: targetPlanData.max_ai_workflow,
-          exceeds: (userSubscription.current_ai_workflow || 0) > targetPlanData.max_ai_workflow
-        },
-        storage: {
-          current: userSubscription.current_storage || 0,
-          limit: targetPlanData.max_storage,
-          exceeds: (userSubscription.current_storage || 0) > targetPlanData.max_storage
-        }
-      };
-
-      console.log('Usage comparison:', comparison);
-      setUsageComparison(comparison);
-      
-    } catch (error) {
-      console.error('Error checking downgrade eligibility:', error);
-      toast.error(`Failed to check downgrade eligibility: ${error.message}`);
-    }
-  };
-
-  // Update fetchDowngradeData to handle target plan data correctly
-  const fetchDowngradeData = async (contactId) => {
-    try {
-      // First get the downgrade request with all necessary plan details
-      const { data: requests, error: requestError } = await supabase
-        .from('downgrade_request')
-        .select(`
-          *,
-          current_subscription:current_subscription_id (
-            id,
-            subscription_plan:plan_id (
-              id,
-              type,
-              name,
-              max_projects,
-              max_teams,
-              max_members,
-              max_ai_chat,
-              max_ai_task,
-              max_ai_workflow,
-              max_storage
-            )
-          ),
-          target_plan:target_plan_id (
-            id,
-            type,
-            name,
-            max_projects,
-            max_teams,
-            max_members,
-            max_ai_chat,
-            max_ai_task,
-            max_ai_workflow,
-            max_storage
-          )
-        `)
-        .eq('contact_id', contactId)
-        .limit(1);
-      
-      if (requestError) {
-        console.error('Error fetching downgrade request:', requestError);
-        throw requestError;
-      }
-
-      // If we found a request, use the first one
-      const data = requests?.[0];
-      
-      if (data) {
-        setDowngradeData(data);
-        // Check eligibility using the target plan data
-        await checkDowngradeEligibility(data.user_id, data.target_plan);
-      } else {
-        console.log('No downgrade request found for contact:', contactId);
-        setDowngradeData(null);
-      }
-    } catch (error) {
-      console.error('Error in fetchDowngradeData:', error);
-      toast.error('Failed to load downgrade request details');
-      setDowngradeData(null);
-    }
-  };
-  
-  // Handle downgrade request approval/rejection
-  const handleDowngradeAction = async (action) => {
-    if (!selectedTicket || !downgradeData) return;
+  // Handle refund request approval/rejection
+  const handleRefundAction = async (action) => {
+    if (!selectedTicket || !refundData) return;
     
     try {
-      console.log('Starting downgrade action:', action);
-      console.log('Admin data:', adminData); // Log admin data
+      console.log('Starting refund action:', action);
+      console.log('Admin data:', adminData);
       
       if (!adminData?.id) {
         throw new Error('Admin ID is required to process the request');
       }
 
-      const loadingToastId = toast.loading(`Processing downgrade request...`);
+      const loadingToastId = toast.loading(`Processing refund request...`);
 
-      // For both approve and reject, first check the limits
-      const { data: targetPlanData, error: targetPlanError } = await supabase
-        .from('subscription_plan')
-        .select('*')
-        .eq('type', downgradeData.target_plan)
-        .single();
-
-      if (targetPlanError) throw targetPlanError;
-      console.log('Target plan data:', targetPlanData);
-
-      // Fetch user's current usage
-      const { data: userSubscription, error: userSubError } = await supabase
-        .from('user_subscription_plan')
-        .select('*')
-        .eq('user_id', downgradeData.user_id)
-        .eq('status', 'ACTIVE')
-        .single();
-
-      if (userSubError) throw userSubError;
-      console.log('User subscription data:', userSubscription);
-
-      // Check if current usage exceeds target plan limits
-      const limitExceededMessages = [];
+      // If rejecting, no need to calculate refund amount
+      if (action === 'reject') {
+        // Process the refund request as rejected
+        const { error: refundError } = await supabase
+          .from('refund_request')
+          .update({
+            status: 'REJECTED',
+            processed_by: adminData.id,
+            processed_at: new Date().toISOString(),
+            refund_amount: 0,
+            notes: 'Refund request rejected'
+          })
+          .eq('id', refundData.id);
       
-      if (userSubscription.current_projects > targetPlanData.max_projects) {
-        limitExceededMessages.push(`Projects: ${userSubscription.current_projects}/${targetPlanData.max_projects}`);
-      }
-      if (userSubscription.current_teams > targetPlanData.max_teams) {
-        limitExceededMessages.push(`Teams: ${userSubscription.current_teams}/${targetPlanData.max_teams}`);
-      }
-      if (userSubscription.current_members > targetPlanData.max_members) {
-        limitExceededMessages.push(`Team Members: ${userSubscription.current_members}/${targetPlanData.max_members}`);
-      }
-      if (userSubscription.current_ai_chat > targetPlanData.max_ai_chat) {
-        limitExceededMessages.push(`AI Chat Usage: ${userSubscription.current_ai_chat}/${targetPlanData.max_ai_chat}`);
-      }
-      if (userSubscription.current_ai_task > targetPlanData.max_ai_task) {
-        limitExceededMessages.push(`AI Task Usage: ${userSubscription.current_ai_task}/${targetPlanData.max_ai_task}`);
-      }
-      if (userSubscription.current_ai_workflow > targetPlanData.max_ai_workflow) {
-        limitExceededMessages.push(`AI Workflow Usage: ${userSubscription.current_ai_workflow}/${targetPlanData.max_ai_workflow}`);
-      }
-      if (userSubscription.current_storage > targetPlanData.max_storage) {
-        limitExceededMessages.push(`Storage Usage: ${userSubscription.current_storage}GB/${targetPlanData.max_storage}GB`);
-      }
-
-      console.log('Limit exceeded messages:', limitExceededMessages);
-
-      // If limits are exceeded, add a warning note first
-      if (limitExceededMessages.length > 0) {
-        console.log('Adding warning note to ticket');
-        // Add an internal note about the exceeded limits
-        const warningContent = `⚠️ WARNING: Current usage exceeds ${downgradeData.target_plan} plan limits:\n\n${limitExceededMessages.join('\n')}\n\nPlease ensure the user is aware they need to reduce their usage before the downgrade can take effect.`;
-        console.log('Warning content:', warningContent);
+        if (refundError) throw refundError;
         
-        const { data: replyData, error: replyError } = await supabase
+        // Add a note to the ticket
+        const { error: replyError } = await supabase
           .from('contact_reply')
           .insert({
             contact_id: selectedTicket.id,
-            content: warningContent,
+            content: 'Refund request rejected.',
             admin_id: adminData.id,
             is_from_contact: false,
             is_internal_note: true
-          })
-          .select();
+          });
 
-        if (replyError) {
-          console.error('Error adding warning note:', replyError);
-          throw replyError;
+        if (replyError) throw replyError;
+
+        // Get user information for sending email notification
+        const { data: userData, error: userError } = await supabase
+          .from('refund_request')
+          .select(`
+            user:user_id (
+              id,
+              email,
+              name
+            )
+          `)
+          .eq('id', refundData.id)
+          .single();
+
+        if (!userError && userData?.user?.email) {
+          try {
+            // Send rejection email
+            const rejectionReason = window.prompt('Enter a reason for rejecting this refund request (this will be sent to the customer):', 'Your refund request does not meet our eligibility criteria.');
+            const emailReason = rejectionReason || 'Your refund request does not meet our eligibility criteria.';
+            
+            const emailResponse = await fetch(`${window.location.origin}/api/send-email`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                to: userData.user.email,
+                subject: 'Your Refund Request Status Update',
+                text: `Dear ${userData.user.name || 'Customer'},\n\nWe've reviewed your refund request and unfortunately, we're unable to approve it at this time.\n\nReason: ${emailReason}\n\nIf you have any questions or would like to discuss this further, please reply to this email or contact our support team.\n\nThank you for your understanding.\n\nBest regards,\nTeam Sync Support Team`,
+                // Use the new template system
+                templateType: 'refund_rejected',
+                templateData: {
+                  customerName: userData.user.name || 'Customer',
+                  rejectionReason: emailReason
+                }
+              }),
+            });
+            
+            const emailResult = await emailResponse.json();
+            console.log('Rejection email sent result:', emailResult);
+            
+          } catch (emailError) {
+            console.error('Error sending refund rejection email:', emailError);
+            // Don't throw here - we still want to complete the ticket update
+          }
         }
-        console.log('Added warning note:', replyData);
-
-        // Refresh ticket replies to show the warning
+  
+        // Update ticket status
+        await handleStatusChange('COMPLETED');
+        
+        // Refresh ticket data
+        await fetchRefundData(selectedTicket.id);
         await fetchTicketReplies(selectedTicket.id);
-        console.log('Fetched updated ticket replies');
-
-        // Show warning toast and ask for confirmation
+        
         toast.dismiss(loadingToastId);
-        
-        const confirmMessage = `WARNING: User's current usage exceeds ${downgradeData.target_plan} plan limits:\n\n${limitExceededMessages.join('\n')}\n\nDo you want to proceed with the ${action}?`;
-        console.log('Showing confirmation dialog:', confirmMessage);
-        
-        if (!window.confirm(confirmMessage)) {
-          console.log('Action cancelled by admin');
-          return;
-        }
+        toast.success('Refund request rejected successfully');
+        return;
       }
 
-      console.log('Processing downgrade request');
-      // Process the downgrade request
-      const { error: downgradeError } = await supabase
-        .from('downgrade_request')
+      // For approvals, we need to calculate the refund amount
+      // Fetch the user's subscription details to get start and end dates
+      const { data: subscription, error: subError } = await supabase
+        .from('user_subscription_plan')
+        .select('*')
+        .eq('id', refundData.current_subscription_id)
+        .single();
+
+      if (subError) throw subError;
+
+      if (!subscription) {
+        throw new Error('Could not find subscription details');
+      }
+      
+      // Calculate refund amount based on remaining days
+      const startDate = new Date(subscription.start_date);
+      const endDate = new Date(subscription.end_date);
+      const currentDate = new Date();
+      
+      // Get billing interval from subscription plan
+      const billingInterval = refundData.current_subscription?.subscription_plan?.billing_interval || 'MONTHLY';
+      
+      // Determine total days based on billing interval
+      let totalDays;
+      if (billingInterval === 'YEARLY') {
+        totalDays = 365; // Standard days in a year
+      } else if (billingInterval === 'MONTHLY') {
+        totalDays = 30; // Standard days in a month
+      } else {
+        // Fallback to calculating from start/end date if billing interval is unknown
+        totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+      }
+      
+      // Calculate remaining days (if current date is past end date, remaining days is 0)
+      const remainingDays = Math.max(0, Math.ceil((endDate - currentDate) / (1000 * 60 * 60 * 24)));
+      
+      // Get total cost
+      const totalCost = refundData.current_subscription?.subscription_plan?.price || 0;
+      
+      // Calculate refund amount: (Remaining days ÷ Total days) × Total cost
+      const calculatedRefundAmount = (remainingDays / totalDays) * totalCost;
+      
+      // Round to 2 decimal places
+      const roundedRefundAmount = Math.round(calculatedRefundAmount * 100) / 100;
+      
+      // Show the calculated amount but allow admin to adjust if needed
+      const refundAmount = window.prompt(
+        `Calculated refund amount: $${roundedRefundAmount}\n(Remaining days: ${remainingDays}, Total days: ${totalDays}, Total cost: $${totalCost})\n\nEnter refund amount:`, 
+        roundedRefundAmount.toString()
+      );
+
+      // If user cancels the prompt, abort the action
+      if (refundAmount === null) {
+        toast.dismiss(loadingToastId);
+        return;
+      }
+
+      const finalRefundAmount = parseFloat(refundAmount) || roundedRefundAmount;
+
+      // Process the refund request
+      const { error: refundError } = await supabase
+        .from('refund_request')
         .update({
-          status: action === 'approve' ? 'APPROVED' : 'REJECTED',
+          status: 'APPROVED',
           processed_by: adminData.id,
           processed_at: new Date().toISOString(),
-          notes: limitExceededMessages.length > 0 ? 
-            `${action === 'approve' ? 'Approved' : 'Rejected'} with usage warnings:\n${limitExceededMessages.join('\n')}` : 
-            null
+          refund_amount: finalRefundAmount,
+          notes: `Refund approved for $${finalRefundAmount}. Calculation: (${remainingDays} remaining days ÷ ${totalDays} total days) × $${totalCost} total cost = $${roundedRefundAmount}`
         })
-        .eq('id', downgradeData.id);
+        .eq('id', refundData.id);
       
-      if (downgradeError) throw downgradeError;
+      if (refundError) throw refundError;
+      
+      // MISSING STEP: Call the refund API to process the actual refund through Stripe
+      try {
+        const refundResponse = await fetch(`${window.location.origin}/api/payment-refund`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            refundRequestId: refundData.id
+          }),
+        });
+        
+        // Check the content type to handle HTML error pages
+        const contentType = refundResponse.headers.get('content-type');
+        
+        if (contentType && contentType.includes('text/html')) {
+          console.error('Received HTML response instead of JSON. API route may not exist or server error occurred.');
+          throw new Error('API returned HTML instead of JSON. Server error occurred.');
+        }
+        
+        if (!refundResponse.ok) {
+          const errorData = await refundResponse.json();
+          throw new Error(errorData.error || 'Failed to process payment refund');
+        }
+        
+        const refundResult = await refundResponse.json();
+        console.log('Refund processed successfully:', refundResult);
+        
+        // Update the notes to include Stripe refund confirmation
+        await supabase
+          .from('refund_request')
+          .update({
+            notes: `${refundData.notes || ''}\nStripe refund processed successfully. Refund ID: ${refundResult.refund.id}`
+          })
+          .eq('id', refundData.id);
+        
+      } catch (stripeError) {
+        console.error('Error processing Stripe refund:', stripeError);
+        // Don't throw here - we still want to update the ticket status and refresh data
+        // Just show an additional error message
+        toast.error(`Refund was approved but payment processing failed: ${stripeError.message}`);
+      }
+      
+      // Add a note to the ticket
+      const noteContent = `Refund request approved. Amount: $${finalRefundAmount}\nCalculation: (${remainingDays} remaining days ÷ ${totalDays} total days) × $${totalCost} total cost = $${roundedRefundAmount}`;
+        
+      const { error: replyError } = await supabase
+          .from('contact_reply')
+          .insert({
+            contact_id: selectedTicket.id,
+          content: noteContent,
+            admin_id: adminData.id,
+            is_from_contact: false,
+            is_internal_note: true
+        });
+
+      if (replyError) throw replyError;
       
       // Update ticket status
       await handleStatusChange('COMPLETED');
       
       // Refresh ticket data
-      await fetchDowngradeData(selectedTicket.id);
+      await fetchRefundData(selectedTicket.id);
       await fetchTicketReplies(selectedTicket.id);
       
       toast.dismiss(loadingToastId);
-      toast.success(`Downgrade request ${action === 'approve' ? 'approved' : 'rejected'} successfully`);
+      toast.success(`Refund request approved successfully for $${finalRefundAmount}`);
       
     } catch (error) {
-      console.error('Error processing downgrade request:', error);
-      toast.error(`Failed to process downgrade request: ${error.message}`);
+      console.error('Error processing refund request:', error);
+      toast.error(`Failed to process refund request: ${error.message}`);
     }
   };
   
@@ -814,6 +861,12 @@ export default function AdminSupport() {
                   >
                     Closed
                   </button>
+                  <button
+                    onClick={() => handleFilterChange('spam')}
+                    className={`flex-1 py-2 text-sm font-medium ${filter === 'spam' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' : 'text-gray-500 dark:text-gray-400'}`}
+                  >
+                    Spam
+                  </button>
                 </div>
                 
                 <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
@@ -835,12 +888,16 @@ export default function AdminSupport() {
                               : ticket.email.split('@')[0]}
                           </h4>
                           <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadgeColor(ticket.status)}`}>
-                            {ticket.status === 'IN_PROGRESS' ? 'Active' : ticket.status === 'NEW' ? 'New' : ticket.status === 'COMPLETED' ? 'Closed' : ticket.status}
+                            {ticket.status === 'IN_PROGRESS' ? 'Active' : 
+                             ticket.status === 'NEW' ? 'New' : 
+                             ticket.status === 'COMPLETED' ? 'Closed' : 
+                             ticket.status === 'SPAM' ? 'Spam' : 
+                             ticket.status}
                           </span>
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                           {ticket.type === 'ENTERPRISE' ? 'Enterprise Inquiry' : 
-                           ticket.type === 'DOWNGRADE' ? 'Downgrade Request' : 
+                           ticket.type === 'REFUND' ? 'Refund Request' : 
                            'General Support'}
                         </p>
                         <div className="flex items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -867,7 +924,7 @@ export default function AdminSupport() {
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                         {selectedTicket.type === 'ENTERPRISE' ? 'Enterprise Inquiry' : 
-                         selectedTicket.type === 'DOWNGRADE' ? 'Downgrade Request' : 
+                         selectedTicket.type === 'REFUND' ? 'Refund Request' : 
                          'General Support'}
                       </h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -1118,107 +1175,86 @@ export default function AdminSupport() {
                   </div>  
                   )}
 
-                  {/* Update the Downgrade Request Details Section */}
-                  {selectedTicket?.type === 'DOWNGRADE' && downgradeData && (
+                  {/* Refund Request Details Section */}
+                  {selectedTicket?.type === 'REFUND' && refundData && (
                     <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Downgrade Request Details</h4>
+                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Refund Request Details</h4>
                       <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                         <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">Customer Information</p>
+                            <div className="mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                              <p className="text-sm text-gray-600 dark:text-gray-300">
+                                Name: {refundData.first_name} {refundData.last_name}
+                              </p>
+                            </div>
+                          </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900 dark:text-white">Current Plan</p>
                             <div className="mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
                               <p className="text-sm text-gray-600 dark:text-gray-300">
-                                Name: {downgradeData.current_subscription?.subscription_plan?.name || 'Unknown'}
+                                Name: {refundData.current_subscription?.subscription_plan?.name || 'Unknown'}
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Type: {downgradeData.current_subscription?.subscription_plan?.type || 'Unknown'}
-                              </p>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">Target Plan</p>
-                            <div className="mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                              <p className="text-sm text-gray-600 dark:text-gray-300">
-                                Name: {downgradeData.target_plan?.name || 'Unknown'}
+                                Type: {refundData.current_subscription?.subscription_plan?.type || 'Unknown'}
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Type: {downgradeData.target_plan?.type || 'Unknown'}
+                                Price: ${refundData.current_subscription?.subscription_plan?.price || '0.00'} / {refundData.current_subscription?.subscription_plan?.billing_interval?.toLowerCase() || 'month'}
                               </p>
                             </div>
                           </div>
                         </div>
                         
-                        {/* Add Usage Comparison Section */}
-                        {usageComparison && (
                           <div className="mb-4">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">Usage Analysis</p>
-                            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-                              <div className="space-y-3">
-                                {Object.entries(usageComparison).map(([key, data]) => (
-                                  <div key={key} className={`flex items-center justify-between ${data.exceeds ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                    <span className="text-sm font-medium">
-                                      {key.replace(/([A-Z])/g, ' $1').trim()} {/* Add spaces before capital letters */}
-                                    </span>
-                                    <span className="text-sm">
-                                      {data.current}/{data.limit} {key === 'storage' ? 'GB' : ''}
-                                      {data.exceeds && ' ⚠️'}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                              {Object.values(usageComparison).some(data => data.exceeds) && (
-                                <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                                  <p className="text-sm text-red-700 dark:text-red-300">
-                                    ⚠️ Warning: Current usage exceeds target plan limits in some areas. User must reduce usage before downgrade can be effective.
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">Reason for Refund</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            {refundData.reason}
                                   </p>
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
                         
                         <div className="mb-4">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">Reason for Downgrade</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">Additional Details</p>
                           <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                            {downgradeData.reason}
+                            {refundData.details}
                           </p>
                         </div>
 
-                        {downgradeData.notes && (
+                        {refundData.notes && (
                           <div className="mb-4">
                             <p className="text-sm font-medium text-gray-900 dark:text-white">Processing Notes</p>
                             <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line mt-1 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                              {downgradeData.notes}
+                              {refundData.notes}
                             </p>
                           </div>
                         )}
                         
-                        {downgradeData.status === 'PENDING' ? (
+                        {refundData.status === 'PENDING' ? (
                           <div className="flex space-x-2">
                             <button
-                              onClick={() => handleDowngradeAction('approve')}
+                              onClick={() => handleRefundAction('approve')}
                               className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
                             >
-                              Approve Downgrade
+                              Approve Refund
                             </button>
                             <button
-                              onClick={() => handleDowngradeAction('reject')}
+                              onClick={() => handleRefundAction('reject')}
                               className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
                             >
-                              Reject Downgrade
+                              Reject Refund
                             </button>
                           </div>
                         ) : (
                           <div className="flex items-center space-x-2">
                             <div className={`text-sm font-medium ${
-                              downgradeData.status === 'APPROVED' 
+                              refundData.status === 'APPROVED' 
                                 ? 'text-green-600 dark:text-green-400'
                                 : 'text-red-600 dark:text-red-400'
                             }`}>
-                              Request {downgradeData.status.toLowerCase()}
-                              {downgradeData.processed_at && ` on ${formatDate(downgradeData.processed_at)}`}
+                              Request {refundData.status.toLowerCase()}
+                              {refundData.processed_at && ` on ${formatDate(refundData.processed_at)}`}
+                              {refundData.refund_amount && refundData.status === 'APPROVED' && ` - Amount: $${refundData.refund_amount}`}
                             </div>
-                            {downgradeData.processed_by && (
+                            {refundData.processed_by && (
                               <div className="text-sm text-gray-500 dark:text-gray-400">
                                 by {adminData?.username || 'Unknown Admin'}
                               </div>

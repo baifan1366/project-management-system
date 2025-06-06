@@ -39,7 +39,10 @@ import {
   Calendar,
   ListChecks,
   Lightbulb,
-  BookOpen
+  BookOpen,
+  X,
+  Loader2,
+  ArrowRight
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -135,6 +138,19 @@ const promptTemplates = [
   { id: 'professional', name: 'Professional', template: 'Write a professional analysis of {{topic}} suitable for business contexts. Include relevant data and insights.' },
 ];
 
+// Add debounce utility at the top of the file after imports
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
 export default function AIWorkflow() {
   const t = useTranslations('AI_Workflow');
   const { confirm } = useConfirm();
@@ -166,6 +182,23 @@ export default function AIWorkflow() {
   const [executionResult, setExecutionResult] = useState(null);
   const [showExecutionForm, setShowExecutionForm] = useState(false);
   
+  // State for streaming output
+  const [streamingOutput, setStreamingOutput] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [showStreamingModal, setShowStreamingModal] = useState(false);
+  const [aiResponseData, setAiResponseData] = useState({});
+  const [showReviewStep, setShowReviewStep] = useState(false);
+  const [editedResponseData, setEditedResponseData] = useState({});
+  const [currentFormat, setCurrentFormat] = useState('');
+  const streamEndRef = useRef(null);
+  
+  // Store output settings and node connections
+  const [outputSettings, setOutputSettings] = useState({});
+  const [nodeConnections, setNodeConnections] = useState({});
+  
+  // Add a ref for storing JSON parsing timeouts
+  const jsonParseTimeoutRef = useRef({});
+  
   // Input schema for the workflow
   const [inputFields, setInputFields] = useState([
     { name: 'topic', label: 'Topic', type: 'text', required: true }
@@ -174,6 +207,7 @@ export default function AIWorkflow() {
   // Create a node ID counter for unique node IDs
   const nodeIdRef = useRef(1);
   const { user } = useGetUser();
+  
   // Get current user on component mount
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -204,7 +238,10 @@ export default function AIWorkflow() {
   
   // Fetch user workflows
   const fetchUserWorkflows = async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('Cannot fetch workflows: userId is not set');
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -426,6 +463,7 @@ export default function AIWorkflow() {
   // Load a workflow
   const loadWorkflow = async (workflowId) => {
     if (!userId) {
+      console.error('Cannot load workflow: userId is not set');
       toast.error('User not authenticated');
       return;
     }
@@ -539,6 +577,7 @@ export default function AIWorkflow() {
   // Delete a workflow
   const deleteWorkflow = async (workflowId) => {
     if (!userId) {
+      console.error('Cannot delete workflow: userId is not set');
       toast.error('User not authenticated');
       return;
     }
@@ -635,13 +674,8 @@ export default function AIWorkflow() {
     return connectionMap;
   }, [edges]);
   
-  // 执行工作流
+  // Execute workflow with streaming output
   const executeWorkflow = async (inputs) => {
-    if (!userId) {
-      toast.error('User not authenticated');
-      return;
-    }
-    
     if (!currentWorkflow) {
       toast.error('Please save the workflow before executing');
       return;
@@ -650,10 +684,15 @@ export default function AIWorkflow() {
     try {
       setIsExecuting(true);
       setExecutionResult(null);
+      setAiResponseData({});
+      setEditedResponseData({});
+      setShowStreamingModal(true);
+      setIsStreaming(true);
+      setStreamingOutput('');
+      setShowExecutionForm(false); // Close the input form when execution starts
       
       // 分析工作流连接
       const connectionMap = analyzeWorkflowConnections();
-      console.log("Connection map:", connectionMap);
       
       // 找到所有处理节点获取选定的模型
       const processNodes = nodes.filter(node => node.data.nodeType === 'process');
@@ -671,8 +710,8 @@ export default function AIWorkflow() {
       
       // 收集输出格式和它们的设置
       const outputFormats = [];
-      const outputSettings = {};
-      const nodeConnections = {};
+      const newOutputSettings = {};
+      const newNodeConnections = {};
       
       // 处理输出节点
       outputNodes.forEach(node => {
@@ -688,12 +727,12 @@ export default function AIWorkflow() {
         
         // 为每种输出类型收集设置
         if (outputType === 'json' && node.data.jsonFormat) {
-          outputSettings[node.id] = {
+          newOutputSettings[node.id] = {
             type: 'json',
             format: node.data.jsonFormat
           };
         } else if (outputType === 'api') {
-          outputSettings[node.id] = {
+          newOutputSettings[node.id] = {
             type: 'api',
             url: node.data.apiUrl || 'https://httpbin.org/post',
             method: node.data.apiMethod || 'POST'
@@ -704,6 +743,8 @@ export default function AIWorkflow() {
             sourceId => connectionMap[sourceId].includes(node.id)
           );
           
+          console.log(`[Debug] Nodes connected to API node ${node.id}:`, connectedToApi);
+          
           if (connectedToApi.length > 0) {
             // 找到连接到此 API 节点的 JSON 节点
             const jsonNodes = nodes.filter(
@@ -711,16 +752,20 @@ export default function AIWorkflow() {
                   n.data.outputType === 'json'
             );
             
+            console.log(`[Debug] JSON nodes connected to API node ${node.id}:`, 
+              jsonNodes.map(n => ({ id: n.id, hasFormat: !!n.data.jsonFormat })));
+            
             if (jsonNodes.length > 0) {
               // 记录这个连接，以便后端可以使用 JSON 输出作为 API 请求数据
-              nodeConnections[node.id] = {
-                sourceNodes: jsonNodes.map(n => n.id)
+              newNodeConnections[node.id] = {
+                sourceNodes: jsonNodes.map(n => n.id),
+                dataType: 'json'
               };
             }
           }
         } else if (outputType === 'task') {
           // 为 task 节点收集项目和团队设置
-          outputSettings[node.id] = {
+          newOutputSettings[node.id] = {
             type: 'task',
             projectId: node.data.projectId || null,
             teamId: node.data.teamId || null
@@ -736,13 +781,13 @@ export default function AIWorkflow() {
           
           // Check if chatSessionIds is defined and not empty
           if (node.data.chatSessionIds && node.data.chatSessionIds.length > 0) {
-            outputSettings[node.id] = {
+            newOutputSettings[node.id] = {
               type: 'chat',
               chatSessionIds: node.data.chatSessionIds,
               messageTemplate: node.data.messageTemplate || 'Hello, this is an automated message from the workflow system:\n\n{{content}}',
               messageFormat: node.data.messageFormat || 'text'
             };
-            console.log(`[Debug] Added chat settings for node ${node.id}:`, outputSettings[node.id]);
+            console.log(`[Debug] Added chat settings for node ${node.id}:`, newOutputSettings[node.id]);
           } else {
             console.warn(`[Debug] No chat sessions selected for chat node ${node.id}`);
           }
@@ -758,7 +803,7 @@ export default function AIWorkflow() {
           
           // Check if email recipients are specified
           if (node.data.emailRecipients) {
-            outputSettings[node.id] = {
+            newOutputSettings[node.id] = {
               type: 'email',
               recipients: node.data.emailRecipients,
               subject: node.data.emailSubject || 'Automated email from workflow system',
@@ -768,7 +813,7 @@ export default function AIWorkflow() {
             
             // Add custom SMTP settings if enabled
             if (node.data.useCustomSmtp) {
-              outputSettings[node.id].smtp = {
+              newOutputSettings[node.id].smtp = {
                 host: node.data.smtpHost,
                 port: node.data.smtpPort || '587',
                 user: node.data.smtpUser,
@@ -777,12 +822,37 @@ export default function AIWorkflow() {
               };
             }
             
-            console.log(`[Debug] Added email settings for node ${node.id}:`, outputSettings[node.id]);
+            console.log(`[Debug] Added email settings for node ${node.id}:`, newOutputSettings[node.id]);
           } else {
             console.warn(`[Debug] No recipients specified for email node ${node.id}`);
           }
+        } else if (outputType === 'document' || outputType === 'ppt') {
+          // Make sure we also set up document and presentation output types
+          newOutputSettings[node.id] = {
+            type: outputType
+          };
         }
       });
+      
+      // Validate JSON-API connections to ensure data flow
+      Object.keys(newNodeConnections).forEach(apiNodeId => {
+        const connection = newNodeConnections[apiNodeId];
+        console.log(`[Debug] Validating connection for API node ${apiNodeId}:`, connection);
+        
+        if (connection.sourceNodes && connection.sourceNodes.length > 0) {
+          // Make sure we generate JSON output for any node that's connected to an API
+          connection.sourceNodes.forEach(jsonNodeId => {
+            if (!outputFormats.includes('json')) {
+              outputFormats.push('json');
+              console.log(`[Debug] Added JSON format to ensure API node ${apiNodeId} gets data`);
+            }
+          });
+        }
+      });
+      
+      // Save output settings and connections to state for later use
+      setOutputSettings(newOutputSettings);
+      setNodeConnections(newNodeConnections);
       
       // Create the request payload
       const payload = {
@@ -790,18 +860,41 @@ export default function AIWorkflow() {
         inputs,
         modelId: selectedModel,
         aiModels: aiModels, // 发送所有选择的AI模型
-        userId,
+        userId: userId || undefined,  // 允许为undefined，后端会处理
         outputFormats,
-        outputSettings,
-        nodeConnections,
-        connectionMap
+        outputSettings: newOutputSettings,
+        nodeConnections: newNodeConnections,
+        connectionMap,
+        streaming: true // Enable streaming output
       };
       
       // Debug log the entire payload
-      console.log(`[Debug] Full workflow execution payload:`, JSON.stringify(payload, null, 2));
+      console.log(`[Debug] Full workflow execution payload:`, {
+        workflowId: payload.workflowId,
+        userId: payload.userId ? 'exists' : 'not-provided',
+        modelId: payload.modelId,
+        inputsCount: Object.keys(inputs || {}).length,
+        outputFormatsCount: outputFormats.length,
+        outputFormats,
+        nodeConnectionsCount: Object.keys(newNodeConnections).length,
+        outputSettings: Object.entries(newOutputSettings).map(([nodeId, settings]) => ({
+          nodeId,
+          type: settings.type,
+          ...(settings.type === 'chat' ? {chatSessions: settings.chatSessionIds?.length || 0} : {}),
+          ...(settings.type === 'email' ? {hasRecipients: !!settings.recipients} : {})
+        }))
+      });
       
-      // 发送请求
-      const response = await fetch('/api/ai/workflow-agent', {
+      // 设置超时处理，只针对初始连接
+      const timeoutId = setTimeout(() => {
+        if (isStreaming) {
+          toast.error('Connection is taking too long. Check console for details.');
+          console.log('Stream connection timeout - continuing to wait in background');
+        }
+      }, 15000); // 15秒超时
+      
+      // Start streaming request
+      const response = await fetch('/api/ai/workflow-agent/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -809,22 +902,259 @@ export default function AIWorkflow() {
         body: JSON.stringify(payload),
       });
       
+      // 清除初始连接超时
+      clearTimeout(timeoutId);
+      
       if (!response.ok) {
-        throw new Error('Failed to execute workflow');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error response from stream API:', { status: response.status, data: errorData });
+        throw new Error(`Failed to stream workflow: ${errorData.error || response.statusText || 'Unknown error'}`);
       }
       
-      const result = await response.json();
-      console.log("Workflow execution result:", result);
+      let receivedFirstData = false;
+      const noDataTimeoutId = setTimeout(() => {
+        if (!receivedFirstData && isStreaming) {
+          toast.error('No data received from server. Check console for details.');
+          console.log('No stream data timeout - connection established but no data received');
+        }
+      }, 20000); // 20秒没收到数据则超时
       
-      setExecutionResult(result);
-      setShowExecutionForm(false);
-      toast.success(t('workflowExecuted'));
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let formatResponses = {};
+      
+      while (true) {
+        const { value, done } = await reader.read();
+        
+        if (done) {
+          console.log('Stream ended naturally');
+          break;
+        }
+        
+        const chunk = decoder.decode(value, { stream: true });
+        
+        if (!receivedFirstData) {
+          receivedFirstData = true;
+          clearTimeout(noDataTimeoutId);
+          console.log('Received first stream data chunk');
+        }
+        
+        // Split by lines to handle multiple JSON objects
+        const lines = chunk.split('\n').filter(line => line.trim());
+        
+        for (const line of lines) {
+          try {
+            // Process each data chunk
+            if (line.startsWith('data: ')) {
+              const data = JSON.parse(line.slice(5));
+              
+              if (data.type === 'content') {
+                setStreamingOutput(prev => prev + data.content);
+              } else if (data.type === 'format_complete') {
+                const { format, content } = data;
+                formatResponses[format] = content;
+                setCurrentFormat(format);
+                setAiResponseData(prev => ({ ...prev, [format]: content }));
+                
+                // Also set in edited responses so user can modify it
+                setEditedResponseData(prev => ({ ...prev, [format]: content }));
+                
+                // Show success message for this format
+                toast.success(`Generated ${format} content`);
+              } else if (data.type === 'complete') {
+                // All AI responses are complete, move to review step
+                setIsStreaming(false);
+                setShowReviewStep(true);
+              } else if (data.type === 'error') {
+                console.error('Error in stream:', data.error);
+                toast.error(`Error: ${data.error}`);
+                setIsStreaming(false);
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing streaming data:', e, line);
+          }
+        }
+      }
+      
+      if (isStreaming) {
+        // 如果流结束但状态没有更新为完成，可能是发生了问题
+        console.log('Stream ended but isStreaming is still true - forcing completion');
+        setIsStreaming(false);
+        if (Object.keys(formatResponses).length > 0) {
+          setShowReviewStep(true);
+          toast.success('AI content generation complete! Review and confirm to continue.');
+        } else {
+          toast.error('Stream ended unexpectedly. Check the console for details.');
+          setShowStreamingModal(false);
+        }
+      }
     } catch (error) {
       console.error('Error executing workflow:', error);
-      toast.error('Failed to execute workflow');
+      toast.error(`Failed to execute workflow: ${error.message}`);
+      setIsStreaming(false);
+      setShowStreamingModal(false);
     } finally {
       setIsExecuting(false);
     }
+  };
+  
+  // Process final outputs after user review
+  const handleProcessFinalOutputs = async () => {
+    try {
+      setIsExecuting(true);
+      setShowReviewStep(false);
+      toast.info('Processing final outputs...');
+      
+      // Analyze the connections to ensure JSON data is properly linked to API nodes
+      const connectionMap = analyzeWorkflowConnections();
+      
+      // Find all API output nodes
+      const apiNodes = nodes.filter(node => 
+        node.data.nodeType === 'output' && 
+        node.data.outputType === 'api'
+      );
+      
+      // For each API node, find if there's a JSON node connected to it
+      // and ensure that connection is properly recorded
+      const enhancedNodeConnections = {...nodeConnections};
+      
+      apiNodes.forEach(apiNode => {
+        // Find nodes that connect to this API node
+        const connectedSources = Object.keys(connectionMap).filter(
+          sourceId => connectionMap[sourceId].includes(apiNode.id)
+        );
+        
+        // Find connected JSON nodes
+        const connectedJsonNodes = nodes.filter(
+          node => connectedSources.includes(node.id) && 
+                 node.data.outputType === 'json'
+        );
+        
+        if (connectedJsonNodes.length > 0) {
+          // Update or create connection info to ensure JSON data flows to API
+          enhancedNodeConnections[apiNode.id] = {
+            sourceNodes: connectedJsonNodes.map(node => node.id),
+            dataType: 'json'
+          };
+          
+          console.log(`[Debug] Enhanced connection: API node ${apiNode.id} will use JSON data from:`, 
+            connectedJsonNodes.map(node => node.id));
+        }
+      });
+      
+      // Create the request payload with the edited AI responses
+      const payload = {
+        workflowId: currentWorkflow.id,
+        userId: userId || undefined,  // 允许为undefined，后端会处理
+        aiResponses: editedResponseData,
+        outputSettings, // Include the output settings from the workflow execution
+        nodeConnections: enhancedNodeConnections, // Use enhanced node connections
+        connectionMap, // Include connection map for backend processing
+        processOutput: true
+      };
+      
+      console.log('Sending process-outputs request with payload:', {
+        workflowId: payload.workflowId,
+        userId: payload.userId ? 'exists' : 'not-provided',
+        outputSettingsIncluded: !!payload.outputSettings,
+        outputFormats: Object.keys(editedResponseData),
+        nodeConnectionsCount: Object.keys(enhancedNodeConnections).length,
+        apiNodeConnections: Object.keys(enhancedNodeConnections).filter(
+          nodeId => nodes.find(n => n.id === nodeId)?.data.outputType === 'api'
+        ),
+        connectionMapIncluded: Object.keys(connectionMap).length > 0
+      });
+      
+      // 设置超时处理
+      const timeoutId = setTimeout(() => {
+        toast.error('Request is taking too long. Check console for details.');
+        console.log('Process outputs request timeout - request continues in background');
+        setIsExecuting(false);
+        setShowStreamingModal(false);
+      }, 30000); // 30秒超时
+      
+      // Send request to process final outputs
+      const response = await fetch('/api/ai/workflow-agent/process-outputs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      // 清除超时
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error response from process-outputs:', { status: response.status, data: errorData });
+        throw new Error(`Failed to process outputs: ${errorData.error || response.statusText || 'Unknown error'}`);
+      }
+
+      const result = await response.json();
+      console.log("Workflow final outputs:", result);
+      
+      setExecutionResult(result);
+      setShowStreamingModal(false);
+      toast.success(t('workflowExecuted'));
+    } catch (error) {
+      console.error('Error processing final outputs:', error);
+      toast.error(`Processing failed: ${error.message}`);
+      setShowStreamingModal(false);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+  
+  // Update edited response for a specific format with debouncing for JSON
+  const updateEditedResponse = (format, value, isJson = false) => {
+    // For non-JSON values or immediate updates, apply directly
+    if (!isJson) {
+      setEditedResponseData(prev => ({
+        ...prev,
+        [format]: value
+      }));
+      return;
+    }
+    
+    // For JSON values, first update with the raw string for immediate feedback
+    setEditedResponseData(prev => ({
+      ...prev,
+      [format]: value
+    }));
+    
+    // Then debounce the expensive JSON parsing operation
+    if (jsonParseTimeoutRef.current[format]) {
+      clearTimeout(jsonParseTimeoutRef.current[format]);
+    }
+    
+    jsonParseTimeoutRef.current[format] = setTimeout(() => {
+      const parsed = safeParseJSON(value);
+      if (parsed.data !== null) {
+        setEditedResponseData(prev => ({
+          ...prev,
+          [format]: parsed.data
+        }));
+      }
+    }, 300); // Wait 300ms after typing stops to parse JSON
+  };
+  
+  // Scroll to bottom of streaming output
+  useEffect(() => {
+    if (streamEndRef.current) {
+      streamEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [streamingOutput]);
+  
+  // Toggle panel collapse
+  const togglePanel = () => {
+    setIsPanelCollapsed(!isPanelCollapsed);
+  };
+
+  // Toggle config collapse
+  const toggleConfig = () => {
+    setIsConfigCollapsed(!isConfigCollapsed);
   };
   
   // Add a new input field to the workflow
@@ -834,19 +1164,19 @@ export default function AIWorkflow() {
       { name: `input_${inputFields.length + 1}`, label: `Input ${inputFields.length + 1}`, type: 'text', required: false }
     ]);
   };
-  
+
   // Remove an input field
   const removeInputField = (index) => {
     setInputFields(inputFields.filter((_, i) => i !== index));
   };
-  
+
   // Update input field
   const updateInputField = (index, field, value) => {
     const updatedFields = [...inputFields];
     updatedFields[index] = { ...updatedFields[index], [field]: value };
     setInputFields(updatedFields);
   };
-  
+
   // Add node function
   const addNode = (nodeType) => {
     const id = `node_${nodeIdRef.current++}`;
@@ -1018,16 +1348,6 @@ export default function AIWorkflow() {
       setNodes((nds) => [...nds, node]);
       toast.success(`Added ${nodeType} node`);
     }
-  };
-  
-  // Toggle panel collapse
-  const togglePanel = () => {
-    setIsPanelCollapsed(!isPanelCollapsed);
-  };
-
-  // Toggle config collapse
-  const toggleConfig = () => {
-    setIsConfigCollapsed(!isConfigCollapsed);
   };
   
   return (
@@ -1413,6 +1733,154 @@ export default function AIWorkflow() {
         </div>
       )}
       
+      {/* Streaming Output Modal */}
+      {showStreamingModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-3/4 h-4/5 max-h-[90vh] dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 flex flex-col">
+            <CardHeader className="border-b dark:border-[#444444]">
+              <div className="flex justify-between items-center">
+                <CardTitle className="dark:text-gray-100">
+                  {isStreaming ? t('generatingContent') || 'Generating Content...' : t('reviewAiOutput') || 'Review AI Generated Content'}
+                </CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => {
+                    if (!isStreaming || confirm({
+                      title: t('cancelGenerationTitle') || 'Cancel Generation?',
+                      description: t('cancelGenerationDesc') || 'Are you sure you want to cancel the content generation?'
+                    })) {
+                      setShowStreamingModal(false);
+                      setIsStreaming(false);
+                      setShowReviewStep(false);
+                    }
+                  }}
+                  className="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#444444]"
+                >
+                  <X size={18} />
+                </Button>
+              </div>
+              <CardDescription className="dark:text-gray-400">
+                {isStreaming 
+                  ? t('streamingDesc') || 'AI is generating content based on your workflow configuration. Please wait...' 
+                  : t('reviewDesc') || 'Review and edit the AI-generated content before finalizing outputs.'}
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent className="flex-grow overflow-hidden p-0 flex flex-col">
+              {isStreaming ? (
+                // Streaming output view
+                <div className="h-full flex flex-col">
+                  <div className="flex-grow overflow-y-auto p-4 font-mono text-sm bg-gray-50 dark:bg-[#222222] whitespace-pre-wrap">
+                    {streamingOutput || '...'}
+                    <div ref={streamEndRef}></div>
+                  </div>
+                  <div className="p-4 border-t dark:border-[#444444] flex items-center">
+                    <Loader2 className="animate-spin h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" />
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      {t('generatingContent')}
+                    </span>
+                  </div>
+                </div>
+              ) : showReviewStep ? (
+                // Review and edit step
+                <div className="h-full flex flex-col">
+                  <Tabs defaultValue={Object.keys(aiResponseData)[0] || 'document'} className="flex flex-col h-full">
+                    <div className="border-b dark:border-[#444444] px-4">
+                      <TabsList className="bg-transparent">
+                        {Object.keys(aiResponseData).map((format) => (
+                          <TabsTrigger 
+                            key={format} 
+                            value={format}
+                            className="data-[state=active]:bg-[#eef6ff] data-[state=active]:dark:bg-[#2a3246] dark:text-gray-300 data-[state=active]:dark:text-blue-300"
+                          >
+                            {format === 'ppt' ? t('presentation') : 
+                             format === 'document' ? t('document') : 
+                             format.charAt(0).toUpperCase() + format.slice(1)}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    </div>
+                    
+                    <div className="flex-grow overflow-hidden">
+                      {Object.keys(aiResponseData).map((format) => (
+                        <TabsContent key={format} value={format} className="h-full p-0">
+                          <div className="h-full flex flex-col">
+                            <div className="p-4 border-b dark:border-[#444444] flex justify-between items-center">
+                              <div>
+                                <h3 className="text-sm font-medium dark:text-gray-200">
+                                  {format === 'ppt' ? t('editPresentationContent') : 
+                                   format === 'document' ? t('editDocumentContent') : 
+                                   format === 'email' ? t('editEmailContent') : 
+                                   format === 'task' ? t('editTaskContent') : 
+                                   format === 'chat' ? t('editChatMessage') : 
+                                   t('editContent')}
+                                </h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {t('editContentDesc')}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex-grow p-0 overflow-y-auto">
+                              <Textarea 
+                                value={typeof editedResponseData[format] === 'string' ? 
+                                  editedResponseData[format] : 
+                                  JSON.stringify(editedResponseData[format], null, 2)
+                                }
+                                onChange={(e) => updateEditedResponse(
+                                  format, 
+                                  e.target.value,
+                                  typeof aiResponseData[format] === 'object'
+                                )}
+                                className="min-h-[400px] font-mono text-sm border-0 rounded-none p-4 bg-gray-50 dark:bg-[#222222] dark:text-gray-300"
+                              />
+                            </div>
+                          </div>
+                        </TabsContent>
+                      ))}
+                    </div>
+                  </Tabs>
+                </div>
+              ) : null}
+            </CardContent>
+            
+            <CardFooter className="border-t dark:border-[#444444] p-4">
+              {showReviewStep ? (
+                <div className="flex justify-between w-full items-center">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {t('editPrompt') || 'Edit the content above before generating final outputs.'}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setShowStreamingModal(false);
+                        setShowReviewStep(false);
+                      }}
+                      className="dark:bg-[#333333] dark:text-gray-300 dark:border-[#444444] dark:hover:bg-[#444444]"
+                    >
+                      {t('cancel')}
+                    </Button>
+                    <Button 
+                      onClick={handleProcessFinalOutputs}
+                      disabled={isExecuting}
+                      className="bg-[#39ac91] hover:bg-[#33a085] text-white dark:bg-[#39ac91] dark:hover:bg-[#33a085] dark:text-white"
+                    >
+                      {isExecuting && <Loader2 className="animate-spin h-4 w-4 mr-2" />}
+                      {t('generateOutputs') || 'Generate Outputs'} <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full text-center text-sm text-gray-500 dark:text-gray-400">
+                  {t('waitingForAi') || 'Please wait while the AI generates content...'}
+                </div>
+              )}
+            </CardFooter>
+          </Card>
+        </div>
+      )}
+      
       {/* Execution Result Overlay */}
       {executionResult && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1712,3 +2180,12 @@ export default function AIWorkflow() {
     </div>
   );
 }
+
+// Helper function to safely parse JSON
+const safeParseJSON = (jsonString) => {
+  try {
+    return { data: JSON.parse(jsonString), error: null };
+  } catch (e) {
+    return { data: null, error: e.message };
+  }
+};

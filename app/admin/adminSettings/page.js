@@ -54,7 +54,7 @@ export default function AdminSettings() {
             {/* Skeleton Tabs */}
             <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
               <ul className="flex flex-wrap -mb-px">
-                {['Website Settings', 'Language & Region', 'Theme & Appearance', 'Landing Page Media'].map((tab, index) => (
+                {['Website Settings', 'Language & Region', 'Theme & Appearance', 'Landing Page Assets'].map((tab, index) => (
                   <li key={index} className="mr-2">
                     <div className="inline-block py-2 px-4 text-gray-400 font-medium animate-pulse">
                       <div className="flex items-center">
@@ -166,7 +166,7 @@ export default function AdminSettings() {
                   >
                     <div className="flex items-center">
                       <Image className="h-4 w-4 mr-2" />
-                      Landing Page Media
+                      Landing Page Assets
                     </div>
                   </button>
                 </li>

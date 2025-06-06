@@ -2187,7 +2187,9 @@ async function sendEmail(emailSettings, content, userId) {
     }
     
     // Split recipients by comma
-    const recipientsList = emailSettings.recipients.split(',').map(email => email.trim()).filter(Boolean);
+    const recipientsList = emailSettings.recipients ? 
+      emailSettings.recipients.split(',').map(email => email.trim()).filter(Boolean) 
+      : [];
     
     if (recipientsList.length === 0) {
       throw new Error('No valid recipients specified');
@@ -2227,11 +2229,511 @@ async function sendEmail(emailSettings, content, userId) {
   }
 }
 
-// Add the new function to the exports
+// Stream AI responses for the workflow
+async function streamAIResponses(workflowId, inputs, modelId, userId, writeChunk, options = {}) {
+  try {
+    // Get workflow data
+    const workflow = await getWorkflow(workflowId);
+    
+    // Prepare the models list
+    const { aiModels = [], outputFormats = [] } = options;
+    const models = aiModels.length > 1 ? aiModels : [modelId || 'google/gemini-2.0-flash-exp:free'];
+    
+    // Prepare the user prompt, replacing input placeholders
+    let userPrompt = workflow.prompt;
+    
+    // Replace input placeholders
+    if (inputs && typeof inputs === 'object') {
+      Object.keys(inputs).forEach(key => {
+        userPrompt = userPrompt.replace(`{{${key}}}`, inputs[key]);
+      });
+    }
+    
+    // Send initial message to the client
+    await writeChunk({
+      type: 'info',
+      message: 'Starting AI content generation'
+    });
+    
+    // If no specific output formats specified, use workflow type
+    if (outputFormats.length === 0) {
+      outputFormats.push(normalizeFormatName(workflow.type));
+    } else {
+      // Normalize all provided output formats
+      for (let i = 0; i < outputFormats.length; i++) {
+        outputFormats[i] = normalizeFormatName(outputFormats[i]);
+      }
+    }
+    
+    // Stream AI responses for all formats
+    for (const model of models) {
+      // For each output format, execute a streaming AI request
+      for (const format of outputFormats) {
+        // Skip API format since it doesn't need AI generation
+        if (format === 'api') continue;
+        
+        await writeChunk({
+          type: 'info',
+          format,
+          message: `Generating ${format} content using ${model}...`
+        });
+        
+        // Get appropriate system prompt for this format
+        const formatPrompt = WORKFLOW_PROMPTS[format] || WORKFLOW_PROMPTS['json'];
+        
+        if (!formatPrompt) {
+          await writeChunk({
+            type: 'warning',
+            format,
+            message: `No prompt template found for ${format}, using default JSON format`
+          });
+          continue;
+        }
+        
+        try {
+          // Stream the AI response
+          const formatResult = await streamAIRequest(model, formatPrompt, userPrompt, format, writeChunk);
+          
+          // Send completion message for this format
+          await writeChunk({
+            type: 'format_complete',
+            format,
+            content: formatResult
+          });
+        } catch (error) {
+          console.error(`Error streaming ${format} with ${model}:`, error);
+          
+          await writeChunk({
+            type: 'error',
+            format,
+            error: error.message
+          });
+        }
+      }
+    }
+    
+    // Save partial execution record for tracking
+    await saveWorkflowExecution(
+      workflowId,
+      userId,
+      models.join(', '),
+      inputs,
+      { status: 'partial', message: 'AI responses generated, awaiting user review' },
+      outputFormats,
+      {},
+      {}
+    );
+    
+    // Send final completion message
+    await writeChunk({
+      type: 'info',
+      message: 'All AI content generated successfully'
+    });
+  } catch (error) {
+    console.error("Error streaming AI responses:", error);
+    await writeChunk({
+      type: 'error',
+      error: error.message
+    });
+    throw error;
+  }
+}
+
+// Stream a single AI request with real-time updates
+async function streamAIRequest(model, formatPrompt, userPrompt, format, writeChunk) {
+  try {
+    console.log(`Streaming ${format} content using ${model}...`);
+    
+    // Special handling for deepseek models
+    let updatedPrompt = formatPrompt;
+    if (model.includes('deepseek')) {
+      updatedPrompt = formatPrompt + "\n\nVERY IMPORTANT: Your response MUST be valid JSON only. Do not include any explanation or commentary. Start your response with '{' and end with '}'. Do not include any text before or after the JSON object.";
+    }
+    
+    // Create basic request config
+    const requestConfig = {
+      model: model,
+      messages: [
+        { role: 'system', content: updatedPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 5000,
+      stream: true // Enable streaming
+    };
+    
+    // Add appropriate response_format based on model
+    if (model.includes('openai') || model.includes('gpt') || model.includes('claude')) {
+      requestConfig.response_format = { type: "json_object" };
+    } else if (model.includes('gemini')) {
+      requestConfig.response_format = { type: "json_object" };
+    }
+    
+    // Stream the completion
+    const stream = await openai.chat.completions.create(requestConfig);
+    
+    let fullContent = '';
+    let contentBuffer = '';
+    let bufferTimer = null;
+    
+    // Process the stream
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      fullContent += content;
+      
+      // Add to buffer
+      contentBuffer += content;
+      
+      // Clear previous timer
+      if (bufferTimer) clearTimeout(bufferTimer);
+      
+      // Send accumulated content every 100ms
+      bufferTimer = setTimeout(async () => {
+        if (contentBuffer) {
+          await writeChunk({
+            type: 'content',
+            format,
+            content: contentBuffer
+          });
+          contentBuffer = '';
+        }
+      }, 100);
+    }
+    
+    // Flush any remaining content
+    if (contentBuffer) {
+      await writeChunk({
+        type: 'content',
+        format,
+        content: contentBuffer
+      });
+    }
+    
+    // Try to parse the final content as JSON
+    try {
+      // Find JSON boundaries
+      const jsonStart = fullContent.indexOf('{');
+      const jsonEnd = fullContent.lastIndexOf('}') + 1;
+      
+      // Extract and parse JSON
+      if (jsonStart >= 0 && jsonEnd > jsonStart) {
+        const jsonString = fullContent.substring(jsonStart, jsonEnd);
+        const jsonResult = JSON.parse(jsonString);
+        return jsonResult;
+      }
+      
+      // If no JSON found, try parsing the whole content
+      return JSON.parse(fullContent);
+    } catch (error) {
+      console.error('Failed to parse AI response as JSON:', error);
+      // Return the raw text if parsing fails
+      return fullContent;
+    }
+  } catch (error) {
+    console.error(`Error streaming AI request for ${format}:`, error);
+    throw error;
+  }
+}
+
+// Process outputs after user review
+async function processOutputs(workflowId, aiResponses, userId, outputSettings = {}, nodeConnections = {}, connectionMap = {}) {
+  try {
+    // Get workflow data
+    const workflow = await getWorkflow(workflowId);
+    
+    // Initialize results and document URLs
+    const results = { ...aiResponses };
+    const documentUrls = {};
+    const apiResponses = {};
+    
+    // Get the output formats from the AI responses
+    const outputFormats = Object.keys(aiResponses);
+    
+    // Process API requests using JSON outputs
+    console.log('Processing API requests...');
+    try {
+      // Find all API nodes in output settings
+      const apiNodeIds = Object.keys(outputSettings).filter(
+        nodeId => outputSettings[nodeId]?.type === 'api'
+      );
+      
+      console.log(`Found ${apiNodeIds.length} API nodes to process`);
+      
+      // Process each API node
+      if (apiNodeIds.length > 0) {
+        results.api_results = {};
+        
+        for (const apiNodeId of apiNodeIds) {
+          const apiSettings = outputSettings[apiNodeId];
+          
+          if (!apiSettings || !apiSettings.url) {
+            console.warn(`API node ${apiNodeId} missing URL configuration`);
+            continue;
+          }
+          
+          console.log(`Processing API node ${apiNodeId} with URL: ${apiSettings.url}`);
+          
+          // Find JSON nodes connected to this API node
+          let requestBody = {};
+          let hasJsonSource = false;
+          
+          // Check if we have explicit connections defined for this API node
+          if (nodeConnections && nodeConnections[apiNodeId] && nodeConnections[apiNodeId].sourceNodes) {
+            const connectedJsonNodes = nodeConnections[apiNodeId].sourceNodes;
+            console.log(`API node ${apiNodeId} has explicit connections to JSON nodes:`, connectedJsonNodes);
+            
+            // Use the first connected JSON node's data as the request body
+            for (const jsonNodeId of connectedJsonNodes) {
+              if (outputFormats.includes('json') && aiResponses.json) {
+                requestBody = aiResponses.json;
+                hasJsonSource = true;
+                console.log(`Using JSON data from node ${jsonNodeId} for API request`);
+                break;
+              }
+            }
+          }
+          // If no explicit connections or no JSON data found, try to use connection map
+          else if (connectionMap) {
+            // Find sources that connect to this API node
+            const sources = Object.keys(connectionMap).filter(
+              sourceId => connectionMap[sourceId] && connectionMap[sourceId].includes(apiNodeId)
+            );
+            
+            console.log(`API node ${apiNodeId} has connections from:`, sources);
+            
+            // Check if any of these sources have JSON data
+            if (outputFormats.includes('json') && aiResponses.json && sources.length > 0) {
+              requestBody = aiResponses.json;
+              hasJsonSource = true;
+              console.log(`Using JSON data for API request based on connection map`);
+            }
+          }
+          
+          // If no JSON source found, use a simple placeholder or the first available AI response
+          if (!hasJsonSource) {
+            console.log(`No JSON source found for API node ${apiNodeId}, using default data`);
+            
+            // Use the first available AI response or a placeholder
+            const firstFormat = outputFormats[0];
+            if (firstFormat && aiResponses[firstFormat]) {
+              requestBody = { data: aiResponses[firstFormat] };
+            } else {
+              requestBody = { message: "No input data available" };
+            }
+          }
+          
+          try {
+            // Execute API request with the JSON data as body
+            console.log(`Executing API request to ${apiSettings.url} with method ${apiSettings.method || 'POST'}`);
+            
+            // Add detailed debug information for the request body
+            if (typeof requestBody === 'object') {
+              console.log(`API request body: ${JSON.stringify(requestBody).substring(0, 200)}${JSON.stringify(requestBody).length > 200 ? '...' : ''}`);
+            } else if (typeof requestBody === 'string') {
+              console.log(`API request body (string): ${requestBody.substring(0, 200)}${requestBody.length > 200 ? '...' : ''}`);
+            }
+            
+            const apiResponse = await executeApiRequest(
+              apiSettings.url,
+              apiSettings.method || 'POST',
+              requestBody,
+              { 'Content-Type': 'application/json' }
+            );
+            
+            // Store API response
+            results.api_results[apiNodeId] = {
+              success: true,
+              status: apiResponse.status,
+              data: apiResponse.data
+            };
+            
+            console.log(`API request successful, status: ${apiResponse.status}`);
+          } catch (apiError) {
+            console.error(`Error executing API request:`, apiError);
+            
+            results.api_results[apiNodeId] = {
+              success: false,
+              error: apiError.message || 'API request failed'
+            };
+          }
+        }
+        
+        console.log('Added API responses to results:', Object.keys(results.api_results).length);
+      }
+    } catch (apiProcessingError) {
+      console.error('Error processing API requests:', apiProcessingError);
+      results.api_processing_error = apiProcessingError.message;
+    }
+    
+    // Process document generation
+    if (aiResponses.document) {
+      console.log('Generating Word document...');
+      try {
+        const docContent = aiResponses.document;
+        
+        const docUrl = await generateDOCX(docContent, userId);
+        documentUrls.document = docUrl;
+        documentUrls.docxUrl = docUrl; // For backwards compatibility
+        
+        console.log('Document generated successfully:', docUrl);
+      } catch (error) {
+        console.error('Error generating document:', error);
+        documentUrls.document_error = error.message;
+      }
+    }
+    
+    // Process PowerPoint generation
+    if (aiResponses.ppt) {
+      console.log('Generating PowerPoint presentation...');
+      try {
+        const pptContent = aiResponses.ppt;
+        const pptUrl = await generatePPTX(pptContent, userId);
+        documentUrls.ppt = pptUrl;
+        
+        console.log('PowerPoint generated successfully:', pptUrl);
+      } catch (error) {
+        console.error('Error generating PowerPoint:', error);
+        documentUrls.ppt_error = error.message;
+      }
+    }
+    
+    // Process task creation
+    if (aiResponses.task) {
+      console.log('Processing task creation...');
+      try {
+        const taskContent = aiResponses.task;
+        
+        // Create tasks based on the edited AI content
+        const taskResult = await createTasksFromResult(taskContent, userId);
+        results.task_result = taskResult;
+        
+        if (taskResult.success) {
+          console.log(`Successfully created ${taskResult.tasksCreated} tasks`);
+        } else {
+          console.error(`Failed to create tasks: ${taskResult.error}`);
+        }
+      } catch (error) {
+        console.error('Error processing tasks:', error);
+        results.task_error = error.message;
+      }
+    }
+    
+    // Process email sending
+    if (aiResponses.email) {
+      console.log('Processing email sending...');
+      try {
+        // Find any email output nodes
+        const emailNodeIds = Object.keys(outputSettings).filter(
+          nodeId => outputSettings[nodeId].type === 'email'
+        );
+        
+        // Use the first email node settings or fall back to workflow defaults
+        const emailNode = emailNodeIds.length > 0 ? outputSettings[emailNodeIds[0]] : null;
+        
+        const emailSettings = emailNode || {
+          recipients: workflow.email_recipients || '',
+          subject: workflow.email_subject || 'Automated email from workflow system',
+          template: workflow.email_template || 'Hello,\n\nThis is an automated email:\n\n{{content}}\n\nRegards,\nWorkflow System'
+        };
+        
+        console.log('Sending email with settings:', {
+          recipients: emailSettings.recipients,
+          subject: emailSettings.subject
+        });
+        
+        // Send email with edited content
+        const emailResult = await sendEmail(emailSettings, aiResponses.email, userId);
+        results.email_result = emailResult;
+        
+        if (emailResult.success) {
+          console.log(`Email sent successfully to ${emailResult.sentCount} recipients`);
+        } else {
+          console.error(`Failed to send email: ${emailResult.error}`);
+        }
+      } catch (error) {
+        console.error('Error sending email:', error);
+        results.email_error = error.message;
+      }
+    }
+    
+    // Process chat message sending
+    if (aiResponses.chat) {
+      console.log('Processing chat message sending...');
+      try {
+        // Find any chat output nodes
+        const chatNodeIds = Object.keys(outputSettings).filter(
+          nodeId => outputSettings[nodeId].type === 'chat'
+        );
+        
+        // Use the first chat node settings if available
+        const chatNode = chatNodeIds.length > 0 ? outputSettings[chatNodeIds[0]] : null;
+        
+        // Use node-specific session IDs or fall back to workflow defaults
+        const chatSessionIds = chatNode?.chatSessionIds || workflow.chat_session_ids || [];
+        const messageFormat = chatNode?.messageFormat || 'text';
+        const messageTemplate = chatNode?.messageTemplate;
+        
+        // Format the message if a template is provided
+        let formattedContent = aiResponses.chat.content || aiResponses.chat;
+        if (messageTemplate && typeof formattedContent === 'string') {
+          formattedContent = messageTemplate.replace('{{content}}', formattedContent);
+        }
+        
+        if (chatSessionIds.length > 0) {
+          // Send message with edited content
+          const chatResult = await sendChatSessionMessages(
+            chatSessionIds, 
+            formattedContent, 
+            messageFormat,
+            userId
+          );
+          
+          results.chat_result = chatResult;
+        } else {
+          results.chat_result = {
+            success: false,
+            error: 'No chat sessions specified in workflow'
+          };
+        }
+      } catch (error) {
+        console.error('Error sending chat message:', error);
+        results.chat_error = error.message;
+      }
+    }
+    
+    // Save execution record
+    await saveWorkflowExecution(
+      workflowId,
+      userId,
+      'user_edited',
+      {},
+      results,
+      outputFormats,
+      documentUrls,
+      apiResponses
+    );
+    
+    // Return combined results
+    return {
+      workflowId,
+      results,
+      outputFormats,
+      apiResponses,
+      ...documentUrls
+    };
+  } catch (error) {
+    console.error("Error processing outputs:", error);
+    throw new Error(`Failed to process outputs: ${error.message}`);
+  }
+}
+
+// Add the new functions to the exports
 export {
   getAvailableModels,
   getWorkflow, 
-  executeWorkflow, 
+  executeWorkflow,
+  streamAIResponses,
+  processOutputs,
   saveWorkflowExecution, 
   createWorkflow, 
   updateWorkflow, 
