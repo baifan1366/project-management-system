@@ -953,7 +953,7 @@ const SprintPlanning = ({
         </div>
         
         <div className="flex space-x-2">
-          {selectedType === 'PLANNING' && !selectedSprint && (
+          {selectedType === 'PLANNING' && !selectedSprint && isTeamCreator && (
             <Button 
               variant="outline" 
               onClick={() => setCreateDialogOpen(true)}
@@ -962,7 +962,7 @@ const SprintPlanning = ({
               {t('createSprint')}
             </Button>
           )}
-          {selectedSprint && (selectedSprint.status === 'PLANNING') && (
+          {selectedSprint && (selectedSprint.status === 'PLANNING') && isTeamCreator && (
             <>
               <Button 
                 variant="outline" 

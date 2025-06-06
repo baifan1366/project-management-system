@@ -493,13 +493,55 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       agileMembersData: agileMembers
     });
     
-    // 始终优先使用teamMembers作为主要数据源
-    let membersToRender = teamMembers;
+    // 创建一个更强大的去重函数
+    const getUniqueMembers = () => {
+      // 使用多个键值进行匹配
+      const membersByIds = new Map();
+      const membersByEmails = new Map();
+      const result = [];
       
-    // 如果teamMembers为空且有agileMembers数据，则使用agileMembers作为后备数据
-    if (membersToRender.length === 0 && agileMembers.length > 0) {
-      membersToRender = agileMembers;
-    }
+      // 首先处理 teamMembers
+      if (Array.isArray(teamMembers)) {
+        teamMembers.forEach(member => {
+          if (!member) return;
+          
+          const id = (member.id || member.user_id)?.toString();
+          const email = member.email?.toLowerCase();
+          
+          if (id) membersByIds.set(id, member);
+          if (email) membersByEmails.set(email, member);
+          
+          // 将成员添加到结果中
+          result.push(member);
+        });
+      }
+      
+      // 然后处理 agileMembers，仅添加新成员
+      if (Array.isArray(agileMembers)) {
+        agileMembers.forEach(member => {
+          if (!member) return;
+          
+          const id = (member.id || member.user_id)?.toString();
+          const email = member.email?.toLowerCase();
+          
+          // 检查这个成员是否已经存在（通过ID或邮箱）
+          if ((id && membersByIds.has(id)) || 
+              (email && membersByEmails.has(email))) {
+            return; // 已存在，跳过
+          }
+          
+          // 这是新成员，添加到映射和结果中
+          if (id) membersByIds.set(id, member);
+          if (email) membersByEmails.set(email, member);
+          result.push(member);
+        });
+      }
+      
+      return result;
+    };
+    
+    // 获取去重后的成员列表
+    const membersToRender = getUniqueMembers();
     
     // 如果没有任何成员数据，显示提示
     if (membersToRender.length === 0) {
