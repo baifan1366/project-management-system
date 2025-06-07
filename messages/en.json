@@ -1343,6 +1343,13 @@
     "tag": "Tag"
   },
   "Calendar": {
+    "cannotCreateTaskInPast": "Cannot create task in the past",
+    "errorRefreshingCalendar": "Error refreshing calendar",	
+    "noTitle": "No Title",
+    "allDay": "All Day",
+    "schedule": "Schedule",
+    "notasks": "No Tasks",
+    "newTask": "New Task",
     "calendar": "Calendar",
     "month": "Month",
     "week": "Week",

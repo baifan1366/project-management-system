@@ -19,7 +19,8 @@ import { toast } from 'sonner'
 import { useGetUser } from '@/lib/hooks/useGetUser'
 import TeamCalendarTools from './CalendarTools'
 import EditTaskDialog from './EditTaskDialog'
-import { WeekView, DayView } from '@/components/calendar'
+import WeekView from './WeekView'
+import DayView from './DayView'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchAllTasks } from '@/lib/redux/features/taskSlice'
 import { getSectionByTeamId } from '@/lib/redux/features/sectionSlice'
@@ -56,6 +57,7 @@ export default function TaskCalendar({ teamId }) {
   );
   // 标签IDs
   const [tagIdName, setTagIdName] = useState(null)
+  const [tagIdStartDate, setTagIdStartDate] = useState(null)
   const [tagIdDueDate, setTagIdDueDate] = useState(null)
   const [tagIdAssignee, setTagIdAssignee] = useState(null)
   
@@ -405,6 +407,7 @@ export default function TaskCalendar({ teamId }) {
       tasks.forEach(task => {
         const tagValues = task.tag_values || {};
         const name = tagValues[tagIdName] || '未命名任务';
+        const startDate = tagValues[tagIdStartDate] ? new Date(tagValues[tagIdStartDate]) : null;
         const dueDate = tagValues[tagIdDueDate] ? new Date(tagValues[tagIdDueDate]) : null;
         const assigneeId = tagValues[tagIdAssignee]; // 可能是数组或单个值
         
@@ -562,22 +565,74 @@ export default function TaskCalendar({ teamId }) {
   // Task creation success handler
   const handleTaskCreated = async () => {
     setIsViewLoading(true)
+    
+    // 重置缓存，确保获取最新数据
+    setLastFetchTime(null)
+    
     try {
-      // 重新获取分区数据
-      await dispatch(getSectionByTeamId(teamId)).unwrap()
+      console.log('开始刷新日历数据...');
       
-      // 重新获取任务数据
-      await dispatch(fetchAllTasks()).unwrap()
+      // 使用重试机制获取最新数据
+      const fetchWithRetry = async (fetchFunction, maxRetries = 2) => {
+        let retries = 0;
+        while (retries < maxRetries) {
+          try {
+            return await fetchFunction();
+          } catch (error) {
+            retries++;
+            console.warn(`刷新数据请求失败，第 ${retries} 次重试...`);
+            if (retries >= maxRetries) throw error;
+            await new Promise(resolve => setTimeout(resolve, 500 * retries));
+          }
+        }
+      };
+      
+      // 并行获取分区和任务数据
+      const [sectionsResult, tasksResult] = await Promise.all([
+        fetchWithRetry(() => dispatch(getSectionByTeamId(teamId)).unwrap()),
+        fetchWithRetry(() => dispatch(fetchAllTasks()).unwrap())
+      ]);
+      
+      console.log('成功获取最新分区数据:', sectionsResult?.length || 0);
+      console.log('成功获取最新任务数据:', tasksResult?.length || 0);
+      
+      // 处理分区中的任务ID
+      if (sectionsResult && sectionsResult.length > 0) {
+        const sectionTaskIds = sectionsResult.reduce((acc, section) => {
+          if (section.task_ids && Array.isArray(section.task_ids)) {
+            acc.push(...section.task_ids);
+          }
+          return acc;
+        }, []);
+        
+        // 更新团队任务ID集合
+        const uniqueTaskIds = [...new Set(sectionTaskIds)];
+        setTeamTaskIds(new Set(uniqueTaskIds));
+        
+        // 如果有任务数据，直接更新Redux store
+        if (tasksResult && tasksResult.length > 0) {
+          store.dispatch({ type: 'tasks/setTasks', payload: tasksResult });
+        }
+      }
+      
+      // 设置新的缓存时间
+      setLastFetchTime(Date.now());
       
       // 重置加载状态
-      setIsViewLoading(false)
+      setIsViewLoading(false);
       
       // 显示成功提示
-      toast.success(t('calendarRefreshed'))
+      toast.success(t('calendarRefreshed'));
     } catch (error) {
-      console.error('Error refreshing calendar data:', error)
-      toast.error(t('errorRefreshingCalendar'))
-      setIsViewLoading(false)
+      console.error('刷新日历数据失败:', error);
+      toast.error(t('errorRefreshingCalendar'));
+      setIsViewLoading(false);
+      
+      // 失败后，尝试延迟重新加载一次
+      setTimeout(() => {
+        console.log('尝试延迟重新加载数据...');
+        setLastFetchTime(null); // 强制重新加载
+      }, 2000);
     }
   }
 
@@ -859,13 +914,29 @@ export default function TaskCalendar({ teamId }) {
         currentDate={currentDate}
         handleOpenCreateEvent={handleOpenCreateTask}
         t={t}
-        tasks={filteredTasks.map(task => ({
-          id: task.taskId,
-          title: task.name,
-          due_date: format(task.dueDate, 'yyyy-MM-dd'),
-          expected_completion_date: format(task.dueDate, 'yyyy-MM-dd'),
-          assignee: task.assigneeId
-        }))}
+        tasks={filteredTasks.map(task => {
+          // 计算开始日期：优先使用tagIdStartDate中的值，如果没有则默认为截止日期前一天
+          const dueDate = format(task.dueDate, 'yyyy-MM-dd');
+          let startDate;
+          
+          if (task.tag_values && tagIdStartDate && task.tag_values[tagIdStartDate]) {
+            // 如果有开始日期标签，使用该日期
+            startDate = task.tag_values[tagIdStartDate];
+          } else {
+            // 没有开始日期标签，默认设置为截止日期前一天
+            const prevDay = addDays(task.dueDate, -1);
+            startDate = format(prevDay, 'yyyy-MM-dd');
+          }
+          
+          return {
+            id: task.taskId,
+            title: task.name,
+            due_date: dueDate,
+            start_date: startDate,
+            assignee: task.assigneeId,
+            tag_values: task.tag_values
+          };
+        })}
         handleEventClick={(event) => {
           if (event.type === 'task') {
             handleTaskClick(event.originalEvent);
@@ -882,13 +953,29 @@ export default function TaskCalendar({ teamId }) {
         currentDate={currentDate}
         handleOpenCreateEvent={handleOpenCreateTask}
         t={t}
-        tasks={filteredTasks.map(task => ({
-          id: task.taskId,
-          title: task.name,
-          due_date: format(task.dueDate, 'yyyy-MM-dd'),
-          expected_completion_date: format(task.dueDate, 'yyyy-MM-dd'),
-          assignee: task.assigneeId
-        }))}
+        tasks={filteredTasks.map(task => {
+          // 计算开始日期：优先使用tagIdStartDate中的值，如果没有则默认为截止日期前一天
+          const dueDate = format(task.dueDate, 'yyyy-MM-dd');
+          let startDate;
+          
+          if (task.tag_values && tagIdStartDate && task.tag_values[tagIdStartDate]) {
+            // 如果有开始日期标签，使用该日期
+            startDate = task.tag_values[tagIdStartDate];
+          } else {
+            // 没有开始日期标签，默认设置为截止日期前一天
+            const prevDay = addDays(task.dueDate, -1);
+            startDate = format(prevDay, 'yyyy-MM-dd');
+          }
+          
+          return {
+            id: task.taskId,
+            title: task.name,
+            due_date: dueDate,
+            start_date: startDate,
+            assignee: task.assigneeId,
+            tag_values: task.tag_values
+          };
+        })}
         handleEventClick={(event) => {
           if (event.type === 'task') {
             handleTaskClick(event.originalEvent);
