@@ -9,7 +9,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { fetchTeamById, fetchProjectTeams, updateTeamStar, updateTeam, fetchUserTeams } from '@/lib/redux/features/teamSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
-import { fetchTeamCustomFieldById } from '@/lib/redux/features/teamCFSlice';
+import { fetchTeamCustomFieldById, fetchTeamCustomField } from '@/lib/redux/features/teamCFSlice';
 import { store } from '@/lib/redux/store';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -95,6 +95,10 @@ const TeamCustomFieldPage = () => {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [teamCFLoaded, setTeamCFLoaded] = useState(false);
   const [teamUsersLoaded, setTeamUsersLoaded] = useState(false);
+  
+  // 添加缺失字段的翻译
+  const fieldNotFoundText = "字段不存在或已被删除";
+  const fieldMayBeDeletedText = "该字段可能已被删除或尚未创建";
   
   // 检查当前用户是否为团队所有者
   const isCurrentUserOwner = () => {
@@ -274,10 +278,35 @@ const TeamCustomFieldPage = () => {
       if (!teamId || !teamCFId || teamCFLoaded || !dataLoaded) return;
       
       try {
-        await dispatch(fetchTeamCustomFieldById({
+        const result = await dispatch(fetchTeamCustomFieldById({
           teamId,
           teamCFId
         })).unwrap();
+        
+        // 检查自定义字段是否存在
+        if (!result || !result.id) {
+          console.error('自定义字段不存在或已被删除:', teamCFId);
+          
+          // 如果字段不存在，获取团队的所有字段
+          const allFields = await dispatch(fetchTeamCustomField(teamId)).unwrap();
+          
+          if (Array.isArray(allFields) && allFields.length > 0) {
+            // 存在其他字段，重定向到第一个字段
+            const sortedFields = [...allFields].sort((a, b) => 
+              (a.order_index || 0) - (b.order_index || 0)
+            );
+            const firstFieldId = sortedFields[0].id;
+            
+            console.log(`自定义字段 ${teamCFId} 不存在，重定向到字段 ${firstFieldId}`);
+            router.replace(`/projects/${projectId}/${teamId}/${firstFieldId}`);
+            return;
+          } else {
+            // 不存在任何字段，返回项目页面
+            console.log(`自定义字段 ${teamCFId} 不存在，且团队没有其他字段，返回项目页面`);
+            router.replace(`/projects/${projectId}`);
+            return;
+          }
+        }
         
         if (isMounted) {
           setTeamCFLoaded(true);
@@ -285,6 +314,31 @@ const TeamCustomFieldPage = () => {
         }
       } catch (error) {
         console.error('Error loading team custom field:', error);
+        
+        // 错误处理 - 如果是因为字段不存在导致的错误
+        try {
+          // 尝试获取团队的所有字段
+          const allFields = await dispatch(fetchTeamCustomField(teamId)).unwrap();
+          
+          if (Array.isArray(allFields) && allFields.length > 0) {
+            // 存在其他字段，重定向到第一个字段
+            const sortedFields = [...allFields].sort((a, b) => 
+              (a.order_index || 0) - (b.order_index || 0)
+            );
+            const firstFieldId = sortedFields[0].id;
+            
+            console.log(`加载自定义字段 ${teamCFId} 失败，重定向到字段 ${firstFieldId}`);
+            router.replace(`/projects/${projectId}/${teamId}/${firstFieldId}`);
+          } else {
+            // 不存在任何字段，返回项目页面
+            console.log(`加载自定义字段 ${teamCFId} 失败，且团队没有其他字段，返回项目页面`);
+            router.replace(`/projects/${projectId}`);
+          }
+        } catch (redirectError) {
+          console.error('重定向处理失败:', redirectError);
+          // 最后的处理方式 - 回到项目页面
+          router.replace(`/projects/${projectId}`);
+        }
       }
     };
     
@@ -293,7 +347,7 @@ const TeamCustomFieldPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [dispatch, teamId, teamCFId, teamCFLoaded, dataLoaded]);
+  }, [dispatch, teamId, teamCFId, teamCFLoaded, dataLoaded, projectId, router]);
 
   useEffect(() => {
     // 如果团队已归档，立即跳转到项目主页
@@ -341,45 +395,56 @@ const TeamCustomFieldPage = () => {
       return <div>Error: {cfError}</div>;
     }
 
-    if (!currentItem) {
+    // 如果currentItem为空或没有custom_field属性，则返回提示或尝试重定向
+    if (!currentItem || !currentItem.custom_field) {
+      // 如果已尝试加载但仍然没有数据，可能是字段已被删除
+      if (teamCFLoaded) {
+        return (
+          <div className="flex flex-col items-center justify-center h-64 text-center">
+            <div className="text-lg text-muted-foreground mb-2">{fieldNotFoundText}</div>
+            <div className="text-sm text-muted-foreground">{fieldMayBeDeletedText}</div>
+          </div>
+        );
+      }
       return <div></div>;
     }
+
     const fieldType = currentItem.custom_field?.type;
     if (fieldType === 'LIST') {
       return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'GANTT') {
-      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'KANBAN') {
-      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'FILES') {
-      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'WORKFLOW') {
-      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'OVERVIEW') {
-      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} />
+      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'TIMELINE') {
-      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'CALENDAR') {
-      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'NOTE') {
-      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'AGILE') {
-      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     if (fieldType === 'POSTS') {
-      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>
+      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
     }
     return <div>暂不支持的字段类型: {fieldType}</div>;
-  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey]);
+  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey, teamCFLoaded, fieldNotFoundText, fieldMayBeDeletedText]);
 
   // 处理加载状态
   if (isLoading) {

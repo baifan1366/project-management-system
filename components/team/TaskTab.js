@@ -40,6 +40,7 @@ import {
   Input
 } from "@/components/ui/input"
 import { useForm } from "react-hook-form";
+import { store } from '@/lib/redux/store';
 
 // 修复记忆化的 selectors - 确保返回新的引用
 const selectTeamCFItems = state => state?.teamCF?.items ?? [];
@@ -503,24 +504,33 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
       description: t('deleteTabConfirm'),
       variant: "error",
       onConfirm: () => {
-        // 从排序列表中移除该字段
-        const newOrderedFields = orderedFields.filter(field => field.id !== fieldId);
-        setOrderedFields(newOrderedFields);
-        
         // 获取用户ID
         const userId = user?.id;
         
         // 获取当前locale
         const locale = params?.locale || 'en';
         
-        // 记录目标URL
+        // 执行删除操作前先检查是否还有其他标签
+        // 从Redux获取最新状态而不是依赖本地状态
+        const availableFields = store.getState().teamCF.items;
+        
+        // 安全地过滤掉将被删除的字段
+        const remainingFields = Array.isArray(availableFields) 
+          ? availableFields.filter(field => field.id !== fieldId)
+          : [];
+
+        // 安全地处理目标URL，避免使用可能已被删除的字段
         let targetUrl;
         
         // 如果删除的是当前激活的标签页
         if (activeTab === `${fieldId}`) {
-          if (newOrderedFields.length > 0) {
-            // 如果还有其他标签页，目标URL为第一个标签页
-            const firstTabValue = `${newOrderedFields[0].id}`;
+          if (remainingFields.length > 0) {
+            // 确保remainingFields有有效数据，避免空引用
+            // 按照order_index排序，确保导航到正确的第一个标签
+            const sortedFields = [...remainingFields].sort((a, b) => 
+              (a.order_index || 0) - (b.order_index || 0)
+            );
+            const firstTabValue = `${sortedFields[0].id}`;
             targetUrl = `/${locale}/projects/${projectId}/${teamId}/${firstTabValue}`;
           } else {
             // 如果没有剩余标签页了，目标URL为项目页面
@@ -540,19 +550,38 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
             teamCustomFieldId: fieldId,
             userId
           })).then(() => {
+            // 删除成功后，再次获取最新状态以确保导航URL有效
+            const latestFields = store.getState().teamCF.items;
+            
+            // 重新验证目标URL
+            if (activeTab === `${fieldId}`) {
+              // 如果删除的是当前标签，需要重新计算目标URL
+              if (Array.isArray(latestFields) && latestFields.length > 0) {
+                // 按照order_index排序，确保导航到正确的第一个标签
+                const sortedFields = [...latestFields].sort((a, b) => 
+                  (a.order_index || 0) - (b.order_index || 0)
+                );
+                const firstTabValue = `${sortedFields[0].id}`;
+                targetUrl = `/${locale}/projects/${projectId}/${teamId}/${firstTabValue}`;
+              } else {
+                // 如果没有剩余标签页了，目标URL为项目页面
+                targetUrl = `/${locale}/projects/${projectId}`;
+              }
+            }
+            
             // 删除成功后强制刷新页面
-            console.log('删除成功，正在刷新页面...');
-            router.replace(targetUrl);
+            console.log('删除成功，正在刷新页面到', targetUrl);
+            router.push(targetUrl);
           }).catch(error => {
             console.error('删除标签页失败:', error);
             // 即使出错也强制刷新
             console.log('删除失败，仍然刷新页面...');
-            router.replace(targetUrl);
+            router.push(targetUrl);
           });
         } else {
           console.error('删除标签页失败: 缺少用户ID或团队ID');
           // 即使出错也强制刷新
-          router.replace(targetUrl);
+          router.push(targetUrl);
         }
       }
     });

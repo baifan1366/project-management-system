@@ -4,7 +4,7 @@
 //sort by created_at asc
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPostsByTeamId, togglePostPin, deletePost, updatePost } from '@/lib/redux/features/postsSlice';
 import { fetchCommentsByPostId } from '@/lib/redux/features/commentsSlice';
@@ -188,15 +188,18 @@ export default function Announcements({ projectId, teamId }) {
       return commentCounts[post.id];
     }
     
-    // 如果没有缓存，触发异步获取评论数量
-    fetchCommentCount(post.id);
+    // 避免在渲染中调用可能导致状态更新的函数
+    // 使用setTimeout将fetchCommentCount调用移到下一个事件循环
+    setTimeout(() => {
+      fetchCommentCount(post.id);
+    }, 0);
     
     // 在异步加载完成前，先返回帖子上的评论ID数组长度作为默认值
     return post.comment_id && Array.isArray(post.comment_id) ? post.comment_id.length : 0;
   };
   
   // 异步获取评论数量
-  const fetchCommentCount = async (postId) => {
+  const fetchCommentCount = useCallback(async (postId) => {
     try {
       // 通过帖子ID获取评论
       const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
@@ -214,7 +217,7 @@ export default function Announcements({ projectId, teamId }) {
       console.error(`获取帖子(${postId})评论数量失败:`, error);
       return 0;
     }
-  };
+  }, [dispatch]);
   
   // 计算点赞数
   const getReactionCount = (post) => {
@@ -223,8 +226,8 @@ export default function Announcements({ projectId, teamId }) {
       total + (Array.isArray(userIds) ? userIds.length : 0), 0);
   };
 
-  // 处理置顶/取消置顶
-  const handleTogglePin = async (postId) => {
+  // 修改handleTogglePin函数，使用useCallback包裹
+  const handleTogglePin = useCallback(async (postId) => {
     try {
       const result = await dispatch(togglePostPin(postId)).unwrap();
       
@@ -236,13 +239,22 @@ export default function Announcements({ projectId, teamId }) {
             : announcement
         )
       );
+      
+      // 成功消息使用setTimeout包装
+      setTimeout(() => {
+        toast.success(result.is_pinned ? t('announcementPinned') : t('announcementUnpinned'));
+      }, 0);
     } catch (err) {
       console.error('置顶/取消置顶公告时出错:', err);
+      // 错误消息使用setTimeout包装
+      setTimeout(() => {
+        toast.error(t('announcementPinError'));
+      }, 0);
     }
-  };
+  }, [dispatch, t]);
 
-  // 处理删除
-  const handleDelete = async (postId) => {
+  // 修改handleDelete函数，使用useCallback包裹
+  const handleDelete = useCallback(async (postId) => {
     try {
       await dispatch(deletePost(postId)).unwrap();
       
@@ -250,29 +262,45 @@ export default function Announcements({ projectId, teamId }) {
       setAnnouncements(prev => 
         prev.filter(announcement => announcement.id !== postId)
       );
+      
+      // 成功消息使用setTimeout包装
+      setTimeout(() => {
+        toast.success(t('announcementDeleted'));
+      }, 0);
     } catch (err) {
       console.error('删除公告时出错:', err);
+      // 错误消息使用setTimeout包装
+      setTimeout(() => {
+        toast.error(t('announcementDeleteError'));
+      }, 0);
     }
-  };
+  }, [dispatch, t]);
 
-  // 检查当前用户是否有权限操作（团队创建者）
-  const hasEditPermission = () => {
+  // 使用useMemo计算是否有编辑权限
+  const hasEditPermission = useMemo(() => {
     return (team && currentUser && team[0]?.created_by === currentUser);
-  };
+  }, [team, currentUser]);
   
-  // 打开公告详情对话框
-  const openAnnouncementDialog = (announcement) => {
+  // 修改openAnnouncementDialog函数，使用useCallback包裹
+  const openAnnouncementDialog = useCallback((announcement) => {
     setSelectedAnnouncement(announcement);
     setEditTitle(announcement.title || '');
     setEditContent(announcement.description || '');
     setIsEditing(false);
     setDialogOpen(true);
-  };
+  }, []);
   
-  // 切换到编辑模式
-  const toggleEditMode = () => {
+  // 修改toggleEditMode函数，使用useCallback包裹
+  const toggleEditMode = useCallback(() => {
     setIsEditing(!isEditing);
-  };
+  }, [isEditing]);
+  
+  // 修改cancelEdit函数，使用useCallback包裹
+  const cancelEdit = useCallback(() => {
+    setEditTitle(selectedAnnouncement?.title || '');
+    setEditContent(selectedAnnouncement?.description || '');
+    setIsEditing(false);
+  }, [selectedAnnouncement]);
   
   // 保存编辑的公告
   const saveAnnouncementEdit = async () => {
@@ -281,7 +309,10 @@ export default function Announcements({ projectId, teamId }) {
     const trimmedTitle = editTitle.trim();
     
     if (trimmedTitle.length < 2 || trimmedTitle.length > 50) {
-      toast.error(t('titleLengthError') || '标题长度必须在2-50个字符之间');
+      // 将toast调用放在setTimeout中以避免在渲染周期中更新状态
+      setTimeout(() => {
+        toast.error(t('titleLengthError') || '标题长度必须在2-50个字符之间');
+      }, 0);
       return;
     }
     
@@ -310,23 +341,25 @@ export default function Announcements({ projectId, teamId }) {
         // 更新选中的公告
         setSelectedAnnouncement(prev => ({ ...prev, title: trimmedTitle, description: editContent }));
         setIsEditing(false);
+        
+        // 将toast移到setTimeout中
+        setTimeout(() => {
+          toast.success(t('updateSuccess') || '公告更新成功');
+        }, 0);
       } else {
         throw new Error('保存失败');
       }
     } catch (err) {
       console.error('更新公告时出错:', err);
+      // 将toast移到setTimeout中
+      setTimeout(() => {
+        toast.error(t('updateFailed') || '更新公告失败');
+      }, 0);
     } finally {
       setIsSaving(false);
     }
   };
   
-  // 取消编辑
-  const cancelEdit = () => {
-    setEditTitle(selectedAnnouncement?.title || '');
-    setEditContent(selectedAnnouncement?.description || '');
-    setIsEditing(false);
-  };
-
   // 处理富文本内容显示
   const renderRichTextContent = (content) => {
     // 确保content是有效的字符串，防止渲染错误
@@ -362,12 +395,12 @@ export default function Announcements({ projectId, teamId }) {
   const endIndex = Math.min(startIndex + itemsPerPage, announcements.length);
   const currentAnnouncements = announcements.slice(startIndex, endIndex);
   
-  // 页面导航处理
-  const handlePageChange = (page) => {
+  // 修改handlePageChange函数，使用useCallback包裹
+  const handlePageChange = useCallback((page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
-  };
+  }, [totalPages]);
   
   // 生成页码数组，用于分页控件
   const generatePagination = () => {
@@ -388,6 +421,13 @@ export default function Announcements({ projectId, teamId }) {
     
     return pages;
   };
+
+  // 使用useEffect处理toast提示，而不是在render函数中直接调用
+  useEffect(() => {
+    if (error) {
+      toast.error(t('loadingError') || '加载公告时出错');
+    }
+  }, [error, t]);
 
   if (loading) {
     return (
@@ -490,7 +530,7 @@ export default function Announcements({ projectId, teamId }) {
                   <span className="text-sm">{getCommentCount(announcement)}</span>
                 </TableCell>
                 <TableCell className="py-3">
-                  {hasEditPermission() && (
+                  {hasEditPermission && (
                     <div className="flex justify-end">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -583,7 +623,7 @@ export default function Announcements({ projectId, teamId }) {
               <span>
                 {getUserName(selectedAnnouncement?.created_by)} • {formatDate(selectedAnnouncement?.created_at)}
               </span>
-              {hasEditPermission() && !isEditing && (
+              {hasEditPermission && !isEditing && (
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -594,7 +634,7 @@ export default function Announcements({ projectId, teamId }) {
                   {t('edit')}
                 </Button>
               )}
-              {!hasEditPermission() && (
+              {!hasEditPermission && (
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <Eye className="h-4 w-4" />
                   {t('viewOnly')}
@@ -642,7 +682,6 @@ export default function Announcements({ projectId, teamId }) {
                       </Button>
                       <Button 
                         onClick={saveAnnouncementEdit}
-                        className="bg-[#6264A7] hover:bg-[#494B83] text-white min-w-[80px]"
                         disabled={!isFormValid || isSaving}
                         variant={projectThemeColor}
                       >

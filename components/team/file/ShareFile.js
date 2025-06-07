@@ -42,13 +42,6 @@ export default function ShareFile({ open, onOpenChange, file }) {
     setTimeout(() => setCopied(false), 3000)
   }
 
-  // 模拟用户列表数据
-  const users = [
-    { id: 1, name: '张三', email: 'zhangsan@example.com' },
-    { id: 2, name: '李四', email: 'lisi@example.com' },
-    { id: 3, name: '王五', email: 'wangwu@example.com' },
-  ]
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -74,32 +67,6 @@ export default function ShareFile({ open, onOpenChange, file }) {
             <Button size="icon" onClick={handleCopyLink} variant="outline">
               {copied ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
             </Button>
-          </div>
-        </div>
-        
-        {/* 用户列表区域 */}
-        <div className="space-y-2">
-          <div className="font-medium">{t('selectUsers')}</div>
-          <div className="max-h-60 overflow-y-auto border rounded-md divide-y">
-            {users.map(user => (
-              <div 
-                key={user.id} 
-                className="flex items-center justify-between p-3 hover:bg-gray-50"
-              >
-                <div className="cursor-pointer">
-                  <div className="font-medium">{user.name}</div>
-                  <div className="text-sm text-gray-500">{user.email}</div>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                  onClick={() => handleSendToUser(user.id)}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
           </div>
         </div>
         
