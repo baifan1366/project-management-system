@@ -7,6 +7,7 @@ import { fetchTeamUsers } from "@/lib/redux/features/teamUserSlice";
 import { fetchUserById } from "@/lib/redux/features/usersSlice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
+import { useTranslations } from 'next-intl';
 
 /**
  * 展示团队成员及其角色
@@ -18,6 +19,7 @@ export default function MembersRole({ teamId }) {
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const t = useTranslations('TeamOverview');
 
     useEffect(() => {
         const fetchMembers = async () => {
@@ -120,7 +122,7 @@ export default function MembersRole({ teamId }) {
     }
 
     if (members.length === 0) {
-        return <p className="text-sm text-muted-foreground p-2">该团队暂无成员</p>;
+        return <p className="text-sm text-muted-foreground p-2">{t('noTeamMemberFound')}</p>;
     }
 
     return (
@@ -133,7 +135,12 @@ export default function MembersRole({ teamId }) {
                     </Avatar>
                     <div className="flex flex-col">
                         <span className="text-sm font-medium">{user.name}</span>
-                        <span className="text-xs text-muted-foreground">{user.role}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {user.role === 'OWNER' ? t('OWNER') : 
+                             user.role === 'CAN_EDIT' ? t('CAN_EDIT') : 
+                             user.role === 'CAN_VIEW' ? t('CAN_VIEW') : 
+                             user.role}
+                        </span>
                     </div>
                 </div>
             ))}

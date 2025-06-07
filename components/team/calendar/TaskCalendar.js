@@ -584,58 +584,25 @@ export default function TaskCalendar({ teamId }) {
   // Loading skeleton - 添加进度显示
   const renderSkeletonCalendar = () => (
     <div className="h-full flex flex-col">
-      <div className="flex-none py-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-2">
-            <Skeleton className="h-5 w-5 rounded-full" />
-            <Skeleton className="h-8 w-40" />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Skeleton className="h-10 w-48" />
-            
+      <div className="flex-none py-2">
+        <div className="flex items-center justify-between mb-2">          
+          <div className="flex items-center justify-between w-full">
             <div className="flex items-center space-x-2">
               <Skeleton className="h-9 w-9 rounded-md" />
-              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-6 w-15" />
               <Skeleton className="h-9 w-9 rounded-md" />
-              <Skeleton className="h-9 w-16 rounded-md ml-2" />
+              <Skeleton className="h-10 w-48" />
             </div>
-            
-            <Skeleton className="h-9 w-24 rounded-md" />
-            <Skeleton className="h-9 w-32 rounded-md" />
+            <div className="flex items-center space-x-2">
+              <Skeleton className="h-9 w-24 rounded-md" />
+              <Skeleton className="h-9 w-32 rounded-md" />
+            </div>
           </div>
         </div>
       </div>
       
       <div className="flex-1 overflow-hidden">
-        <div className="h-full grid grid-cols-12 gap-4">
-          <div className="col-span-2">
-            <Card className="h-full p-4">
-              <Skeleton className="h-6 w-32 mb-3" />
-              
-              <div className="space-y-3 mb-6">
-                {Array(5).fill().map((_, i) => (
-                  <div key={`member-${i}`} className="flex items-center">
-                    <Skeleton className="w-4 h-4 rounded mr-2" />
-                    <Skeleton className="w-6 h-6 rounded-full mr-2" />
-                    <Skeleton className="h-4 w-24" />
-                  </div>
-                ))}
-              </div>
-              
-              <Skeleton className="h-6 w-20 mb-3" />
-              <div className="space-y-3">
-                {Array(5).fill().map((_, i) => (
-                  <div key={`status-${i}`} className="flex items-center">
-                    <Skeleton className="w-4 h-4 rounded mr-2" />
-                    <Skeleton className="w-3 h-3 rounded-full mr-2" />
-                    <Skeleton className="h-4 w-20" />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-          
+        <div className="h-full grid grid-cols-10 gap-4">
           <div className="col-span-10 overflow-hidden">
             {view === 'month' && (
               <Card className="p-2">
@@ -692,12 +659,6 @@ export default function TaskCalendar({ teamId }) {
           </Button>
         </div>
 
-        <div className="ml-4">
-          <Button variant="outline" onClick={handleTodayClick}>
-            {t('today')}
-          </Button>
-        </div>
-
         <Tabs value={view} onValueChange={(newView) => {
           if (newView === view) return
           setIsViewLoading(true)
@@ -710,11 +671,16 @@ export default function TaskCalendar({ teamId }) {
           </TabsList>
         </Tabs>
       </div>
+      <div className="flex items-center space-x-2">
+        <Button variant="outline" onClick={handleTodayClick}>
+          {t('today')}
+        </Button>
+        <Button variant={themeColor} onClick={() => handleOpenCreateTask()}>
+          <Plus className="h-4 w-4" />
+          {t('newTask')}
+        </Button>
+      </div>
       
-      <Button variant={themeColor} size="icon" onClick={() => handleOpenCreateTask()}>
-        <Plus className="h-4 w-4" />
-        {/* {t('newTask')} */}
-      </Button>
     </div>
   )
 
@@ -896,8 +862,8 @@ export default function TaskCalendar({ teamId }) {
         tasks={filteredTasks.map(task => ({
           id: task.taskId,
           title: task.name,
-          due_date: task.dueDate,
-          expected_completion_date: task.dueDate,
+          due_date: format(task.dueDate, 'yyyy-MM-dd'),
+          expected_completion_date: format(task.dueDate, 'yyyy-MM-dd'),
           assignee: task.assigneeId
         }))}
         handleEventClick={(event) => {
@@ -919,8 +885,8 @@ export default function TaskCalendar({ teamId }) {
         tasks={filteredTasks.map(task => ({
           id: task.taskId,
           title: task.name,
-          due_date: task.dueDate,
-          expected_completion_date: task.dueDate,
+          due_date: format(task.dueDate, 'yyyy-MM-dd'),
+          expected_completion_date: format(task.dueDate, 'yyyy-MM-dd'),
           assignee: task.assigneeId
         }))}
         handleEventClick={(event) => {
@@ -1005,47 +971,7 @@ export default function TaskCalendar({ teamId }) {
       </div>
       
       <div className="flex-1 overflow-hidden">
-        <div className="h-full grid grid-cols-12 gap-4">
-          <div className="col-span-2">
-            <Card className="h-full p-4 overflow-y-auto">
-              <div className="mb-4">
-                <h3 className="font-medium mb-2">{t('teamMembers')}</h3>
-                
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <Button variant="link" className="p-0 h-auto text-xs" onClick={handleSelectAllMembers}>
-                      {t('selectAll')}
-                    </Button>
-                    <Button variant="link" className="p-0 h-auto text-xs" onClick={handleDeselectAllMembers}>
-                      {t('deselectAll')}
-                    </Button>
-                  </div>
-                  
-                  {teamMembers.map(member => (
-                    <div key={member.id} className="flex items-center">
-                      <Checkbox 
-                        id={`member-${member.id}`}
-                        checked={selectedMembers.includes(member.id)}
-                        onCheckedChange={() => handleToggleMember(member.id)}
-                        className="mr-2"
-                      />
-                      <Avatar className="h-6 w-6 mr-2">
-                        <AvatarImage src={member.avatar} alt={member.name} />
-                        <AvatarFallback>{member.name ? member.name.charAt(0).toUpperCase() : '?'}</AvatarFallback>
-                      </Avatar>
-                      <label 
-                        htmlFor={`member-${member.id}`}
-                        className="text-sm cursor-pointer"
-                      >
-                        {member.name}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          </div>
-          
+        <div className="h-full grid grid-cols-10 gap-4">
           <div className="col-span-10 overflow-hidden">
             {isViewLoading ? (
               // Show skeleton based on current view

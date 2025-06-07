@@ -326,7 +326,7 @@ export default function CalendarTools({
                       {errorMessages.title}
                     </p>
                   ) : (
-                    <span className="text-xs text-muted-foreground opacity-0">占位</span>
+                    <span className="text-xs text-muted-foreground opacity-0"></span>
                   )}
                   <span className="text-xs text-muted-foreground">
                     {title.trim().length}/100
@@ -375,7 +375,7 @@ export default function CalendarTools({
                       {errorMessages.description}
                     </p>
                   ) : (
-                    <span className="text-xs text-muted-foreground opacity-0">占位</span>
+                    <span className="text-xs text-muted-foreground opacity-0"></span>
                   )}
                   <span className="text-xs text-muted-foreground">
                     {description.trim().length}/1000
@@ -420,70 +420,6 @@ export default function CalendarTools({
                     {errorMessages.dates}
                   </p>
                 )}
-              </div>
-            </div>            
-            
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">
-                {t('assignees')}
-              </Label>
-              <div className="col-span-3">
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {selectedAssignees.length === 0 ? (
-                    <div className="text-sm text-muted-foreground italic">
-                      {t('noAssignees')}
-                    </div>
-                  ) : (
-                    selectedAssignees.map(userId => {
-                      const member = teamMembers.find(m => m.id === userId)
-                      return member ? (
-                        <Badge 
-                          key={userId} 
-                          variant="secondary"
-                          className="flex items-center gap-1"
-                        >
-                          <Avatar className="h-4 w-4">
-                            <AvatarImage src={member.avatar} alt={member.name} />
-                            <AvatarFallback className="text-[8px]">{member.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <span className="max-w-24 truncate">{member.name}</span>
-                          <button 
-                            type="button"
-                            className="ml-1 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleToggleAssignee(userId)}
-                          >
-                            ×
-                          </button>
-                        </Badge>
-                      ) : null
-                    })
-                  )}
-                </div>
-                
-                <div className="border rounded-md">
-                  <ScrollArea className="h-32">
-                    <div className="p-2 space-y-1">
-                      {teamMembers.map(member => (
-                        <div 
-                          key={member.id} 
-                          className={cn(
-                            "flex items-center gap-2 p-1.5 rounded cursor-pointer",
-                            selectedAssignees.includes(member.id) 
-                              ? "bg-accent" 
-                              : "hover:bg-muted"
-                          )}
-                          onClick={() => handleToggleAssignee(member.id)}
-                        >
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={member.avatar} alt={member.name} />
-                            <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <div className="text-sm">{member.name}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
               </div>
             </div>
           </div>

@@ -2010,6 +2010,10 @@
     "cancelGenerationDesc": "Are you sure you want to cancel the content generation?"
   },
   "TeamOverview": {
+    "noTeamMemberFound": "No team members found",
+    "OWNER": "Owner",
+    "CAN_EDIT": "Editor",
+    "CAN_VIEW": "Viewer",
     "titleLengthError": "Title must be between 2 and 50 characters",
     "edit": "Edit",
     "cancel": "Cancel",

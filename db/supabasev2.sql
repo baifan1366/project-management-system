@@ -149,6 +149,8 @@ CREATE TABLE "task" (
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
   "likes" UUID[] DEFAULT '{}',
   "page_id" INT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
+  "agile_id" INT NULL REFERENCES "team_agile"("id") ON DELETE CASCADE,
+  "agile_status" TEXT NULL CHECK ("agile_status" IN ('TODO', 'IN_PROGRESS', 'DONE')) DEFAULT 'TODO',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
