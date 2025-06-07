@@ -126,7 +126,6 @@ export default function TaskCalendar({ teamId }) {
       if (!teamId) return
       
       try {
-        console.log('开始获取团队成员，teamId:', teamId)
         const result = await dispatch(fetchTeamUsers(teamId)).unwrap()
         
         // 检查并处理返回的数据结构
@@ -151,7 +150,6 @@ export default function TaskCalendar({ teamId }) {
             }
           }).filter(Boolean) // 移除null值
           
-          console.log('成功获取团队成员:', members)
           setTeamMembers(members)
           
           // 默认选择所有成员
@@ -184,7 +182,6 @@ export default function TaskCalendar({ teamId }) {
     // 添加简单缓存机制，避免短时间内重复请求
     const now = Date.now()
     if (lastFetchTime && now - lastFetchTime < 30000) { // 30秒缓存
-      console.log('使用缓存数据，跳过请求')
       setIsLoading(false)
       setIsViewLoading(false)
       return
@@ -231,7 +228,6 @@ export default function TaskCalendar({ teamId }) {
         // 等待分区数据完成
         const sections = await fetchSectionsPromise
         setDataLoadingProgress(40)
-        console.log('获取到团队分区:', sections?.length || 0);
         
         // 继续等待团队信息
         const teamResult = await fetchTeamPromise
@@ -266,11 +262,9 @@ export default function TaskCalendar({ teamId }) {
         
         // 去除重复的任务ID
         const uniqueTaskIds = [...new Set(sectionTaskIds)]
-        console.log('团队分区包含的任务IDs:', uniqueTaskIds.length)
         setDataLoadingProgress(60)
         
         if (uniqueTaskIds.length === 0) {
-          console.log('没有找到属于该团队的任务');
           setTasksByDate({});
           setFilteredTasks([]);
           setIsLoading(false);
@@ -288,7 +282,6 @@ export default function TaskCalendar({ teamId }) {
           
           setDataLoadingProgress(80)
           if (!allTasks || allTasks.length === 0) {
-            console.log('没有获取到任何任务');
             setTasksByDate({});
             setFilteredTasks([]);
             setIsLoading(false);
@@ -296,19 +289,15 @@ export default function TaskCalendar({ teamId }) {
             setLastFetchTime(Date.now())
             return;
           }
-          
-          console.log('获取到的所有任务:', allTasks.length)
-          
+                    
           // 使用Set加速查找
           const uniqueTaskIdSet = new Set(uniqueTaskIds)
           
           // 筛选属于当前团队的任务
           const teamTasks = allTasks.filter(task => uniqueTaskIdSet.has(task.id))
-          console.log('属于当前团队的任务:', teamTasks.length)
           setDataLoadingProgress(90)
           
           if (teamTasks.length === 0) {
-            console.log('筛选后没有找到属于该团队的任务');
             setTasksByDate({});
             setFilteredTasks([]);
           } else {
@@ -318,7 +307,6 @@ export default function TaskCalendar({ teamId }) {
             // 更新Redux store和本地状态
             store.dispatch({ type: 'tasks/setTasks', payload: teamTasks })
             setTeamTaskIds(teamTaskIds)
-            console.log('成功更新任务数据，任务数量:', teamTasks.length);
           }
           setDataLoadingProgress(100)
           // 更新最后加载时间
@@ -367,7 +355,6 @@ export default function TaskCalendar({ teamId }) {
       results.forEach(({ name, tag, success, error }) => {
         const mapping = tagMappings.find(m => m.name === name);
         if (success && mapping) {
-          console.log(`获取到${name}标签ID:`, tag);
           mapping.setter(tag);
         } else {
           console.error(`获取${name}标签失败:`, error);
@@ -389,13 +376,11 @@ export default function TaskCalendar({ teamId }) {
   // 处理任务数据 - 优化筛选规则
   useEffect(() => {
     if (!tasks || tasks.length === 0) {
-      console.log('没有任务可筛选')
       setFilteredTasks([])
       return
     }
 
     if (!tagIdName || !tagIdDueDate || !tagIdAssignee) {
-      console.log('标签ID未就绪')
       return
     }
 
@@ -451,7 +436,6 @@ export default function TaskCalendar({ teamId }) {
         filteredTasksArray.push(task);
       }
       
-      console.log('筛选后的任务:', filteredTasksArray.length);
       setFilteredTasks(filteredTasksArray);
     } catch (error) {
       console.error('处理任务数据时出错:', error)
@@ -462,12 +446,10 @@ export default function TaskCalendar({ teamId }) {
   // 按日期分组任务 - 优化处理逻辑
   useEffect(() => {
     if (!filteredTasks || filteredTasks.length === 0) {
-      console.log('没有筛选后的任务可分组')
       setTasksByDate({})
       return
     }
 
-    console.log('开始按日期分组筛选后的任务:', filteredTasks.length)
     
     // 使用更高效的分组方式
     const groupedTasks = filteredTasks.reduce((acc, task) => {
@@ -491,7 +473,6 @@ export default function TaskCalendar({ teamId }) {
     }, {});
     
     const totalTasksGrouped = Object.values(groupedTasks).reduce((sum, tasks) => sum + tasks.length, 0);
-    console.log(`分组完成, 共 ${Object.keys(groupedTasks).length} 个日期, ${totalTasksGrouped} 个任务`);
     setTasksByDate(groupedTasks);
   }, [filteredTasks]);
 
@@ -569,9 +550,7 @@ export default function TaskCalendar({ teamId }) {
     // 重置缓存，确保获取最新数据
     setLastFetchTime(null)
     
-    try {
-      console.log('开始刷新日历数据...');
-      
+    try {      
       // 使用重试机制获取最新数据
       const fetchWithRetry = async (fetchFunction, maxRetries = 2) => {
         let retries = 0;
@@ -592,9 +571,6 @@ export default function TaskCalendar({ teamId }) {
         fetchWithRetry(() => dispatch(getSectionByTeamId(teamId)).unwrap()),
         fetchWithRetry(() => dispatch(fetchAllTasks()).unwrap())
       ]);
-      
-      console.log('成功获取最新分区数据:', sectionsResult?.length || 0);
-      console.log('成功获取最新任务数据:', tasksResult?.length || 0);
       
       // 处理分区中的任务ID
       if (sectionsResult && sectionsResult.length > 0) {
@@ -630,7 +606,6 @@ export default function TaskCalendar({ teamId }) {
       
       // 失败后，尝试延迟重新加载一次
       setTimeout(() => {
-        console.log('尝试延迟重新加载数据...');
         setLastFetchTime(null); // 强制重新加载
       }, 2000);
     }
@@ -775,7 +750,6 @@ export default function TaskCalendar({ teamId }) {
       // 获取当天任务并检查是否有数据
       const dayTasks = tasksByDate[formattedDate] || []
       if (dayTasks.length > 0) {
-        console.log('日期:', formattedDate, '有任务:', dayTasks.length, '个')
       }
 
       currentWeekDays.push(
@@ -999,31 +973,25 @@ export default function TaskCalendar({ teamId }) {
       // 1. 直接使用日历格式化的日期
       taskDueDateString = task.dueDate
       taskDueDate = new Date(task.dueDate.replace(/-/g, '/'))
-      console.log('使用日历格式化的日期:', taskDueDateString)
     } else if (task.tag_values && tagIdDueDate && task.tag_values[tagIdDueDate]) {
       // 2. 从任务的tag_values中获取日期
       taskDueDateString = task.tag_values[tagIdDueDate]
       taskDueDate = new Date(taskDueDateString.replace(/-/g, '/'))
-      console.log('使用tag_values中的日期:', taskDueDateString)
     } else if (task.rawTask && task.rawTask.tag_values && tagIdDueDate && task.rawTask.tag_values[tagIdDueDate]) {
       // 3. 从原始任务对象的tag_values中获取日期
       taskDueDateString = task.rawTask.tag_values[tagIdDueDate]
       taskDueDate = new Date(taskDueDateString.replace(/-/g, '/'))
-      console.log('使用rawTask中的日期:', taskDueDateString)
     }
     
     // 如果都没找到，则使用当前日期
     if (!taskDueDate || isNaN(taskDueDate.getTime())) {
-      console.warn('无法确定任务日期，使用当前日期')
       taskDueDate = new Date()
       taskDueDateString = format(taskDueDate, 'yyyy-MM-dd')
     }
     
     // 如果任务有截止日期并且截止日期在今天之前，则标记为只读
     const isPastTask = taskDueDate && isBefore(taskDueDate, today)
-    
-    console.log('打开任务:', task.name, '截止日期:', taskDueDateString, task)
-    
+        
     // 保存原始的日期值以便在编辑对话框中正确显示
     setSelectedTask({
       ...task,

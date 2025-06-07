@@ -20,7 +20,6 @@ const TaskNode = memo(({ data, isConnectable }) => {
   const handleClick = () => {
     // 确保ID类型一致
     const taskId = typeof data.id === 'string' ? parseInt(data.id) || data.id : data.id;
-    console.log('TaskNode - 点击任务节点:', taskId);
     setSelectedTaskId(taskId);
   };
 

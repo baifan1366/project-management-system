@@ -29,7 +29,6 @@ export default function ShareFile({ open, onOpenChange, file }) {
    */
   const handleSendToUser = (userId) => {
     // 实际应用中这里会调用API发送链接给特定用户
-    console.log(`向用户 ${userId} 发送链接: ${fileLink}`)
   }
   
   /**

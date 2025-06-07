@@ -23,13 +23,10 @@ export default function HandleTask({ teamId }) {
         dispatch(setSelectedTask(task));
     };
 
-    const CreateTask = async(taskData, onTaskCreated) => {
-        console.log('创建新任务:', taskData);
-        
+    const CreateTask = async(taskData, onTaskCreated) => {        
         try {
             // 获取任务名称的Tag ID
             const tagIdName = await dispatch(getTagByName("Name")).unwrap();
-            console.log('Name标签ID:', tagIdName);
             
             // 准备要创建的任务数据 - 只包含 task 表中实际存在的字段
             const newTaskData = {
@@ -38,9 +35,7 @@ export default function HandleTask({ teamId }) {
                 },
                 created_by: user?.id
             };
-            
-            console.log('准备创建的任务数据:', newTaskData);
-            
+                        
             // 创建任务
             const result = await dispatch(createTask(newTaskData)).unwrap();
             //it may also create a notion_page, then update the notion_page id into the task table, page_id column
@@ -52,7 +47,6 @@ export default function HandleTask({ teamId }) {
             })
             .select()
             .single();
-            console.log(notionPageData);
             //update the notion_page id into the task table, page_id column
             const { data: taskDbData, error: taskError } = await supabase
             .from('task')
@@ -60,7 +54,6 @@ export default function HandleTask({ teamId }) {
                 page_id: notionPageData.id
             })
             .eq('id', result.id);
-            console.log(taskDbData);
             
             // 如果任务创建成功且有分区ID，则将任务添加到分区的 task_ids 中
             if (result && result.id && taskData.sectionId) {
@@ -85,7 +78,6 @@ export default function HandleTask({ teamId }) {
                             newTaskIds: updatedTaskIds
                         })).unwrap();
                         
-                        console.log(`已将任务 ${result.id} 添加到分区 ${section.id} 的task_ids中`);
                     } else {
                         console.error(`未找到ID为 ${taskData.sectionId} 的分区`);
                     }
@@ -107,7 +99,6 @@ export default function HandleTask({ teamId }) {
     }
 
     const UpdateTask = async(taskId, onTaskUpdated, newContent) => {
-        console.log('编辑任务:', taskId, '新内容:', newContent);
         const taskToEdit = selectedTask || null;
         const taskIdToEdit = taskId || (taskToEdit ? taskToEdit.id : null);
         
@@ -118,23 +109,18 @@ export default function HandleTask({ teamId }) {
         
         try {
             const previousTaskData = await dispatch(fetchTaskById(taskIdToEdit)).unwrap();
-            console.log('获取到的任务数据:', previousTaskData);
             
             // 获取任务名称的Tag ID
             const tagIdName = await dispatch(getTagByName("Name")).unwrap();
-            console.log('Name标签ID:', tagIdName);
             
             // 使用传入的新内容，如果没有则使用提示框
             let newTaskName = newContent;
             if (newTaskName === undefined) {
                 newTaskName = prompt(t('enterNewTaskName'), previousTaskData?.content || '');
             }
-            
-            console.log('将要更新的任务名称:', newTaskName);
-            
+                        
             // 如果用户取消了输入或内容为空，则不执行更新
             if (newTaskName === null || newTaskName === '') {
-                console.log('用户取消了编辑或输入内容为空');
                 return;
             }
             
@@ -142,8 +128,6 @@ export default function HandleTask({ teamId }) {
             const updatedTaskData = {
                 [tagIdName]: newTaskName
             };
-            
-            console.log('准备更新的数据:', updatedTaskData);
             
             // 更新任务
             const result = await dispatch(updateTask({ 
@@ -156,7 +140,6 @@ export default function HandleTask({ teamId }) {
                 }
             })).unwrap();
             
-            console.log('任务更新结果:', result);
             
             // 如果提供了更新后的回调函数，则调用它
             if (typeof onTaskUpdated === 'function') {

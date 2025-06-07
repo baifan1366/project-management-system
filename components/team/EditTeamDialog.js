@@ -177,9 +177,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
     if (deleteConfirmText !== team?.name) return;
     try {
       // 这里调用删除团队的API并等待操作完成
-      const teamId = team?.id;
-      // console.log(team);
-      
+      const teamId = team?.id;      
       // Delete all team members first to avoid orphaned records
       // This ensures proper cleanup of user associations before removing the team
       await dispatch(deleteTeamUserByTeamId({userId, teamId})).unwrap();

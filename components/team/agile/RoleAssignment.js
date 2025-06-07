@@ -132,17 +132,6 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
   const [roleToEdit, setRoleToEdit] = useState(null);
   const [deleteRoleDialogOpen, setDeleteRoleDialogOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState(null);
-  
-  // 添加调试日志
-  useEffect(() => {
-    console.log('RoleAssignment 调试信息:', {
-      teamId,
-      team,
-      teamCreatedBy: team?.created_by,
-      userId,
-      isCreator: team?.created_by && userId ? team.created_by.toString() === userId.toString() : false
-    });
-  }, [team, userId, teamId]);
 
   // 专门监听角色列表变化的effect
   useEffect(() => {
@@ -176,16 +165,12 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       fetch(`/api/teams/${teamId}/members`)
         .then(res => res.json())
         .then(data => {
-          console.log('获取到的团队成员:', data);
           setTeamMembers(data);
           setLoading(false);
         })
         .catch(err => {
           console.error('获取团队成员失败:', err);
           // 即使获取失败，也使用agileMembers数据
-          if (agileMembers.length > 0) {
-            console.log('使用agileMembers作为后备:', agileMembers);
-          }
           setLoading(false);
         });
     }
@@ -332,7 +317,6 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         throw new Error('无法获取当前用户ID');
       }
       
-      console.log('准备创建角色，用户ID:', userId);
       setLoading(true); // 开始加载状态
       
       const roleData = { 
@@ -341,15 +325,12 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         description: newRoleDescription,
         created_by: userId
       };
-      
-      console.log('发送角色数据:', roleData);
-      
+            
       const response = await dispatch(createRole(roleData));
       
       if (!response.ok) throw new Error('创建角色失败');
       
       const newRoleData = await response.json();
-      console.log('角色创建成功，返回数据:', newRoleData);
       
       // 获取API返回的新角色数据
       const newRole = newRoleData.data || newRoleData;
@@ -485,13 +466,6 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
 
   // 渲染角色分配表格
   const renderRoleAssignmentTable = () => {
-    // 添加调试信息
-    console.log('角色分配表格渲染:', {
-      teamMembers: teamMembers?.length,
-      agileMembers: agileMembers?.length,
-      teamMembersData: teamMembers,
-      agileMembersData: agileMembers
-    });
     
     // 创建一个更强大的去重函数
     const getUniqueMembers = () => {

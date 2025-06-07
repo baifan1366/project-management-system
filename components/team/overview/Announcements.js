@@ -126,7 +126,6 @@ export default function Announcements({ projectId, teamId }) {
   
   // 添加新的useEffect设置项目主题颜色
   useEffect(() => {
-    console.log(project)
     if (project && project.theme_color) {
       setProjectThemeColor(project.theme_color);
     } else {

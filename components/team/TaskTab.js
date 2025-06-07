@@ -170,7 +170,6 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
       }
       
       // 不管当前状态如何，都要再发送一次请求确保数据最新
-      console.log('发送最终请求确保数据最新...');
       const latestFields = await dispatch(fetchTeamCustomField(tid)).unwrap();
       if (Array.isArray(latestFields) && latestFields.length > 0) {
         await Promise.all(
@@ -207,7 +206,6 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
 
   useEffect(() => {
     if (teamId && !dataFetchedRef.current && isTeamCustomFieldsLoaded && teamsStatus === 'succeeded') {
-      console.log('ProjectSidebar加载自定义字段完成，TaskTab开始加载...');
       dataFetchedRef.current = true;
       fetchData(teamId);
     }
@@ -290,9 +288,7 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
       console.error('无法编辑标签名：用户未登录');
       return Promise.reject(new Error('用户未登录'));
     }
-    
-    console.log(`开始处理标签名称编辑... fieldId=${fieldId}, newName=${newName}, userId=${userId}, teamId=${teamId}`);
-    
+        
     // 使用正确的参数名：teamCustomFieldId
     const teamCustomFieldId = fieldId;
     
@@ -310,19 +306,13 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
     // 获取当前字段值对象，添加防御性编程
     const fieldValues = customFieldValues?.[teamCustomFieldId] || { data: [] };
     const currentFieldValue = fieldValues.data?.[0] || null;
-    
-    console.log('当前字段值:', currentFieldValue);
-    
+        
     // 构建当前URL用于刷新
     const locale = params?.locale || 'en';
     const currentUrl = `/${locale}/projects/${projectId}/${teamId}/${activeTab}`;
-    
-    console.log('准备编辑标签名称，刷新URL将为:', currentUrl);
-    
+        
     // 定义安全刷新函数，添加延时确保状态更新完成
-    const safeRefresh = () => {
-      console.log('准备安全刷新页面...');
-      
+    const safeRefresh = () => {      
       // 先重新获取最新的状态数据
       dispatch(fetchTeamCustomField(teamId)).then(() => {
         // 确保所有自定义字段值也刷新
@@ -330,25 +320,20 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
           customFields.map(field => 
             dispatch(fetchTeamCustomFieldValue({teamId, teamCustomFieldId: field.id}))
           )
-        ).then(() => {
-          console.log('数据刷新完成，准备刷新UI...');
-          
+        ).then(() => {          
           // 使用多重刷新策略
           setTimeout(() => {
             try {
               // 策略1: 强制路由刷新
-              console.log('尝试方法1: 使用router.refresh()');
               if (typeof router.refresh === 'function') {
                 router.refresh();
               }
               
               // 策略2: 路由替换
-              console.log('尝试方法2: router.replace到当前URL');
               router.replace(currentUrl);
               
               // 策略3: 延迟后检查并使用window.location刷新
               setTimeout(() => {
-                console.log('尝试方法3: 使用window.location.href刷新');
                 window.location.href = currentUrl;
               }, 500);
             } catch (e) {
@@ -366,9 +351,7 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
       });
     };
     
-    try {
-      console.log('开始执行API请求...');
-      
+    try {      
       // 设置Redux的loading状态
       dispatch({ 
         type: 'teamCFValue/setLoadingState', 
@@ -378,15 +361,7 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
       let result;
       
       // 检查是否已有记录
-      if (currentFieldValue && currentFieldValue.id) {
-        // 如果已有记录，使用updateTeamCustomFieldValue来更新名称
-        console.log('更新现有字段值:', {
-          teamId,
-          teamCustomFieldId,
-          valueId: currentFieldValue.id,
-          name: newName
-        });
-        
+      if (currentFieldValue && currentFieldValue.id) {        
         // 准备更新数据
         const updateData = {
           name: newName,
@@ -397,13 +372,6 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
           updated_at: new Date().toISOString()
         };
         
-        console.log('发送更新请求:', {
-          teamId,
-          teamCustomFieldId,
-          valueId: currentFieldValue.id,
-          data: updateData
-        });
-        
         // 使用await等待请求完成
         result = await dispatch(updateTeamCustomFieldValue({
           teamId,
@@ -412,15 +380,7 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
           data: updateData
         })).unwrap(); // 使用unwrap()来确保Promise完成
         
-        console.log('标签名称更新成功，结果:', result);
       } else {
-        // 如果没有记录，创建新记录
-        console.log('创建新字段值:', {
-          teamId,
-          teamCustomFieldId,
-          name: newName
-        });
-        
         // 准备创建数据
         const createData = {
           name: newName,
@@ -430,20 +390,12 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
           value: ''
         };
         
-        console.log('发送创建请求:', {
-          teamId,
-          teamCustomFieldId,
-          data: createData
-        });
-        
         // 使用await等待请求完成
         result = await dispatch(createTeamCustomFieldValue({
           teamId,
           teamCustomFieldId,
           data: createData
         })).unwrap(); // 使用unwrap()来确保Promise完成
-        
-        console.log('标签名称创建成功，结果:', result);
       }
       
       // 重置Redux的loading状态
@@ -540,9 +492,7 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
           // 如果删除的不是当前激活的标签页，保持当前URL
           targetUrl = window.location.pathname;
         }
-        
-        console.log(`删除标签页: ${fieldId}, 由用户: ${userId}, 完成后将导航至: ${targetUrl}`);
-        
+                
         // 无论如何，先执行删除操作
         if (userId && teamId) {
           dispatch(deleteTeamCustomField({ 
@@ -570,12 +520,10 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
             }
             
             // 删除成功后强制刷新页面
-            console.log('删除成功，正在刷新页面到', targetUrl);
             router.push(targetUrl);
           }).catch(error => {
             console.error('删除标签页失败:', error);
             // 即使出错也强制刷新
-            console.log('删除失败，仍然刷新页面...');
             router.push(targetUrl);
           });
         } else {
@@ -604,32 +552,21 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
     // 更新本地状态
     setOrderedFields(newOrderedFields);
     
-    // 在控制台显示加载信息
-    console.log('正在更新标签页顺序，页面将在更新完成后刷新...');
-    
     // 调用Redux action保存到服务器
     dispatch(updateTeamCustomFieldOrder({
       teamId: teamId, // 确保您有teamId变量
       orderedFields: newOrderedFields
-    })).then(() => {
-      console.log('标签页顺序更新成功，正在刷新组件...');
-      
+    })).then(() => {      
       // 使用父组件提供的 refreshContent 函数刷新组件
-      if (typeof handleRefreshContent === 'function') {
-        console.log('调用 refreshContent 函数刷新 TaskTab 和 customFieldContent...');
-        
+      if (typeof handleRefreshContent === 'function') {        
         // 正确处理异步函数调用
         Promise.resolve().then(async () => {
           try {
             await handleRefreshContent();
-            console.log('refreshContent 调用成功');
           } catch (error) {
-            console.error('调用 refreshContent 函数时出错:', error);
-            console.log('尝试使用备选方案...');
-            
+            console.error('调用 refreshContent 函数时出错:', error);            
             // 如果 refreshContent 调用失败，使用备选方案
             setTimeout(() => {
-              console.log('使用备选方案刷新页面...');
               const locale = params?.locale || 'en';
               const currentTab = activeTab || (orderedFields.length > 0 ? `${orderedFields[0].id}` : '');
               const pageUrl = `/${locale}/projects/${projectId}/${teamId}/${currentTab}`;
@@ -638,18 +575,14 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
           }
         });
       } else {
-        // 如果没有提供 refreshContent，则使用备选方案
-        console.log('未提供 refreshContent 函数，使用备选方案...');
-        
+        // 如果没有提供 refreshContent，则使用备选方案        
         // 从 params 中获取 locale，默认为 'en'
         const locale = params?.locale || 'en';
         
         // 构建当前完整 URL
         const currentTab = activeTab || (orderedFields.length > 0 ? `${orderedFields[0].id}` : '');
         const fullUrl = `/${locale}/projects/${projectId}/${teamId}/${currentTab}`;
-        
-        console.log(`强制刷新页面到: ${fullUrl}`);
-        
+                
         // 使用 router.replace 刷新页面
         router.replace(fullUrl);
       }
@@ -657,7 +590,6 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
       console.error('更新标签页顺序失败:', error);
       // 如果更新失败，尝试刷新页面
       setTimeout(() => {
-        console.log('更新失败，刷新页面...');
         const locale = params?.locale || 'en';
         const currentTab = activeTab || (orderedFields.length > 0 ? `${orderedFields[0].id}` : '');
         const pageUrl = `/${locale}/projects/${projectId}/${teamId}/${currentTab}`;

@@ -28,14 +28,12 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
                 const assigneeTag = await dispatch(getTagByName("Assignee")).unwrap();
                 if (assigneeTag) {
                     setAssigneeTagId(assigneeTag);
-                    console.log('获取到Assignee标签ID:', assigneeTag);
                 }
 
                 // 获取Name标签ID
                 const nameTag = await dispatch(getTagByName("Name")).unwrap();
                 if (nameTag) {
                     setNameTagId(nameTag);
-                    console.log('获取到Name标签ID:', nameTag);
                 }
             } catch (error) {
                 console.error('获取标签ID失败:', error);
@@ -162,7 +160,6 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
             
             // 重置加载状态，允许强制重新加载
             if (forceReload) {
-                console.log('重新加载看板数据完成');
             }
             
         } catch (error) {

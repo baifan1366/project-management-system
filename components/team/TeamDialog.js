@@ -125,24 +125,12 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
         created_by: userId
       })).unwrap();
       
-      // 调用TeamGuard处理团队创建后的访问权限管理
-      console.log('TeamDialog: 准备调用TeamGuard处理团队访问权限', {
-        teamId: team.id,
-        teamAccess: team.access,
-        projectId,
-        userId
-      });
-      
       if (team.access === 'CAN_EDIT') {
         try {
-          console.log('TeamDialog: 开始调用TeamGuard.handleTeamCreation');
           await TeamGuard.handleTeamCreation(team, projectId, userId);
-          console.log('TeamDialog: TeamGuard.handleTeamCreation调用成功');
         } catch (guardError) {
           console.error('TeamDialog: TeamGuard调用失败', guardError);
         }
-      } else {
-        console.log('TeamDialog: 跳过TeamGuard调用，因为团队访问权限不是CAN_EDIT');
       }
 
       // 创建团队自定义字段
@@ -239,8 +227,6 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
             userId: userId
           })).unwrap();
         }
-      } else {
-        console.log('未找到LIST类型的自定义字段，跳过更新标签');
       }
 
       // 重置状态并关闭对话框

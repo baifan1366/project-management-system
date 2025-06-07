@@ -199,7 +199,6 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
         })
         .select()
         .single();
-      console.log(notionPageData);
       //update the notion_page id into the task table, page_id column
       const { data: newTaskData, error: taskError } = await supabase
         .from('task')
@@ -207,7 +206,6 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
           page_id: notionPageData.id
         })
         .eq('id', result.id);
-      console.log(newTaskData);
 
       //updateTaskIds
       //check whether this team has section or not

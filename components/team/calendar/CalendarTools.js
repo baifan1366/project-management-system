@@ -192,11 +192,6 @@ export default function CalendarTools({
       const assigneesTagId = await dispatch(getTagByName("Assignee")).unwrap()
       const startDateTagId = await dispatch(getTagByName("Start Date")).unwrap()
       
-      console.log('获取到的标签IDs:', {
-        titleTagId, descriptionTagId, dueDateTagId, 
-        assigneesTagId, startDateTagId
-      })
-      
       // 准备任务数据
       const taskData = {
         tag_values: {
@@ -215,9 +210,7 @@ export default function CalendarTools({
       if (selectedAssignees.length > 0) {
         taskData.tag_values[assigneesTagId] = selectedAssignees
       }
-      
-      console.log('准备创建的任务数据:', taskData)
-      
+            
       // 创建任务
       const result = await dispatch(createTask(taskData)).unwrap()
       //it may also create a notion_page, then update the notion_page id into the task table, page_id column
@@ -229,7 +222,6 @@ export default function CalendarTools({
         })
         .select()
         .single();
-      console.log(notionPageData);
       //update the notion_page id into the task table, page_id column
       const { data: newTaskData, error: taskError } = await supabase
         .from('task')
@@ -237,7 +229,6 @@ export default function CalendarTools({
           page_id: notionPageData.id
         })
         .eq('id', result.id);
-      console.log(newTaskData);
       
       // 如果任务创建成功且有分区ID，将任务添加到分区的task_ids中
       if (result && result.id && selectedSection) {
@@ -262,7 +253,6 @@ export default function CalendarTools({
               newTaskIds: updatedTaskIds
             })).unwrap()
             
-            console.log(`已将任务 ${result.id} 添加到分区 ${section.id} 的task_ids中`)
           } else {
             console.error(`未找到ID为 ${selectedSection} 的分区`)
           }
