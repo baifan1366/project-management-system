@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchCustomFields } from '@/lib/redux/features/customFieldSlice';
@@ -11,6 +11,7 @@ import { fetchTeamCustomField } from '@/lib/redux/features/teamCFSlice';
 import { updateTagIds, getTags } from '@/lib/redux/features/teamCFSlice';
 import { supabase } from '@/lib/supabase';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { fetchCurrentUser } from '@/lib/redux/features/usersSlice';
 
 export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   const t = useTranslations('CreateTask');
@@ -22,6 +23,80 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   const availableFields = useSelector(state => state.customFields?.fields || []);
   const customFieldStatus = useSelector(state => state.customFields?.status || 'idle');
   
+  //use the plan_id find the type
+  //type consists FREE, PRO, ENTERPRISE
+  const subscription = useSelector(state => state.users?.subscription || {});
+  console.log('订阅数据:', subscription);
+  
+  const planId = subscription?.plan_id;
+  console.log('计划ID:', planId);
+  
+  // 使用useEffect获取最新的用户数据
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const result = await dispatch(fetchCurrentUser()).unwrap();
+        console.log('已更新用户数据:', result);
+      } catch (error) {
+        console.error('获取用户数据失败:', error);
+      }
+    };
+    
+    loadCurrentUser();
+  }, [dispatch]);
+  
+  // 存储计划类型的状态
+  const [planType, setPlanType] = useState('FREE'); // 默认为FREE
+  
+  useEffect(() => {
+    // 组件加载时获取计划类型
+    const getPlanType = async () => {
+      try {
+        const type = await fetchPlanType();
+        console.log('获取到的计划类型:', type);
+        setPlanType(type);
+      } catch (error) {
+        console.error('获取计划类型失败:', error);
+        setPlanType('FREE'); // 出错时默认为FREE
+      }
+    };
+    
+    getPlanType();
+  }, [planId]); // 当planId变化时重新获取
+  
+  const fetchPlanType = async () => {
+    // 如果没有planId，默认返回FREE
+    if (!planId) {
+      console.log('未找到有效的计划ID，使用默认计划类型: FREE');
+      return 'FREE';
+    }
+    
+    try {
+      console.log('正在查询计划ID:', planId);
+      const {data: plan, error: planError} = await supabase
+        .from('subscription_plan')
+        .select('*')
+        .eq('id', planId)
+        .single();
+      
+      if (planError) {
+        console.error('获取计划类型出错:', planError);
+        return 'FREE'; // 出错时返回默认值
+      }
+      
+      if (!plan) {
+        console.log('未找到对应的计划数据，使用默认类型: FREE');
+        return 'FREE';
+      }
+      
+      console.log('数据库中的计划数据:', plan);
+      return plan.type || 'FREE';
+    } catch (error) {
+      console.error('计划类型查询异常:', error);
+      return 'FREE';
+    }
+  }
+
   // 获取可用的自定义字段模板
   useEffect(() => {
     // 仅在对话框打开且数据未加载且未请求过时获取数据
@@ -153,21 +228,55 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
     // 获取对应的图标组件
     const IconComponent = getIconComponent(field.icon);
     
+    // 判断字段是否可用
+    let isAvailable = false;
+    if(planType === 'FREE'){
+      isAvailable = field.type === 'OVERVIEW' || field.type === 'LIST' || field.type === 'CALENDAR' || field.type === 'POSTS' || field.type === 'FILES';
+    } else if(planType === 'PRO'){
+      isAvailable = field.type === 'OVERVIEW' || field.type === 'LIST' || field.type === 'CALENDAR' || field.type === 'POSTS' || field.type === 'FILES' || field.type === 'TIMELINE' || field.type === 'NOTE' || field.type === 'KANBAN';
+    } else if(planType === 'ENTERPRISE'){
+      isAvailable = true;
+    }
+
     return (
       <div 
         key={field.id || field.type}
-        className="flex items-start gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent"
-        onClick={() => handleFieldClick(field)}
+        className={`flex items-start gap-3 p-3 border rounded-md ${isAvailable ? 'cursor-pointer hover:bg-accent' : 'opacity-60 cursor-not-allowed'}`}
+        onClick={() => isAvailable && handleFieldClick(field)}
+        data-available={isAvailable ? 'true' : 'false'} // 用于排序
       >
-        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-          <IconComponent className="h-5 w-5 text-blue-600" />
+        <div className={`flex-shrink-0 w-8 h-8 rounded flex items-center justify-center ${isAvailable ? 'bg-blue-100' : 'bg-gray-100'}`}>
+          <IconComponent className={`h-5 w-5 ${isAvailable ? 'text-blue-600' : 'text-gray-400'}`} />
         </div>
         <div>
           <div className="font-medium">{field.name}</div>
           <div className="text-xs text-muted-foreground">{field.description || t(`${field.name.toLowerCase()}_description`)}</div>
+          {!isAvailable && <div className="text-xs text-amber-500 mt-1">{t('upgrade_plan_required')}</div>}
         </div>
       </div>
     );
+  };
+
+  // 排序字段，将可用的放在前面
+  const sortFields = (fields) => {
+    if (!Array.isArray(fields)) return [];
+    return [...fields].sort((a, b) => {
+      const aIsAvailable = planType === 'FREE' 
+        ? (a.type === 'CALENDAR' || a.type === 'POSTS' || a.type === 'FILES')
+        : planType === 'PRO'
+          ? (a.type === 'TIMELINE' || a.type === 'NOTE' || a.type === 'KANBAN')
+          : true;
+      
+      const bIsAvailable = planType === 'FREE'
+        ? (b.type === 'CALENDAR' || b.type === 'POSTS' || b.type === 'FILES')
+        : planType === 'PRO'
+          ? (b.type === 'TIMELINE' || b.type === 'NOTE' || b.type === 'KANBAN')
+          : true;
+      
+      if (aIsAvailable && !bIsAvailable) return -1;
+      if (!aIsAvailable && bIsAvailable) return 1;
+      return 0;
+    });
   };
 
   return (
@@ -189,7 +298,7 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
           <div className="px-4 pb-4">
             <div className="grid grid-cols-3 gap-4">
               {Array.isArray(availableFields) && availableFields.length > 0 ? (
-                availableFields.map(renderFieldItem)
+                sortFields(availableFields).map(renderFieldItem)
               ) : (
                 <div className="text-center text-muted-foreground col-span-3 items-center justify-center">
                   {t('loading')}
