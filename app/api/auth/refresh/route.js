@@ -69,10 +69,11 @@ export async function POST() {
         sameSite: 'lax'
       };
       
-      await cookies().set('auth_token', newToken, cookieOptions);
+      const cookieStore = await cookies();
+      await cookieStore.set('auth_token', newToken, cookieOptions);
       
       // For client-side detection
-      await cookies().set('user_logged_in', 'true', {
+      await cookieStore.set('user_logged_in', 'true', {
         ...cookieOptions,
         httpOnly: false
       });
@@ -113,10 +114,11 @@ export async function POST() {
                 sameSite: 'lax'
               };
               
-              await cookies().set('auth_token', newToken, cookieOptions);
+              const cookieStore = await cookies();
+              await cookieStore.set('auth_token', newToken, cookieOptions);
               
               // For client-side detection
-              await cookies().set('user_logged_in', 'true', {
+              await cookieStore.set('user_logged_in', 'true', {
                 ...cookieOptions,
                 httpOnly: false
               });
@@ -133,8 +135,9 @@ export async function POST() {
       }
       
       // Clear any existing cookies if we couldn't refresh the token
-      await cookies().delete('auth_token');
-      await cookies().delete('user_logged_in');
+      const cookieStore = await cookies();
+      await cookieStore.delete('auth_token');
+      await cookieStore.delete('user_logged_in');
       
       return NextResponse.json(
         { 

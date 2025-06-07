@@ -5,11 +5,19 @@ import { getDefaultTagIdsForField } from './utils';
 export async function createProject(projectData, userId) {
   console.log("正在创建项目:", projectData);
   
-  // 添加当前用户作为创建者
+  // Ensure all required fields have values
   const newProjectData = {
-    ...projectData,
-    created_by: userId
+    project_name: projectData.project_name || 'Untitled Project',
+    description: projectData.description || '',
+    visibility: projectData.visibility || 'private',
+    status: projectData.status || 'PENDING',
+    created_by: userId,
+    // Include any other fields from projectData
+    ...projectData
   };
+  
+  // Ensure created_by is set correctly (in case it was overwritten by projectData)
+  newProjectData.created_by = userId;
   
   // 插入项目到数据库
   const { data: createdProject, error: projectError } = await supabase
@@ -33,7 +41,8 @@ export async function createTeam(projectId, projectName, userId) {
     description: "Default team for " + projectName,
     access: "can_edit",
     created_by: userId,
-    project_id: projectId
+    project_id: projectId,
+    status: 'PENDING'
   };
   
   console.log("正在创建团队:", newTeamData);
@@ -388,6 +397,7 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
         user_email: email,
         team_id: teamId,
         role: role.toUpperCase(),
+        status: 'PENDING',  // Explicitly set status
         created_by: invitedBy
       }]);
       
@@ -530,7 +540,8 @@ export async function createSection(teamId, userId) {
           name: "Section",
           team_id: teamId,
           created_by: userId,
-          task_ids: [] // Initialize as empty array
+          task_ids: [], // Initialize as empty array
+          order_index: 0 // Explicitly set order_index
         };
         
         // Add random ID for retry attempts

@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import TaskManagerAgent from '@/components/ui/TaskManagerAgent';
 import { useTranslations } from 'next-intl';
 import { useGetUser } from '@/lib/hooks/useGetUser';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import Image from 'next/image';
 
 export default function TaskAssistantPage() {
   const t = useTranslations();
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const { user, error, isLoading } = useGetUser();
   
   useEffect(() => {
@@ -19,13 +20,41 @@ export default function TaskAssistantPage() {
         setUserId(user.id);
       }
       setLoading(false);
+      
+      if (error) {
+        setLoadError(error.message || 'Failed to load user data');
+      }
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, error]);
   
   if (loading || isLoading) {
     return (
       <div className="flex items-center justify-center h-[70vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (loadError) {
+    return (
+      <div className="container w-full py-12 px-4 md:px-6 h-[calc(100vh-64px)] overflow-auto">
+        <div className="text-center space-y-3 w-full">
+          <div className="flex justify-center mb-4 w-full">
+            <AlertCircle className="h-16 w-16 text-red-500" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t('nav.taskAssistant')}
+          </h1>
+          <p className="text-red-500">
+            {loadError}
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
     );
   }
