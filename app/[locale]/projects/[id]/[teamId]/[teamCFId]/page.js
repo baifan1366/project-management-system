@@ -297,12 +297,10 @@ const TeamCustomFieldPage = () => {
             );
             const firstFieldId = sortedFields[0].id;
             
-            console.log(`自定义字段 ${teamCFId} 不存在，重定向到字段 ${firstFieldId}`);
             router.replace(`/projects/${projectId}/${teamId}/${firstFieldId}`);
             return;
           } else {
             // 不存在任何字段，返回项目页面
-            console.log(`自定义字段 ${teamCFId} 不存在，且团队没有其他字段，返回项目页面`);
             router.replace(`/projects/${projectId}`);
             return;
           }
@@ -327,11 +325,9 @@ const TeamCustomFieldPage = () => {
             );
             const firstFieldId = sortedFields[0].id;
             
-            console.log(`加载自定义字段 ${teamCFId} 失败，重定向到字段 ${firstFieldId}`);
             router.replace(`/projects/${projectId}/${teamId}/${firstFieldId}`);
           } else {
             // 不存在任何字段，返回项目页面
-            console.log(`加载自定义字段 ${teamCFId} 失败，且团队没有其他字段，返回项目页面`);
             router.replace(`/projects/${projectId}`);
           }
         } catch (redirectError) {
@@ -373,7 +369,6 @@ const TeamCustomFieldPage = () => {
         // 明确检查用户是否为团队成员
         const isMember = teamUsers.some(tu => String(tu.user.id) === String(user.id));
         if (!isMember) {
-          console.log("用户不是团队成员，显示错误提示");
           setShowTeamNotFound(true);
         }
       }
@@ -540,7 +535,6 @@ const TeamCustomFieldPage = () => {
           old_values: selectedTeam,
           updated_at: new Date().toISOString()
         }));
-        console.log("confirm archive");
         setRefreshKey(prev => prev + 1);
         // Await fetching the updated user teams list
         await dispatch(fetchUserTeams({ userId, projectId }));

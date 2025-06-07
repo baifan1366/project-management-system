@@ -6,9 +6,7 @@ export async function GET(request) {
     // 获取URL参数
     const { searchParams } = new URL(request.url);
     const agileId = searchParams.get('agileId');
-    
-    console.log('【API接收参数】获取敏捷详情:', { agileId });
-    
+        
     if (!agileId) {
       console.error('【API错误】敏捷ID不能为空');
       return NextResponse.json({ error: '敏捷ID不能为空' }, { status: 400 });
@@ -25,9 +23,7 @@ export async function GET(request) {
       console.error(`【API错误】获取敏捷ID ${agileId} 详情失败:`, error);
       throw error;
     }
-    
-    console.log(`【API响应】敏捷ID ${agileId} 详情:`, data ? '成功' : '无数据');
-    
+        
     return NextResponse.json(data || null);
   } catch (error) {
     console.error('【API错误】处理请求时出错:', error);

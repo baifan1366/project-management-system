@@ -32,18 +32,9 @@ export async function POST(request) {
       },
     });
     
-    // 更新日志输出
-    console.log('SMTP Config:', {
-      host: process.env.NEXT_PUBLIC_SMTP_HOSTNAME,
-      port: process.env.NEXT_PUBLIC_SMTP_PORT,
-      user: process.env.NEXT_PUBLIC_SMTP_USERNAME,
-      secure: process.env.NEXT_PUBLIC_SMTP_SECURE,
-    });
-    
     // 测试 SMTP 连接
     try {
       await transporter.verify();
-      console.log('SMTP 连接成功');
     } catch (error) {
       console.error('SMTP 连接失败:', error);
     }
@@ -182,19 +173,6 @@ export async function POST(request) {
 </html>
       `;
     }
-    
-    // 发送邮件
-    console.log('Sending email to:', to);
-    const info = await transporter.sendMail({
-      from: `"Team Sync" <${process.env.NEXT_PUBLIC_SMTP_FROM || process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
-      to: to,
-      subject: subject || 'Team Invitation',
-      text: text || 'Welcome to join us.',
-      html: emailHtml,
-    });
-    
-    console.log('Message sent: %s', info.messageId);
-    console.log('Response:', info.response);
     
     return NextResponse.json({
       success: true,

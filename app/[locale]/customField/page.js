@@ -37,9 +37,7 @@ export default function CustomField() {
   }, [defaultSettings]);
 
   useEffect(() => {
-    console.log('defaultSettings:', defaultSettings);
     const customField = defaultSettings.find(setting => setting.name === 'custom_field');
-    console.log('customField:', customField);
   }, [defaultSettings]);
 
   // 获取默认字段数量

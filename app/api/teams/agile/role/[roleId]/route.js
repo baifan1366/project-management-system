@@ -7,9 +7,7 @@ export async function PATCH(request, { params }) {
     const roleId = params.roleId;
     // 获取请求数据
     const roleData = await request.json();
-    
-    console.log('【API接收参数】更新角色:', { roleId, roleData });
-    
+        
     // 验证数据
     if (!roleId) {
       console.error('【API错误】角色ID不能为空');
@@ -31,9 +29,7 @@ export async function PATCH(request, { params }) {
       console.error(`【API错误】更新角色ID ${roleId} 失败:`, error);
       throw error;
     }
-    
-    console.log(`【API响应】角色ID ${roleId} 已更新:`, updatedRole);
-    
+        
     return NextResponse.json(updatedRole);
   } catch (error) {
     console.error('【API错误】处理请求时出错:', error);
@@ -45,9 +41,7 @@ export async function PATCH(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const roleId = params.roleId;
-    
-    console.log('【API接收参数】删除角色:', { roleId });
-    
+        
     // 验证数据
     if (!roleId) {
       console.error('【API错误】角色ID不能为空');
@@ -66,9 +60,7 @@ export async function DELETE(request, { params }) {
       console.error(`【API错误】删除角色ID ${roleId} 失败:`, error);
       throw error;
     }
-    
-    console.log(`【API响应】角色ID ${roleId} 已删除`);
-    
+        
     return NextResponse.json({ success: true, id: roleId, deleted: data });
   } catch (error) {
     console.error('【API错误】处理请求时出错:', error);

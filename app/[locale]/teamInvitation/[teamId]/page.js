@@ -37,7 +37,6 @@ export default function TeamInvitation() {
         }
 
         if (!user) {
-          console.log("用户未登录，重定向到登录页面");
           const currentPath = window.location.pathname;
           
           // 使用不带locale前缀的路径，因为登录页面会自动添加locale
@@ -46,7 +45,6 @@ export default function TeamInvitation() {
           const searchParams = new URLSearchParams();
           searchParams.append('redirect', redirectPath);
           
-          console.log(`重定向到登录页面，参数: ${searchParams.toString()}`);
           router.push(`/${params.locale}/login?${searchParams.toString()}`);
           return;
         }

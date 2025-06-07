@@ -12,9 +12,7 @@ export async function GET(request) {
     const projectId = searchParams.get('projectId')
     
     // 如果提供了 userId 和 projectId，获取用户在特定项目中加入的团队
-    if (userId && projectId) {
-      console.log('API Route: 获取用户在项目中的团队，userId:', userId, 'projectId:', projectId);
-      
+    if (userId && projectId) {      
       const { data, error } = await supabase
         .from('team')
         .select(`
@@ -44,8 +42,6 @@ export async function GET(request) {
     }
 
     // 原有的按团队 ID 获取用户的逻辑
-    console.log('API Route: 接收到获取团队用户请求，teamId:', teamId);
-
     // 构建基础查询
     let query = supabase
       .from('user_team')  // 确保表名正确
@@ -73,11 +69,9 @@ export async function GET(request) {
         );
       }
       query = query.eq('team_id', parsedTeamId);
-      console.log('API Route: 按团队ID筛选:', parsedTeamId);
     }
 
     // 执行查询
-    console.log('API Route: 执行查询...');
     const { data, error } = await query;
 
     if (error) {
@@ -90,11 +84,9 @@ export async function GET(request) {
 
     // 验证返回的数据
     if (!data) {
-      console.log('API Route: 没有找到团队用户数据');
       return NextResponse.json([]);
     }
 
-    console.log(`API Route: 成功获取团队用户数据，找到 ${data.length} 条记录:`, data);
     return NextResponse.json(data);
   } catch (error) {
     console.error('API Route: 获取团队用户时出错:', error);
@@ -109,8 +101,6 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    console.log('API Route: 接收到创建团队用户请求:', body);
-
     const { team_id, user_id, role, created_by } = body;
 
     // 验证必需的字段
@@ -143,7 +133,6 @@ export async function POST(request) {
     }
 
     // 先检查团队是否存在
-    console.log('API Route: 检查团队是否存在:', teamId);
     const { data: teamExists, error: teamCheckError } = await supabase
       .from('team')
       .select('id')
@@ -159,7 +148,6 @@ export async function POST(request) {
     }
 
     // 创建新的团队用户关系
-    console.log('API Route: 开始创建团队用户关系:', { teamId, user_id, role: normalizedRole });
     const { data: newTeamUser, error: insertError } = await supabase
       .from('user_team')
       .insert([
@@ -201,7 +189,6 @@ export async function POST(request) {
       );
     }
 
-    console.log('API Route: 团队用户创建成功，返回数据:', newTeamUser);
     return NextResponse.json(newTeamUser);
 
   } catch (error) {

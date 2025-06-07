@@ -12,6 +12,50 @@ import { updateTagIds, getTags } from '@/lib/redux/features/teamCFSlice';
 import { supabase } from '@/lib/supabase';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { fetchCurrentUser } from '@/lib/redux/features/usersSlice';
+import { createSelector } from '@reduxjs/toolkit';
+
+// 从Redux获取原始状态
+const getUsersSubscription = state => state.users?.subscription;
+const getCustomFields = state => state.customFields?.fields;
+const getCustomFieldStatus = state => state.customFields?.status;
+
+// 创建记忆化的选择器
+const selectSubscription = createSelector(
+  [getUsersSubscription],
+  (subscription) => {
+    // 进行实际的数据转换，而不是简单地返回输入
+    return {
+      ...subscription,
+      isValid: !!subscription && typeof subscription === 'object',
+      plan_id: subscription?.plan_id || null
+    };
+  }
+);
+
+const selectAvailableFields = createSelector(
+  [getCustomFields],
+  (fields) => {
+    // 对字段进行处理，例如添加额外的属性或过滤
+    return (fields || []).map(field => ({
+      ...field,
+      isActive: true
+    }));
+  }
+);
+
+const selectCustomFieldStatus = createSelector(
+  [getCustomFieldStatus],
+  (status) => {
+    // 将状态转换为具体的应用状态
+    const normalizedStatus = status || 'idle';
+    return {
+      value: normalizedStatus,
+      isLoading: normalizedStatus === 'loading',
+      isError: normalizedStatus === 'failed',
+      isSuccess: normalizedStatus === 'succeeded'
+    };
+  }
+);
 
 export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   const t = useTranslations('CreateTask');
@@ -19,24 +63,20 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   const dataFetchedRef = useRef(false);
   const { user } = useGetUser();
 
-  // 从 Redux store 获取自定义字段模板
-  const availableFields = useSelector(state => state.customFields?.fields || []);
-  const customFieldStatus = useSelector(state => state.customFields?.status || 'idle');
+  // 使用记忆化的选择器
+  const availableFields = useSelector(selectAvailableFields);
+  const fieldStatus = useSelector(selectCustomFieldStatus);
+  const customFieldStatus = fieldStatus.value;
   
-  //use the plan_id find the type
-  //type consists FREE, PRO, ENTERPRISE
-  const subscription = useSelector(state => state.users?.subscription || {});
-  console.log('订阅数据:', subscription);
-  
-  const planId = subscription?.plan_id;
-  console.log('计划ID:', planId);
+  // 使用记忆化的订阅选择器
+  const subscriptionData = useSelector(selectSubscription);
+  const planId = subscriptionData.plan_id;
   
   // 使用useEffect获取最新的用户数据
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
         const result = await dispatch(fetchCurrentUser()).unwrap();
-        console.log('已更新用户数据:', result);
       } catch (error) {
         console.error('获取用户数据失败:', error);
       }
@@ -53,7 +93,6 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
     const getPlanType = async () => {
       try {
         const type = await fetchPlanType();
-        console.log('获取到的计划类型:', type);
         setPlanType(type);
       } catch (error) {
         console.error('获取计划类型失败:', error);
@@ -67,12 +106,10 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
   const fetchPlanType = async () => {
     // 如果没有planId，默认返回FREE
     if (!planId) {
-      console.log('未找到有效的计划ID，使用默认计划类型: FREE');
       return 'FREE';
     }
     
     try {
-      console.log('正在查询计划ID:', planId);
       const {data: plan, error: planError} = await supabase
         .from('subscription_plan')
         .select('*')
@@ -85,11 +122,9 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
       }
       
       if (!plan) {
-        console.log('未找到对应的计划数据，使用默认类型: FREE');
         return 'FREE';
       }
       
-      console.log('数据库中的计划数据:', plan);
       return plan.type || 'FREE';
     } catch (error) {
       console.error('计划类型查询异常:', error);
@@ -105,7 +140,6 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
          (availableFields.length === 0 && customFieldStatus !== 'loading'))) {
       // 设置标记，避免重复请求
       dataFetchedRef.current = true;
-      console.log('正在获取自定义字段模板...');
       dispatch(fetchCustomFields());
     }
     
@@ -119,6 +153,12 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
 
   // 处理字段点击事件
   const handleFieldClick = async (field) => {
+    // 移除我们在选择器中添加的isActive属性（如果存在）
+    const fieldData = {...field};
+    if ('isActive' in fieldData) {
+      delete fieldData.isActive;
+    }
+    
     // 创建团队自定义字段
     const userId = user?.id;
     
@@ -135,13 +175,11 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
       // 创建团队自定义字段
       const teamCF = await dispatch(createTeamCustomField({
         team_id: teamId,
-        custom_field_id: field.id,
+        custom_field_id: fieldData.id,
         order_index: maxOrderIndex,
         created_by: userId
       })).unwrap();
-      
-      console.log('自定义字段创建成功:', teamCF);
-      
+            
       // 触发重新获取团队自定义字段，确保 TaskTab 能够更新
       dispatch(fetchTeamCustomField(teamId));
       
@@ -153,7 +191,7 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
       );
       
       // 如果当前添加的字段是LIST类型，自动添加默认标签
-      if (listCustomField && field.id === listCustomField.id) {
+      if (listCustomField && fieldData.id === listCustomField.id) {
         try {
           // 获取所有可用的标签
           const {data: defaultTags, error: tagError} = await supabase
@@ -203,7 +241,6 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
             userId: userId
           })).unwrap();
           
-          console.log('默认标签添加完成');
         } catch (error) {
           console.error('添加默认标签失败:', error);
         }

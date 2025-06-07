@@ -26,9 +26,7 @@ export default function Tag() {
   }, [defaultSettings]);
 
   useEffect(() => {
-    console.log('defaultSettings:', defaultSettings);
     const tag = defaultSettings.find(setting => setting.name === 'tag');
-    console.log('tag:', tag);
   }, [defaultSettings]);
 
   // 获取默认字段数量
