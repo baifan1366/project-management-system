@@ -82,11 +82,22 @@ export default function RouteGuard({ children }) {
         redirectUrl
       });
 
+      // 使用safeNavigate函数包装所有导航操作，避免渲染期间的路由更新
+      const safeNavigate = (path) => {
+        // 使用setTimeout确保导航发生在渲染周期之后
+        setTimeout(() => {
+          if (window.location.pathname !== path) {
+            console.log('🚀 Safely navigating to:', path);
+            router.replace(path);
+          }
+        }, 0);
+      };
+
       // Handle team invitation path
       if (isTeamInvitationPath && !isLoggedIn) {
         console.log('⚠️ Accessing team invitation page but not logged in, redirecting to login');
         const redirectPath = pathname.replace(`/${locale}`, '');
-        router.replace(`/${locale}/login?redirect=${encodeURIComponent(redirectPath)}`);
+        safeNavigate(`/${locale}/login?redirect=${encodeURIComponent(redirectPath)}`);
         return;
       }
 
@@ -96,7 +107,7 @@ export default function RouteGuard({ children }) {
         if (redirectUrl.includes('teamInvitation')) {
           const redirectPath = redirectUrl.startsWith('/') ? redirectUrl : `/${redirectUrl}`;
           console.log('Redirecting to team invitation page:', redirectPath);
-          router.replace(`/${locale}${redirectPath}`);
+          safeNavigate(`/${locale}${redirectPath}`);
           return;
         }
       }
@@ -105,9 +116,9 @@ export default function RouteGuard({ children }) {
       if (!isLoggedIn && !isPublicPath && !isSpecialPath) {
         console.log('⚠️ Not logged in, redirecting to appropriate login page');
         if (isAdminPath) {
-          router.replace('/admin/adminLogin');
+          safeNavigate('/admin/adminLogin');
         } else {
-          router.replace(`/${locale}/login${redirectUrl ? `?redirect=${redirectUrl}` : ''}`);
+          safeNavigate(`/${locale}/login${redirectUrl ? `?redirect=${redirectUrl}` : ''}`);
         }
         return;
       }
@@ -116,15 +127,17 @@ export default function RouteGuard({ children }) {
       if (isLoggedIn && isPublicPath && !isSpecialPath && !pathname.startsWith('/pricing') && pathname !== '/') {
         console.log('⚠️ Already logged in, redirecting to appropriate dashboard');
         if (isAdminPath) {
-          router.replace('/admin/adminDashboard');
+          safeNavigate('/admin/adminDashboard');
         } else if (!redirectUrl) {
-          router.replace(`/${locale}/projects`);
+          safeNavigate(`/${locale}/projects`);
         }
         return;
       }
     };
 
-    checkAuth();
+    // 延迟检查，确保在渲染完成后执行
+    const timer = setTimeout(checkAuth, 0);
+    return () => clearTimeout(timer);
   }, [pathname, router]);
 
   return children;

@@ -191,8 +191,15 @@ export default function Home({ params }) {
 
   // 立即检查项目是否存在
   if (projectsStatus === 'succeeded' && !project) {
-    // 如果项目加载完成但不存在，立即重定向
-    router.replace(`/${locale}/projects`);
+    // 使用useEffect处理重定向，而不是在渲染过程中
+    useEffect(() => {
+      // 使用setTimeout确保在渲染完成后执行
+      const redirectTimer = setTimeout(() => {
+        router.replace(`/${locale}/projects`);
+      }, 0);
+      
+      return () => clearTimeout(redirectTimer);
+    }, [projectsStatus, project, locale, router]);
     
     // 显示加载状态，直到重定向完成
     return (
