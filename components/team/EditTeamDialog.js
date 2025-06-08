@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { createSelector } from '@reduxjs/toolkit';
 import InvitationDialog from './InvitationDialog';
-import { handleAccessChangeToInviteOnly } from './TeamGuard';
+import { handleAccessChangeFromInviteOnlyToCanEdit, handleAccessChangeFromCanEditToInviteOnly, handleAccessChangeFromInviteOnlyToCanView, handleAccessChangeFromCanViewToInviteOnly, handleAccessChangeFromCanViewToCanEdit, handleAccessChangeFromCanEditToCanView } from './TeamGuard';
 
 // 组件外部：创建记忆化的 selector 工厂函数
 const selectTeamUsers = createSelector(
@@ -131,9 +131,48 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
         updated_at: new Date().toISOString()
       })).unwrap();
       
-      // 处理访问权限从 CAN_EDIT 变更为 INVITE_ONLY 的情况
       if (team.access === 'can_edit' && access === 'invite_only') {
-        await handleAccessChangeToInviteOnly(
+        await handleAccessChangeFromCanEditToInviteOnly(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+      
+      if (team.access === 'invite_only' && access === 'can_edit') {
+        await handleAccessChangeFromInviteOnlyToCanEdit(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+
+      if (team.access === 'can_view' && access === 'invite_only') {
+        await handleAccessChangeFromCanViewToInviteOnly(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+
+      if (team.access === 'invite_only' && access === 'can_view') {
+        await handleAccessChangeFromInviteOnlyToCanView(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+
+      if (team.access === 'can_view' && access === 'can_edit') {
+        await handleAccessChangeFromCanViewToCanEdit(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+
+      if (team.access === 'can_edit' && access === 'can_view') {
+        await handleAccessChangeFromCanEditToCanView(
           { ...team, access }, // 更新后的团队数据
           team, // 更新前的团队数据
           userId // 执行更新的用户ID

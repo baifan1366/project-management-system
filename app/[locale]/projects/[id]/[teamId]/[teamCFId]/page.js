@@ -173,6 +173,10 @@ const TeamCustomFieldPage = () => {
   };
 
   const handleEditSuccess = () => {
+    // 增加刷新整个页面的功能
+    window.location.reload();
+    
+    // 保留原有功能作为备份，虽然在页面刷新后这段代码不会执行
     setRefreshKey(prev => {
       const newValue = prev + 1;
       return newValue;

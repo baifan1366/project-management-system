@@ -12,6 +12,7 @@ import { updateInvitationStatus } from '@/lib/redux/features/teamUserInvSlice';
 import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { handleInvitationAccepted } from '@/components/team/TeamGuard';
 
 export default function TeamInvitation() {
   const t = useTranslations('TeamInvitation');
@@ -179,8 +180,19 @@ export default function TeamInvitation() {
         invitationId: invitationInfo.id,
         status: 'ACCEPTED'
       })).unwrap();
+      
+      // handleInvitationAccepted
+      // 6. 处理邀请接受后的其他团队权限变更
+      const invitationData = {
+        ...currentInvitation,
+        status: 'ACCEPTED',
+        project_id: teamData.project_id
+      };
+      
+      await handleInvitationAccepted(invitationData, invitationInfo.userId);
 
-      // 6. 重定向到项目页面
+
+      // 7. 重定向到项目页面
       router.push(`/${params.locale}/projects/${teamData.project_id}`);
     } catch (error) {
       // console.error('Failed to accept invitation:', error);

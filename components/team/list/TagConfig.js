@@ -3135,7 +3135,7 @@ export function validateTextInput(value, options = {}) {
  * @returns {JSX.Element} 渲染的文本单元格组件
  */
 export function renderTextCell(value, onChange, options = {}) {
-  const { multiline = false, placeholder = '输入文本...' } = options;
+  const { multiline = false, placeholder = 'Please enter...' } = options;
   
   return (
     <div className="w-full">
@@ -3146,6 +3146,7 @@ export function renderTextCell(value, onChange, options = {}) {
           placeholder={placeholder}
           className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded p-1 text-sm"
           rows={2}
+          max={100}
         />
       ) : (
         <input
@@ -3154,6 +3155,7 @@ export function renderTextCell(value, onChange, options = {}) {
           onChange={(e) => onChange && onChange(e.target.value)}
           placeholder={placeholder}
           className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded p-1 text-sm"
+          max={50}
         />
       )}
     </div>
