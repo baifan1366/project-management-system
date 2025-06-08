@@ -802,7 +802,8 @@ const SprintPlanning = ({
       if (typeof selectedSprint.startDate === 'string') {
         if (selectedSprint.startDate.includes(' ')) {
           formattedStartDate = selectedSprint.startDate.split(' ')[0];
-        } else (selectedSprint.startDate.includes('T')) {
+        } 
+        if (selectedSprint.startDate.includes('T')) {
           formattedStartDate = selectedSprint.startDate.split('T')[0];
         }
       }
@@ -814,10 +815,12 @@ const SprintPlanning = ({
         if (typeof selectedSprint.endDate === 'string') {
           if (selectedSprint.endDate.includes(' ')) {
             formattedEndDate = selectedSprint.endDate.split(' ')[0];
-          } else (selectedSprint.endDate.includes('T')) {
+          } 
+          if (selectedSprint.endDate.includes('T')) {
             formattedEndDate = selectedSprint.endDate.split('T')[0];
           } 
         }
+        
       }
       
     }

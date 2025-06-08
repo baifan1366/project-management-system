@@ -173,6 +173,14 @@ export async function POST(request) {
 </html>
       `;
     }
+
+    const info = await transporter.sendMail({
+      from: `"Team Sync" <${process.env.NEXT_PUBLIC_SMTP_FROM || process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
+      to: to,
+      subject: subject || 'Team Invitation',
+      text: text || 'Welcome to join us.',
+      html: emailHtml,
+    });
     
     return NextResponse.json({
       success: true,
