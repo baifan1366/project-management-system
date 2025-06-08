@@ -62,6 +62,7 @@
     "retry": "Retry",
     "unknown": "Unknown",
     "notAvailable": "Not Available",
+    "clear": "Clear",
     "confirmDialog": {
       "confirm": "Confirm",
       "cancel": "Cancel",
@@ -1539,7 +1540,11 @@
     "urgentPriority": "Urgent",
     "createTaskFailed": "Failed to create task",
     "updateTaskFailed": "Failed to update task",
-    "endTimeBeforeStartAcrossDays": "End date/time must be after start date/time"
+    "endTimeBeforeStartAcrossDays": "End date/time must be after start date/time",
+    "externalUserConfirmTitle": "Add External User",
+    "externalUserConfirmDescription": "{name} is not a member of any of your teams. Are you sure you want to invite this external user?",
+    "userCheckFailed": "Failed to check user details",
+    "confirm": "Confirm"
   },
   "CreateTag": {
     "createTag": "Create New Field",

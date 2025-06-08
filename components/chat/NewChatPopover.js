@@ -262,11 +262,6 @@ export default function NewChatPopover({ className, buttonContent }) {
             // Add the user and then create the chat immediately
             const newSelectedUsers = [...prev, user];
             
-            // Create the chat in the next tick to ensure state is updated
-            setTimeout(() => {
-              createChat();
-            }, 0);
-            
             return newSelectedUsers;
           });
           // Reset confirmation dialog state

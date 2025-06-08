@@ -19,6 +19,8 @@ import { supabase } from '@/lib/supabase';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import useGetUser from '@/lib/hooks/useGetUser';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { checkUserRelationship } from '@/lib/utils/checkUserRelationship';
+import { useConfirm } from '@/hooks/use-confirm';
 
 export default function CreateCalendarEvent({ 
   isOpen, 
@@ -30,6 +32,7 @@ export default function CreateCalendarEvent({
   eventToEdit = null
 }) {
   const t = useTranslations('Calendar');
+  const { confirm } = useConfirm();
   const [eventType, setEventType] = useState(isEditing && eventToEdit ? 
     eventToEdit.type || (eventToEdit.originalEvent ? 'google' : 'task') : 'task'); // 'task', 'google', 'personal'
   const [isLoading, setIsLoading] = useState(false);
@@ -217,9 +220,41 @@ export default function CreateCalendarEvent({
   };
 
   // 选择用户
-  const selectUser = (user) => {
-    if (!selectedUsers.some(u => u.id === user.id)) {
-      setSelectedUsers([...selectedUsers, user]);
+  const selectUser = async (user) => {
+    // Check if this user is already selected
+    if (selectedUsers.some(u => u.id === user.id)) {
+      return;
+    }
+
+    // Check if this is an external user
+    try {
+      if (!session) {
+        toast.error(t('notLoggedIn') || 'Not logged in');
+        return;
+      }
+
+      const result = await checkUserRelationship(session.id, user.id);
+      
+      if (result.isExternal) {
+        // Show confirmation dialog for external users
+        confirm({
+          title: t('externalUserConfirmTitle') || 'Add External User',
+          description: t('externalUserConfirmDescription', { name: user.name }) || 
+            `${user.name} is not a member of any of your teams. Are you sure you want to invite this external user?`,
+          confirmText: t('confirm') || 'Confirm',
+          cancelText: t('cancel') || 'Cancel',
+          onConfirm: () => {
+            // User confirmed, add the user
+            setSelectedUsers([...selectedUsers, user]);
+          }
+        });
+      } else {
+        // For internal users, add directly
+        setSelectedUsers([...selectedUsers, user]);
+      }
+    } catch (error) {
+      console.error('Error checking user relationship:', error);
+      toast.error(t('userCheckFailed') || 'Failed to check user details');
     }
   };
 

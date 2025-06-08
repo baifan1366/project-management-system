@@ -10,15 +10,24 @@ import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import UserProfileDialog from '@/components/chat/UserProfileDialog';
+import { useConfirm } from '@/hooks/use-confirm';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { useChat } from '@/contexts/ChatContext';
 
 export default function SearchPage() {
   const t = useTranslations();
+  const chatT = useTranslations('Chat');
   const { user: currentUser, isLoading: userLoading } = useGetUser();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const { confirm } = useConfirm();
+  const router = useRouter();
+  const { fetchChatSessions } = useChat();
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
   
   // Add state for user profile dialog
   const [selectedUser, setSelectedUser] = useState(null);
@@ -150,8 +159,138 @@ export default function SearchPage() {
     }
   };
   
-  // Handle user click to open profile dialog
-  const handleUserClick = (user) => {
+  // Create chat with user
+  const createChatWithUser = async (user) => {
+    if (!currentUser || !user) return;
+    
+    try {
+      setIsCreatingChat(true);
+      
+      // Check if chat already exists
+      const { data: existingChats, error: checkError } = await supabase
+        .from('chat_participant')
+        .select('session_id, chat_session!inner(*)')
+        .eq('user_id', currentUser.id)
+        .eq('chat_session.type', 'PRIVATE');
+        
+      if (checkError) {
+        console.error('Error checking existing chats:', checkError);
+        toast.error(t('errors.chatCreationFailed') || 'Failed to check existing chats');
+        setIsCreatingChat(false);
+        return;
+      }
+      
+      let sessionId = null;
+      
+      // Find if there's already a private chat with this user
+      if (existingChats && existingChats.length > 0) {
+        for (const chat of existingChats) {
+          // Get participants for this session
+          const { data: participants, error: partError } = await supabase
+            .from('chat_participant')
+            .select('user_id')
+            .eq('session_id', chat.session_id);
+            
+          if (partError) continue;
+          
+          // If this session has exactly 2 participants (current user and target user)
+          if (participants?.length === 2 && 
+              participants.some(p => p.user_id === user.id)) {
+            sessionId = chat.session_id;
+            break;
+          }
+        }
+      }
+      
+      // If no existing chat found, create a new one
+      if (!sessionId) {
+        // Generate a unique timestamp to ensure different chats with the same user don't conflict
+        const uniqueTimestamp = Date.now().toString();
+        
+        // Create new chat session with name
+        const chatName = `${user.name} (${uniqueTimestamp.slice(-4)})`;
+        
+        const { data: session, error: createError } = await supabase
+          .from('chat_session')
+          .insert({
+            type: 'PRIVATE',
+            name: chatName,
+            created_by: currentUser.id
+          })
+          .select()
+          .single();
+          
+        if (createError) {
+          console.error('Error creating chat session:', createError);
+          toast.error(t('errors.chatCreationFailed') || 'Failed to create chat');
+          setIsCreatingChat(false);
+          return;
+        }
+        
+        sessionId = session.id;
+        
+        // Add participants
+        const participants = [
+          { session_id: sessionId, user_id: currentUser.id },
+          { session_id: sessionId, user_id: user.id }
+        ];
+        
+        const { error: participantError } = await supabase
+          .from('chat_participant')
+          .insert(participants);
+          
+        if (participantError) {
+          console.error('Error adding participants to chat:', participantError);
+          toast.error(t('errors.chatCreationFailed') || 'Failed to create chat');
+          setIsCreatingChat(false);
+          return;
+        }
+        
+        // Give the other user a notification
+        try {
+          await supabase
+            .from('notification')
+            .insert({
+              user_id: user.id,
+              title: chatT('newPrivateChat'),
+              content: chatT('startedChatWithYou', { name: currentUser.name || currentUser.email }),
+              type: 'SYSTEM',
+              related_entity_type: 'chat_session',
+              related_entity_id: sessionId,
+              data: {
+                chat_session_id: sessionId,
+                chat_type: 'private',
+                created_by: currentUser.id,
+                creator_name: currentUser.name || currentUser.email
+              },
+              is_read: false
+            });
+        } catch (notifyError) {
+          console.error('Error creating notification:', notifyError);
+          // Continue even if notification fails
+        }
+      }
+      
+      // Refresh the chat list
+      fetchChatSessions();
+      
+      // Close the dialog if open
+      setIsUserProfileOpen(false);
+      
+      // Navigate to the chat
+      router.push(`/${locale}/chat?session=${sessionId}`);
+      
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+      toast.error(t('errors.chatCreationFailed') || 'Failed to create chat');
+    } finally {
+      setIsCreatingChat(false);
+    }
+  };
+  
+  // Handle user click to open profile dialog or show confirmation for external users
+  const handleUserClick = (user, metadata = {}) => {
+    // Always open the profile dialog first, regardless of external status
     setSelectedUser(user);
     setIsUserProfileOpen(true);
   };
