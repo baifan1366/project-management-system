@@ -15,6 +15,8 @@ import PengyImage from '../../../public/pengy.webp';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { useConfirm } from '@/hooks/use-confirm';
+import ExternalBadge from '@/components/users/ExternalBadge';
+import useBatchUserRelationships from '@/lib/hooks/useBatchUserRelationships';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +58,23 @@ function ChatLayout({ children }) {
   
   // Add state to control showing all hidden sessions
   const [showAllHidden, setShowAllHidden] = useState(false);
+  
+  // Get all user IDs from visible and hidden sessions for batch relationship checking
+  const userIds = useMemo(() => {
+    const ids = [];
+    
+    // Collect user IDs from all sessions
+    sessions.forEach(session => {
+      if (session.type === 'PRIVATE' && session.participants?.[0]?.id) {
+        ids.push(session.participants[0].id);
+      }
+    });
+    
+    return [...new Set(ids)]; // Remove duplicates
+  }, [sessions]);
+  
+  // Use batch relationship checking for all users
+  const { relationships } = useBatchUserRelationships(userIds);
   
   // Calculate total unread count excluding muted sessions
   const totalUnreadCount = useMemo(() => {
@@ -562,18 +581,25 @@ function ChatLayout({ children }) {
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline justify-between">
-                        <h3 className="font-medium truncate text-sm">
-                          {sessionName}
-                        </h3>
-                        <button
-                          onClick={() => handleUnhideSession(session.id)}
-                          className="text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 py-1 px-2 rounded-full"
-                        >
-                          {t('unhide')}
-                        </button>
-                      </div>
+                                          <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between">
+                          <div className="flex items-center gap-1">
+                            <h3 className="font-medium truncate text-sm">
+                              {sessionName}
+                            </h3>
+                            {/* Display external badge for private chats */}
+                            {session.type === 'PRIVATE' && session.participants?.[0]?.id && 
+                              relationships[session.participants[0].id]?.isExternal && (
+                              <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleUnhideSession(session.id)}
+                            className="text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 py-1 px-2 rounded-full"
+                          >
+                            {t('unhide')}
+                          </button>
+                        </div>
                       <p className="text-xs text-muted-foreground truncate">
                         {session.lastMessage?.content || t('noRecentMessages')}
                       </p>
@@ -638,14 +664,21 @@ function ChatLayout({ children }) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline justify-between">
-                            <h3 className="font-medium truncate text-sm">
-                              {sessionName}
-                            </h3>
+                            <div className="flex items-center gap-1">
+                              <h3 className="font-medium truncate text-sm">
+                                {sessionName}
+                              </h3>
+                              {/* Display external badge for private chats */}
+                              {session.type === 'PRIVATE' && session.participants?.[0]?.id && 
+                                relationships[session.participants[0].id]?.isExternal && (
+                                <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />
+                              )}
+                            </div>
                             <button
                               onClick={() => handleUnhideSession(session.id)}
                               className="text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 py-1 px-2 rounded-full"
                             >
-                              {t('unhide') || 'Unhide'}
+                              {t('unhide')}
                             </button>
                           </div>
                           <p className="text-xs text-muted-foreground truncate">
@@ -731,14 +764,21 @@ function ChatLayout({ children }) {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline justify-between">
-                        <h3 className={`font-medium truncate ${session.unreadCount > 0 && !mutedSessions[session.id] ? 'text-foreground font-semibold' : ''}`}>
-                          {sessionName}
-                        </h3>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {formatChatTime(session.lastMessage?.created_at || session.matchedMessages?.[0]?.created_at)}
-                        </span>
-                      </div>
+                                                <div className="flex items-baseline justify-between">
+                            <div className="flex items-center gap-1">
+                              <h3 className={`font-medium truncate ${session.unreadCount > 0 && !mutedSessions[session.id] ? 'text-foreground font-semibold' : ''}`}>
+                                {sessionName}
+                              </h3>
+                              {/* Display external badge for private chats */}
+                              {session.type === 'PRIVATE' && session.participants?.[0]?.id && 
+                                relationships[session.participants[0].id]?.isExternal && (
+                                <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {formatChatTime(session.lastMessage?.created_at || session.matchedMessages?.[0]?.created_at)}
+                            </span>
+                          </div>
                       <div className="flex items-center justify-between mt-1">
                         <p className={`text-sm truncate ${session.unreadCount > 0 && !mutedSessions[session.id] ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
                           {lastMessageContent

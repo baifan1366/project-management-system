@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
 
@@ -28,12 +28,25 @@ const SPECIAL_PATHS = [
   
 ]; // Special paths that can be accessed even when logged in
 
+// Auth state cache
+let lastAuthCheck = 0;
+let cachedAuthState = null;
+const AUTH_CHECK_INTERVAL = 60 * 1000; // Check auth only once per minute
+
 export default function RouteGuard({ children }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     const checkAuth = async () => {
+      // Only check auth if cache is expired or doesn't exist
+      const now = Date.now();
+      if (cachedAuthState && now - lastAuthCheck < AUTH_CHECK_INTERVAL) {
+        console.log('Using cached auth state, skipping check');
+        return;
+      }
+      
       // Check if it's an admin path
       const isAdminPath = pathname.startsWith('/admin');
       
@@ -54,6 +67,10 @@ export default function RouteGuard({ children }) {
         // For regular paths, check cookie
         isLoggedIn = !!Cookies.get('auth_token');
       }
+      
+      // Update cache
+      lastAuthCheck = now;
+      cachedAuthState = { isLoggedIn, isAdminPath };
       
       // Get redirect URL from query string if exists
       const searchParams = new URLSearchParams(window.location.search);
@@ -133,6 +150,8 @@ export default function RouteGuard({ children }) {
         }
         return;
       }
+      
+      setIsChecking(false);
     };
 
     // 延迟检查，确保在渲染完成后执行
@@ -140,5 +159,7 @@ export default function RouteGuard({ children }) {
     return () => clearTimeout(timer);
   }, [pathname, router]);
 
+  // Don't render children until auth check is complete
+  // This helps prevent flashing of protected content before redirect
   return children;
 } 

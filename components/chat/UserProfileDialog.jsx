@@ -11,6 +11,8 @@ import { useChat } from '@/contexts/ChatContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import useUserRelationship from '@/lib/hooks/useUserRelationship';
+import ExternalBadge from '@/components/users/ExternalBadge';
 
 export default function UserProfileDialog({ open, onOpenChange, user = null }) {
   const t = useTranslations('UserProfile');
@@ -20,6 +22,9 @@ export default function UserProfileDialog({ open, onOpenChange, user = null }) {
   const router = useRouter();
   const [userData, setUserData] = useState(null);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  
+  // Check if this user is external (not in any of the current user's teams)
+  const userRelationship = useUserRelationship(user?.id);
 
   useEffect(() => {
     if (open) {
@@ -164,8 +169,11 @@ export default function UserProfileDialog({ open, onOpenChange, user = null }) {
             )}
           </div>
           
-          {/* User Name */}
-          <h2 className="text-xl font-semibold">{userData.name}</h2>
+          {/* User Name with External Badge */}
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">{userData.name}</h2>
+            {!isCurrentUser && userRelationship.isExternal && <ExternalBadge />}
+          </div>
           
           {/* User Details */}
           <div className="w-full space-y-3 mt-6">

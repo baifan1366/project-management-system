@@ -334,7 +334,7 @@ export function UserStatusProvider({ children }) {
     sendHeartbeat();
     
     // 设置定时器，每100秒发送一次心跳
-    const intervalId = setInterval(sendHeartbeat, 100000);
+    const intervalId = setInterval(sendHeartbeat, 600000);
     
     // 页面可见性变化时更新
     const handleVisibilityChange = () => {
