@@ -32,29 +32,53 @@ import { api } from '@/lib/api';
  * @param {string} createdBy - 创建者ID
  */
 export const handleTeamCreation = async (team, projectId, createdBy) => {
-  try {
+  try {    
     // 检查团队是否为"全项目可编辑"类型
-    if (team && team.access === 'CAN_EDIT') {
-      // 1. 加载项目成员
-      const projectMembers = await api.projects.getProjectMembers(projectId);
-
-      // 2. 为所有项目成员创建user_team记录，设置角色为CAN_EDIT
-      if (projectMembers && projectMembers.length > 0) {
-        for (const member of projectMembers) {
-          // 确保不重复添加创建者本身
-          if (member.user_id !== createdBy) {
-            await api.teams.createTeamUser({
-              team_id: team.id,
-              user_id: member.user_id,
-              role: 'CAN_EDIT',
-              created_by: createdBy
-            });
-          }
+    // 转换为小写进行比较，支持'CAN_EDIT'和'can_edit'两种情况
+    if (team && (team.access.toLowerCase() === 'can_edit')) {      
+      // 1. 获取项目中的所有团队
+      const projectTeams = await api.teams.listByProject(projectId);
+      
+      if (!projectTeams || projectTeams.length === 0) {
+        return;
+      }
+            
+      // 2. 创建一个Map来存储项目中的所有唯一用户
+      const projectMembersMap = new Map();
+      
+      // 3. 获取每个团队的成员并添加到Map中
+      for (const existingTeam of projectTeams) {
+        // 跳过当前正在创建的团队
+        if (String(existingTeam.id) === String(team.id)) continue;
+        
+        const teamUsers = await api.teams.getTeamUsers(existingTeam.id);
+        
+        if (teamUsers && teamUsers.length > 0) {
+          teamUsers.forEach(member => {
+            const userId = member.user.id || member.user_id;
+            if (userId && !projectMembersMap.has(userId)) {
+              projectMembersMap.set(userId, member.user);
+            }
+          });
         }
       }
-    }
+            
+      // 4. 为所有项目成员创建user_team记录，设置角色为CAN_EDIT
+      for (const [userId, userInfo] of projectMembersMap.entries()) {
+        // 确保不重复添加创建者本身
+        if (String(userId) !== String(createdBy)) {
+          await api.teams.createTeamUser({
+            team_id: team.id,
+            user_id: userId,
+            role: 'CAN_EDIT',
+            created_by: createdBy
+          });
+        }
+      }
+    } 
   } catch (error) {
-    console.error('处理团队创建时出错:', error);
+    console.error('TeamGuard: 处理团队创建时出错:', error);
+    throw error; // 重新抛出错误，让调用方知道发生了错误
   }
 };
 
@@ -67,26 +91,47 @@ export const handleTeamCreation = async (team, projectId, createdBy) => {
 export const handleAccessChangeToCanEdit = async (team, oldValues, userId) => {
   try {
     if (oldValues.access === 'INVITE_ONLY' && team.access === 'CAN_EDIT') {
-      // 1. 加载项目成员
-      const projectMembers = await api.projects.getProjectMembers(team.project_id);
+      // 1. 获取项目中的所有团队
+      const projectTeams = await api.teams.listByProject(team.project_id);
       
-      // 2. 加载当前团队成员
+      if (!projectTeams || projectTeams.length === 0) {
+        return;
+      }
+      
+      // 2. 创建一个Map来存储项目中的所有唯一用户
+      const projectMembersMap = new Map();
+      
+      // 3. 获取每个团队的成员并添加到Map中
+      for (const existingTeam of projectTeams) {
+        // 跳过当前正在更新的团队
+        if (String(existingTeam.id) === String(team.id)) continue;
+        
+        const teamUsers = await api.teams.getTeamUsers(existingTeam.id);
+        
+        if (teamUsers && teamUsers.length > 0) {
+          teamUsers.forEach(member => {
+            const userId = member.user.id || member.user_id;
+            if (userId && !projectMembersMap.has(userId)) {
+              projectMembersMap.set(userId, member.user);
+            }
+          });
+        }
+      }
+      
+      // 4. 获取当前团队成员
       const teamUsers = await api.teams.getTeamUsers(team.id);
-      const teamUserIds = teamUsers.map(tu => tu.user.id);
+      const teamUserIds = teamUsers.map(tu => tu.user.id || tu.user_id);
       
-      // 3. 找出不在团队中的项目成员
-      const nonTeamMembers = projectMembers.filter(
-        member => !teamUserIds.includes(member.user_id)
-      );
-      
-      // 4. 为不在团队中的项目成员创建user_team记录
-      for (const member of nonTeamMembers) {
-        await api.teams.createTeamUser({
-          team_id: team.id,
-          user_id: member.user_id,
-          role: 'CAN_EDIT',
-          created_by: userId
-        });
+      // 5. 为不在团队中的项目成员创建user_team记录
+      for (const [memberId, userInfo] of projectMembersMap.entries()) {
+        if (!teamUserIds.includes(memberId) && String(memberId) !== String(userId)) {
+          await api.teams.createTeamUser({
+            team_id: team.id,
+            user_id: memberId,
+            role: 'CAN_EDIT',
+            created_by: userId
+          });
+        }
       }
     }
   } catch (error) {
@@ -110,10 +155,10 @@ export const handleAccessChangeToInviteOnly = async (team, oldValues, userId) =>
       const canEditUsers = teamUsers.filter(tu => tu.role === 'CAN_EDIT');
       
       // 3. 记录这些用户的ID
-      const canEditUserIds = canEditUsers.map(tu => tu.user.id);
+      const canEditUserIds = canEditUsers.map(tu => tu.user.id || tu.user_id);
       
       // 4. 获取团队邀请记录
-      const invitations = await api.teams.teamInvitations.getByTeam(team.id);
+      const invitations = await api.teams.teamInvitations.list(team.id);
       const invitedUserIds = invitations.map(inv => inv.user_id);
       
       // 5. 找出没有邀请记录的CAN_EDIT用户

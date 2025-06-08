@@ -125,9 +125,15 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
         created_by: userId
       })).unwrap();
       
-      if (team.access === 'CAN_EDIT') {
-        try {
-          await TeamGuard.handleTeamCreation(team, projectId, userId);
+      if (data.teamAccess === 'can_edit') {
+        try {          
+          // 确保团队对象的access属性与表单数据一致
+          const teamForGuard = {
+            ...team,
+            access: data.teamAccess // 使用表单数据中的访问权限值
+          };
+          
+          await TeamGuard.handleTeamCreation(teamForGuard, projectId, userId);
         } catch (guardError) {
           console.error('TeamDialog: TeamGuard调用失败', guardError);
         }
