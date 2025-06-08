@@ -40,6 +40,8 @@ import { useSearchParams } from 'next/navigation';
 import UserProfileDialog from '@/components/chat/UserProfileDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import useUserRelationship from '@/lib/hooks/useUserRelationship';
+import ExternalBadge from '@/components/users/ExternalBadge';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -241,6 +243,9 @@ const MemoizedMessage = memo(function Message({
   const isDeleted = msg.is_deleted;
   const [editContent, setEditContent] = useState('');
   
+  // Add relationship check for external users
+  const userRelationship = useUserRelationship(msg.user?.id);
+  
   // Initialize edit content when entering edit mode
   useEffect(() => {
     if (isEditing && isEditing.id === msg.id) {
@@ -275,7 +280,13 @@ const MemoizedMessage = memo(function Message({
           "flex items-baseline gap-2",
           isMe ? "flex-row-reverse" : ""
         )}>
-          <span className="font-medium truncate">{msg.user?.name}</span>
+          <div className="font-medium truncate flex items-center gap-1">
+            <span>{msg.user?.name}</span>
+            {/* Show external badge for non-current users who are external */}
+            {!isMe && userRelationship.isExternal && (
+              <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />
+            )}
+          </div>
           <span className="text-xs text-muted-foreground flex-shrink-0">
             {adjustTimeByOffset && new Date(msg.created_at) ? 
               adjustTimeByOffset(new Date(msg.created_at)).toLocaleTimeString([], {

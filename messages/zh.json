@@ -2744,5 +2744,14 @@
     "sessionExpiresIn": "会话将在以下时间后到期",
     "pleaseCompletePayment": "请完成您的支付",
     "pleaseCompletePaymentNow": "请立即完成您的支付"
+  },
+  "Users": {
+    "external": "外部成员",
+    "internal": "团队成员",
+    "searchUsers": "搜索用户",
+    "inviteUsers": "邀请用户",
+    "userProfile": "用户资料",
+    "notFound": "用户未找到",
+    "accountSettings": "账户设置"
   }
 }

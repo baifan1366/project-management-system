@@ -1105,6 +1105,8 @@
     "creating": "Creating chat...",
     "startedChatWithYou": "{name} started a chat with you",
     "addedYouToGroup": "{name} added you to group \"{groupName}\"",
+    "externalUserConfirmTitle": "Add External User",
+    "externalUserConfirmDescription": "{name} is not a member of any of your teams. Are you sure you want to start a chat with this external user?",
     "sun": "Sunday",
     "mon": "Monday",
     "tue": "Tuesday",
@@ -1122,6 +1124,7 @@
       "matchesFound": "matching message(s)",
       "resultsFilteredByCleared": "Some results may be filtered by cleared history"
     },
+    "confirm": "Confirm",
     "confirmDelete": "Delete Message",
     "confirmDeleteDesc": "Are you sure you want to withdraw this message? This action cannot be undone and both parties will see that the message was withdrawn.",
     "messageDeleted": "Message withdrawn successfully",
@@ -2820,5 +2823,14 @@
     "sessionExpiresIn": "Session expires in",
     "pleaseCompletePayment": "Please complete your payment",
     "pleaseCompletePaymentNow": "Please complete your payment now"
+  },
+  "Users": {
+    "external": "External",
+    "internal": "Team Member",
+    "searchUsers": "Search users",
+    "inviteUsers": "Invite users",
+    "userProfile": "User Profile",
+    "notFound": "User not found",
+    "accountSettings": "Account Settings"
   }
 }

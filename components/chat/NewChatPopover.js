@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useTranslations } from 'next-intl';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -13,17 +13,80 @@ import { supabase } from '@/lib/supabase';
 import { useChat } from '@/contexts/ChatContext';
 import { toast } from 'sonner';
 import useGetUser from '@/lib/hooks/useGetUser';
+import ExternalBadge from '@/components/users/ExternalBadge';
+import { checkUserRelationship, checkUserRelationshipBatch } from '@/lib/utils/checkUserRelationship';
+import { useConfirm } from '@/hooks/use-confirm';
+
+// Context for storing user relationship data
+const UserRelationshipsContext = createContext({});
+
+// User item component to show user with external badge if needed
+const UserItem = ({ user, onClick }) => {
+  const relationships = useContext(UserRelationshipsContext);
+  const relationshipData = relationships[user.id] || { isExternal: false, isLoading: true };
+  
+  return (
+    <div
+      className="flex items-center gap-3 p-2 hover:bg-accent rounded-md cursor-pointer"
+      onClick={onClick}
+    >
+      <Avatar className="h-8 w-8">
+        <AvatarImage src={user.avatar_url} />
+        <AvatarFallback>{user.name?.[0]}</AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <p className="font-medium truncate">{user.name}</p>
+          {!relationshipData.isLoading && relationshipData.isExternal && (
+            <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground truncate">
+          {user.email}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 export default function NewChatPopover({ className, buttonContent }) {
   const t = useTranslations('Chat');
   const { chatMode, createAIChatSession, setCurrentSession, setChatMode } = useChat();
   const [isOpen, setIsOpen] = useState(false);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [recentContacts, setRecentContacts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const { user: currentUser } = useGetUser();
+  const { confirm } = useConfirm();
+  const [relationships, setRelationships] = useState({});
+
+  // Save popover state when confirmation dialog opens
+  const onPopoverOpenChange = (open) => {
+    // Only allow closing if confirmation dialog is not open
+    if (!isConfirmDialogOpen || open) {
+      setIsOpen(open);
+    }
+  };
+
+  // Helper function to check relationships in batch
+  const checkRelationshipsForUsers = async (users) => {
+    if (!users?.length || !currentUser?.id) return;
+    
+    try {
+      const userIds = users.map(user => user.id);
+      const relationshipData = await checkUserRelationshipBatch(currentUser.id, userIds);
+      
+      setRelationships(prev => ({
+        ...prev,
+        ...relationshipData
+      }));
+    } catch (error) {
+      console.error('Error checking relationships for users:', error);
+    }
+  };
 
   // 加载最近联系人
   useEffect(() => {
@@ -97,6 +160,9 @@ export default function NewChatPopover({ className, buttonContent }) {
 
         console.log('处理后的联系人列表 (已去重):', contacts);
         setRecentContacts(contacts);
+        
+        // Check relationships for recent contacts in batch
+        await checkRelationshipsForUsers(contacts);
       } catch (error) {
         console.error('加载最近联系人时出错:', error);
         // 确保即使出错也不会影响UI
@@ -133,6 +199,9 @@ export default function NewChatPopover({ className, buttonContent }) {
       );
       
       setSearchResults(uniqueUsers);
+      
+      // Check relationships for search results in batch
+      await checkRelationshipsForUsers(uniqueUsers);
     } catch (error) {
       console.error('Error searching users:', error);
     } finally {
@@ -148,23 +217,76 @@ export default function NewChatPopover({ className, buttonContent }) {
   };
 
   // 选择/取消选择用户
-  const toggleUser = (user) => {
-    setSelectedUsers(prev => {
-      // Check if this user is already selected
-      const isSelected = prev.some(u => u.id === user.id);
+  const toggleUser = async (user) => {
+    // Check if this user is already selected
+    const isSelected = selectedUsers.some(u => u.id === user.id);
+    
+    if (isSelected) {
+      // If already selected, simply remove the user
+      setSelectedUsers(prev => prev.filter(u => u.id !== user.id));
+      return;
+    }
+    
+    // Get the relationship data from context, or fetch it if not available
+    let isExternal = relationships[user.id]?.isExternal;
+    
+    if (isExternal === undefined) {
+      // If relationship data isn't already available, fetch it
+      const result = await checkUserRelationship(currentUser.id, user.id);
+      isExternal = result.isExternal;
       
-      if (isSelected) {
-        // If already selected, remove the user
-        return prev.filter(u => u.id !== user.id);
-      } else {
-        // If not selected, add the user (avoid duplicates)
+      // Update the relationships state
+      setRelationships(prev => ({
+        ...prev,
+        [user.id]: result
+      }));
+    }
+    
+    if (isExternal) {
+      // Prevent popover from closing
+      setIsConfirmDialogOpen(true);
+      
+      // Show confirmation dialog for external users
+      confirm({
+        title: t('externalUserConfirmTitle') || 'Add External User',
+        description: t('externalUserConfirmDescription', { name: user.name }) || `${user.name} is not a member of any of your teams. Are you sure you want to start a chat with this external user?`,
+        confirmText: t('confirm') || 'Confirm',
+        cancelText: t('cancel') || 'Cancel',
+        preventClose: true,
+        onConfirm: () => {
+          setSelectedUsers(prev => {
+            // First check if the user is already in the array (extra safety check)
+            if (prev.find(u => u.id === user.id)) {
+              return prev; // User already exists, don't add again
+            }
+            // Add the user and then create the chat immediately
+            const newSelectedUsers = [...prev, user];
+            
+            // Create the chat in the next tick to ensure state is updated
+            setTimeout(() => {
+              createChat();
+            }, 0);
+            
+            return newSelectedUsers;
+          });
+          // Reset confirmation dialog state
+          setIsConfirmDialogOpen(false);
+        },
+        onCancel: () => {
+          // Reset confirmation dialog state
+          setIsConfirmDialogOpen(false);
+        }
+      });
+    } else {
+      // For internal users, add without confirmation
+      setSelectedUsers(prev => {
         // First check if the user is already in the array (extra safety check)
         if (prev.find(u => u.id === user.id)) {
           return prev; // User already exists, don't add again
         }
         return [...prev, user];
-      }
-    });
+      });
+    }
   };
 
   // 创建新聊天
@@ -341,7 +463,7 @@ export default function NewChatPopover({ className, buttonContent }) {
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen} onOpenChange={onPopoverOpenChange}>
       <PopoverTrigger asChild>
         <Button 
           variant="default" 
@@ -356,7 +478,12 @@ export default function NewChatPopover({ className, buttonContent }) {
         </Button>
       </PopoverTrigger>
       {chatMode !== 'ai' && (
-        <PopoverContent className="w-80 p-0" align="start">
+        <PopoverContent className="w-80 p-0" align="start" onInteractOutside={(e) => {
+          // Prevent closing the popover when interacting with confirm dialog
+          if (e.target.closest('[role="dialog"]')) {
+            e.preventDefault();
+          }
+        }}>
           <div className="p-4 border-b">
             <div className="flex items-center gap-2 mb-3">
               {selectedUsers.map(user => (
@@ -385,67 +512,47 @@ export default function NewChatPopover({ className, buttonContent }) {
             </div>
           </div>
 
-          <ScrollArea className="max-h-[300px] overflow-y-auto">
-            {searchQuery ? (
-              // 搜索结果
-              <div className="p-2">
-                {isLoading ? (
-                  <div className="text-center py-4 text-sm text-muted-foreground">
-                    {t('searching')}...
-                  </div>
-                ) : searchResults.length > 0 ? (
-                  searchResults.map(user => (
-                    <div
-                      key={user.id}
-                      className="flex items-center gap-3 p-2 hover:bg-accent rounded-md cursor-pointer"
-                      onClick={() => toggleUser(user)}
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.avatar_url} />
-                        <AvatarFallback>{user.name?.[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{user.name}</p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {user.email}
-                        </p>
-                      </div>
+          <UserRelationshipsContext.Provider value={relationships}>
+            <ScrollArea className="max-h-[300px] overflow-y-auto">
+              {searchQuery ? (
+                // 搜索结果
+                <div className="p-2">
+                  {isLoading ? (
+                    <div className="text-center py-4 text-sm text-muted-foreground">
+                      {t('searching')}...
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-4 text-sm text-muted-foreground">
-                    {t('noResults')}
-                  </div>
-                )}
-              </div>
-            ) : (
-              // 最近联系人
-              <div className="p-2">
-                <div className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
-                  <Users className="h-4 w-4" />
-                  {t('recentContacts')}
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map(user => (
+                      <UserItem 
+                        key={user.id} 
+                        user={user} 
+                        onClick={() => toggleUser(user)} 
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-sm text-muted-foreground">
+                      {t('noResults')}
+                    </div>
+                  )}
                 </div>
-                {recentContacts.map((user, index) => (
-                  <div
-                    key={`${user.id}-${index}`}
-                    className="flex items-center gap-3 p-2 hover:bg-accent rounded-md cursor-pointer"
-                    onClick={() => toggleUser(user)}
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar_url} />
-                      <AvatarFallback>{user.name?.[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{user.name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {user.email}
-                      </p>
-                    </div>
+              ) : (
+                // 最近联系人
+                <div className="p-2">
+                  <div className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    {t('recentContacts')}
                   </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
+                  {recentContacts.map((user, index) => (
+                    <UserItem 
+                      key={`${user.id}-${index}`} 
+                      user={user} 
+                      onClick={() => toggleUser(user)} 
+                    />
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </UserRelationshipsContext.Provider>
 
           {selectedUsers.length > 0 && (
             <div className="p-4 border-t">
