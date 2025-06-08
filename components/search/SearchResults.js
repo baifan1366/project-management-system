@@ -1,9 +1,13 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { Loader, FolderKanban, CheckSquare, User, Calendar, MessageSquare, Search, Users } from 'lucide-react';
+import ExternalBadge from '@/components/users/ExternalBadge';
+import useGetUser from '@/lib/hooks/useGetUser';
+import { checkUserRelationshipBatch } from '@/lib/utils/checkUserRelationship';
 
 // 高亮匹配文本
 function HighlightText({ text, query }) {
@@ -83,6 +87,30 @@ function getDisplayName(item, t) {
 export default function SearchResults({ results, loading, query, onUserClick }) {
   const t = useTranslations();
   const locale = useLocale();
+  const { user: currentUser } = useGetUser();
+  const [relationships, setRelationships] = useState({});
+
+  // Check relationships for user type results
+  useEffect(() => {
+    const checkExternalStatus = async () => {
+      if (!currentUser?.id || !results?.length) return;
+      
+      // Filter out just the user type results
+      const userResults = results.filter(item => item.type === 'user');
+      if (!userResults.length) return;
+      
+      try {
+        const userIds = userResults.map(user => user.id);
+        const relationshipData = await checkUserRelationshipBatch(currentUser.id, userIds);
+        
+        setRelationships(relationshipData);
+      } catch (error) {
+        console.error('Error checking relationships for search results:', error);
+      }
+    };
+    
+    checkExternalStatus();
+  }, [results, currentUser]);
 
   // Create a wrapper component to handle conditional rendering of Link vs div
   const ResultItem = ({ item, children }) => {
@@ -91,7 +119,11 @@ export default function SearchResults({ results, loading, query, onUserClick }) 
       return (
         <div 
           className="block p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-          onClick={() => onUserClick(item)}
+          onClick={() => {
+            // Pass relationship data along with the user item
+            const isExternal = relationships[item.id]?.isExternal;
+            onUserClick(item, { isExternal });
+          }}
         >
           {children}
         </div>
@@ -145,8 +177,11 @@ export default function SearchResults({ results, loading, query, onUserClick }) 
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-base font-medium truncate">
+                  <h3 className="text-base font-medium truncate flex items-center">
                     <HighlightText text={getDisplayName(item, t)} query={query} />
+                    {item.type === 'user' && relationships[item.id]?.isExternal && (
+                      <ExternalBadge className="ml-2 py-0 px-1 text-[10px]" />
+                    )}
                   </h3>
                   <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
                     {t(`search.types.${item.type}`)}

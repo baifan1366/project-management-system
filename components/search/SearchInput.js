@@ -38,7 +38,7 @@ export default function SearchInput({ query, setQuery, onSearch }) {
             setQuery('');
             onSearch('');
           }}
-          className="absolute right-14 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          className="absolute right-20 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
         >
           <span className="sr-only">{t('common.clear')}</span>
           <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
