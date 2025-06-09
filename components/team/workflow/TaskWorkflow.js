@@ -3,6 +3,7 @@
 import { useState, createContext, useEffect, useCallback } from 'react';
 import { WorkflowTools } from './WorkflowTools';
 import BodyContent from './BodyContent';
+import { useSelector } from 'react-redux';
 
 // 创建工作流上下文
 export const WorkflowContext = createContext(null);
@@ -14,7 +15,16 @@ export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey}) 
         edges: []
     });
     const [editableTask, setEditableTask] = useState(null);
-
+    const [projectThemeColor, setProjectThemeColor] = useState('#ffffff');
+    const project = useSelector(state => 
+      state.projects.projects.find(p => String(p.id) === String(projectId))
+    );
+    
+    useEffect(() => {
+      if (project?.theme_color) {
+        setProjectThemeColor(project.theme_color);
+      }
+    }, [project]);
     // 添加一个新的 useEffect 来响应 refreshKey 变化
     useEffect(() => {        
         // 重置工作流数据，以便 BodyContent 组件重新获取任务数据
@@ -57,6 +67,7 @@ export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey}) 
                         label: matchingTask.name,
                         description: matchingTask.description,
                         status: matchingTask.status,
+                        statusData: matchingTask.statusData,
                         assignee: matchingTask.assignee,
                         dueDate: matchingTask.dueDate,
                         originalTask: matchingTask.originalTask
@@ -94,7 +105,7 @@ export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey}) 
                         <WorkflowTools />
                     </div>
                     <div className="lg:w-1/3 rounded-lg shadow h-[600px] overflow-auto">
-                        <BodyContent />
+                        <BodyContent projectThemeColor={projectThemeColor} />
                     </div>
                 </div>
             </div>

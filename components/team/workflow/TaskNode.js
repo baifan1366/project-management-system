@@ -31,6 +31,7 @@ const TaskNode = memo(({ data, isConnectable }) => {
         name: data.label,
         description: data.description,
         status: data.status,
+        statusData: data.statusData,
         assignee: data.assignee,
         dueDate: data.dueDate,
         originalTask: data.originalTask
@@ -40,9 +41,14 @@ const TaskNode = memo(({ data, isConnectable }) => {
 
   // 获取状态颜色
   const getStatusColor = () => {
+    // 优先使用传递的statusData
+    if (data.statusData && data.statusData.color) {
+      return data.statusData.color;
+    }
+    
     if (!data.status || data.status === '-') return 'transparent'; // 返回透明色，将使用边框样式
     
-    // 使用与BodyContent相同的解析逻辑
+    // 作为后备，使用与BodyContent相同的解析逻辑
     const statusData = parseSingleSelectValue(data.status);
     return statusData?.color || 'transparent';
   };
@@ -75,11 +81,11 @@ const TaskNode = memo(({ data, isConnectable }) => {
         <div className="font-bold">{data.label}</div>
       </div>
       {data.description && (
-        <div className="mt-1 text-xs text-gray-600">{data.description}</div>
+        <div className="mt-1 text-gray-500 text-xss">{data.description}</div>
       )}
       <div className="mt-1 text-xs text-gray-500 flex justify-between">
-        <div>{t('assignee')}: {data.assignee || '-'}</div>
-        <div>{t('dueDate')}: {data.dueDate || '-'}</div>
+        <div>{data.assignee || '-'}</div>
+        <div>{data.dueDate || '-'}</div>
       </div>
       <Handle
         type="target"

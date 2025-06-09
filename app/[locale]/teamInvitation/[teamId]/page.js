@@ -134,25 +134,31 @@ export default function TeamInvitation() {
       }
 
       // 1. 再次验证邀请状态
-      const { data: currentInvitation } = await supabase
+      const { data: currentInvitation, error: invitationError } = await supabase
         .from('user_team_invitation')
         .select('*')
         .eq('id', invitationInfo.id)
         .single();
+      
+      if (invitationError) {
+        console.error("Invitation fetch error:", invitationError);
+        throw new Error(t('invitationNotFound'));
+      }
 
       if (!currentInvitation || currentInvitation.status !== 'PENDING') {
         throw new Error(t('invitationNoLongerValid'));
       }
 
       // 2. 验证用户不是已经是团队成员
-      const { data: existingMember } = await supabase
+      const { data: existingMembers, error: memberCheckError } = await supabase
         .from('user_team')
         .select('*')
         .eq('team_id', params.teamId)
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
 
-      if (existingMember) {
+      if (memberCheckError) {
+        console.error("Member check error:", memberCheckError);
+      } else if (existingMembers && existingMembers.length > 0) {
         throw new Error(t('alreadyTeamMember'));
       }
 
@@ -167,35 +173,36 @@ export default function TeamInvitation() {
         throw new Error(t('teamNotFound'));
       }
 
-      // 4. 创建团队用户关系
-      await dispatch(createTeamUser({
-        team_id: Number(params.teamId),
-        user_id: invitationInfo.userId,
-        role: invitationInfo.role,
-        created_by: invitationInfo.created_by
-      })).unwrap();
+      // 4. 直接使用Supabase创建团队用户关系
+      const { error: userTeamError } = await supabase
+        .from('user_team')
+        .insert({
+          team_id: Number(params.teamId),
+          user_id: user.id,
+          role: invitationInfo.role,
+          created_by: invitationInfo.created_by
+        });
+
+      if (userTeamError) {
+        console.error("Team user creation error:", userTeamError);
+        throw new Error(userTeamError.message || t('acceptInvitationFailed'));
+      }
 
       // 5. 更新邀请状态为已接受
-      await dispatch(updateInvitationStatus({
-        invitationId: invitationInfo.id,
-        status: 'ACCEPTED'
-      })).unwrap();
-      
-      // handleInvitationAccepted
-      // 6. 处理邀请接受后的其他团队权限变更
-      const invitationData = {
-        ...currentInvitation,
-        status: 'ACCEPTED',
-        project_id: teamData.project_id
-      };
-      
-      await handleInvitationAccepted(invitationData, invitationInfo.userId);
+      const { error: updateError } = await supabase
+        .from('user_team_invitation')
+        .update({ status: 'ACCEPTED' })
+        .eq('id', invitationInfo.id);
 
+      if (updateError) {
+        console.error("Invitation update error:", updateError);
+        throw new Error(updateError.message || t('acceptInvitationFailed'));
+      }
 
-      // 7. 重定向到项目页面
-      router.push(`/${params.locale}/projects/${teamData.project_id}`);
+      // 6. 重定向到项目页面
+      window.location.href = `/${params.locale}/projects/${teamData.project_id}`;
     } catch (error) {
-      // console.error('Failed to accept invitation:', error);
+      console.error("Accept invitation error:", error);
       setError(error.message);
     } finally {
       setLoading(false);
