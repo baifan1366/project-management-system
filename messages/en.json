@@ -470,7 +470,18 @@
     "showArchivedProjects": "Show Archived Projects",
     "restoreProjectConfirmTitle": "Restore Project",
     "restoreProjectConfirmDescription": "Are you sure you want to restore this project?",
-    "noArchivedProjects": "No archived projects"
+    "noArchivedProjects": "No archived projects",
+    "projectDetails": "Project Details",
+    "starredTeams": "Starred Teams",
+    "totalTasks": "Total Tasks",
+    "projectTeams": "Project Teams",
+    "allTeams": "All Teams",
+    "pending": "Pending",
+    "onHold": "On Hold",
+    "cancelled": "Cancelled",
+    "noTeams": "No teams available",
+    "noDescription": "No description provided",
+    "created": "Created"
   },
   "tasks": {
     "title": "Tasks",
