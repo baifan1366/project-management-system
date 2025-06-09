@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 /**
  * Check if a user has any relationship with multiple other users in a single request
  * This endpoint supports batch operations to reduce multiple API calls
+ * Users are considered related if they are in any teams within the same project
  * 
  * @param {Request} request - The request object
  * @returns {Promise<NextResponse>} JSON response with relationship data for multiple users
@@ -52,54 +53,79 @@ export async function POST(request) {
       }, { status: 500 });
     }
     
-    // Group teams by user ID
-    const teamsByUser = {};
-    for (const record of targetUsersTeams || []) {
-      if (!teamsByUser[record.user_id]) {
-        teamsByUser[record.user_id] = [];
-      }
-      teamsByUser[record.user_id].push(record.team_id);
+    // Check if there are any teams to process
+    if (!targetUsersTeams || targetUsersTeams.length === 0) {
+      return NextResponse.json(results);
+    }
+
+    // Get all team IDs to fetch projects
+    const teamIds = [...new Set(targetUsersTeams.map(record => record.team_id))];
+    
+    // Get projects for these teams
+    const { data: teamProjects, error: projectsError } = await supabase
+      .from('team')
+      .select('id, project_id')
+      .in('id', teamIds);
+      
+    if (projectsError) {
+      console.error('Error fetching team projects:', projectsError);
+      return NextResponse.json({ 
+        error: 'Failed to fetch team projects' 
+      }, { status: 500 });
     }
     
-    // For users with no teams, they remain external
-    // For users with teams, check if the current user is in any of them
-    const usersWithTeams = Object.keys(teamsByUser);
+    // Map teams to their projects
+    const teamToProjectMap = {};
+    for (const team of teamProjects || []) {
+      teamToProjectMap[team.id] = team.project_id;
+    }
     
-    if (usersWithTeams.length > 0) {
-      // Get all the teams the current user belongs to
-      const { data: currentUserTeams, error: currentUserTeamsError } = await supabase
-        .from('user_team')
-        .select('team_id')
-        .eq('user_id', userId);
-        
-      if (currentUserTeamsError) {
-        console.error('Error fetching current user teams:', currentUserTeamsError);
-        return NextResponse.json({ 
-          error: 'Failed to fetch current user teams' 
-        }, { status: 500 });
-      }
+    // Group users by projects they belong to
+    const userProjectsMap = {};
+    for (const record of targetUsersTeams) {
+      const projectId = teamToProjectMap[record.team_id];
+      if (!projectId) continue;
       
-      // Convert to a Set for faster lookups
-      const currentUserTeamSet = new Set(
-        (currentUserTeams || []).map(team => team.team_id)
+      if (!userProjectsMap[record.user_id]) {
+        userProjectsMap[record.user_id] = new Set();
+      }
+      userProjectsMap[record.user_id].add(projectId);
+    }
+    
+    // Get all projects the current user belongs to
+    const { data: currentUserTeams, error: currentUserTeamsError } = await supabase
+      .from('user_team')
+      .select('user_team.team_id, team.project_id')
+      .eq('user_team.user_id', userId)
+      .join('team', { 'user_team.team_id': 'team.id' });
+      
+    if (currentUserTeamsError) {
+      console.error('Error fetching current user teams:', currentUserTeamsError);
+      return NextResponse.json({ 
+        error: 'Failed to fetch current user teams' 
+      }, { status: 500 });
+    }
+    
+    // Get the current user's projects
+    const currentUserProjectSet = new Set(
+      (currentUserTeams || []).map(record => record.project_id)
+    );
+    
+    // Update results for each target user based on project relationships
+    for (const targetUserId in userProjectsMap) {
+      const targetUserProjects = userProjectsMap[targetUserId];
+      
+      // Check for common projects
+      const commonProjects = [...targetUserProjects].filter(projectId => 
+        currentUserProjectSet.has(projectId)
       );
       
-      // Update results for each user with team information
-      for (const targetUserId of usersWithTeams) {
-        const targetTeams = teamsByUser[targetUserId] || [];
-        
-        // Check for common teams
-        const commonTeams = targetTeams.filter(teamId => 
-          currentUserTeamSet.has(teamId)
-        );
-        
-        // Update relationship data
-        results[targetUserId] = {
-          hasRelationship: commonTeams.length > 0,
-          isExternal: commonTeams.length === 0,
-          commonTeamCount: commonTeams.length
-        };
-      }
+      // Update relationship data
+      results[targetUserId] = {
+        hasRelationship: commonProjects.length > 0,
+        isExternal: commonProjects.length === 0,
+        commonTeamCount: commonProjects.length // This now represents common projects count
+      };
     }
     
     return NextResponse.json(results);
