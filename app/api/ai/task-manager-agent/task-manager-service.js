@@ -115,18 +115,24 @@ export async function createProjectAndTasks(
       // Don't rethrow, continue with task creation
     }
     
-    // 添加团队成员（如果有）
+    // 添加团队成员（如果有）- 并行处理
     if (aiResponse.team_members && Array.isArray(aiResponse.team_members) && aiResponse.team_members.length > 0) {
-      for (const member of aiResponse.team_members) {
-        if (member && member.email) {
-          try {
-            await dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId);
-          } catch (error) {
-            console.error(`Failed to invite member ${member.email}, but continuing:`, error);
-            // Don't rethrow, continue with next member
-          }
-        }
-      }
+      // 创建邀请的Promise数组
+      const invitationPromises = aiResponse.team_members
+        .filter(member => member && member.email)
+        .map(member => 
+          dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId)
+            .catch(error => {
+              console.error(`Failed to invite member ${member.email}, but continuing:`, error);
+              // Don't rethrow, return null to indicate failed invitation
+              return null;
+            })
+        );
+      
+      // 并行处理所有邀请，但不等待结果
+      Promise.allSettled(invitationPromises).catch(error => {
+        console.error("Some invitations may have failed:", error);
+      });
     }
     
     // 获取团队的默认分区
@@ -195,18 +201,24 @@ export async function createProjectAndTasks(
       teamId = teamData[0].id;
     }
     
-    // 添加团队成员（如果有）
+    // 添加团队成员（如果有）- 并行处理
     if (aiResponse.team_members && Array.isArray(aiResponse.team_members) && aiResponse.team_members.length > 0) {
-      for (const member of aiResponse.team_members) {
-        if (member && member.email) {
-          try {
-            await dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId);
-          } catch (error) {
-            console.error(`Failed to invite member ${member.email}, but continuing:`, error);
-            // Don't rethrow, continue with next member
-          }
-        }
-      }
+      // 创建邀请的Promise数组
+      const invitationPromises = aiResponse.team_members
+        .filter(member => member && member.email)
+        .map(member => 
+          dbService.inviteTeamMember(teamId, member.email, member.role || 'CAN_VIEW', userId)
+            .catch(error => {
+              console.error(`Failed to invite member ${member.email}, but continuing:`, error);
+              // Don't rethrow, return null to indicate failed invitation
+              return null;
+            })
+        );
+      
+      // 并行处理所有邀请，但不等待结果
+      Promise.allSettled(invitationPromises).catch(error => {
+        console.error("Some invitations may have failed:", error);
+      });
     }
     
     // 使用提供的分区ID，或者查询/创建分区
@@ -295,18 +307,25 @@ export async function handleInvitation(instruction, userId, projectId, teamId, s
     throw new Error("No team specified for invitation");
   }
   
-  // 处理每个邮箱的邀请
-  const results = [];
+  // 并行处理每个邮箱的邀请
+  const invitePromises = emails.map(email => 
+    dbService.inviteTeamMember(targetTeamId, email, 'CAN_VIEW', userId)
+      .then(() => ({ email, success: true }))
+      .catch(error => {
+        console.error(`邀请 ${email} 失败:`, error);
+        return { email, success: false, error: error.message };
+      })
+  );
   
-  for (const email of emails) {
-    try {
-      const inviteResult = await dbService.inviteTeamMember(targetTeamId, email, 'CAN_VIEW', userId);
-      results.push({ email, success: true });
-    } catch (error) {
-      console.error(`邀请 ${email} 失败:`, error);
-      results.push({ email, success: false, error: error.message });
-    }
-  }
+  // 等待所有邀请处理完成
+  const results = await Promise.allSettled(invitePromises)
+    .then(outcomes => outcomes.map(outcome => 
+      outcome.status === 'fulfilled' ? outcome.value : { 
+        email: outcome.reason?.email || 'unknown',
+        success: false, 
+        error: outcome.reason?.message || 'Failed to process invitation' 
+      }
+    ));
   
   return {
     success: results.some(r => r.success),

@@ -364,15 +364,17 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
       throw new Error(`Failed to add member to team: ${addMemberError.message}`);
     }
         
-    // 给用户发送通知
-    await createTeamNotification(
+    // 给用户发送通知 - 不等待完成
+    createTeamNotification(
       userId, 
       'TEAM_INVITATION',
       `Added to team: ${teamData.name}`,
       `You have been added to the team "${teamData.name}"`,
       teamId,
       'team'
-    );
+    ).catch(error => {
+      console.error("Failed to create notification, but continuing:", error);
+    });
   } else {
     // 如果用户不存在，创建邀请记录
     const { error: inviteError } = await supabase
@@ -390,54 +392,62 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
       throw new Error(`Failed to create team invitation: ${inviteError.message}`);
     }
     
+    // 发送邀请邮件 - 不等待完成
+    const invitationDetails = {
+      teamId: teamId,
+      teamName: teamData.name,
+      permission: role.toUpperCase(),
+      projectId: teamData.project_id
+    };
     
-    // 发送邀请邮件
-    try {
-      const invitationDetails = {
-        teamId: teamId,
-        teamName: teamData.name,
-        permission: role.toUpperCase(),
-        projectId: teamData.project_id
-      };
-      
-      // 调用邮件发送API
-      const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/send-team-invitation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: email,
-          subject: `You're invited to join ${teamData.name} on Team Sync`,
-          invitationDetails: invitationDetails
-        }),
-      });
-      
-      if (!emailResponse.ok) {
-        const errorData = await emailResponse.json();
-        throw new Error(errorData.error || "Failed to send invitation email");
-      }
-      
-    } catch (emailError) {
-      console.error("发送邀请邮件失败:", emailError);
-      // 即使邮件发送失败，我们仍然保留邀请记录，但记录错误
-      // 这里不抛出异常，避免中断流程
-    }
+    // 异步发送邮件，不等待
+    sendInvitationEmail(email, teamData.name, invitationDetails).catch(emailError => {
+      console.error("发送邀请邮件失败，但继续流程:", emailError);
+    });
   }
   
-  // 通知邀请者
+  // 通知邀请者 - 不等待完成
   if (invitedBy) {
-    await createTeamNotification(
+    createTeamNotification(
       invitedBy,
       'SYSTEM',
       `Invitation sent to ${email}`,
       `You invited ${email} to join the team "${teamData.name}"`,
       teamId,
       'team'
-    );
+    ).catch(error => {
+      console.error("Failed to create notification, but continuing:", error);
+    });
   }
   
   return { success: true, email, teamId, role };
+}
+
+// 异步发送邀请邮件函数
+async function sendInvitationEmail(email, teamName, invitationDetails) {
+  try {
+    const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/send-team-invitation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: email,
+        subject: `You're invited to join ${teamName} on Team Sync`,
+        invitationDetails: invitationDetails
+      }),
+    });
+    
+    if (!emailResponse.ok) {
+      const errorData = await emailResponse.json();
+      throw new Error(errorData.error || "Failed to send invitation email");
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("发送邀请邮件失败:", error);
+    return false;
+  }
 }
 
 // 创建团队相关通知
@@ -450,7 +460,6 @@ async function createTeamNotification(
   relatedEntityType = 'team'
 ) {
   try {
-    
     const notificationData = {
       user_id: userId,
       title: title,
@@ -478,7 +487,6 @@ async function createTeamNotification(
     return true;
   } catch (error) {
     console.error('创建通知失败:', error);
-    // 不抛出异常，继续处理后续逻辑
     return false;
   }
 }
