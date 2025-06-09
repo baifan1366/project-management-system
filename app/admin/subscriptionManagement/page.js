@@ -70,12 +70,14 @@ export default function AdminSubscriptions() {
   const [isCodeToDelete, setIsCodeToDelete] = useState(null);
   const [planMaxTeams, setPlanMaxTeams] = useState('0');
   const [isPlanToDelete, setIsPlanToDelete] = useState(null);
+  const [distributionViewMode, setDistributionViewMode] = useState('type'); // 'type' or 'name'
   const [subscriptionStats, setSubscriptionStats] = useState({
     distribution: {
       FREE: { count: 0, percentage: 0 },
       PRO: { count: 0, percentage: 0 },
       ENTERPRISE: { count: 0, percentage: 0 }
     },
+    distributionByName: {},
     stats: {
       totalActive: 0,
       totalRevenue: 0,
@@ -376,12 +378,35 @@ export default function AdminSubscriptions() {
   
   // Format date for display
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    
+    // Check if the date is valid (not 1970-01-01 from null conversion)
     const date = new Date(dateString);
+    if (date.getFullYear() === 1970 && date.getMonth() === 0 && date.getDate() === 1) {
+      return 'N/A';
+    }
+    
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     }).format(date);
+  };
+  
+  // Format date range for display
+  const formatDateRange = (startDate, endDate) => {
+    const formattedStartDate = formatDate(startDate);
+    const formattedEndDate = formatDate(endDate);
+    
+    if (formattedStartDate === 'N/A' && formattedEndDate === 'N/A') {
+      return 'No date range set';
+    } else if (formattedStartDate === 'N/A') {
+      return `Until ${formattedEndDate}`;
+    } else if (formattedEndDate === 'N/A') {
+      return `From ${formattedStartDate}`;
+    }
+    
+    return `${formattedStartDate} - ${formattedEndDate}`;
   };
   
   // Format storage size for display
@@ -795,37 +820,76 @@ export default function AdminSubscriptions() {
   // 获取订阅分布数据
   const fetchSubscriptionDistribution = async () => {
     try {
+      // Get all subscription plans first
+      const { data: plans, error: plansError } = await supabase
+        .from('subscription_plan')
+        .select('id, name, type')
+        .order('id', { ascending: true });
+      
+      if (plansError) throw plansError;
+      
+      // Get active subscriptions
       const { data: subscriptions, error } = await supabase
         .from('user_subscription_plan')
         .select(`
           id,
+          plan_id,
           plan:subscription_plan (
-            type
+            id, name, type
           )
         `)
         .eq('status', 'ACTIVE');
 
       if (error) throw error;
 
+      // Initialize distribution by type
       const distribution = {
         FREE: { count: 0, percentage: 0 },
         PRO: { count: 0, percentage: 0 },
         ENTERPRISE: { count: 0, percentage: 0 }
       };
 
-      // 计算每种类型的数量
-      subscriptions.forEach(sub => {
-        const planType = sub.plan?.type || 'FREE';
-        distribution[planType].count++;
+      // Initialize distribution by name
+      const distributionByName = {};
+      plans.forEach(plan => {
+        distributionByName[plan.name] = { 
+          count: 0, 
+          percentage: 0, 
+          type: plan.type,
+          id: plan.id
+        };
       });
 
-      // 计算百分比
-      const total = subscriptions.length;
+      // Count active subscriptions
+      subscriptions.forEach(sub => {
+        const planType = sub.plan?.type || 'FREE';
+        const planName = sub.plan?.name || 'Unknown';
+        
+        // Update type distribution
+        if (distribution[planType]) {
+        distribution[planType].count++;
+        }
+        
+        // Update name distribution
+        if (distributionByName[planName]) {
+          distributionByName[planName].count++;
+        }
+      });
+
+      // Calculate percentages
+      const total = subscriptions.length || 1; // Avoid division by zero
+      
+      // For type distribution
       Object.keys(distribution).forEach(type => {
         distribution[type].percentage = (distribution[type].count / total * 100).toFixed(1);
       });
 
-      return distribution;
+      // For name distribution
+      Object.keys(distributionByName).forEach(name => {
+        distributionByName[name].percentage = (distributionByName[name].count / total * 100).toFixed(1);
+      });
+
+      return { distribution, distributionByName };
     } catch (error) {
       console.error('Error fetching subscription distribution:', error);
       return null;
@@ -900,14 +964,15 @@ export default function AdminSubscriptions() {
 
   // 更新所有统计数据
   const updateSubscriptionAnalytics = async () => {
-    const [distribution, stats, activity] = await Promise.all([
+    const [distributionData, stats, activity] = await Promise.all([
       fetchSubscriptionDistribution(),
       fetchSubscriptionStats(),
       fetchRecentActivity()
     ]);
 
     setSubscriptionStats({
-      distribution: distribution || subscriptionStats.distribution,
+      distribution: distributionData?.distribution || subscriptionStats.distribution,
+      distributionByName: distributionData?.distributionByName || subscriptionStats.distributionByName,
       stats: stats || subscriptionStats.stats,
       recentActivity: activity || subscriptionStats.recentActivity
     });
@@ -1300,7 +1365,7 @@ export default function AdminSubscriptions() {
                             {code.current_uses} / {code.max_uses || '∞'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {formatDate(code.start_date)} - {formatDate(code.end_date)}
+                            {formatDateRange(code.start_date, code.end_date)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {code.is_active ? (
@@ -1406,9 +1471,39 @@ export default function AdminSubscriptions() {
                     </p>
                   </div>
                 ) : (
+                  <div className="overflow-hidden">
                   <div className="overflow-x-auto">
+                      <div 
+                        style={{ 
+                          height: '480px',
+                          scrollbarWidth: 'thin',
+                          scrollbarColor: 'rgba(156, 163, 175, 0.5) transparent'
+                        }} 
+                        className="overflow-y-auto custom-scrollbar"
+                      >
+                        <style jsx>{`
+                          .custom-scrollbar::-webkit-scrollbar {
+                            width: 6px;
+                          }
+                          .custom-scrollbar::-webkit-scrollbar-track {
+                            background: transparent;
+                          }
+                          .custom-scrollbar::-webkit-scrollbar-thumb {
+                            background-color: rgba(156, 163, 175, 0.5);
+                            border-radius: 20px;
+                          }
+                          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                            background-color: rgba(156, 163, 175, 0.7);
+                          }
+                          .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+                            background-color: rgba(75, 85, 99, 0.5);
+                          }
+                          .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                            background-color: rgba(75, 85, 99, 0.7);
+                          }
+                        `}</style>
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                      <thead className="bg-gray-50 dark:bg-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                         <tr>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             User
@@ -1484,7 +1579,7 @@ export default function AdminSubscriptions() {
                                 </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                {formatDate(subscription.start_date)} - {formatDate(subscription.end_date)}
+                                {formatDateRange(subscription.start_date, subscription.end_date)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
@@ -1603,7 +1698,8 @@ export default function AdminSubscriptions() {
                                   <button 
                                     className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                                     title="Edit subscription"
-                                    onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                       setIsUserSubscriptionPlanSelected(subscription);
                                       setIsModalOpen(true);
                                       setModalType('edit');
@@ -1613,7 +1709,8 @@ export default function AdminSubscriptions() {
                                   </button>
                                   {subscription.status.toUpperCase() === 'ACTIVE' ? (
                                     <button 
-                                      onClick={() => {
+                                          onClick={(e) => {
+                                              e.stopPropagation();
                                           // Update subscription status to CANCELED
                                           supabase
                                             .from('user_subscription_plan')
@@ -1644,7 +1741,8 @@ export default function AdminSubscriptions() {
                                     </button>
                                   ) : (
                                     <button 
-                                      onClick={() => {
+                                        onClick={(e) => {
+                                            e.stopPropagation();
                                           // Update subscription status to ACTIVE
                                           supabase
                                             .from('user_subscription_plan')
@@ -1681,6 +1779,8 @@ export default function AdminSubscriptions() {
                         })}
                       </tbody>
                     </table>
+                      </div>
+                    </div>
                   </div>
                 )}
                 
@@ -1691,15 +1791,29 @@ export default function AdminSubscriptions() {
               <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Distribution Card */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-                  <h4 className="text-base font-medium text-gray-800 dark:text-white mb-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-base font-medium text-gray-800 dark:text-white">
                     Subscription Distribution
                   </h4>
+                    <div className="flex items-center">
+                      <select 
+                        className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                        value={distributionViewMode}
+                        onChange={(e) => setDistributionViewMode(e.target.value)}
+                      >
+                        <option value="type">By Type</option>
+                        <option value="name">By Plan Name</option>
+                      </select>
+                    </div>
+                  </div>
                   <div className="flex flex-col space-y-4">
-                    {Object.entries(subscriptionStats.distribution).map(([type, data]) => (
+                    {distributionViewMode === 'type' ? (
+                      // Display by type
+                      Object.entries(subscriptionStats.distribution).map(([type, data]) => (
                       <div key={type}>
                         <div className="flex justify-between mb-1">
                           <span className="text-sm text-gray-600 dark:text-gray-400">{type}</span>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">{data.percentage}%</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">{data.count} ({data.percentage}%)</span>
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                           <div 
@@ -1711,7 +1825,36 @@ export default function AdminSubscriptions() {
                           />
                         </div>
                       </div>
-                    ))}
+                      ))
+                    ) : (
+                      // Display by name
+                      Object.entries(subscriptionStats.distributionByName || {}).map(([name, data]) => (
+                        <div key={name}>
+                          <div className="flex justify-between mb-1">
+                            <div className="flex items-center">
+                              <span className="text-sm text-gray-600 dark:text-gray-400">{name}</span>
+                              <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                ${data.type === 'FREE' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : 
+                                  data.type === 'PRO' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 
+                                  'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'}`}
+                              >
+                                {data.type}
+                              </span>
+                            </div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">{data.count} ({data.percentage}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full ${
+                                data.type === 'FREE' ? 'bg-gray-500' :
+                                data.type === 'PRO' ? 'bg-blue-500' : 'bg-purple-500'
+                              }`} 
+                              style={{ width: `${data.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -2956,6 +3099,7 @@ export default function AdminSubscriptions() {
                     required
                     min={new Date().toISOString().split('T')[0]}
                     value={startDate}
+                    lang="en"
                     className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                       focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -2973,6 +3117,7 @@ export default function AdminSubscriptions() {
                     name='end_date'
                     required
                     value={endDate}
+                    lang="en"
                     className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                       focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -3182,6 +3327,7 @@ export default function AdminSubscriptions() {
                     required
                     min={new Date().toISOString().split('T')[0]}
                     value={startDate}
+                    lang="en"
                     className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                       focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -3199,6 +3345,7 @@ export default function AdminSubscriptions() {
                     name='end_date'
                     required
                     value={endDate}
+                    lang="en"
                     className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                       focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
@@ -3378,6 +3525,7 @@ export default function AdminSubscriptions() {
                     id='start-date'
                     name='start_date'
                     required
+                    lang="en"
                     defaultValue={new Date(isUserSubscriptionPlanSelected.start_date).toISOString().split('T')[0]}
                     className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white

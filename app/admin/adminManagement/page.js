@@ -920,7 +920,7 @@ export default function AdminUserManagement() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((row) => (
-                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse mr-3"></div>
@@ -1050,7 +1050,7 @@ export default function AdminUserManagement() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {currentAdmins.length > 0 ? (
                       currentAdmins.map((admin) => (
-                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
+                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
@@ -1137,7 +1137,7 @@ export default function AdminUserManagement() {
               
               {/* Pagination */}
               {filteredAdmins.length > adminsPerPage && (
-                <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
                   <div className="flex-1 flex justify-between items-center">
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
@@ -1462,7 +1462,43 @@ export default function AdminUserManagement() {
                 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                 placeholder='Enter confirm password'
                 />
-              </div>               
+              </div>
+              
+              {password && (
+                <div className="mt-1">
+                  <p className="text-xs font-medium mb-1">Password must contain:</p>
+                  <ul className="space-y-1 text-xs">
+                    <li className={`flex items-center ${validatePassword(password).criteria.minLength ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.minLength ? '✓' : '✗'}</span>
+                      At least 8 characters
+                    </li>
+                    <li className={`flex items-center ${validatePassword(password).criteria.hasUpperCase ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.hasUpperCase ? '✓' : '✗'}</span>
+                      One uppercase letter
+                    </li>
+                    <li className={`flex items-center ${validatePassword(password).criteria.hasLowerCase ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.hasLowerCase ? '✓' : '✗'}</span>
+                      One lowercase letter
+                    </li>
+                    <li className={`flex items-center ${validatePassword(password).criteria.hasNumber ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.hasNumber ? '✓' : '✗'}</span>
+                      One number
+                    </li>
+                    <li className={`flex items-center ${validatePassword(password).criteria.hasSpecialChar ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="mr-1">{validatePassword(password).criteria.hasSpecialChar ? '✓' : '✗'}</span>
+                      One special character
+                    </li>
+                  </ul>
+                </div>
+              )}
+
+              {confirmPassword && (
+                <div className="mt-1">
+                  <p className={`text-xs ${isPasswordMatch ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {isPasswordMatch ? '✓ Passwords match' : '✗ Passwords do not match'}
+                  </p>
+                </div>
+              )}               
                 <div className='pt-3 border-t border-gray-200 dark:border-gray-700'>
                   <p className='text-xs text-gray-500 dark:text-gray-400'>
                     Admin ID: {selectedAdmin.id}<br />
@@ -1492,9 +1528,12 @@ export default function AdminUserManagement() {
                 </button>
                 <button
                   type='submit'
-                  className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
-                    text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                    focus:ring-offset-2 focus:ring-indigo-500'
+                  disabled={password && (!isPasswordValid || !isPasswordMatch)}
+                  className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                    text-white ${password && (!isPasswordValid || !isPasswordMatch)
+                    ? 'bg-indigo-400 cursor-not-allowed' 
+                    : 'bg-indigo-600 hover:bg-indigo-700'} 
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
                 >
                   Save Changes
                 </button>
@@ -1663,7 +1702,7 @@ export default function AdminUserManagement() {
 
             {/* Quick Permission Setup */}
             {!loadingPermissions && allPermissions.length > 0 && (
-              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-750 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quick Permission Setup</h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
                   Quickly set permissions based on common role patterns
@@ -1724,7 +1763,7 @@ export default function AdminUserManagement() {
                 <div className='space-y-6'>
                   {Object.entries(permissionsByCategory).map(([category, categoryPermissions]) => (
                     <div key={category} className='border dark:border-gray-700 rounded-lg overflow-hidden'>
-                      <div className='bg-gray-50 dark:bg-gray-750 px-4 py-3 border-b border-gray-200 dark:border-gray-700'>
+                      <div className='bg-gray-50 dark:bg-gray-700 px-4 py-3 border-b border-gray-200 dark:border-gray-700'>
                         <h3 className='text-md font-medium text-gray-700 dark:text-gray-300'>
                           {formatCategoryName(category)}
                         </h3>
@@ -1830,9 +1869,9 @@ export default function AdminUserManagement() {
             </div>
             
             {/* Admin Details Grid */}
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-750 p-4 rounded-lg border border-gray-200 dark:border-gray-700'>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-600'>
               <div>
-                <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Basic Information</h4>
+                <h4 className='text-sm font-medium text-gray-500 dark:text-gray-300 uppercase mb-2'>Basic Information</h4>
                 <div className='space-y-3'>
                   <div>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>ID</p>
@@ -1853,7 +1892,7 @@ export default function AdminUserManagement() {
                 </div>
               </div>
               <div>
-                <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Account Information</h4>
+                <h4 className='text-sm font-medium text-gray-500 dark:text-gray-300 uppercase mb-2'>Account Information</h4>
                 <div className='space-y-3'>
                   <div>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>Registered</p>
@@ -1887,9 +1926,8 @@ export default function AdminUserManagement() {
               </div>
             </div>
             
-            {/* Permissions Summary */}
-            <div className='bg-gray-50 dark:bg-gray-750 p-4 rounded-lg border border-gray-200 dark:border-gray-700'>
-              <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Permissions</h4>
+            {/* Role and Access Level */}
+            <div className='bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-600'>
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div>
                   <p className='text-xs text-gray-500 dark:text-gray-400'>Role</p>
@@ -1902,46 +1940,11 @@ export default function AdminUserManagement() {
                   </p>
                 </div>
               </div>
-              
-              {/* Permission Groups */}
-              <div className='mt-4 grid grid-cols-1 md:grid-cols-3 gap-2'>
-                {Object.entries(permissionsByCategory).length > 0 ? (
-                  Object.entries(permissionsByCategory).map(([category, perms]) => {
-                    // Check if admin has any permissions from this category
-                    const hasPermissionsInCategory = perms.some(p => adminPermissions.includes(p.id));
-                    
-                    return (
-                      <div key={category} className='border border-gray-200 dark:border-gray-600 rounded p-2'>
-                        <p className='text-xs font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                          {formatCategoryName(category)}
-                        </p>
-                        <p className='text-xs'>
-                          {hasPermissionsInCategory ? (
-                            <span className='text-green-600 dark:text-green-400'>
-                              <span className='w-1.5 h-1.5 bg-green-500 rounded-full inline-block mr-1'></span>
-                              Access Granted
-                            </span>
-                          ) : (
-                            <span className='text-red-600 dark:text-red-400'>
-                              <span className='w-1.5 h-1.5 bg-red-500 rounded-full inline-block mr-1'></span>
-                              No Access
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className='text-sm text-gray-500 dark:text-gray-400 col-span-3'>
-                    No permission data available
-                  </p>
-                )}
-              </div>
             </div>
             
             {/* Activity Summary */}
-            <div className='bg-gray-50 dark:bg-gray-750 p-4 rounded-lg border border-gray-200 dark:border-gray-700'>
-              <h4 className='text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-2'>Recent Activity</h4>
+            <div className='bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-600'>
+              <h4 className='text-sm font-medium text-gray-500 dark:text-gray-300 uppercase mb-2'>Recent Activity</h4>
               <p className='text-sm text-gray-700 dark:text-gray-300'>
                 Last login: {formatDate(selectedAdmin.last_login) || 'Never logged in'}
               </p>
@@ -1958,7 +1961,7 @@ export default function AdminUserManagement() {
             </div>
           </div>
           
-          <div className='flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700'>
+          <div className='flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-600'>
             {adminData && adminData.id === selectedAdmin.id ? (
               <p className='text-sm text-gray-500 dark:text-gray-400 italic mr-auto'>
                 This is your account. Some actions are restricted for security reasons.
@@ -1985,7 +1988,7 @@ export default function AdminUserManagement() {
                       closeModal();
                       openModal('editPermission', selectedAdmin);
                     }}
-                    className='px-4 py-2 border border-indigo-500 text-indigo-500 rounded-md text-sm font-medium
+                    className='px-4 py-2 border border-indigo-500 text-indigo-500 dark:border-indigo-400 dark:text-indigo-400 rounded-md text-sm font-medium
                       bg-white dark:bg-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
                   >
                     Manage Permissions
