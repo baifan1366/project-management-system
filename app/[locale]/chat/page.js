@@ -1898,12 +1898,7 @@ export default function ChatPage() {
                     ref={textareaRef}
                   />
                   
-                  {/* Show character count when approaching limit */}
-                  {message.length > 700 && (
-                    <div className={`text-xs absolute bottom-1 right-3 ${message.length > 1000 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                      {message.length}/1000
-                    </div>
-                  )}
+                  {/* Character count removed from here and moved below */}
                   
                   {/* @提及选择器 */}
                   <MentionSelector
@@ -1944,6 +1939,13 @@ export default function ChatPage() {
                 </button>
               </div>
             </form>
+            
+            {/* Show character count when approaching limit */}
+            {message.length > 700 && (
+              <div className={`text-xs text-right mt-1 mr-2 ${message.length > 1000 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                {message.length}/1000
+              </div>
+            )}
           </div>
         </>
       ) : (

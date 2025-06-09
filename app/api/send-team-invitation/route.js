@@ -30,6 +30,9 @@ export async function POST(request) {
         user: process.env.NEXT_PUBLIC_SMTP_USERNAME,
         pass: process.env.NEXT_PUBLIC_SMTP_PASSWORD,
       },
+      connectionTimeout: 10000, // 10 seconds timeout for connections
+      greetingTimeout: 5000,   // 5 seconds timeout for greeting
+      socketTimeout: 10000,    // 10 seconds timeout for socket
     });
     
     // 测试 SMTP 连接
