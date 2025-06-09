@@ -215,7 +215,7 @@ export default function SearchResults({ results, loading, query, onUserClick }) 
                   
                   {item.status && (
                     <span className="capitalize">
-                      {t('search.status')}: {t(`Projects.status.${item.status}`)}
+                      {t('search.status')}: {t(`Projects.status.${item.status.toLowerCase()}`)}
                     </span>
                   )}
 
