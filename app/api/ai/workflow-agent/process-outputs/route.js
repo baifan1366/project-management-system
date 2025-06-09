@@ -24,18 +24,9 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-    
-    console.log(`API: Processing outputs for workflow ${workflowId} with formats: ${Object.keys(aiResponses).join(', ')}`);
-    console.log(`API: Node connections included: ${Object.keys(nodeConnections).length}`);
-    console.log(`API: Connection map included: ${Object.keys(connectionMap).length}`);
-    
+
     // Allow processing without userId in development (using a default)
     const userIdentifier = userId || 'default-user-id';
-    console.log('Using user identifier:', userIdentifier);
-    
-    // Log output settings for debugging
-    console.log('Output settings for processing:', outputSettings ? 
-      JSON.stringify(outputSettings, null, 2) : 'No output settings provided');
     
     // Process the outputs
     const result = await processOutputs(
@@ -46,9 +37,7 @@ export async function POST(request) {
       nodeConnections,
       connectionMap // Pass connectionMap to the processOutputs function
     );
-    
-    console.log('Output processing completed successfully');
-    
+        
     // Add information about the presentation design capabilities
     if (result.pptxUrl || result.ppt) {
       result.designInfo = {

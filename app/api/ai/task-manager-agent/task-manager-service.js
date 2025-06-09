@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase';
 
 // 调用AI解析用户指令
 export async function parseInstruction(instruction) {
-  console.log("正在调用AI解析指令...");
   try {
     const completion = await openai.chat.completions.create({
       model: "qwen/qwen2.5-vl-32b-instruct:free",
@@ -37,12 +36,9 @@ export async function parseInstruction(instruction) {
       aiContent = completion;
     } else {
       // Log the response structure for debugging
-      console.log("Unexpected API response structure:", JSON.stringify(completion).substring(0, 500) + "...");
       aiContent = "";
     }
-    
-    console.log("AI响应:", aiContent.substring(0, 200) + "...");
-    
+        
     // Use safeParseJSON utility to parse the response
     const { data: aiResponse, error: parseError } = safeParseJSON(aiContent);
     
@@ -75,7 +71,6 @@ export async function createProjectAndTasks(
   
   // 创建项目（如果需要）
   if (!existingProjectId && aiResponse.action === "create_project_and_tasks" && aiResponse.project) {
-    console.log("创建新项目和任务流程");
     const createdProject = await dbService.createProject(aiResponse.project, userId);
     projectId = createdProject.id;
     
@@ -83,7 +78,6 @@ export async function createProjectAndTasks(
     const teamId = await dbService.createTeam(projectId, aiResponse.project.project_name, userId);
     
     // 使用AI推荐的自定义字段，将它们关联到团队
-    console.log("正在关联自定义字段到团队...");
     
     // 定义要关联的字段ID和排序，使用AI推荐或默认配置
     const customFieldsToAssociate = aiResponse.recommended_views || [
@@ -100,7 +94,6 @@ export async function createProjectAndTasks(
       //{ "id": 11, "name": "Agile", "order_index": 10 }
     ];
     
-    console.log("将使用以下自定义字段:", customFieldsToAssociate);
     
     // 创建team_custom_field关联
     for (let i = 0; i < customFieldsToAssociate.length; i++) {
@@ -148,7 +141,6 @@ export async function createProjectAndTasks(
     }
     
     if (!sectionData || sectionData.length === 0) {
-      console.log("未找到现有分区，创建新分区");
       // 创建默认分区
       try {
         const newSection = await dbService.createSection(teamId, userId);
@@ -159,16 +151,13 @@ export async function createProjectAndTasks(
         var sectionId = 0;
       }
     } else {
-      console.log(`找到 ${sectionData.length} 个分区，使用第一个分区`);
       var sectionId = sectionData[0].id;
     }
     
     // 处理任务
     if (aiResponse.tasks && aiResponse.tasks.length > 0) {
-      console.log(`正在处理 ${aiResponse.tasks.length} 个任务`);
       
       for (const taskInfo of aiResponse.tasks) {
-        console.log(`处理任务: ${JSON.stringify(taskInfo)}`);
         
         // 常规任务处理流程
         const taskData = await dbService.createTask(taskInfo, userId);
@@ -182,14 +171,11 @@ export async function createProjectAndTasks(
     }
   }
   // 仅创建任务（如果有现有项目ID）
-  else if (existingProjectId) {
-    console.log("向现有项目添加任务流程");
-    
+  else if (existingProjectId) {    
     // 使用提供的团队ID，或者查询项目关联的团队
     let teamId = providedTeamId;
     
     if (!teamId) {
-      console.log("未提供团队ID，尝试查询项目关联的团队");
       const { data: teamData, error: teamError } = await supabase
         .from('team')
         .select('id')
@@ -207,9 +193,6 @@ export async function createProjectAndTasks(
       
       // 使用第一个团队（如果有多个）
       teamId = teamData[0].id;
-      console.log(`找到 ${teamData.length} 个团队，使用第一个团队 ID: ${teamId}`);
-    } else {
-      console.log(`使用提供的团队 ID: ${teamId}`);
     }
     
     // 添加团队成员（如果有）
@@ -230,7 +213,6 @@ export async function createProjectAndTasks(
     let sectionId = providedSectionId;
     
     if (!sectionId) {
-      console.log("未提供分区ID，尝试查询团队分区");
       // 获取团队的默认分区
       const { data: sectionData, error: sectionError } = await supabase
         .from('section')
@@ -243,24 +225,18 @@ export async function createProjectAndTasks(
       }
       
       if (!sectionData || sectionData.length === 0) {
-        console.log("未找到现有分区，创建新分区");
         // 创建默认分区
         const newSection = await dbService.createSection(teamId, userId);
         sectionId = newSection.id;
       } else {
-        console.log(`找到 ${sectionData.length} 个分区，使用第一个分区`);
         sectionId = sectionData[0].id;
       }
-    } else {
-      console.log(`使用提供的分区 ID: ${sectionId}`);
     }
     
     // 处理任务
     if (aiResponse.tasks && aiResponse.tasks.length > 0) {
-      console.log(`正在处理 ${aiResponse.tasks.length} 个任务`);
       
       for (const taskInfo of aiResponse.tasks) {
-        console.log(`处理任务: ${JSON.stringify(taskInfo)}`);
         
         // 常规任务处理流程
         const taskData = await dbService.createTask(taskInfo, userId);
@@ -282,23 +258,19 @@ export async function createProjectAndTasks(
 
 // 直接处理邀请指令
 export async function handleInvitation(instruction, userId, projectId, teamId, sectionId) {
-  console.log("直接处理邀请指令");
   
   // 提取邮箱
   const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   const emails = instruction.match(emailPattern);
   
   if (!emails || emails.length === 0) {
-    console.log("邀请指令中未找到邮箱");
     throw new Error("No email addresses found in invitation instruction");
   }
   
-  console.log(`找到以下邮箱: ${emails.join(', ')}`);
   
   // 获取或查询团队ID
   let targetTeamId = teamId;
   if (!targetTeamId && projectId) {
-    console.log("未提供团队ID，尝试查询项目关联的团队");
     const { data: teamData, error: teamError } = await supabase
       .from('team')
       .select('id')
@@ -316,7 +288,6 @@ export async function handleInvitation(instruction, userId, projectId, teamId, s
     
     // 使用第一个团队
     targetTeamId = teamData[0].id;
-    console.log(`找到 ${teamData.length} 个团队，使用第一个团队 ID: ${targetTeamId}`);
   }
   
   if (!targetTeamId) {
@@ -329,7 +300,6 @@ export async function handleInvitation(instruction, userId, projectId, teamId, s
   
   for (const email of emails) {
     try {
-      console.log(`正在邀请 ${email} 加入团队 ${targetTeamId}`);
       const inviteResult = await dbService.inviteTeamMember(targetTeamId, email, 'CAN_VIEW', userId);
       results.push({ email, success: true });
     } catch (error) {

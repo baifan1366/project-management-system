@@ -19,25 +19,10 @@ export async function GET(request) {
 
     // 如果提供了会话ID，先获取会话详情
     if (sessionId) {
-      console.log('Retrieving session information for:', sessionId);
       
       // 从Stripe获取会话详情
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      console.log('Session retrieved:', {
-        id: session.id,
-        payment_intent: session.payment_intent,
-        payment_status: session.payment_status,
-        customer_email: session.customer_email,
-      });
-      
-      console.log('Full session details:', JSON.stringify({
-        payment_status: session.payment_status,
-        status: session.status,
-        currency: session.currency,
-        amount_total: session.amount_total,
-        metadata: session.metadata
-      }, null, 2));
-      
+
       // 返回会话数据
       return NextResponse.json({
         id: session.id,
@@ -56,7 +41,6 @@ export async function GET(request) {
     if (paymentIntentId) {
       // 获取支付意向详情
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      console.log('Retrieved payment intent:', JSON.stringify(paymentIntent, null, 2)); // 详细日志
 
       // 确保包含所有必要的字段
       const paymentDetails = {
@@ -73,7 +57,6 @@ export async function GET(request) {
         created: paymentIntent.created
       };
 
-      console.log('Sending payment details:', JSON.stringify(paymentDetails, null, 2)); // 详细日志
 
       return NextResponse.json(paymentDetails);
     }
