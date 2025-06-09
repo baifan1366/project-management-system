@@ -77,9 +77,9 @@ export default function SearchPage() {
       const userIdParam = currentUser?.id ? `&userId=${currentUser.id}` : '';
       const response = await fetch(`/api/search?query=${encodeURIComponent(searchQuery)}${userIdParam}`);
       
-      console.log('Fetching search results for:', searchQuery);
+      
       const data = await response.json();
-      console.log('Search results received:', data.results?.length || 0);
+      
       
       if (response.ok) {
         setResults(data.results || []);

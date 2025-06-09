@@ -677,9 +677,8 @@ export default function AdminUserManagement() {
     const validationResult = validatePassword(password);
     setIsPasswordValid(validationResult.isValid);
     setIsPasswordMatch(password === confirmPassword)
-    console.log("Password valid?:", validationResult.isValid);
-    console.log("password matach? :", isPasswordMatch)
-  }, [password, confirmPassword]);
+    
+    }, [password, confirmPassword]);
 
   // Fetch permissions for a specific admin
   const fetchAdminPermissions = async (adminId) => {

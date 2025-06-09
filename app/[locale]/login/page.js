@@ -93,18 +93,18 @@ export default function LoginPage() {
   useEffect(() => {
     // 如果用户已登录且不在加载中，检查是否需要重定向
     if (user && !userLoading) {
-      console.log('检测到用户已登录，检查重定向参数:', { redirect });
+      
       // 添加小延迟确保页面完全加载
       const timer = setTimeout(() => {
         if (redirect && redirect.includes('teamInvitation')) {
           // 如果是团队邀请页面，重定向回邀请页面
           // 确保路径格式正确（添加前导斜杠如果没有）
           const redirectPath = redirect.startsWith('/') ? redirect : `/${redirect}`;
-          console.log('重定向到团队邀请页面:', redirectPath);
+          
           router.push(`/${locale}${redirectPath}`);
         } else {
           // 默认重定向到项目页面
-          console.log('重定向到项目页面');
+          
           router.replace(`/${locale}/projects`);
         }
       }, 100);
@@ -116,17 +116,17 @@ export default function LoginPage() {
   const handleRedirect = (user) => {
     if (!user) return;
     
-    console.log('处理重定向，redirect值:', redirect);
+    
     
     if (redirect && redirect.includes('teamInvitation')) {
       // 如果是团队邀请页面，重定向回邀请页面
       // 确保路径格式正确（添加前导斜杠如果没有）
       const redirectPath = redirect.startsWith('/') ? redirect : `/${redirect}`;
-      console.log('重定向到团队邀请页面:', redirectPath);
+      
       router.push(`/${locale}${redirectPath}`);
     } else {
       // 默认重定向到项目页面
-      console.log('重定向到项目页面');
+      
       router.replace(`/${locale}/projects`);
     }
   };
@@ -221,7 +221,7 @@ export default function LoginPage() {
         url += `?${params.toString()}`;
       }
       
-      console.log('Google登录重定向URL:', url);
+      
       
       // Redirect to our custom OAuth endpoint
       window.location.href = url;
@@ -256,7 +256,7 @@ export default function LoginPage() {
         url += `?${params.toString()}`;
       }
       
-      console.log('Github登录重定向URL:', url);
+      
       
       // Redirect to our custom OAuth endpoint
       window.location.href = url;

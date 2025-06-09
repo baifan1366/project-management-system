@@ -122,7 +122,7 @@ export default function AdminSubscriptions() {
       if(error){
         console.error('Error fetching subscription plans:', error);
       } else {
-        console.log('Subscription plans fetched successfully:', data);
+        
         setSubscriptionPlans(data);
       }    
     } catch (error) {
@@ -140,7 +140,7 @@ export default function AdminSubscriptions() {
       if(error){
         console.error('Error fetching promo codes:', error);
       } else {
-        console.log('Promo codes fetched successfully:', data);
+        
         setPromoCodes(data);
       }
     } catch (error) {
@@ -180,7 +180,7 @@ export default function AdminSubscriptions() {
         return;
       }
       
-      console.log('User subscriptions fetched successfully:', data);
+      
       setUserSubscriptions(data || []);
     } catch (error) {
       console.error('Error in fetchUserSubscriptions:', error);
@@ -243,7 +243,7 @@ export default function AdminSubscriptions() {
       setPlanIsActive(plan.is_active ? 'true' : 'false');
       
     } else if(type === 'edit' && code){
-      console.log('code', code);
+      
       // Reset form values for promo codes
       setCodeName(code.code || '');
       setCodeType(code.discount_type || '');
@@ -437,7 +437,7 @@ export default function AdminSubscriptions() {
         return;
       }
       
-      console.log('Promo code deleted successfully');
+      
       toast.success(`Promo code "${isCodeToDelete.code}" deleted successfully`);
       
       // Refresh the promo codes list
@@ -505,7 +505,7 @@ export default function AdminSubscriptions() {
           userEmail: payment.user?.email || 'No email'
         }));
         
-        console.log('Payment history fetched successfully:', formattedPayments);
+        
         setPayments(formattedPayments);
       }
     } catch (error) {
@@ -668,7 +668,7 @@ export default function AdminSubscriptions() {
           return;
         }
         
-        console.log('Promo code updated successfully:', data);
+        
         toast.success(`Promo code "${codeData.code}" updated successfully`);
         
         // Now fetchPromoCodes is accessible here
@@ -709,7 +709,7 @@ export default function AdminSubscriptions() {
         return false;
       }
 
-      console.log('Promo code added successfully:', data);
+      
       toast.success(`Promo code "${codeData.code}" added successfully`);
       
       await fetchPromoCodes();
@@ -3310,7 +3310,7 @@ export default function AdminSubscriptions() {
                   return;
                 }
                 
-                console.log('User subscription updated successfully:', data);
+                
                 toast.success(`Subscription for "${userName}" updated to ${planName} successfully`);
                 
                 // Refresh the user subscriptions list

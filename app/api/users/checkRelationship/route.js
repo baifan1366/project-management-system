@@ -80,28 +80,59 @@ export async function POST(request) {
     // Get unique project IDs
     const targetProjectIds = [...new Set(targetTeamProjects.map(team => team.project_id))];
     
-    // Check if current user has any teams in these projects
-    const { data: currentUserProjectTeams, error: userProjectTeamsError } = await supabase
+    // Get teams the current user belongs to
+    const { data: currentUserTeams, error: currentUserTeamsError } = await supabase
       .from('user_team')
-      .select('user_team.team_id, team.project_id')
-      .eq('user_team.user_id', userId)
-      .in('team.project_id', targetProjectIds)
-      .join('team', { 'user_team.team_id': 'team.id' });
+      .select('team_id')
+      .eq('user_id', userId);
       
-    if (userProjectTeamsError) {
-      console.error('Error checking common project teams:', userProjectTeamsError);
+    if (currentUserTeamsError) {
+      console.error('Error fetching current user teams:', currentUserTeamsError);
       return NextResponse.json({ 
-        error: 'Failed to check common project teams' 
+        error: 'Failed to fetch current user teams' 
       }, { status: 500 });
     }
     
+    if (!currentUserTeams || currentUserTeams.length === 0) {
+      return NextResponse.json({
+        hasRelationship: false,
+        isExternal: true,
+        commonTeamCount: 0
+      });
+    }
+    
+    // Get projects for the current user's teams
+    const currentUserTeamIds = currentUserTeams.map(team => team.team_id);
+    
+    const { data: currentUserProjects, error: currentUserProjectsError } = await supabase
+      .from('team')
+      .select('project_id')
+      .in('id', currentUserTeamIds);
+      
+    if (currentUserProjectsError) {
+      console.error('Error fetching current user projects:', currentUserProjectsError);
+      return NextResponse.json({ 
+        error: 'Failed to fetch current user projects' 
+      }, { status: 500 });
+    }
+    
+    // Convert to a Set for faster lookups
+    const currentUserProjectSet = new Set(
+      (currentUserProjects || []).map(team => team.project_id)
+    );
+    
+    // Check for common projects
+    const commonProjects = targetProjectIds.filter(projectId => 
+      currentUserProjectSet.has(projectId)
+    );
+    
     // Return relationship data
-    const hasRelationship = currentUserProjectTeams && currentUserProjectTeams.length > 0;
+    const hasRelationship = commonProjects.length > 0;
     
     return NextResponse.json({
       hasRelationship,
       isExternal: !hasRelationship,
-      commonTeamCount: currentUserProjectTeams?.length || 0
+      commonTeamCount: commonProjects.length
     });
   } catch (error) {
     console.error('Error in relationship check:', error);

@@ -8,19 +8,14 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 // GET: Fetch all subscription plans
 export async function GET() {
   try {
-    console.log('1. Creating Supabase client')
-    
     const supabase = createClient(supabaseUrl, supabaseKey)
     
-    console.log('2. Fetching active subscription plans')
     const { data, error } = await supabase
       .from('subscription_plan')
       .select('*')
       .eq('is_active', true) // 只获取激活的计划
       .order('price', { ascending: true })
       .order('id', { ascending: true })
-
-    console.log('3. Query result:', { data, error })
 
     if (error) {
       throw error

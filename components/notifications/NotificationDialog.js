@@ -53,7 +53,7 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
     // If Header handles subscriptions, we only refresh data but don't manage subscriptions
     if (headerHandlesSubscription) {
       // Only refresh data, don't handle subscriptions
-      console.log('NotificationDialog: Header handles subscriptions, only refreshing data');
+      
       dispatch(fetchNotifications(user.id));
       return;
     }
@@ -62,19 +62,18 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
     
     // Don't re-subscribe if already subscribed
     if (!isSubscribed) {
-      console.log('NotificationDialog: Starting realtime subscription (dialog-managed)');
       dispatch(subscribeToNotifications(user.id));
       dialogSubscriptionCreatedRef.current = true;
     } else {
       // Just refresh the data if already subscribed
-      console.log('NotificationDialog: Already subscribed, refreshing data');
+      
       dispatch(fetchNotifications(user.id));
     }
     
     // Clean up when dialog closes, but only if we created the subscription
     return () => {
       if (!headerHandlesSubscription && dialogSubscriptionCreatedRef.current && isSubscribed) {
-        console.log('NotificationDialog: Cleaning up dialog-managed subscription');
+        
         dispatch(unsubscribeFromNotifications());
         dialogSubscriptionCreatedRef.current = false;
       }

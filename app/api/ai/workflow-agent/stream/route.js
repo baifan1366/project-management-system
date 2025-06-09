@@ -6,7 +6,7 @@ export const maxDuration = 60; // 60 second timeout (max for hobby plan)
 // This function handles the streaming of AI responses
 export async function POST(request) {
   try {
-    console.log('Stream API: Starting request processing');
+    
     
     // Parse request body
     const body = await request.json();
@@ -22,7 +22,7 @@ export async function POST(request) {
       aiModels = []
     } = body;
     
-    console.log(`Stream API: Received request for workflow ${workflowId}`);
+    
     
     if (!workflowId) {
       return new Response(JSON.stringify({ error: 'workflowId is required' }), {
@@ -33,10 +33,6 @@ export async function POST(request) {
 
     // Allow processing without userId in development (using a default)
     const userIdentifier = userId || 'default-user-id';
-    console.log('Using user identifier:', userIdentifier);
-    
-    // Log output settings for debugging
-    console.log('Output settings received:', JSON.stringify(outputSettings, null, 2));
     
     // Set up response streaming
     const encoder = new TextEncoder();
@@ -49,7 +45,7 @@ export async function POST(request) {
     // Function to send a chunk of data
     const writeChunk = async (data) => {
       if (isWriterClosed) {
-        console.log('Skipping write attempt on closed stream');
+        
         return;
       }
       
@@ -90,7 +86,7 @@ export async function POST(request) {
         }
       }
       
-      console.log('Stream API: Stream completed successfully');
+      
     }).catch(async (error) => {
       console.error('Error in streaming workflow:', error);
       
@@ -106,7 +102,7 @@ export async function POST(request) {
       }
     });
     
-    console.log('Stream API: Returning stream response');
+    
     
     // Return the stream as response
     return new Response(stream.readable, {

@@ -316,7 +316,6 @@ async function uploadFileToStorage(fileBuffer, fileName, contentType, userId) {
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      console.log(`尝试上传文件到存储 (尝试 ${attempt + 1}/${maxRetries}): ${fileName}`);
       const filePath = `workflows/${userId}/${fileName}`;
       
       const { data, error } = await supabase.storage
@@ -333,7 +332,6 @@ async function uploadFileToStorage(fileBuffer, fileName, contentType, userId) {
         .from("workflow-files")
         .getPublicUrl(filePath);
       
-      console.log(`文件上传成功: ${fileName}`);
       return urlData.publicUrl;
     } catch (error) {
       lastError = error;
@@ -345,7 +343,6 @@ async function uploadFileToStorage(fileBuffer, fileName, contentType, userId) {
                             error.message.includes('connection') ||
                             error.code === 'UND_ERR_CONNECT_TIMEOUT')) {
         const retryDelay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-        console.log(`等待 ${retryDelay}ms 后重试...`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
         // 继续下一次重试
       } else {
@@ -365,7 +362,6 @@ async function uploadFileToStorage(fileBuffer, fileName, contentType, userId) {
 // Generate PowerPoint presentation from JSON content
 async function generatePPTX(content, userId) {
   try {
-    console.log("Generating PPTX with content:", JSON.stringify(content, null, 2).substring(0, 500) + "...");
     
     // Check if content has an error
     if (content.error) {
@@ -384,7 +380,6 @@ async function generatePPTX(content, userId) {
     // Check the content structure
     let pptContent = content;
     if (content.ppt_generation && typeof content.ppt_generation === 'object') {
-      console.log("Using ppt_generation key from response");
       pptContent = content.ppt_generation;
     }
     
@@ -557,7 +552,6 @@ async function generatePPTX(content, userId) {
       userId
     );
     
-    console.log(`Presentation PPTX uploaded to: ${fileUrl}`);
     
     return fileUrl;
   } catch (error) {
@@ -569,7 +563,6 @@ async function generatePPTX(content, userId) {
 // Generate Word document from JSON content
 async function generateDOCX(content, userId) {
   try {
-    console.log("Generating DOCX with content:", JSON.stringify(content, null, 2).substring(0, 500) + "...");
     
     // Check if content has an error
     if (content.error) {
@@ -592,7 +585,6 @@ async function generateDOCX(content, userId) {
     let documentSections = [];
     
     if (!content.sections && typeof content === 'object') {
-      console.log("Content is not in expected format, creating a structured document from raw data");
       
       if (Object.keys(content).length > 0) {
         documentSections = Object.keys(content).map(key => {
@@ -873,7 +865,6 @@ async function generateDOCX(content, userId) {
       userId
     );
     
-    console.log('Document generated successfully:', fileUrl);
     
     // Return the URL directly instead of an object
     return fileUrl;
@@ -899,7 +890,6 @@ function normalizeFormatName(format) {
 // Create tasks from the AI response
 async function createTasksFromResult(taskResult, userId, teamId, projectId) {
   try {
-    console.log(`Creating tasks from result for user ${userId}, project ${projectId}, team ${teamId}`);
     
     // Import the createTask function from db-service.js
     const { createTask, addTaskToSection, createSection } = require('../../api/ai/task-manager-agent/db-service');
@@ -934,12 +924,10 @@ async function createTasksFromResult(taskResult, userId, teamId, projectId) {
         if (existingSections && existingSections.length > 0) {
           // Use the existing section
           sectionId = existingSections[0].id;
-          console.log(`Using existing section with ID: ${sectionId}`);
         } else {
           // Create a new section for the team
           const section = await createSection(teamId, userId);
           sectionId = section.id;
-          console.log(`Created new section with ID: ${sectionId}`);
         }
       } catch (error) {
         console.error("Error working with sections:", error);
@@ -954,12 +942,10 @@ async function createTasksFromResult(taskResult, userId, teamId, projectId) {
       try {
         // Create the task
         const task = await createTask(taskInfo, userId);
-        console.log(`Created task with ID: ${task.id}`);
         
         // Add task to section if section exists
         if (sectionId) {
           await addTaskToSection(sectionId, task.id);
-          console.log(`Added task ${task.id} to section ${sectionId}`);
         }
         
         createdTasks.push({
@@ -1044,15 +1030,9 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
       }
     }
     
-    console.log(`执行工作流，输出格式: ${outputFormats.join(', ')}`);
-    console.log('节点连接:', JSON.stringify(nodeConnections));
-    console.log('连接图:', JSON.stringify(connectionMap));
-    console.log('使用模型:', models.join(', '));
-    
     // STEP 1: 首先处理API节点，它们的结果将用于后续AI处理
     let apiExecutionResults = {};
     if (Object.keys(connectionMap).length > 0) {
-      console.log('1. 第一步: 执行API请求');
       
       // 查找输出类型为API的节点
       const apiNodes = [];
@@ -1065,7 +1045,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
       // 检查是否有API节点连接到AI模型节点
       for (const nodeId of apiNodes) {
         const apiSettings = outputSettings[nodeId];
-        console.log(`处理API节点 ${nodeId}`);
         
         // 查找哪些节点使用了这个API节点的输出
         const connectedToModelNodes = [];
@@ -1078,18 +1057,15 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
             if (outputSettings[sourceId]) {
               // 推测节点类型 - processNode通常没有特定类型，不在outputSettings中
               connectedToModelNodes.push(sourceId);
-              console.log(`找到连接到API节点 ${nodeId} 的节点: ${sourceId}`);
             }
           }
         }
         
         // 如果有节点连接到此API节点
         if (connectedToModelNodes.length > 0) {
-          console.log(`API节点 ${nodeId} 连接到了 ${connectedToModelNodes.length} 个节点`);
           
           try {
             // 执行API请求
-            console.log(`执行API请求: ${apiSettings.url}, 方法: ${apiSettings.method}`);
             
             // 使用输入作为API请求体
             const apiResponse = await executeApiRequest(
@@ -1102,7 +1078,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
             apiResponses[nodeId] = apiResponse;
             apiExecutionResults[nodeId] = apiResponse.data;
             
-            console.log(`API请求成功，状态码: ${apiResponse.status}`);
           } catch (apiError) {
             console.error(`执行API请求时出错:`, apiError);
             apiResponses[nodeId] = {
@@ -1115,9 +1090,7 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
     }
     
     // STEP 2: 执行AI处理，使用API响应作为输入
-    console.log('2. 第二步: 执行AI处理');
     for (const model of models) {
-      console.log(`使用模型 ${model} 处理...`);
       modelResults[model] = {};
       
       // 收集所有输出节点类型，以便特殊处理Task和Chat节点
@@ -1151,7 +1124,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
                 outputSettings[sourceId] && outputSettings[sourceId].type === 'api' && 
                 apiResponses[sourceId]) {
               connectedApiNodes.push(sourceId);
-              console.log(`找到连接到${nodeType}节点 ${nodeId} 的API节点: ${sourceId}`);
             }
           }
           
@@ -1159,7 +1131,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
           for (const apiNodeId of connectedApiNodes) {
             if (apiResponses[apiNodeId]?.data) {
               apiDataByNodeType[nodeType][apiNodeId] = apiResponses[apiNodeId].data;
-              console.log(`将API节点 ${apiNodeId} 的数据添加到 ${nodeType} 节点 ${nodeId} 的上下文`);
             }
           }
         }
@@ -1178,7 +1149,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
           
           // 对于其他未知格式，使用JSON格式的提示
           if (format !== 'api') {
-            console.log(`使用通用JSON格式的提示代替: ${format}`);
             const jsonPrompt = WORKFLOW_PROMPTS['json'];
             
             if (jsonPrompt) {
@@ -1198,16 +1168,13 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
           continue;
         }
         
-        console.log(`为格式执行AI请求: ${format} 使用模型: ${model}`);
         
         // 特殊处理task和chat格式，添加API数据
         let apiDataForFormat = {};
         if (format === 'task' && Object.keys(apiDataByNodeType.task).length > 0) {
           apiDataForFormat = apiDataByNodeType.task;
-          console.log(`为任务生成添加API数据上下文`);
         } else if (format === 'chat' && Object.keys(apiDataByNodeType.chat).length > 0) {
           apiDataForFormat = apiDataByNodeType.chat;
-          console.log(`为聊天消息生成添加API数据上下文`);
         }
         
         // 扩展处理AI请求函数，传入API数据
@@ -1227,17 +1194,14 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
     }
     
     // STEP 3: 处理输出节点
-    console.log('3. 第三步: 处理输出节点');
     
     // 处理PPT生成
     if (outputFormats.includes('ppt')) {
-      console.log('生成PPT文档...');
       try {
         // 使用AI生成的PPT内容，不直接使用API响应
         const pptContent = results['ppt'] || { error: "No valid presentation content generated" };
         const pptUrl = await generatePPTX(pptContent, userId);
         documentUrls['ppt'] = pptUrl;
-        console.log('PPT生成成功:', pptUrl);
       } catch (error) {
         console.error('生成PPT时出错:', error);
         documentUrls['ppt_error'] = error.message;
@@ -1246,7 +1210,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
     
     // 处理文档生成
     if (outputFormats.includes('document')) {
-      console.log('生成Word文档...');
       try {
         // 使用AI生成的文档内容，不直接使用API响应
         let docContent = results['document'] || { error: "No valid document content generated" };
@@ -1270,7 +1233,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
           ]
         };
         
-        console.log('文档生成成功:', docUrl);
       } catch (error) {
         console.error('生成文档时出错:', error);
         documentUrls['document_error'] = error.message;
@@ -1287,7 +1249,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
       // 检查源节点是否为PPT或文档节点
       const sourceSettings = outputSettings[sourceId] || {};
       
-      console.log(`分析节点连接: 源节点 ${sourceId} (类型: ${sourceSettings.type || 'unknown'}) -> 目标节点: [${targetNodes.join(', ')}]`);
       
       // 更智能的节点类型检测：
       // 1. 通过outputSettings中的明确类型
@@ -1301,17 +1262,14 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
       } else if (sourceId.includes('doc') || sourceId.includes('document') || sourceId.includes('ppt') || sourceId.includes('presentation')) {
         // 通过ID中的关键词猜测
         isDocumentNode = true;
-        console.log(`根据ID猜测 ${sourceId} 为文档节点`);
       } else if (/node_\d+/.test(sourceId)) {
         // 如果是node_1这样的标准节点名，检查是否处理了document或ppt格式
         if (outputFormats.includes('document') || outputFormats.includes('ppt')) {
-          console.log(`将 ${sourceId} 视为潜在的文档节点，因为工作流包含文档/PPT输出格式`);
           
           // 如果有node_1指向node_2，且我们处理了文档格式，则假设node_1是文档节点
           const firstNodePattern = /node_1/i;
           if (firstNodePattern.test(sourceId)) {
             isDocumentNode = true;
-            console.log(`将节点 ${sourceId} 标记为文档节点，因为它是流程中的第一个节点且工作流生成了文档`);
           }
         }
       }
@@ -1321,7 +1279,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
         if (!sourceSettings.type) {
           // 判断更可能是哪种文档类型
           const detectedType = outputFormats.includes('ppt') ? 'ppt' : 'document';
-          console.log(`将节点 ${sourceId} 的类型设置为 ${detectedType}`);
           
           // 更新outputSettings以便后续处理使用
           if (!outputSettings[sourceId]) {
@@ -1346,7 +1303,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
             // 更新目标节点的类型，如果之前没有设置
             if (!targetSettings.type) {
               const guessedType = targetId.includes('email') || targetId.includes('mail') ? 'email' : 'chat';
-              console.log(`根据ID猜测 ${targetId} 为 ${guessedType} 节点`);
               
               if (!outputSettings[targetId]) {
                 outputSettings[targetId] = {};
@@ -1359,7 +1315,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
           // 如果node_1指向node_2，且node_2没有确定类型，但我们有email或chat格式
           if (/node_\d+/.test(targetId)) {
             if (outputFormats.includes('email') || outputFormats.includes('chat')) {
-              console.log(`将 ${targetId} 视为潜在的邮件/聊天节点`);
               
               // 根据位置和输出格式猜测类型
               if (!targetSettings.type) {
@@ -1369,7 +1324,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
                   outputSettings[targetId] = {};
                 }
                 outputSettings[targetId].type = guessedType;
-                console.log(`将节点 ${targetId} 的类型设置为 ${guessedType}`);
               }
               return true;
             }
@@ -1381,21 +1335,11 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
         // 保存连接关系
         if (potentialTargets.length > 0) {
           docToNodeConnections[sourceId] = potentialTargets;
-          console.log(`文档节点 ${sourceId} 连接到以下节点: [${potentialTargets.join(', ')}]`);
         }
       }
     }
-    
-    // 输出在文档生成之后所检测到的所有连接关系
-    console.log('检测到的文档节点连接关系:', JSON.stringify(docToNodeConnections));
-    console.log('节点类型设置:', JSON.stringify(Object.entries(outputSettings).map(([id, settings]) => ({
-      id,
-      type: settings.type
-    }))));
-    
     // 处理任务创建
     if (outputFormats.includes('task')) {
-      console.log('处理任务创建...');
       try {
         // 获取任务数据来源
         const taskContent = results['task'];
@@ -1407,7 +1351,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
         
         if (taskNodes.length > 0) {
           const [nodeId, nodeSettings] = taskNodes[0];
-          console.log(`Using task settings from node ${nodeId}`);
           
           // 设置任务的团队和项目ID
           let taskTeamId = teamId;
@@ -1429,7 +1372,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
             results['task_result'] = taskResult;
             
             if (taskResult.success) {
-              console.log(`Successfully created ${taskResult.tasksCreated} tasks`);
             } else {
               console.error(`Failed to create tasks: ${taskResult.error}`);
             }
@@ -1449,7 +1391,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
     
     // 处理聊天消息发送
     if (outputFormats.includes('chat')) {
-      console.log('处理聊天消息发送...');
       try {
         // Find chat nodes in the output settings
         const chatNodes = Object.entries(outputSettings).filter(([_, settings]) => 
@@ -1459,7 +1400,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
         if (chatNodes.length > 0) {
           // Process each chat node
           for (const [nodeId, nodeSettings] of chatNodes) {
-            console.log(`Processing chat node ${nodeId}`);
             
             // Get chat session IDs, message template and format
             const chatSessionIds = nodeSettings.chatSessionIds || [];
@@ -1511,14 +1451,12 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
                   docLinksStr += `${index + 1}. ${doc.type === 'presentation' ? 'PowerPoint' : 'Word'}: ${doc.url}\n`;
                 });
                 contentStr += docLinksStr;
-                console.log(`已将 ${connectedDocuments.length} 个文档链接添加到聊天消息中`);
               }
               
               // 替换模板中的内容占位符
               const finalMessage = messageTemplate.replace('{{content}}', contentStr);
               
               // 发送消息到选择的聊天会话
-              console.log(`Sending messages to ${chatSessionIds.length} chat sessions with format ${messageFormat}`);
               const chatResult = await sendChatSessionMessages(chatSessionIds, finalMessage, messageFormat, userId);
               
               // 存储结果
@@ -1542,7 +1480,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
     
     // 处理邮件发送
     if (outputFormats.includes('email')) {
-      console.log('处理邮件发送...');
       try {
         // Find email nodes in the output settings
         const emailNodes = Object.entries(outputSettings).filter(([_, settings]) => 
@@ -1552,7 +1489,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
         if (emailNodes.length > 0) {
           // Process each email node
           for (const [nodeId, nodeSettings] of emailNodes) {
-            console.log(`Processing email node ${nodeId}`);
             
             // Check if recipients are specified
             if (nodeSettings.recipients) {
@@ -1592,18 +1528,15 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
                   });
                 });
                 
-                console.log(`已将 ${connectedDocuments.length} 个文档添加到邮件内容中`);
               }
               
               // 发送邮件
-              console.log(`Sending email to recipients: ${nodeSettings.recipients}`);
               const emailResult = await sendEmail(nodeSettings, content, userId);
               
               // 存储结果
               results['email_result'] = emailResult;
               
               if (emailResult.success) {
-                console.log(`Email sent successfully to ${emailResult.sentCount} recipients`);
               } else {
                 console.error(`Failed to send email: ${emailResult.error}`);
               }
@@ -1626,7 +1559,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
     
     // 处理节点间的通用连接关系 (除了上面特殊处理过的)
     if (Object.keys(connectionMap).length > 0) {
-      console.log('处理其他节点间的连接关系');
       
       // 检查是否有API节点需要处理
       for (const nodeId in nodeConnections) {
@@ -1635,13 +1567,11 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
         
         // 跳过已经在上面处理过的API节点
         if (apiSettings && apiSettings.type === 'api' && !apiResponses[nodeId]) {
-          console.log(`处理其他API节点 ${nodeId}`);
           
           // 获取连接到此API节点的源节点
           const sourceNodes = nodeConnections[nodeId]?.sourceNodes || [];
           
           if (sourceNodes.length > 0) {
-            console.log(`API节点 ${nodeId} 有 ${sourceNodes.length} 个源节点`);
             
             // 遍历所有源节点
             for (const sourceId of sourceNodes) {
@@ -1650,7 +1580,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
               
               // 如果源节点是JSON输出，使用它作为API请求体
               if (sourceSettings && sourceSettings.type === 'json') {
-                console.log(`使用JSON节点 ${sourceId} 作为API请求体`);
                 
                 // 修复获取JSON结果的方式 - 检查各种可能的结果格式
                 let jsonResult = null;
@@ -1659,7 +1588,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
                 for (const format in results) {
                   if (results[format]) {
                     jsonResult = results[format];
-                    console.log(`找到结果格式: ${format}, 使用此结果作为API请求数据`);
                     break;
                   }
                 }
@@ -1672,12 +1600,7 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
                   };
                   continue;
                 }
-                
-                // 执行API请求
-                console.log(`使用节点 ${nodeId} 的API设置执行请求`);
-                console.log(`请求URL: ${apiSettings.url}, 方法: ${apiSettings.method}`);
-                console.log(`请求数据:`, JSON.stringify(jsonResult).substring(0, 200) + '...');
-                
+
                 try {
                   // 使用API设置和JSON结果执行请求
                   const apiResponse = await executeApiRequest(
@@ -1688,7 +1611,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
                   
                   // 存储API响应
                   apiResponses[nodeId] = apiResponse;
-                  console.log(`API请求成功，状态码: ${apiResponse.status}`);
                 } catch (apiError) {
                   console.error(`执行API请求时出错:`, apiError);
                   apiResponses[nodeId] = {
@@ -1729,7 +1651,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
         };
       }
       
-      console.log('添加API响应到结果中:', Object.keys(results.api_results).length);
     }
     
     return {
@@ -1863,7 +1784,6 @@ ${apiDataStr}
 
 Based on the above API data, please ${userPrompt}`;
       
-      console.log('使用API数据增强提示');
     }
     
     // 创建基本请求配置
@@ -1888,7 +1808,6 @@ Based on the above API data, please ${userPrompt}`;
     }
     // 其他模型可能不支持response_format，依赖于system prompt
     
-    console.log(`向模型 ${model} 发送请求，格式: ${format}`);
     
     // 实现指数退避重试逻辑
     const maxRetries = 3;
@@ -1906,7 +1825,6 @@ Based on the above API data, please ${userPrompt}`;
         // 检查是否为速率限制错误
         if (error.status === 429) {
           const retryDelay = Math.pow(2, attempt) * 1000 + Math.random() * 1000; // 指数退避 + 随机抖动
-          console.log(`遇到速率限制，等待 ${retryDelay}ms 后重试 (尝试 ${attempt + 1}/${maxRetries})...`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           // 继续下一次重试
         } else {
@@ -1922,7 +1840,6 @@ Based on the above API data, please ${userPrompt}`;
     }
     
     // Add diagnostic logging
-    console.log(`从模型 ${model} 收到响应:`, JSON.stringify(completion).substring(0, 300) + '...');
     
     // Check if completion has the expected structure
     if (!completion || !completion.choices || !Array.isArray(completion.choices) || completion.choices.length === 0) {
@@ -1958,19 +1875,10 @@ Based on the above API data, please ${userPrompt}`;
     
     if (parseError || !formatResult) {
       console.error(`格式${format}的AI响应解析失败:`, parseError, "原始内容:", aiContent);
-      console.log("尝试清理后的内容:", cleanedContent);
       results[format] = { error: `解析AI响应失败: ${parseError || '无效的响应格式'}` };
       return { error: `解析AI响应失败: ${parseError || '无效的响应格式'}` };
     }
-    
-    // 记录结果结构以进行调试
-    console.log(`格式${format}的AI响应结构:`, JSON.stringify({
-      hasTitle: !!formatResult.title,
-      hasSlides: !!formatResult.slides,
-      hasSections: !!formatResult.sections,
-      resultKeys: Object.keys(formatResult)
-    }));
-    
+
     // 存储此格式的结果
     results[format] = formatResult;
     
@@ -2097,11 +2005,6 @@ async function sendChatSessionMessages(sessionIds, content, format = 'text', use
 // Send email with nodemailer
 async function sendEmail(emailSettings, content, userId) {
   try {
-    console.log('Sending email with settings:', JSON.stringify({
-      recipients: emailSettings.recipients,
-      subject: emailSettings.subject,
-      useCustomSmtp: emailSettings.useCustomSmtp
-    }));
     
     // Prepare the email content by replacing the content placeholder
     let emailContent = emailSettings.template || 'Hello,\n\nThis is an automated email:\n\n{{content}}\n\nRegards,\nWorkflow System';
@@ -2115,7 +2018,6 @@ async function sendEmail(emailSettings, content, userId) {
         // Check if there are attached files
         if (content.attachedFiles && Array.isArray(content.attachedFiles) && content.attachedFiles.length > 0) {
           attachedFiles = content.attachedFiles;
-          console.log(`Found ${attachedFiles.length} attached files in content`);
         }
         
         // Try to extract a 'content' field if it exists
@@ -2160,7 +2062,6 @@ async function sendEmail(emailSettings, content, userId) {
         }
       });
       
-      console.log(`Using custom SMTP: ${emailSettings.smtp.host}:${emailSettings.smtp.port}`);
     } else {
       // Use default SMTP settings from environment variables
       const defaultHost = process.env.NEXT_PUBLIC_SMTP_HOSTNAME;
@@ -2183,7 +2084,6 @@ async function sendEmail(emailSettings, content, userId) {
         }
       });
       
-      console.log(`Using default SMTP: ${defaultHost}:${defaultPort}`);
     }
     
     // Split recipients by comma
@@ -2208,7 +2108,6 @@ async function sendEmail(emailSettings, content, userId) {
     // Send the email
     const info = await transporter.sendMail(mailOptions);
     
-    console.log('Email sent successfully:', info.messageId);
     
     // Return success result
     return {
@@ -2342,7 +2241,6 @@ async function streamAIResponses(workflowId, inputs, modelId, userId, writeChunk
 // Stream a single AI request with real-time updates
 async function streamAIRequest(model, formatPrompt, userPrompt, format, writeChunk) {
   try {
-    console.log(`Streaming ${format} content using ${model}...`);
     
     // Special handling for deepseek models
     let updatedPrompt = formatPrompt;
@@ -2450,14 +2348,12 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
     const outputFormats = Object.keys(aiResponses);
     
     // Process API requests using JSON outputs
-    console.log('Processing API requests...');
     try {
       // Find all API nodes in output settings
       const apiNodeIds = Object.keys(outputSettings).filter(
         nodeId => outputSettings[nodeId]?.type === 'api'
       );
       
-      console.log(`Found ${apiNodeIds.length} API nodes to process`);
       
       // Process each API node
       if (apiNodeIds.length > 0) {
@@ -2471,7 +2367,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
             continue;
           }
           
-          console.log(`Processing API node ${apiNodeId} with URL: ${apiSettings.url}`);
           
           // Find JSON nodes connected to this API node
           let requestBody = {};
@@ -2480,14 +2375,12 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
           // Check if we have explicit connections defined for this API node
           if (nodeConnections && nodeConnections[apiNodeId] && nodeConnections[apiNodeId].sourceNodes) {
             const connectedJsonNodes = nodeConnections[apiNodeId].sourceNodes;
-            console.log(`API node ${apiNodeId} has explicit connections to JSON nodes:`, connectedJsonNodes);
             
             // Use the first connected JSON node's data as the request body
             for (const jsonNodeId of connectedJsonNodes) {
               if (outputFormats.includes('json') && aiResponses.json) {
                 requestBody = aiResponses.json;
                 hasJsonSource = true;
-                console.log(`Using JSON data from node ${jsonNodeId} for API request`);
                 break;
               }
             }
@@ -2499,19 +2392,16 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
               sourceId => connectionMap[sourceId] && connectionMap[sourceId].includes(apiNodeId)
             );
             
-            console.log(`API node ${apiNodeId} has connections from:`, sources);
             
             // Check if any of these sources have JSON data
             if (outputFormats.includes('json') && aiResponses.json && sources.length > 0) {
               requestBody = aiResponses.json;
               hasJsonSource = true;
-              console.log(`Using JSON data for API request based on connection map`);
             }
           }
           
           // If no JSON source found, use a simple placeholder or the first available AI response
           if (!hasJsonSource) {
-            console.log(`No JSON source found for API node ${apiNodeId}, using default data`);
             
             // Use the first available AI response or a placeholder
             const firstFormat = outputFormats[0];
@@ -2523,16 +2413,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
           }
           
           try {
-            // Execute API request with the JSON data as body
-            console.log(`Executing API request to ${apiSettings.url} with method ${apiSettings.method || 'POST'}`);
-            
-            // Add detailed debug information for the request body
-            if (typeof requestBody === 'object') {
-              console.log(`API request body: ${JSON.stringify(requestBody).substring(0, 200)}${JSON.stringify(requestBody).length > 200 ? '...' : ''}`);
-            } else if (typeof requestBody === 'string') {
-              console.log(`API request body (string): ${requestBody.substring(0, 200)}${requestBody.length > 200 ? '...' : ''}`);
-            }
-            
             const apiResponse = await executeApiRequest(
               apiSettings.url,
               apiSettings.method || 'POST',
@@ -2547,7 +2427,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
               data: apiResponse.data
             };
             
-            console.log(`API request successful, status: ${apiResponse.status}`);
           } catch (apiError) {
             console.error(`Error executing API request:`, apiError);
             
@@ -2558,7 +2437,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
           }
         }
         
-        console.log('Added API responses to results:', Object.keys(results.api_results).length);
       }
     } catch (apiProcessingError) {
       console.error('Error processing API requests:', apiProcessingError);
@@ -2567,7 +2445,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
     
     // Process document generation
     if (aiResponses.document) {
-      console.log('Generating Word document...');
       try {
         const docContent = aiResponses.document;
         
@@ -2575,7 +2452,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
         documentUrls.document = docUrl;
         documentUrls.docxUrl = docUrl; // For backwards compatibility
         
-        console.log('Document generated successfully:', docUrl);
       } catch (error) {
         console.error('Error generating document:', error);
         documentUrls.document_error = error.message;
@@ -2584,13 +2460,11 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
     
     // Process PowerPoint generation
     if (aiResponses.ppt) {
-      console.log('Generating PowerPoint presentation...');
       try {
         const pptContent = aiResponses.ppt;
         const pptUrl = await generatePPTX(pptContent, userId);
         documentUrls.ppt = pptUrl;
         
-        console.log('PowerPoint generated successfully:', pptUrl);
       } catch (error) {
         console.error('Error generating PowerPoint:', error);
         documentUrls.ppt_error = error.message;
@@ -2599,7 +2473,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
     
     // Process task creation
     if (aiResponses.task) {
-      console.log('Processing task creation...');
       try {
         const taskContent = aiResponses.task;
         
@@ -2608,7 +2481,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
         results.task_result = taskResult;
         
         if (taskResult.success) {
-          console.log(`Successfully created ${taskResult.tasksCreated} tasks`);
         } else {
           console.error(`Failed to create tasks: ${taskResult.error}`);
         }
@@ -2620,7 +2492,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
     
     // Process email sending
     if (aiResponses.email) {
-      console.log('Processing email sending...');
       try {
         // Find any email output nodes
         const emailNodeIds = Object.keys(outputSettings).filter(
@@ -2635,18 +2506,12 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
           subject: workflow.email_subject || 'Automated email from workflow system',
           template: workflow.email_template || 'Hello,\n\nThis is an automated email:\n\n{{content}}\n\nRegards,\nWorkflow System'
         };
-        
-        console.log('Sending email with settings:', {
-          recipients: emailSettings.recipients,
-          subject: emailSettings.subject
-        });
-        
+
         // Send email with edited content
         const emailResult = await sendEmail(emailSettings, aiResponses.email, userId);
         results.email_result = emailResult;
         
         if (emailResult.success) {
-          console.log(`Email sent successfully to ${emailResult.sentCount} recipients`);
         } else {
           console.error(`Failed to send email: ${emailResult.error}`);
         }
@@ -2658,7 +2523,6 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
     
     // Process chat message sending
     if (aiResponses.chat) {
-      console.log('Processing chat message sending...');
       try {
         // Find any chat output nodes
         const chatNodeIds = Object.keys(outputSettings).filter(

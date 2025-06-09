@@ -7,7 +7,7 @@ export async function GET(request) {
     const planId = searchParams.get('plan_id');
     const redirectTo = searchParams.get('redirectTo');
     
-    console.log('Github OAuth请求参数:', { redirect, planId, redirectTo });
+    
     
     // Build GitHub OAuth URL
     const githubOAuthEndpoint = 'https://github.com/login/oauth/authorize';

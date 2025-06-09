@@ -111,7 +111,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
             const resultAction = await dispatch(createCustomField(fieldData));
             
             if(createCustomField.fulfilled.match(resultAction)) {
-                console.log('Custom field created successfully');
+                
                 onClose();
             }
         } catch (error) {

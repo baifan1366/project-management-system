@@ -76,7 +76,7 @@ export async function DELETE(request, { params }) {
     
     // Handle token expiration
     if (response.status === 401 && refreshToken) {
-      console.log('Access token expired, attempting to refresh token');
+      
       const newAccessToken = await refreshAccessToken(refreshToken);
       
       if (!newAccessToken) {
@@ -199,7 +199,7 @@ export async function PATCH(request, { params }) {
     
     // Handle token expiration
     if (response.status === 401 && refreshToken) {
-      console.log('Access token expired, attempting to refresh token');
+      
       const newAccessToken = await refreshAccessToken(refreshToken);
       
       if (!newAccessToken) {

@@ -10,8 +10,6 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
   
   // Fetch available models on component mount or when userId changes
   useEffect(() => {
-    // Log userId changes for debugging
-    console.log('ModelSelector: userId changed:', userId);
     fetchModels();
   }, [userId]);
   
@@ -21,12 +19,10 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
       setIsLoading(true);
       
       if (userId) {
-        console.log('ModelSelector: Fetching models for userId:', userId);
         const response = await fetch(`/api/ai/workflow-agent/models?userId=${userId}`);
         
         if (response.ok) {
           const data = await response.json();
-          console.log('ModelSelector: Models fetched successfully:', data);
           setModels(data);
           
           // Set default model if not already set
@@ -39,7 +35,6 @@ export default function ModelSelector({ selectedModel, onModelChange, userId }) 
           console.error('ModelSelector: Failed to fetch models, status:', response.status);
         }
       } else {
-        console.log('ModelSelector: Using default models (no userId)');
       }
       
       // Fallback to default models if API fails or userId is not available

@@ -14,7 +14,7 @@ export async function GET(request) {
   }
   
   try {
-    console.log('API: 获取用户通知，用户ID:', userId);
+    
     
     const { data, error } = await supabase
       .from('notification')
@@ -27,7 +27,7 @@ export async function GET(request) {
       throw error;
     }
     
-    console.log(`API: 成功获取到 ${data?.length || 0} 条通知`);
+    
     return NextResponse.json(data || []);
   } catch (error) {
     console.error('API: 获取通知失败:', error.message);

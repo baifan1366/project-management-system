@@ -13,7 +13,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
     
-    console.log("Redirecting to process-response endpoint for compatibility...");
+    
     
     // Use fetch to call the process-response endpoint internally
     const internalResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/ai/task-manager-agent/process-response`, {

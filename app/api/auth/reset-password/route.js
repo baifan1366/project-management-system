@@ -23,7 +23,7 @@ function isValidPassword(password) {
 
 // Request password reset
 export async function POST(request) {
-  console.log('====== Password Reset POST Request Started ======');
+  
   try {
     // Verify JWT_SECRET exists before proceeding
     if (!JWT_SECRET) {
@@ -33,9 +33,8 @@ export async function POST(request) {
       }, { status: 500 });
     }
     
-    console.log('1. Processing request body');
+    
     const data = await request.json();
-    console.log('1a. Raw request data:', JSON.stringify(data));
     
     // Extract email, handling both direct string and nested object formats
     let emailValue;
@@ -54,7 +53,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Email is required in a valid format' }, { status: 400 });
     }
     
-    console.log('2. Password reset requested for email:', emailValue);
+    
     
     // Check if email exists and is a valid string
     if (!emailValue) {
@@ -63,7 +62,7 @@ export async function POST(request) {
     
     // Ensure email is a string and normalize it
     const normalizedEmail = typeof emailValue === 'string' ? emailValue.toLowerCase().trim() : String(emailValue).toLowerCase().trim();
-    console.log('3. Normalized email:', normalizedEmail);
+    
     
     // Validate email format with a more robust check
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -71,7 +70,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
     
-    console.log('4. Looking up user in database');
+    
     // Check if user exists - using normalized email
     const { data: user, error: userError } = await supabase
       .from('user')
@@ -85,17 +84,17 @@ export async function POST(request) {
     
     if (userError || !user) {
       // Don't reveal if email exists or not for security
-      console.log('6. User not found or error occurred, returning generic success message');
+      
       return NextResponse.json({ 
         success: true, 
         message: 'If your email exists in our system, you will receive password reset instructions.'
       });
     }
     
-    console.log('7. User found:', user.id);
+    
     
     try {
-      console.log('8. Generating reset token');
+      
       // Generate reset token
       const resetToken = jwt.sign(
         { userId: user.id, email: user.email },
@@ -103,15 +102,12 @@ export async function POST(request) {
         { expiresIn: '24h' }  // Extended from 1h to 24h for better user experience
       );
       
-      console.log('9. Token generated successfully, setting expiration time');
+      
       // Add expiration time (24 hours from now) using UTC for consistency with database
       const tokenExpires = new Date();
       tokenExpires.setUTCHours(tokenExpires.getUTCHours() + 24);
       
-      console.log(`9a. Token will expire at: ${tokenExpires.toISOString()} (UTC time)`);
-      console.log(`9b. UTC expiration time: ${tokenExpires.toUTCString()}`);
       
-      console.log('10. Saving reset token to user record');
       // Save reset token to user
       const { error: updateError } = await supabase
         .from('user')
@@ -127,22 +123,17 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Failed to process password reset' }, { status: 500 });
       }
       
-      console.log('12. Reset token saved, preparing to send email');
+      
       
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-      console.log('13. Site URL for reset link:', siteUrl || 'NOT SET');
+      
       
       // Log SMTP configuration (without sensitive info)
-      console.log('14. SMTP Configuration:', {
-        host: process.env.NEXT_PUBLIC_SMTP_HOSTNAME || 'NOT SET',
-        port: process.env.NEXT_PUBLIC_SMTP_PORT || 'NOT SET',
-        secure: process.env.NEXT_PUBLIC_SMTP_SECURE || 'NOT SET',
-        fromEmail: process.env.NEXT_PUBLIC_EMAIL_FROM || 'NOT SET'
-      });
+      
       
       // Send password reset email with better error handling
       try {
-        console.log('15. Calling sendPasswordResetEmail function');
+        
         const emailResult = await sendPasswordResetEmail({
           to: user.email,
           name: user.name || 'User', // Add fallback in case name is null
@@ -150,14 +141,14 @@ export async function POST(request) {
           locale
         });
         
-        console.log('16. Email function returned result:', emailResult);
+        
         
         if (!emailResult.success) {
           console.error('17. Failed to send password reset email:', emailResult.error);
           return NextResponse.json({ error: 'Failed to send password reset email: ' + emailResult.error }, { status: 500 });
         }
         
-        console.log('18. Password reset email sent successfully');
+        
         
         return NextResponse.json({
           success: true,
@@ -188,7 +179,7 @@ export async function POST(request) {
 
 // Verify and set new password
 export async function PUT(request) {
-  console.log('====== Password Reset PUT Request Started ======');
+  
   try {
     // Verify JWT_SECRET exists before proceeding
     if (!JWT_SECRET) {
@@ -201,27 +192,27 @@ export async function PUT(request) {
     const data = await request.json();
     const { token, password, confirmPassword } = data;
     
-    console.log('Password reset request received. Validating inputs...');
+    
     
     if (!token || !password || !confirmPassword) {
-      console.log('Missing required fields');
+      
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
     }
     
     if (password !== confirmPassword) {
-      console.log('Passwords do not match');
+      
       return NextResponse.json({ error: 'Passwords do not match' }, { status: 400 });
     }
     
     if (!isValidPassword(password)) {
-      console.log('Password does not meet requirements');
+      
       return NextResponse.json({ 
         error: 'Password must be at least 8 characters long and include uppercase, lowercase, number, and special character' 
       }, { status: 400 });
     }
     
     try {
-      console.log('Verifying token validity...');
+      
       // Verify token with ignoreExpiration option to handle our own expiration logic
       let decoded;
       try {
@@ -233,15 +224,14 @@ export async function PUT(request) {
         }
         
         // If token is expired, verify without checking expiration
-        console.log('JWT token is expired, verifying signature only...');
+        
         decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true });
-        console.log('JWT signature is valid, proceeding with custom expiration check');
+        
       }
       
-      console.log(`Token decoded. UserId: ${decoded.userId}, Expires: ${new Date(decoded.exp * 1000).toISOString()}`);
       const { userId } = decoded;
       
-      console.log(`Looking up user with ID: ${userId}`);
+      
       // Find user with this token
       const { data: user, error: userError } = await supabase
         .from('user')
@@ -256,34 +246,34 @@ export async function PUT(request) {
       }
       
       if (!user) {
-        console.log('No user found with this token');
+        
         return NextResponse.json({ error: 'Invalid or expired token' }, { status: 400 });
       }
       
-      console.log('User found. Checking token expiration in database...');
+      
       // Check if token is expired with grace period
       const tokenExpires = new Date(user.reset_password_expires);
       // Ensure we're using UTC time for consistent comparison
       const now = new Date();
-      console.log(`Token expiration time: ${tokenExpires.toISOString()}, Current time: ${now.toISOString()}`);
+
       
       // Calculate time difference in minutes for grace period - ensure using UTC milliseconds
       const timeDifference = (now.getTime() - tokenExpires.getTime()) / (1000 * 60);
-      console.log(`Time difference in minutes: ${timeDifference.toFixed(2)}`);
+
       const GRACE_PERIOD_MINUTES = 60; // Extended from 15 to 60 minutes for better user experience
       
       if (tokenExpires < now) {
-        console.log(`Password reset token expired at ${tokenExpires.toISOString()}`);
+
         
         if (timeDifference > GRACE_PERIOD_MINUTES) {
-          console.log(`Token expired beyond ${GRACE_PERIOD_MINUTES} minute grace period. Cannot proceed.`);
+          
           return NextResponse.json({ error: 'Password reset token has expired' }, { status: 400 });
         }
         
-        console.log(`Token expired but within ${GRACE_PERIOD_MINUTES} minute grace period. Proceeding with password reset.`);
+        
       }
       
-      console.log('Token is valid. Updating password...');
+      
       
       try {
         // Hash the new password with proper bcrypt implementation
@@ -306,7 +296,7 @@ export async function PUT(request) {
           return NextResponse.json({ error: 'Failed to update password' }, { status: 500 });
         }
         
-        console.log('Password reset completed successfully');
+        
         return NextResponse.json({
           success: true,
           message: 'Password has been updated successfully'

@@ -29,7 +29,7 @@ const AdminHeader = ({
   }, []);
 
   useEffect(()=>{
-    console.log('admin data', adminData);
+    
   })
 
   // Handle theme toggle

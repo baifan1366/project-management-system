@@ -31,7 +31,7 @@ export default function AdminLoginPage() {
       .unwrap()
       .then(adminData => {
         if (adminData) {
-          console.log('Admin already logged in, redirecting to dashboard');
+          
           router.replace(`/admin/adminDashboard`);
         }
       });
@@ -55,7 +55,7 @@ export default function AdminLoginPage() {
     e.preventDefault();
     
     try {
-      console.log('Submitting login form...');
+      
       // Dispatch login action
       const adminData = await dispatch(loginAdmin({
         email: formData.email,
@@ -63,7 +63,7 @@ export default function AdminLoginPage() {
       })).unwrap();
       
       if (adminData) {
-        console.log('Login successful, redirecting to dashboard');
+        
         
         // Redirect to admin dashboard
         router.replace(`/admin/adminDashboard`);

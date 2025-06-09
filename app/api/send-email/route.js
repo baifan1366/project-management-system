@@ -14,7 +14,7 @@ export async function POST(request) {
     }
     
     // 使用环境变量中的 SMTP 配置
-    console.log('Creating transporter with SMTP config...');
+    
     const transporter = nodemailer.createTransport({
       host: process.env.NEXT_PUBLIC_SMTP_HOSTNAME,
       port: parseInt(process.env.NEXT_PUBLIC_SMTP_PORT || '587'),
@@ -61,7 +61,7 @@ export async function POST(request) {
     }
     
     // 发送邮件
-    console.log('Sending email to:', to);
+    
     const info = await transporter.sendMail({
       from: `"Team Sync" <${process.env.NEXT_PUBLIC_SMTP_FROM || process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
       to: to,
@@ -70,8 +70,8 @@ export async function POST(request) {
       html: emailHtml,
     });
     
-    console.log('Message sent: %s', info.messageId);
-    console.log('Response:', info.response);
+    
+    
     
     return NextResponse.json({
       success: true,

@@ -318,7 +318,7 @@ export async function GET(request) {
     const type = searchParams.get('type'); // Get the search type (mention, etc.)
     const sessionId = searchParams.get('sessionId'); // Get the chat session ID
     
-    console.log('Search API called with:', { query, userId, type, sessionId });
+    
     
     // // 如果查询过短，返回空结果
     // if (query.length < 2) {
@@ -378,14 +378,7 @@ export async function GET(request) {
       ...messages
     ];
     
-    console.log(`Search results for "${query}":`, { 
-      totalResults: results.length,
-      projectCount: projects.length,
-      taskCount: tasks.length,
-      userCount: users.length,
-      teamCount: teams.length,
-      messageCount: messages.length
-    });
+    
     
     return NextResponse.json({
       results

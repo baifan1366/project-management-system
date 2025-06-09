@@ -255,7 +255,7 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
         sessionData.participantsCount = allParticipants.length;
         
         // 确保created_by字段被保留
-        console.log("Refreshed session data with owner:", sessionData.created_by);
+        
       }
 
       // 更新toast为成功状态

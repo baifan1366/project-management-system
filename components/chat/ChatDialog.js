@@ -121,7 +121,20 @@ const ChatMessage = memo(({
                       <img 
                         src={attachment.file_url} 
                         alt={attachment.file_name || "Image"}
-                        className="max-w-full rounded-lg"
+                        className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => window.open(attachment.file_url, '_blank')}
+                        loading="lazy"
+                        onError={(e) => {
+                          console.error("Failed to load image:", attachment.file_url);
+                          e.target.onerror = null;
+                          e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
+                          e.target.style.padding = "20px";
+                          e.target.style.background = "#f0f0f0";
+                        }}
+                        style={{
+                          maxHeight: "200px",
+                          objectFit: "contain"
+                        }}
                       />
                     ) : (
                       <a 
@@ -314,15 +327,18 @@ export default function ChatDialog({
 
     fetchMessages();
 
-    // Subscribe to new messages
+    // Subscribe to new messages - with specific filter for this session only
     const channel = supabase
-      .channel(`chat_${sessionId}`)
+      .channel(`chat_dialog_${sessionId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'chat_message',
         filter: `session_id=eq.${sessionId}`
       }, async (payload) => {
+        // Only process messages for this specific session
+        if (payload.new.session_id !== sessionId) return;
+        
         // Directly fetch message with user info
         const { data: messageData, error: messageError } = await supabase
           .from('chat_message')
@@ -466,7 +482,7 @@ export default function ChatDialog({
       // 发送消息获取消息ID
       const sentMessage = await sendMessage(
         sessionId,
-        messageText || '发送了附件', // 如果没有消息文本，则使用默认文本
+        messageText || 'Sent an attachment', // 如果没有消息文本，则使用默认文本
         replyTo?.id || null,
         [] // 空数组作为mentions参数
       );
@@ -481,7 +497,8 @@ export default function ChatDialog({
               file_url: attachment.file_url,
               file_name: attachment.file_name,
               file_type: attachment.file_type,
-              is_image: attachment.is_image
+              is_image: attachment.is_image,
+              uploaded_by: currentUser.id // Use currentUser.id from the useGetUser hook
             });
             
           if (attachmentError) {

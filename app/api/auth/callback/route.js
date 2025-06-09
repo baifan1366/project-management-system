@@ -197,7 +197,7 @@ export async function GET(request) {
     const redirectParam = stateParams.get('redirect');
     const planId = stateParams.get('plan_id');
     
-    console.log('OAuth回调参数:', { provider, finalRedirect, redirectParam, planId });
+    
     
     // 构建重定向URL    
     let redirectUrl = '/projects'; // 默认重定向到项目页面
@@ -214,7 +214,7 @@ export async function GET(request) {
       redirectUrl = redirectParam;
     }
     
-    console.log('最终重定向URL:', redirectUrl);
+    
     
     if (!provider) {
       return NextResponse.redirect(new URL('/en/login?error=invalid_state', request.url));
@@ -413,7 +413,7 @@ export async function GET(request) {
         }
         
         try {
-          console.log('Creating free subscription plan for OAuth user:', userId);
+          
           const { data: subscriptionData, error: subscriptionError } = await supabase
             .from('user_subscription_plan')
             .insert([
@@ -431,7 +431,7 @@ export async function GET(request) {
             console.error('Error creating subscription for OAuth user:', subscriptionError);
             // Continue with login despite subscription error
           } else {
-            console.log('Subscription created successfully for OAuth user:', subscriptionData);
+            
           }
         } catch (subscriptionCreateError) {
           console.error('Exception during subscription creation for OAuth user:', subscriptionCreateError);
@@ -474,7 +474,7 @@ export async function GET(request) {
         finalDestination = `/${locale}/${redirectUrl}`;
       }
       
-      console.log('最终重定向目标:', finalDestination);
+      
       
       // Redirect to specified URL or dashboard
       return NextResponse.redirect(new URL(finalDestination, request.url));

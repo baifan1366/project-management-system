@@ -78,7 +78,7 @@ export default function AdminSupport() {
   // Add this function after fetchSupportTickets
   const fetchTicketReplies = useCallback(async (ticketId) => {
     try {
-      console.log('Fetching replies for ticket:', ticketId);
+      
       
       // First, get the admin user data
       const { data: adminUserData, error: adminError } = await supabase
@@ -90,7 +90,7 @@ export default function AdminSupport() {
       if (adminError) {
         console.error('Error fetching admin user data:', adminError);
       } else {
-        console.log('Admin user data:', adminUserData);
+        
       }
 
       // Then fetch the replies with admin user data
@@ -111,7 +111,7 @@ export default function AdminSupport() {
         throw error;
       }
       
-      console.log('Fetched ticket replies:', data);
+      
       
       // Update the state with all replies
       setTicketReplies(data || []);
@@ -155,7 +155,7 @@ export default function AdminSupport() {
       if (data) {
         setRefundData(data);
       } else {
-        console.log('No refund request found for contact:', contactId);
+        
         setRefundData(null);
       }
     } catch (error) {
@@ -453,8 +453,8 @@ export default function AdminSupport() {
     if (!selectedTicket || !refundData) return;
     
     try {
-      console.log('Starting refund action:', action);
-      console.log('Admin data:', adminData);
+      
+      
       
       if (!adminData?.id) {
         throw new Error('Admin ID is required to process the request');
@@ -529,7 +529,7 @@ export default function AdminSupport() {
             });
             
             const emailResult = await emailResponse.json();
-            console.log('Rejection email sent result:', emailResult);
+            
             
           } catch (emailError) {
             console.error('Error sending refund rejection email:', emailError);
@@ -648,7 +648,7 @@ export default function AdminSupport() {
         }
         
         const refundResult = await refundResponse.json();
-        console.log('Refund processed successfully:', refundResult);
+        
         
         // Update the notes to include Stripe refund confirmation
         await supabase

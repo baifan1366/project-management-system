@@ -44,7 +44,7 @@ export default function AdminDashboard() {
       try {
         setLoading(true);
 
-        console.log('permissions', permissions || []);
+        
         // Fetch dashboard statistics
         await fetchDashboardStats();
         

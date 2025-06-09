@@ -179,7 +179,7 @@ export default function NotificationItem({ notification, onAction, formatDateToU
       
       if (error) throw error;
       
-      console.log(`Sent ${isAccepted ? 'acceptance' : 'decline'} notification to inviter ${meetData.inviterId}`);
+      
     } catch (error) {
       console.error('Failed to send meeting response notification:', error);
     }

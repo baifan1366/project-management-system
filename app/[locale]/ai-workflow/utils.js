@@ -199,7 +199,6 @@ const options = {
 
 fetch('${url}', options)
   .then(response => response.json())
-  .then(data => console.log(data))
   .catch(error => console.error('Error:', error));`;
 
   return code;
@@ -244,7 +243,6 @@ print(response.json())`;
 // 添加执行API请求的函数
 export async function executeApiRequest(apiUrl, method, body, headers = {}) {
   try {
-    console.log(`Executing API request to ${apiUrl} with method ${method}`);
     
     // 设置默认头信息
     const requestHeaders = {
@@ -264,7 +262,6 @@ export async function executeApiRequest(apiUrl, method, body, headers = {}) {
     }
     
     // 发送请求
-    console.log('Request options:', JSON.stringify(requestOptions));
     const response = await fetch(apiUrl, requestOptions);
     
     // 获取响应
@@ -541,7 +538,6 @@ export async function createDocxTemplate() {
     const content = zip.generate({ type: 'nodebuffer' });
     
     fs.writeFileSync(templatePath, content);
-    console.log('Document template created successfully at:', templatePath);
     return templatePath;
   } catch (error) {
     console.error('Error creating document template:', error);

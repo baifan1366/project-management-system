@@ -482,7 +482,7 @@ export default function UserManagement() {
         notifications_enabled: true
       };
       
-      console.log('Inserting user with data:', userDataWithId);
+      
       
       // Insert directly using Supabase client
       const { data, error } = await supabase

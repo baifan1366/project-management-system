@@ -76,7 +76,7 @@ export async function POST() {
  */
 async function checkSubscriptionRenewal(userId) {
   try {
-    console.log(`Checking subscription renewal for user ${userId}`);
+    
     
     // Get user's auto-renew preference
     const { data: user, error: userError } = await supabase
@@ -86,13 +86,13 @@ async function checkSubscriptionRenewal(userId) {
       .single();
 
     if (userError) {
-      console.log('Error fetching user data:', userError);
+      
       return;
     }
 
     if (!user.auto_renew_enabled) {
       // Auto-renew not enabled
-      console.log(`Auto-renew not enabled for user ${userId}`);
+      
       return;
     }
 
@@ -125,13 +125,13 @@ async function checkSubscriptionRenewal(userId) {
 
     // If no subscription found or query error, just exit without error
     if (subError) {
-      console.log('Error checking for subscriptions:', subError);
+      
       return;
     }
 
     // Check if we have a subscription to process
     if (!subscriptions || subscriptions.length === 0) {
-      console.log(`No active subscription near expiration for user ${userId}`);
+      
       return;
     }
 
@@ -139,7 +139,7 @@ async function checkSubscriptionRenewal(userId) {
     
     // If subscription doesn't have auto-renew enabled, exit
     if (!subscription.auto_renew) {
-      console.log(`Subscription ${subscription.id} doesn't have auto-renew enabled`);
+      
       return;
     }
 
@@ -151,7 +151,7 @@ async function checkSubscriptionRenewal(userId) {
 
       if (lastAttempt > oneHourAgo) {
         // Already attempted recently, skip to avoid multiple attempts
-        console.log(`Skipping renewal for subscription ${subscription.id} - recently attempted at ${lastAttempt}`);
+        
         return;
       }
     }
@@ -167,7 +167,7 @@ async function checkSubscriptionRenewal(userId) {
         .limit(1);
         
       if (paymentMethodError) {
-        console.log('Error checking for default payment methods:', paymentMethodError);
+        
         return;
       }
       
@@ -182,22 +182,22 @@ async function checkSubscriptionRenewal(userId) {
           .eq('id', userId);
           
         if (updateUserError) {
-          console.log('Error updating user default payment method:', updateUserError);
+          
           // Continue with the payment method we found, even if updating the user record failed
         } else {
           // Update the local user object with the new payment method ID
           user.default_payment_method_id = defaultPaymentMethodId;
-          console.log(`Updated default payment method for user ${userId} to ${defaultPaymentMethodId}`);
+          
         }
       } else {
         // No default payment method found in either place
-        console.log(`No default payment method set for user ${userId} - skipping renewal`);
+        
         return;
       }
     }
 
     // Mark that we're attempting renewal
-    console.log(`Marking renewal attempt for subscription ${subscription.id}`);
+    
     await supabase
       .from('user_subscription_plan')
       .update({ 
@@ -208,7 +208,7 @@ async function checkSubscriptionRenewal(userId) {
     // Trigger the renewal process directly with the same logic as the API endpoint
     // This avoids issues with fetch() in server-side contexts
     try {
-      console.log(`Processing renewal for subscription ${subscription.id}`);
+      
       
       // Import Stripe directly in this function to ensure it's available
       const Stripe = require('stripe');
@@ -230,7 +230,7 @@ async function checkSubscriptionRenewal(userId) {
         }
       });
 
-      console.log(`Payment intent created: ${paymentIntent.id}, status: ${paymentIntent.status}`);
+      
 
       if (paymentIntent.status === 'succeeded') {
         // Payment successful, extend subscription
@@ -281,7 +281,6 @@ async function checkSubscriptionRenewal(userId) {
           // Non-critical error, we'll continue
         }
 
-        console.log(`Successfully renewed subscription ${subscription.id} until ${newEndDate.toISOString()}`);
 
         // Get user information for email
         const { data: userData, error: userDataError } = await supabase
@@ -304,7 +303,7 @@ async function checkSubscriptionRenewal(userId) {
             }),
             locale: 'en'
           });
-          console.log(`Sent renewal success email to ${userData.email}`);
+          
         } else {
           console.error('Error fetching user data for email:', userDataError);
         }
@@ -319,7 +318,7 @@ async function checkSubscriptionRenewal(userId) {
           })
           .eq('id', subscription.id);
         
-        console.log(`Payment requires additional action for subscription ${subscription.id}`);
+        
 
         // Get user information for email
         const { data: userData, error: userDataError } = await supabase
@@ -342,7 +341,7 @@ async function checkSubscriptionRenewal(userId) {
             }),
             locale: 'en'
           });
-          console.log(`Sent renewal failure email to ${userData.email}`);
+          
         } else {
           console.error('Error fetching user data for email:', userDataError);
         }
@@ -380,13 +379,13 @@ async function checkSubscriptionRenewal(userId) {
           }),
           locale: 'en'
         });
-        console.log(`Sent renewal failure email to ${userData.email}`);
+        
       } else {
         console.error('Error fetching user data for email:', userDataError);
       }
     }
   } catch (error) {
-    console.log('Error checking subscription renewal:', error);
+    
     // Don't throw error, as this is a background process
   }
 }
@@ -419,7 +418,7 @@ async function checkSubscriptionExpiration(userId) {
       return;
     }
     
-    console.log(`Found ${expiredSubscriptions.length} expired subscriptions for user ${userId}`);
+    
     
     // Get the free plan ID (typically 1)
     const FREE_PLAN_ID = 1;
@@ -437,14 +436,14 @@ async function checkSubscriptionExpiration(userId) {
         throw new Error(`Stored procedure error: ${transactionError.message}`);
       }
       
-      console.log(`Successfully handled subscription expiration for user ${userId} via stored procedure`);
+      
       return; // Successfully used the stored procedure
     } catch (procedureError) {
       // Log the error but continue with the fallback implementation
       console.error('Failed to use stored procedure for expiration handling, using fallback implementation:', procedureError);
     }
     
-    console.log('Using fallback implementation for subscription expiration handling');
+    
     
     // Fallback implementation: manually handle the updates
     // Mark expired subscriptions as EXPIRED
@@ -457,7 +456,7 @@ async function checkSubscriptionExpiration(userId) {
         })
         .eq('id', subscription.id);
       
-      console.log(`Marked subscription ${subscription.id} as EXPIRED`);
+      
     }
     
     // Check if user already has an active free plan
@@ -493,7 +492,7 @@ async function checkSubscriptionExpiration(userId) {
           })
           .eq('id', inactiveFreePlan.id);
         
-        console.log(`Reactivated free plan ${inactiveFreePlan.id} for user ${userId}`);
+        
       } else {
         // Create a new free plan subscription
         await supabase
@@ -507,10 +506,10 @@ async function checkSubscriptionExpiration(userId) {
             auto_renew: false // Free plans don't need auto-renewal
           });
         
-        console.log(`Created new free plan for user ${userId}`);
+        
       }
     } else {
-      console.log(`User ${userId} already has an active free plan`);
+      
     }
     
     // Send notification to the user about subscription expiration
@@ -526,7 +525,7 @@ async function checkSubscriptionExpiration(userId) {
           read: false
         });
       
-      console.log(`Sent expiration notification to user ${userId}`);
+      
     } catch (notifyError) {
       console.error('Error sending expiration notification:', notifyError);
     }

@@ -16,7 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { useConfirm } from '@/hooks/use-confirm';
 import ExternalBadge from '@/components/users/ExternalBadge';
-import useBatchUserRelationships from '@/lib/hooks/useBatchUserRelationships';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,22 +58,8 @@ function ChatLayout({ children }) {
   // Add state to control showing all hidden sessions
   const [showAllHidden, setShowAllHidden] = useState(false);
   
-  // Get all user IDs from visible and hidden sessions for batch relationship checking
-  const userIds = useMemo(() => {
-    const ids = [];
-    
-    // Collect user IDs from all sessions
-    sessions.forEach(session => {
-      if (session.type === 'PRIVATE' && session.participants?.[0]?.id) {
-        ids.push(session.participants[0].id);
-      }
-    });
-    
-    return [...new Set(ids)]; // Remove duplicates
-  }, [sessions]);
-  
-  // Use batch relationship checking for all users
-  const { relationships } = useBatchUserRelationships(userIds);
+  // Use relationship data from ChatContext directly instead of making API calls
+  const { userRelationships } = useChat();
   
   // Calculate total unread count excluding muted sessions
   const totalUnreadCount = useMemo(() => {
@@ -588,10 +573,14 @@ function ChatLayout({ children }) {
                               {sessionName}
                             </h3>
                             {/* Display external badge for private chats */}
-                            {session.type === 'PRIVATE' && session.participants?.[0]?.id && 
-                              relationships[session.participants[0].id]?.isExternal && (
-                              <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />
-                            )}
+                            {(() => {
+                              if (session.type === 'PRIVATE' && session.participants?.[0]?.id) {
+                                const userId = session.participants[0].id;
+                                const isExternal = userRelationships[userId]?.isExternal;
+                                return isExternal && <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />;
+                              }
+                              return null;
+                            })()}
                           </div>
                           <button
                             onClick={() => handleUnhideSession(session.id)}
@@ -669,10 +658,14 @@ function ChatLayout({ children }) {
                                 {sessionName}
                               </h3>
                               {/* Display external badge for private chats */}
-                              {session.type === 'PRIVATE' && session.participants?.[0]?.id && 
-                                relationships[session.participants[0].id]?.isExternal && (
-                                <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />
-                              )}
+                              {(() => {
+                                if (session.type === 'PRIVATE' && session.participants?.[0]?.id) {
+                                  const userId = session.participants[0].id;
+                                  const isExternal = userRelationships[userId]?.isExternal;
+                                  return isExternal && <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />;
+                                }
+                                return null;
+                              })()}
                             </div>
                             <button
                               onClick={() => handleUnhideSession(session.id)}
@@ -770,10 +763,14 @@ function ChatLayout({ children }) {
                                 {sessionName}
                               </h3>
                               {/* Display external badge for private chats */}
-                              {session.type === 'PRIVATE' && session.participants?.[0]?.id && 
-                                relationships[session.participants[0].id]?.isExternal && (
-                                <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />
-                              )}
+                              {(() => {
+                                if (session.type === 'PRIVATE' && session.participants?.[0]?.id) {
+                                  const userId = session.participants[0].id;
+                                  const isExternal = userRelationships[userId]?.isExternal;
+                                  return isExternal && <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />;
+                                }
+                                return null;
+                              })()}
                             </div>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               {formatChatTime(session.lastMessage?.created_at || session.matchedMessages?.[0]?.created_at)}

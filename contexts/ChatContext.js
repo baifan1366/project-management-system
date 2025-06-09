@@ -19,6 +19,8 @@ export function ChatProvider({ children }) {
   const [aiConversationId, setAiConversationId] = useState(null);
   const [chatMode, setChatMode] = useState('normal');
   const { user:authSession, isLoading: authLoading } = useGetUser();
+  // Add storage for user relationships to avoid repeated API calls
+  const [userRelationships, setUserRelationships] = useState({});
 
   // Add useEffect to handle the case where authentication is taking too long
   useEffect(() => {
@@ -542,7 +544,55 @@ export function ChatProvider({ children }) {
     });
 
     setSessions(sessionsWithMessages);
+    
+    // Fetch all user relationships in one batch
+    fetchAllUserRelationships(sessionsWithMessages);
+    
     setLoading(false);
+  };
+
+  // Add a function to fetch all user relationships at once
+  const fetchAllUserRelationships = async (sessionsData) => {
+    try {
+      if (!authSession || !sessionsData.length) return;
+      
+      // Extract all user IDs from private chat sessions
+      const userIds = [];
+      
+      sessionsData.forEach(session => {
+        if (session.type === 'PRIVATE' && session.participants?.[0]?.id) {
+          userIds.push(session.participants[0].id);
+        }
+      });
+      
+      // Remove duplicates
+      const uniqueUserIds = [...new Set(userIds)];
+      
+      if (uniqueUserIds.length === 0) return;
+      
+      // Batch fetch all relationships at once
+      const response = await fetch('/api/users/checkRelationshipBatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserIds: uniqueUserIds,
+          userId: authSession.id
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Relationship API response:', data);
+        // The API returns the results directly (not nested under a "relationships" property)
+        setUserRelationships(data);
+        console.log('Batch fetched all user relationships successfully');
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to batch fetch user relationships:', errorText);
+      }
+    } catch (error) {
+      console.error('Error fetching user relationships:', error);
+    }
   };
 
   // 获取会话消息
@@ -1663,7 +1713,8 @@ export function ChatProvider({ children }) {
       fetchMessages,
       deleteMessage,
       deleteChatSession,
-      leaveGroupChat
+      leaveGroupChat,
+      userRelationships
     }}>
       {children}
     </ChatContext.Provider>

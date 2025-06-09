@@ -43,7 +43,7 @@ export default function RouteGuard({ children }) {
       // Only check auth if cache is expired or doesn't exist
       const now = Date.now();
       if (cachedAuthState && now - lastAuthCheck < AUTH_CHECK_INTERVAL) {
-        console.log('Using cached auth state, skipping check');
+        
         return;
       }
       
@@ -88,23 +88,13 @@ export default function RouteGuard({ children }) {
       // Get current locale
       const locale = pathname.split('/')[1] || 'en';
 
-      console.log('🔒 Auth check:', { 
-        path: pathname,
-        isAdminPath,
-        isLoggedIn,
-        hasAuthToken: Boolean(isLoggedIn),
-        isPublicPath,
-        isSpecialPath,
-        isTeamInvitationPath,
-        redirectUrl
-      });
 
       // 使用safeNavigate函数包装所有导航操作，避免渲染期间的路由更新
       const safeNavigate = (path) => {
         // 使用setTimeout确保导航发生在渲染周期之后
         setTimeout(() => {
           if (window.location.pathname !== path) {
-            console.log('🚀 Safely navigating to:', path);
+            
             router.replace(path);
           }
         }, 0);
@@ -112,7 +102,7 @@ export default function RouteGuard({ children }) {
 
       // Handle team invitation path
       if (isTeamInvitationPath && !isLoggedIn) {
-        console.log('⚠️ Accessing team invitation page but not logged in, redirecting to login');
+        
         const redirectPath = pathname.replace(`/${locale}`, '');
         safeNavigate(`/${locale}/login?redirect=${encodeURIComponent(redirectPath)}`);
         return;
@@ -120,10 +110,10 @@ export default function RouteGuard({ children }) {
 
       // Handle redirect URL for logged in users
       if (isLoggedIn && redirectUrl) {
-        console.log('⚠️ User is logged in and has redirect parameter, handling redirect:', redirectUrl);
+        
         if (redirectUrl.includes('teamInvitation')) {
           const redirectPath = redirectUrl.startsWith('/') ? redirectUrl : `/${redirectUrl}`;
-          console.log('Redirecting to team invitation page:', redirectPath);
+          
           safeNavigate(`/${locale}${redirectPath}`);
           return;
         }
@@ -131,7 +121,7 @@ export default function RouteGuard({ children }) {
 
       // Handle authentication redirects
       if (!isLoggedIn && !isPublicPath && !isSpecialPath) {
-        console.log('⚠️ Not logged in, redirecting to appropriate login page');
+        
         if (isAdminPath) {
           safeNavigate('/admin/adminLogin');
         } else {
@@ -142,7 +132,7 @@ export default function RouteGuard({ children }) {
 
       // Handle logged in users accessing auth-only pages
       if (isLoggedIn && isPublicPath && !isSpecialPath && !pathname.startsWith('/pricing') && pathname !== '/') {
-        console.log('⚠️ Already logged in, redirecting to appropriate dashboard');
+        
         if (isAdminPath) {
           safeNavigate('/admin/adminDashboard');
         } else if (!redirectUrl) {

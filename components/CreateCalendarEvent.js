@@ -43,19 +43,6 @@ export default function CreateCalendarEvent({
   const { user: session } = useGetUser();
   const [dateError, setDateError] = useState('');
   
-  // Debug: Check Google auth status when component mounts
-  useEffect(() => {
-    if (eventType === 'google') {
-      console.log("Google connection status:", { 
-        isGoogleConnected, 
-        hasProviderToken: !!session?.provider_token,
-        hasRefreshToken: !!session?.provider_refresh_token,
-        hasGoogleAccessToken: !!session?.google_access_token,
-        hasGoogleRefreshToken: !!session?.google_refresh_token,
-        session: JSON.stringify(session)
-      });
-    }
-  }, [eventType, session, isGoogleConnected]);
   
   // 事件表单数据
   const [formData, setFormData] = useState({
@@ -195,7 +182,7 @@ export default function CreateCalendarEvent({
         return;
       }
 
-      console.log('Searching users with query:', query, 'Session user ID:', session.id);
+      
 
       const { data, error } = await supabase
         .from('user')
@@ -209,7 +196,7 @@ export default function CreateCalendarEvent({
         throw error;
       }
       
-      console.log('User search results:', data?.length || 0, 'users found');
+      
       setUsers(data || []);
     } catch (error) {
       console.error('搜索用户失败:', error);
@@ -461,7 +448,7 @@ export default function CreateCalendarEvent({
             
             if (isUpdateMode) {
               // 更新现有任务
-              console.log('Updating existing task with ID:', eventToEdit.id);
+              
               
               // 准备任务数据
               const taskData = {
@@ -483,7 +470,7 @@ export default function CreateCalendarEvent({
                 throw new Error(error.message || t('updateTaskFailed') || 'Failed to update task');
               }
               
-              console.log('Task successfully updated:', data);
+              
             } else {
               // 创建新任务
               const taskData = {
@@ -505,7 +492,7 @@ export default function CreateCalendarEvent({
                 throw new Error(error.message || t('createTaskFailed') || 'Failed to create task');
               }
               
-              console.log('Task successfully added to mytasks:', data);
+              
             }
           } else {
             throw new Error(t('notLoggedIn') || 'Not logged in');
@@ -545,7 +532,7 @@ export default function CreateCalendarEvent({
         
         if (isUpdateMode) {
           // 更新现有个人事件
-          console.log('Updating existing personal event with ID:', eventToEdit.id);
+          
           const { error } = await supabase
             .from('personal_calendar_event')
             .update(personalEventData)
@@ -581,10 +568,7 @@ export default function CreateCalendarEvent({
         let refreshToken = session?.google_refresh_token || null;
         
         // Add debug logging
-        console.log("Google auth tokens check:", { 
-          hasAccessToken: !!accessToken, 
-          hasRefreshToken: !!refreshToken
-        });
+        
         
         // Check if we have either token
         if (!accessToken && !refreshToken) {
@@ -597,10 +581,7 @@ export default function CreateCalendarEvent({
         // Try to refresh the token if we only have a refresh token or if token might be expired
         if ((!accessToken && refreshToken) || (refreshToken && session?.id)) {
           try {
-            console.log("Attempting to refresh token with:", { 
-              refreshTokenLength: refreshToken?.length || 0,
-              userId: session?.id
-            });
+            
             
             const response = await fetch('/api/refresh-google-token', {
               method: 'POST',
@@ -616,7 +597,7 @@ export default function CreateCalendarEvent({
             if (response.ok) {
               const data = await response.json();
               accessToken = data.access_token;
-              console.log("Successfully refreshed Google token");
+              
             } else {
               const errorText = await response.text();
               console.error("Failed to refresh Google token. Status:", response.status);

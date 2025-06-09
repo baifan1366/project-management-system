@@ -61,7 +61,7 @@ export default function PricingPage() {
       }
       
       if (!user) {
-        console.log('用户未登录，重定向到登录页面');
+        
         const loginParams = new URLSearchParams({
           plan_id: plan.id.toString(),
           redirect: 'payment'
@@ -141,7 +141,7 @@ export default function PricingPage() {
       try {
         const result = await dispatch(fetchCurrentUserPlan({ user }));
         const userData = result.payload;
-        console.log('User data:', userData);
+        
 
         if (!userData) {
           setCurrentUserPlan(null);

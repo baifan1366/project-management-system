@@ -121,7 +121,7 @@ export default function TaskManagerAgent({ userId, projectId }) {
       setReceivedChunks(0);
       setStreamStatus("Starting request");
       
-      console.log("Starting streaming request...");
+      
       
       // Configure fetch with proper options for streaming
       const response = await fetch('/api/ai/task-manager-agent/stream', {
@@ -150,7 +150,7 @@ export default function TaskManagerAgent({ userId, projectId }) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       
-      console.log("Stream connected, waiting for data...");
+      
       setStreamStatus("Connected, waiting for data");
       
       // Process the stream
@@ -158,14 +158,14 @@ export default function TaskManagerAgent({ userId, projectId }) {
         const { value, done } = await reader.read();
         
         if (done) {
-          console.log("Stream complete");
+          
           setStreamStatus("Stream complete");
           break;
         }
         
         // Decode the received chunk
         const chunk = decoder.decode(value, { stream: true });
-        console.log("Received chunk:", chunk.length, "bytes");
+        
         setStreamStatus(`Processing chunk: ${chunk.length} bytes`);
         
         // Process all events in this chunk
@@ -176,18 +176,18 @@ export default function TaskManagerAgent({ userId, projectId }) {
             try {
               // Parse the JSON data
               const jsonData = JSON.parse(event.slice(6));
-              console.log("Parsed event:", jsonData.type);
+              
               setStreamStatus(`Received event: ${jsonData.type}`);
               setReceivedChunks(prev => prev + 1);
               
               if (jsonData.type === 'start') {
-                console.log("Generation started");
+                
               }
               else if (jsonData.type === 'chunk') {
                 setStreamedResponse(prev => prev + (jsonData.content || ""));
               }
               else if (jsonData.type === 'complete') {
-                console.log("Generation completed");
+                
                 setStreamingComplete(true);
                 setEditedResponse(jsonData.content || "");
                 setStreamStatus("Generation complete");
@@ -235,7 +235,7 @@ export default function TaskManagerAgent({ userId, projectId }) {
     setResults(null);
     
     try {
-      console.log("Starting streaming request...");
+      
       // Start streaming response
       await initEventSource();
     } catch (error) {

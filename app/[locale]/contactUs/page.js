@@ -168,7 +168,7 @@ export default function ContactUs(){
 
     // Helper function to determine available downgrade plans
     const getAvailableDowngradePlans = (currentPlanType) => {
-        console.log('Current plan type:', currentPlanType);
+        
         switch (currentPlanType) {
             case 'ENTERPRISE':
                 return ['PRO', 'FREE'];
@@ -230,7 +230,7 @@ export default function ContactUs(){
                 formData.email = accountEmail;
             }
 
-            console.log('Sending form data:', formData);
+            
 
             const response = await fetch('/api/contactUs', {
                 method: 'POST',

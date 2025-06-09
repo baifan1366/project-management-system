@@ -11,7 +11,7 @@ export async function POST(request) {
   try {
     // Parse the request body
     const body = await request.json();
-    console.log('Received request body:', body);
+    
     
     // Validate required fields
     if (!body.email || !body.type) {
@@ -58,14 +58,7 @@ export async function POST(request) {
       // Validate required refund fields
       if (!body.userId || !body.currentSubscriptionId || !body.firstName || !body.lastName || 
           !body.selectedReason || !body.details) {
-        console.log('Missing refund fields:', { 
-          userId: !!body.userId, 
-          currentSubscriptionId: !!body.currentSubscriptionId, 
-          firstName: !!body.firstName,
-          lastName: !!body.lastName,
-          selectedReason: !!body.selectedReason,
-          details: !!body.details
-        });
+        
         return NextResponse.json(
           { error: 'User ID, current subscription, first name, last name, reason, and details are required for refund requests' },
           { status: 400 }
@@ -76,7 +69,7 @@ export async function POST(request) {
       contactData.message = body.details;
     }
 
-    console.log('Preparing to insert contact data:', contactData);
+    
     
     // Insert contact record and get the generated ID
     const { data: contact, error: contactError } = await supabase
@@ -94,7 +87,7 @@ export async function POST(request) {
       );
     }
 
-    console.log('Successfully created contact:', contact);
+    
 
     // If this is a refund request, create the refund request record
     if (body.type === 'refund') {
@@ -129,7 +122,7 @@ export async function POST(request) {
         updated_at: new Date().toISOString()
       };
 
-      console.log('Preparing to insert refund data:', refundData);
+      
 
       const { error: refundError } = await supabase
         .from('refund_request')
@@ -144,7 +137,7 @@ export async function POST(request) {
         );
       }
 
-      console.log('Successfully created refund request');
+      
     }
     
     // Return success response

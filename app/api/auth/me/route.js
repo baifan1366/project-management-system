@@ -9,7 +9,7 @@ export async function GET(request) {
     const userData = await getCurrentUser();
     
     // Check if token exists but is invalid
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get('auth_token')?.value;
     const authHeader = request.headers.get('Authorization');
     
@@ -36,7 +36,7 @@ export async function GET(request) {
     }
     
     const endTime = Date.now();
-    console.log(`/api/auth/me completed in ${endTime - startTime}ms`);
+    
     
     return NextResponse.json({
       success: true,

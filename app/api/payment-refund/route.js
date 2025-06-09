@@ -6,7 +6,7 @@ import Stripe from 'stripe';
 const stripe = new Stripe(process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY);
 
 export async function POST(req) {
-  console.log('Payment refund API route hit!');
+  
   try {
     // Check if Stripe is properly initialized
     if (!process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY) {
@@ -21,10 +21,10 @@ export async function POST(req) {
     const stripeKeyMask = process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY 
       ? `${process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY.substring(0, 7)}...` 
       : 'not set';
-    console.log('Environment check: Stripe key is', stripeKeyMask);
+    
     
     const body = await req.json();
-    console.log('Received refund request body:', body);
+    
     const { refundRequestId } = body;
     
     if (!refundRequestId) {
@@ -53,8 +53,8 @@ export async function POST(req) {
       .eq('id', refundRequestId)
       .single();
     
-    console.log('Refund request data:', refundRequest);
-    console.log('Refund request error:', error);
+    
+    
     
     if (error) throw error;
     if (!refundRequest) {
@@ -69,7 +69,7 @@ export async function POST(req) {
     
     // Get the payment intent ID from the linked payment
     const paymentIntentId = refundRequest.payment?.stripe_payment_id || refundRequest.payment?.transaction_id;
-    console.log('Payment intent ID:', paymentIntentId);
+    
     
     if (!paymentIntentId) {
       return NextResponse.json(
@@ -79,13 +79,12 @@ export async function POST(req) {
     }
     
     // Process refund through Stripe
-    console.log('Creating Stripe refund with payment_intent:', paymentIntentId, 'amount:', Math.round(refundRequest.refund_amount * 100));
     const refund = await stripe.refunds.create({
       payment_intent: paymentIntentId,
       amount: Math.round(refundRequest.refund_amount * 100), // Convert to cents
     });
     
-    console.log('Stripe refund created:', refund);
+    
     
     // Update refund status
     await supabase
@@ -100,7 +99,7 @@ export async function POST(req) {
     // Send refund confirmation email to user
     if (refundRequest.user?.email) {
       try {
-        console.log('Sending refund confirmation email to:', refundRequest.user.email);
+        
         
         const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/send-email`, {
           method: 'POST',
@@ -124,7 +123,7 @@ export async function POST(req) {
         });
         
         const emailResult = await emailResponse.json();
-        console.log('Email sent result:', emailResult);
+        
       } catch (emailError) {
         console.error('Error sending refund confirmation email:', emailError);
         // Don't throw here, we still want to return the refund success response

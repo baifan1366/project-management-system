@@ -31,7 +31,7 @@ export function ChatDialogProvider({ children }) {
           if (pathname.includes('/chat')) return;
           
           // 如果消息不是自己发的，且不是当前打开的会话，则显示对话框
-          if (payload.new.user_id !== currentUser.id) {
+          if (payload.new.user_id !== currentUser.id && payload.new.session_id !== currentSession?.id) {
             // 获取发送者信息
             const { data: senderData } = await supabase
               .from('user')

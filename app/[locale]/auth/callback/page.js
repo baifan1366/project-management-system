@@ -34,7 +34,7 @@ export default function AuthCallbackPage() {
           const redirect = urlParams.get('redirect') || urlParams.get('redirectTo');
           const finalRedirect = urlParams.get('final_redirect');
           
-          console.log('Auth callback parameters:', { planId, redirect, finalRedirect });
+          
           
           const locale = window.location.pathname.split('/')[1];
           
@@ -44,16 +44,16 @@ export default function AuthCallbackPage() {
           } else if (redirect && redirect.includes('teamInvitation')) {
             // 处理团队邀请重定向
             const redirectPath = redirect.startsWith('/') ? redirect : `/${redirect}`;
-            console.log('重定向到团队邀请页面:', redirectPath);
+            
             router.push(`/${locale}${redirectPath}`);
           } else if (finalRedirect && finalRedirect.includes('teamInvitation')) {
             // 处理final_redirect参数
             const finalRedirectPath = finalRedirect.startsWith('/') ? finalRedirect : `/${finalRedirect}`;
-            console.log('使用final_redirect重定向到团队邀请页面:', finalRedirectPath);
+            
             router.push(`/${locale}${finalRedirectPath}`);
           } else {
             // Otherwise redirect to dashboard
-            console.log('重定向到项目页面');
+            
             router.push(`/${locale}/projects`);
           }
         }, 1000); // Small delay to ensure cookie is set

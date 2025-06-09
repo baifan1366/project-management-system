@@ -4,7 +4,7 @@ import { safeParseJSON } from '../utils';
 
 export async function POST(request) {
   try {
-    console.log("Processing user-edited AI response...");
+    
     const { aiResponse, userId, projectId, teamId, sectionId } = await request.json();
     
     if (!aiResponse) {
@@ -54,7 +54,7 @@ export async function POST(request) {
         );
       }
       
-      console.log("Response processing completed successfully");
+      
       return NextResponse.json({
         success: true,
         ...result

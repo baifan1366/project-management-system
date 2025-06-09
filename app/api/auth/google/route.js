@@ -8,7 +8,7 @@ export async function GET(request) {
     const redirectTo = searchParams.get('redirectTo');
     const calendar = searchParams.get('calendar') === 'true';
     
-    console.log('Google OAuth请求参数:', { redirect, planId, redirectTo, calendar });
+    
     
     // Build Google OAuth URL
     const googleOAuthEndpoint = 'https://accounts.google.com/o/oauth2/v2/auth';

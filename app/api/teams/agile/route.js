@@ -101,7 +101,7 @@ export async function GET(request) {
         
         // 如果没有用户ID，直接返回原始数据
         if (userIds.length === 0) {
-          console.log(`【API响应】敏捷 ${agileId} 的成员中没有有效的用户ID`);
+          
           return NextResponse.json(memberData);
         }
         

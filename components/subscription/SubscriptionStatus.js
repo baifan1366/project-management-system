@@ -20,8 +20,8 @@ export default function SubscriptionStatus() {
     setIsUpdating(true);
     try {
       const newValue = !subscriptionStatus.autoRenewEnabled;
-      console.log('Current auto-renewal status:', subscriptionStatus.autoRenewEnabled);
-      console.log('Setting auto-renewal to:', newValue);
+      
+      
       
       // If enabling auto-renewal, first check if user has a payment method
       if (newValue) {
@@ -33,7 +33,7 @@ export default function SubscriptionStatus() {
             throw new Error('Failed to fetch payment methods');
           }
           
-          console.log('Payment methods check:', paymentMethodData);
+          
           
           if (!paymentMethodData.payment_methods || paymentMethodData.payment_methods.length === 0) {
             toast.error(t('subscription.autoRenewal.needsPaymentMethod'));
@@ -57,7 +57,7 @@ export default function SubscriptionStatus() {
       const success = await toggleAutoRenewal(newValue);
       
       if (success) {
-        console.log('Auto-renewal update successful, new value:', newValue);
+        
         toast.success(
           newValue 
             ? t('subscription.autoRenewal.enabled') 
@@ -206,16 +206,7 @@ export default function SubscriptionStatus() {
   };
 
   // Add a debug log to check subscription status values
-  console.log('Subscription status in component:', {
-    ...subscriptionStatus,
-    isExpiringSoon: subscriptionStatus.isExpiringSoon,
-    autoRenewEnabled: subscriptionStatus.autoRenewEnabled,
-    planAutoRenew: subscriptionStatus.plan?.auto_renew,
-    userAutoRenewEnabled: subscriptionStatus.userAutoRenewEnabled,
-    lastRenewalAttempt: subscriptionStatus.lastRenewalAttempt,
-    renewalStatus: subscriptionStatus.renewalStatus,
-    isFreePlan
-  });
+  
 
   if (!subscriptionStatus.isActive) {
     return (

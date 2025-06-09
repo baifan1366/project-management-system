@@ -5,7 +5,7 @@ export const maxDuration = 60; // 60 second timeout
 
 export async function POST(request) {
   try {
-    console.log('Task Manager Stream API: Starting request processing');
+    
     
     // Parse request body
     const body = await request.json();
@@ -26,7 +26,7 @@ export async function POST(request) {
     // Start the streaming process in the background
     (async () => {
       try {
-        console.log("Starting AI stream for task manager...");
+        
         const aiStream = await openai.chat.completions.create({
           model: "qwen/qwen2.5-vl-32b-instruct:free",
           messages: [
@@ -45,7 +45,7 @@ export async function POST(request) {
         await writer.write(
           encoder.encode(`data: ${JSON.stringify({ type: 'start', message: 'Starting generation' })}\n\n`)
         );
-        console.log("Initial stream message sent");
+        
         
         for await (const chunk of aiStream) {
           const content = chunk.choices[0]?.delta?.content || '';
@@ -58,7 +58,7 @@ export async function POST(request) {
                 accumulated: accumulatedContent
               })}\n\n`)
             );
-            console.log(`Streamed chunk: ${content.length} chars`);
+            
           }
         }
         
@@ -69,7 +69,7 @@ export async function POST(request) {
             content: accumulatedContent
           })}\n\n`)
         );
-        console.log("Stream completed");
+        
         
       } catch (error) {
         console.error('Error in AI streaming:', error);
@@ -82,7 +82,7 @@ export async function POST(request) {
       } finally {
         try {
           await writer.close();
-          console.log("Stream writer closed");
+          
         } catch (closeError) {
           console.warn('Error closing stream writer:', closeError.message);
         }

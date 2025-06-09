@@ -100,11 +100,7 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
         // Create UTC version of the selected time
         const startDateTimeUTC = new Date(startDateTime.toISOString());
         
-        console.log("Time validation:", {
-          now: now.toISOString(),
-          startDateTime: startDateTime.toISOString(),
-          isPast: startDateTimeUTC < nowUTC
-        });
+ 
         
         if (startDateTimeUTC < nowUTC) {
           // Use a direct string instead of translation key
@@ -190,14 +186,7 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
       const startDateISO = startDateTime ? startDateTime.toISOString() : null;
       const dueDateISO = dueDateTime ? dueDateTime.toISOString() : null;
       
-      console.log("Saving dates to database:", { 
-        dueDateISO, 
-        startDateISO,
-        dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
-        startDate: startDate ? format(startDate, 'yyyy-MM-dd') : null,
-        dueTime,
-        startTime
-      });
+
       
       // Create new task in the mytasks table - directly store dates as ISO strings
       const { data, error } = await supabase

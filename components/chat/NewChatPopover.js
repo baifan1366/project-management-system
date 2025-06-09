@@ -93,11 +93,11 @@ export default function NewChatPopover({ className, buttonContent }) {
     const loadRecentContacts = async () => {
       try {
         if (!currentUser) {
-          console.log('未找到有效的用户，无法加载联系人');
+          
           return;
         }
 
-        console.log('正在加载用户ID为', currentUser.id, '的最近联系人');
+        
 
         const { data, error } = await supabase
           .from('chat_participant')
@@ -121,7 +121,7 @@ export default function NewChatPopover({ className, buttonContent }) {
           throw error;
         }
 
-        console.log('获取到的原始数据:', data);
+        
 
         // 安全地提取联系人
         const contacts = [];
@@ -130,12 +130,12 @@ export default function NewChatPopover({ className, buttonContent }) {
         if (Array.isArray(data)) {
           for (const item of data) {
             if (!item || !item.chat_session) {
-              console.log('跳过无效的聊天会话项', item);
+              
               continue;
             }
             
             if (!Array.isArray(item.chat_session.participants)) {
-              console.log('会话没有有效的参与者列表', item.chat_session);
+              
               continue;
             }
             
@@ -148,17 +148,17 @@ export default function NewChatPopover({ className, buttonContent }) {
               
               // Only add the user if we haven't seen their ID before
               if (!userIdSet.has(otherUser.id)) {
-                console.log('找到联系人:', otherUser.name);
+                
                 contacts.push(otherUser);
                 userIdSet.add(otherUser.id); // Mark this user ID as seen
               } else {
-                console.log('跳过重复联系人:', otherUser.name);
+                
               }
             }
           }
         }
 
-        console.log('处理后的联系人列表 (已去重):', contacts);
+
         setRecentContacts(contacts);
         
         // Check relationships for recent contacts in batch
@@ -289,7 +289,6 @@ export default function NewChatPopover({ className, buttonContent }) {
     if (selectedUsers.length === 0 || !currentUser) return;
 
     try {
-      console.log('开始创建聊天，已选择的用户:', selectedUsers.map(u => u.name).join(', '));
 
       // Generate a unique timestamp to ensure different chats with the same user don't conflict
       const uniqueTimestamp = Date.now().toString();
@@ -315,7 +314,7 @@ export default function NewChatPopover({ className, buttonContent }) {
         throw chatError;
       }
 
-      console.log('成功创建聊天会话:', chatSession);
+      
 
       // 添加参与者
       const participants = [
@@ -326,7 +325,7 @@ export default function NewChatPopover({ className, buttonContent }) {
         }))
       ];
 
-      console.log('正在添加聊天参与者:', participants.length, '人');
+      
 
       const { error: participantError } = await supabase
         .from('chat_participant')
@@ -338,7 +337,7 @@ export default function NewChatPopover({ className, buttonContent }) {
         throw participantError;
       }
 
-      console.log('聊天创建成功，正在切换到新会话');
+      
       toast.success(selectedUsers.length === 1 ? t('chatCreated') : t('groupCreated'));
 
       // 给其他参与者发送通知
@@ -370,7 +369,7 @@ export default function NewChatPopover({ className, buttonContent }) {
               is_read: false
             });
         }
-        console.log('已向所有参与者发送聊天创建通知');
+        
       } catch (notifyError) {
         console.error('发送通知失败:', notifyError);
         // 通知发送失败不影响主流程

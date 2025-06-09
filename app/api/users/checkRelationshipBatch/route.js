@@ -92,12 +92,11 @@ export async function POST(request) {
       userProjectsMap[record.user_id].add(projectId);
     }
     
-    // Get all projects the current user belongs to
+    // Get all teams the current user belongs to
     const { data: currentUserTeams, error: currentUserTeamsError } = await supabase
       .from('user_team')
-      .select('user_team.team_id, team.project_id')
-      .eq('user_team.user_id', userId)
-      .join('team', { 'user_team.team_id': 'team.id' });
+      .select('team_id')
+      .eq('user_id', userId);
       
     if (currentUserTeamsError) {
       console.error('Error fetching current user teams:', currentUserTeamsError);
@@ -106,9 +105,30 @@ export async function POST(request) {
       }, { status: 500 });
     }
     
-    // Get the current user's projects
+    // If user has no teams, all results remain external
+    if (!currentUserTeams || currentUserTeams.length === 0) {
+      return NextResponse.json(results);
+    }
+    
+    // Get the current user's team IDs
+    const currentUserTeamIds = currentUserTeams.map(team => team.team_id);
+    
+    // Get projects for the current user's teams
+    const { data: currentUserProjects, error: currentUserProjectsError } = await supabase
+      .from('team')
+      .select('project_id')
+      .in('id', currentUserTeamIds);
+      
+    if (currentUserProjectsError) {
+      console.error('Error fetching current user projects:', currentUserProjectsError);
+      return NextResponse.json({ 
+        error: 'Failed to fetch current user projects' 
+      }, { status: 500 });
+    }
+    
+    // Convert to a Set for faster lookups
     const currentUserProjectSet = new Set(
-      (currentUserTeams || []).map(record => record.project_id)
+      (currentUserProjects || []).map(team => team.project_id)
     );
     
     // Update results for each target user based on project relationships

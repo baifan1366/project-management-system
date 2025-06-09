@@ -30,12 +30,8 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
     try {
       // 获取项目的所有团队
       const teams = await api.teams.listByProject(projectId)
-      console.log('所有团队:', teams)
-      
       // 过滤出已归档的团队
       const archived = teams.filter(team => team.archive === true)
-      console.log('已归档团队:', archived)
-      
       setArchivedTeams(archived)
     } catch (error) {
       console.error('获取团队失败:', error)
@@ -85,8 +81,7 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
       variant: 'error',
       onConfirm: async () => {
         // 实现删除团队的功能 (待实现)
-        console.log('删除团队:', teamId)
-      }
+        }
     })
   }
   
