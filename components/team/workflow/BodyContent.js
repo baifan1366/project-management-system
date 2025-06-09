@@ -7,11 +7,12 @@ import { fetchTasksBySectionId, updateTask, fetchTaskById, createTask, deleteTas
 import { getSectionByTeamId, createSection, updateTaskIds } from '@/lib/redux/features/sectionSlice';
 import { fetchAllTags, getTagByName } from '@/lib/redux/features/tagSlice';
 import { getTags } from '@/lib/redux/features/teamCFSlice';
-import { Plus, Edit, Check, X, CheckCircle2, Circle, Trash } from 'lucide-react';
+import { Plus, Edit, Check, X, CheckCircle2, Circle, Trash, Settings } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useConfirm } from '@/hooks/use-confirm';
+import WorkflowLabelManager from './WorkflowLabelManager';
 import { 
   Popover, 
   PopoverContent, 
@@ -1465,12 +1466,39 @@ export default function BodyContent({ projectThemeColor }) {
         });
     };
 
+    // 添加标签管理状态
+    const [showLabelManager, setShowLabelManager] = useState(false);
+
     if (loading) {
       return <div className="p-4 text-center">{t('loading')}</div>;
     }
 
     return (
         <div className="p-1">
+            {/* 添加标签管理器切换按钮 */}
+            <div className="mb-4 flex justify-end items-center">
+                <Button
+                    variant={projectThemeColor}
+                    size="sm"
+                    onClick={() => setShowLabelManager(!showLabelManager)}
+                    className="flex items-center gap-1"
+                >
+                    <Settings className="w-4 h-4" />
+                    {showLabelManager ? t('hideStatusManager') : t('manageStatusOptions')}
+                </Button>
+            </div>
+
+            {/* 标签管理器组件 */}
+            {showLabelManager && (
+                <div className="mb-6 border rounded-lg">
+                    <WorkflowLabelManager 
+                        teamId={teamId}
+                        tasks={allTasks}
+                        projectThemeColor={projectThemeColor}
+                    />
+                </div>
+            )}
+
             {selectedTask && !isEditing && (
                 <div className="mb-6 p-4 border rounded-lg">
                     <div className="flex justify-between items-center border-b pb-2 mb-3">

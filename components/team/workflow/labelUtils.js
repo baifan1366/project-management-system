@@ -221,4 +221,159 @@ export function integrateLabelsWithTasks(teamLabelData, tasks, statusTagId) {
     tasksWithStatus,
     tasksByStatus
   };
+}
+
+/**
+ * 创建新的状态选项
+ * @param {Object} label - 现有的标签对象
+ * @param {Object} newOption - 新的选项对象 {label:string, color:string}
+ * @returns {Object} - 更新后的标签对象
+ */
+export function createStatusOption(label, newOption) {
+  // 验证输入
+  if (!newOption || !newOption.label || !newOption.color) {
+    console.error('创建状态选项失败: 缺少必要参数', newOption);
+    throw new Error('创建状态选项失败: 缺少必要参数');
+  }
+
+  try {
+    // 确保label是对象
+    let labelData = label || {};
+    
+    // 如果标签数据为空，初始化结构
+    if (Object.keys(labelData).length === 0) {
+      labelData = {
+        'SINGLE-SELECT': []
+      };
+    }
+    
+    // 确保有SINGLE-SELECT键
+    if (!labelData['SINGLE-SELECT']) {
+      labelData['SINGLE-SELECT'] = [];
+    }
+    
+    // 准备新选项数据 - 确保包含value
+    const option = {
+      label: newOption.label,
+      value: newOption.value || newOption.label.toLowerCase().replace(/\s+/g, '_'),
+      color: newOption.color
+    };
+    
+    // 将选项对象转为JSON字符串（与现有格式保持一致）
+    const optionJson = JSON.stringify(option);
+    
+    // 确保SINGLE-SELECT是数组
+    if (!Array.isArray(labelData['SINGLE-SELECT'])) {
+      labelData['SINGLE-SELECT'] = [];
+    }
+    
+    // 添加到SINGLE-SELECT数组
+    labelData['SINGLE-SELECT'].push(optionJson);
+    
+    console.log('成功添加新状态选项:', option);
+    return labelData;
+  } catch (error) {
+    console.error('创建状态选项发生错误:', error);
+    throw error;
+  }
+}
+
+/**
+ * 更新现有的状态选项
+ * @param {Object} label - 现有的标签对象
+ * @param {Object} updatedOption - 更新的选项对象，必须包含value属性以匹配现有选项
+ * @returns {Object} - 更新后的标签对象
+ */
+export function updateStatusOption(label, updatedOption) {
+  // 验证输入
+  if (!label || !updatedOption || !updatedOption.value) {
+    console.error('更新状态选项失败: 缺少必要参数', { label, updatedOption });
+    throw new Error('更新状态选项失败: 缺少必要参数');
+  }
+
+  try {
+    // 确保SINGLE-SELECT是数组
+    if (!label['SINGLE-SELECT'] || !Array.isArray(label['SINGLE-SELECT'])) {
+      throw new Error('标签数据结构不正确: 缺少SINGLE-SELECT数组');
+    }
+    
+    // 从SINGLE-SELECT数组中找到匹配的选项
+    const updatedOptions = label['SINGLE-SELECT'].map(optionStr => {
+      try {
+        let option = typeof optionStr === 'string' ? JSON.parse(optionStr) : optionStr;
+        
+        // 如果找到匹配的选项，更新它
+        if (option.value === updatedOption.value) {
+          option = {
+            ...option,
+            label: updatedOption.label || option.label,
+            color: updatedOption.color || option.color
+          };
+          console.log('找到并更新选项:', option);
+        }
+        
+        // 将对象转回JSON字符串
+        return typeof optionStr === 'string' ? JSON.stringify(option) : option;
+      } catch (e) {
+        console.error('解析选项时出错:', e, optionStr);
+        return optionStr;
+      }
+    });
+    
+    // 更新标签对象
+    const updatedLabel = {
+      ...label,
+      'SINGLE-SELECT': updatedOptions
+    };
+    
+    console.log('成功更新状态选项:', updatedLabel);
+    return updatedLabel;
+  } catch (error) {
+    console.error('更新状态选项发生错误:', error);
+    throw error;
+  }
+}
+
+/**
+ * 删除状态选项
+ * @param {Object} label - 现有的标签对象
+ * @param {String} optionValue - 要删除的选项的value值
+ * @returns {Object} - 更新后的标签对象
+ */
+export function deleteStatusOption(label, optionValue) {
+  // 验证输入
+  if (!label || !optionValue) {
+    console.error('删除状态选项失败: 缺少必要参数', { label, optionValue });
+    throw new Error('删除状态选项失败: 缺少必要参数');
+  }
+
+  try {
+    // 确保SINGLE-SELECT是数组
+    if (!label['SINGLE-SELECT'] || !Array.isArray(label['SINGLE-SELECT'])) {
+      throw new Error('标签数据结构不正确: 缺少SINGLE-SELECT数组');
+    }
+    
+    // 从SINGLE-SELECT数组中过滤掉匹配的选项
+    const filteredOptions = label['SINGLE-SELECT'].filter(optionStr => {
+      try {
+        let option = typeof optionStr === 'string' ? JSON.parse(optionStr) : optionStr;
+        return option.value !== optionValue;
+      } catch (e) {
+        console.error('解析选项时出错:', e, optionStr);
+        return true; // 如果解析错误，保留选项
+      }
+    });
+    
+    // 更新标签对象
+    const updatedLabel = {
+      ...label,
+      'SINGLE-SELECT': filteredOptions
+    };
+    
+    console.log('成功删除状态选项:', optionValue);
+    return updatedLabel;
+  } catch (error) {
+    console.error('删除状态选项发生错误:', error);
+    throw error;
+  }
 } 
