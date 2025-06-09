@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 /**
  * Check if a user has any relationship with another user
  * This endpoint is designed for direct frontend calls
+ * Users are considered related if they are in any teams within the same project
  * 
  * @param {Request} request - The request object
  * @returns {Promise<NextResponse>} JSON response with relationship data
@@ -51,30 +52,56 @@ export async function POST(request) {
       });
     }
     
-    // Extract team IDs
+    // Get project IDs for the target user's teams
     const targetTeamIds = targetUserTeams.map(team => team.team_id);
     
-    // Check if current user is in any of those teams
-    const { data: commonTeams, error: commonTeamsError } = await supabase
-      .from('user_team')
-      .select('team_id')
-      .eq('user_id', userId)
-      .in('team_id', targetTeamIds);
+    // Get projects associated with these teams
+    const { data: targetTeamProjects, error: projectsError } = await supabase
+      .from('team')
+      .select('project_id')
+      .in('id', targetTeamIds);
       
-    if (commonTeamsError) {
-      console.error('Error checking common teams:', commonTeamsError);
+    if (projectsError) {
+      console.error('Error fetching target team projects:', projectsError);
       return NextResponse.json({ 
-        error: 'Failed to check common teams' 
+        error: 'Failed to fetch target team projects' 
+      }, { status: 500 });
+    }
+    
+    // If no projects found, they are external
+    if (!targetTeamProjects || targetTeamProjects.length === 0) {
+      return NextResponse.json({
+        hasRelationship: false,
+        isExternal: true,
+        commonTeamCount: 0
+      });
+    }
+    
+    // Get unique project IDs
+    const targetProjectIds = [...new Set(targetTeamProjects.map(team => team.project_id))];
+    
+    // Check if current user has any teams in these projects
+    const { data: currentUserProjectTeams, error: userProjectTeamsError } = await supabase
+      .from('user_team')
+      .select('user_team.team_id, team.project_id')
+      .eq('user_team.user_id', userId)
+      .in('team.project_id', targetProjectIds)
+      .join('team', { 'user_team.team_id': 'team.id' });
+      
+    if (userProjectTeamsError) {
+      console.error('Error checking common project teams:', userProjectTeamsError);
+      return NextResponse.json({ 
+        error: 'Failed to check common project teams' 
       }, { status: 500 });
     }
     
     // Return relationship data
-    const hasRelationship = commonTeams && commonTeams.length > 0;
+    const hasRelationship = currentUserProjectTeams && currentUserProjectTeams.length > 0;
     
     return NextResponse.json({
       hasRelationship,
       isExternal: !hasRelationship,
-      commonTeamCount: commonTeams?.length || 0
+      commonTeamCount: currentUserProjectTeams?.length || 0
     });
   } catch (error) {
     console.error('Error in relationship check:', error);
