@@ -243,6 +243,7 @@ export default function PaymentPage() {
   const options = {
     clientSecret,
     appearance,
+    locale: locale, // Use the actual locale from the URL parameters
   };
   
   // Callback function to receive the payment handler from CheckoutForm
@@ -889,10 +890,7 @@ export default function PaymentPage() {
                           {clientSecret ? (
                             <Elements 
                               stripe={stripePromise} 
-                              options={{
-                                clientSecret,
-                                appearance,
-                              }}
+                              options={options}
                             >
                               <CheckoutForm onPaymentSubmit={onPaymentSubmit} />
                             </Elements>

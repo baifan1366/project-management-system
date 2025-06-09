@@ -24,7 +24,7 @@ export default function PaymentError() {
     const errorMessage = searchParams.get('message') || error || 'Invalid or expired payment session. Please try again.';
     
     setErrorDetails({
-      title: 'Payment Failed',
+      title: 'Payment Error',
       message: errorMessage,
     });
 
