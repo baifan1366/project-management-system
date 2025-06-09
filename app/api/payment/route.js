@@ -20,7 +20,7 @@ export async function POST(request) {
 
     // 解析请求体并立即记录
     const body = await request.json();
-    console.log('Received payment request body:', body);
+    
 
     // 解构参数并验证
     const { planId, amount, quantity = 1, userId, planName, promoCode, discount, payment_method } = body;
@@ -57,7 +57,7 @@ export async function POST(request) {
       }
     });
 
-    console.log('Payment intent created:', paymentIntent.id);
+    
 
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret

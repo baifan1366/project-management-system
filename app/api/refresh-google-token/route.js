@@ -4,10 +4,10 @@ import { supabase } from '@/lib/supabase';
 // Refresh access token from Google
 async function refreshAccessToken(refreshToken) {
   try {
-    console.log("Attempting to refresh token:");
-    console.log("Client ID available:", !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
-    console.log("Client Secret available:", !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET);
-    console.log("Refresh Token:", refreshToken);
+    
+    
+    
+    
     
     // Check if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are defined
     if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || !process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET) {
@@ -79,7 +79,6 @@ async function updateUserTokens(userId, accessToken, refreshToken) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    console.log("Received request body:", JSON.stringify(body, null, 2));
     
     const { refresh_token: refreshToken, userId } = body;
 

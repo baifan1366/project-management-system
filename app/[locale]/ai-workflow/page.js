@@ -213,12 +213,7 @@ export default function AIWorkflow() {
     const getCurrentUser = async () => {
       try {
         if (user && user.id) {
-          console.log('AIWorkflow: Setting userId from user:', user.id);
           setUserId(user.id);
-        } else if (user === null) {
-          console.log('AIWorkflow: User is null, not authenticated');
-        } else if (user) {
-          console.log('AIWorkflow: User exists but no ID:', user);
         }
       } catch (error) {
         console.error('Error getting user:', error);
@@ -239,7 +234,6 @@ export default function AIWorkflow() {
   // Fetch user workflows
   const fetchUserWorkflows = async () => {
     if (!userId) {
-      console.log('Cannot fetch workflows: userId is not set');
       return;
     }
     
@@ -313,7 +307,6 @@ export default function AIWorkflow() {
   // Update nodes with the handleInputChange function after userId is set
   useEffect(() => {
     if (userId) {
-      console.log('AIWorkflow: Updating nodes with userId:', userId);
       setNodes(prevNodes => 
         prevNodes.map(node => ({
           ...node,
@@ -446,7 +439,6 @@ export default function AIWorkflow() {
       }
       
       const savedWorkflow = await response.json();
-      console.log('Workflow saved successfully:', savedWorkflow);
       setCurrentWorkflow(savedWorkflow);
       toast.success(t('workflowSaved'));
       
@@ -477,7 +469,6 @@ export default function AIWorkflow() {
       }
       
       const workflow = await response.json();
-      console.log('Loaded workflow data:', workflow);
       
       // Set workflow data
       setCurrentWorkflow(workflow);
@@ -493,7 +484,6 @@ export default function AIWorkflow() {
       
       // Set flow data if available
       if (workflow.flow_data) {
-        console.log('Loaded flow data:', workflow.flow_data);
         
         // Restore React elements in nodes
         if (workflow.flow_data.nodes) {
@@ -555,12 +545,10 @@ export default function AIWorkflow() {
             return updatedNode;
           });
           
-          console.log('Restored nodes with React elements:', restoredNodes);
           setNodes(restoredNodes);
         }
         
         if (workflow.flow_data.edges) {
-          console.log('Setting edges:', workflow.flow_data.edges);
           setEdges(workflow.flow_data.edges);
         }
       }
@@ -718,13 +706,6 @@ export default function AIWorkflow() {
         const outputType = node.data.outputType || 'default';
         outputFormats.push(outputType);
         
-        // For debugging
-        console.log(`[Debug] Processing output node:`, {
-          id: node.id,
-          type: outputType,
-          data: node.data
-        });
-        
         // 为每种输出类型收集设置
         if (outputType === 'json' && node.data.jsonFormat) {
           newOutputSettings[node.id] = {
@@ -742,18 +723,13 @@ export default function AIWorkflow() {
           const connectedToApi = Object.keys(connectionMap).filter(
             sourceId => connectionMap[sourceId].includes(node.id)
           );
-          
-          console.log(`[Debug] Nodes connected to API node ${node.id}:`, connectedToApi);
-          
+                    
           if (connectedToApi.length > 0) {
             // 找到连接到此 API 节点的 JSON 节点
             const jsonNodes = nodes.filter(
               n => connectedToApi.includes(n.id) && 
                   n.data.outputType === 'json'
             );
-            
-            console.log(`[Debug] JSON nodes connected to API node ${node.id}:`, 
-              jsonNodes.map(n => ({ id: n.id, hasFormat: !!n.data.jsonFormat })));
             
             if (jsonNodes.length > 0) {
               // 记录这个连接，以便后端可以使用 JSON 输出作为 API 请求数据
@@ -771,13 +747,6 @@ export default function AIWorkflow() {
             teamId: node.data.teamId || null
           };
         } else if (outputType === 'chat') {
-          // 为 chat 节点收集聊天会话ID和消息模板
-          console.log(`[Debug] Chat node found:`, {
-            id: node.id,
-            chatSessionIds: node.data.chatSessionIds,
-            messageTemplate: node.data.messageTemplate,
-            messageFormat: node.data.messageFormat
-          });
           
           // Check if chatSessionIds is defined and not empty
           if (node.data.chatSessionIds && node.data.chatSessionIds.length > 0) {
@@ -787,19 +756,10 @@ export default function AIWorkflow() {
               messageTemplate: node.data.messageTemplate || 'Hello, this is an automated message from the workflow system:\n\n{{content}}',
               messageFormat: node.data.messageFormat || 'text'
             };
-            console.log(`[Debug] Added chat settings for node ${node.id}:`, newOutputSettings[node.id]);
           } else {
             console.warn(`[Debug] No chat sessions selected for chat node ${node.id}`);
           }
         } else if (outputType === 'email') {
-          // 为 email 节点收集邮件设置
-          console.log(`[Debug] Email node found:`, {
-            id: node.id,
-            emailRecipients: node.data.emailRecipients,
-            emailSubject: node.data.emailSubject,
-            emailTemplate: node.data.emailTemplate,
-            useCustomSmtp: node.data.useCustomSmtp
-          });
           
           // Check if email recipients are specified
           if (node.data.emailRecipients) {
@@ -822,7 +782,6 @@ export default function AIWorkflow() {
               };
             }
             
-            console.log(`[Debug] Added email settings for node ${node.id}:`, newOutputSettings[node.id]);
           } else {
             console.warn(`[Debug] No recipients specified for email node ${node.id}`);
           }
@@ -837,14 +796,12 @@ export default function AIWorkflow() {
       // Validate JSON-API connections to ensure data flow
       Object.keys(newNodeConnections).forEach(apiNodeId => {
         const connection = newNodeConnections[apiNodeId];
-        console.log(`[Debug] Validating connection for API node ${apiNodeId}:`, connection);
         
         if (connection.sourceNodes && connection.sourceNodes.length > 0) {
           // Make sure we generate JSON output for any node that's connected to an API
           connection.sourceNodes.forEach(jsonNodeId => {
             if (!outputFormats.includes('json')) {
               outputFormats.push('json');
-              console.log(`[Debug] Added JSON format to ensure API node ${apiNodeId} gets data`);
             }
           });
         }
@@ -868,28 +825,10 @@ export default function AIWorkflow() {
         streaming: true // Enable streaming output
       };
       
-      // Debug log the entire payload
-      console.log(`[Debug] Full workflow execution payload:`, {
-        workflowId: payload.workflowId,
-        userId: payload.userId ? 'exists' : 'not-provided',
-        modelId: payload.modelId,
-        inputsCount: Object.keys(inputs || {}).length,
-        outputFormatsCount: outputFormats.length,
-        outputFormats,
-        nodeConnectionsCount: Object.keys(newNodeConnections).length,
-        outputSettings: Object.entries(newOutputSettings).map(([nodeId, settings]) => ({
-          nodeId,
-          type: settings.type,
-          ...(settings.type === 'chat' ? {chatSessions: settings.chatSessionIds?.length || 0} : {}),
-          ...(settings.type === 'email' ? {hasRecipients: !!settings.recipients} : {})
-        }))
-      });
-      
       // 设置超时处理，只针对初始连接
       const timeoutId = setTimeout(() => {
         if (isStreaming) {
           toast.error('Connection is taking too long. Check console for details.');
-          console.log('Stream connection timeout - continuing to wait in background');
         }
       }, 15000); // 15秒超时
       
@@ -915,7 +854,6 @@ export default function AIWorkflow() {
       const noDataTimeoutId = setTimeout(() => {
         if (!receivedFirstData && isStreaming) {
           toast.error('No data received from server. Check console for details.');
-          console.log('No stream data timeout - connection established but no data received');
         }
       }, 20000); // 20秒没收到数据则超时
       
@@ -927,7 +865,6 @@ export default function AIWorkflow() {
         const { value, done } = await reader.read();
         
         if (done) {
-          console.log('Stream ended naturally');
           break;
         }
         
@@ -936,7 +873,6 @@ export default function AIWorkflow() {
         if (!receivedFirstData) {
           receivedFirstData = true;
           clearTimeout(noDataTimeoutId);
-          console.log('Received first stream data chunk');
         }
         
         // Split by lines to handle multiple JSON objects
@@ -979,7 +915,6 @@ export default function AIWorkflow() {
       
       if (isStreaming) {
         // 如果流结束但状态没有更新为完成，可能是发生了问题
-        console.log('Stream ended but isStreaming is still true - forcing completion');
         setIsStreaming(false);
         if (Object.keys(formatResponses).length > 0) {
           setShowReviewStep(true);
@@ -1037,9 +972,6 @@ export default function AIWorkflow() {
             sourceNodes: connectedJsonNodes.map(node => node.id),
             dataType: 'json'
           };
-          
-          console.log(`[Debug] Enhanced connection: API node ${apiNode.id} will use JSON data from:`, 
-            connectedJsonNodes.map(node => node.id));
         }
       });
       
@@ -1053,23 +985,10 @@ export default function AIWorkflow() {
         connectionMap, // Include connection map for backend processing
         processOutput: true
       };
-      
-      console.log('Sending process-outputs request with payload:', {
-        workflowId: payload.workflowId,
-        userId: payload.userId ? 'exists' : 'not-provided',
-        outputSettingsIncluded: !!payload.outputSettings,
-        outputFormats: Object.keys(editedResponseData),
-        nodeConnectionsCount: Object.keys(enhancedNodeConnections).length,
-        apiNodeConnections: Object.keys(enhancedNodeConnections).filter(
-          nodeId => nodes.find(n => n.id === nodeId)?.data.outputType === 'api'
-        ),
-        connectionMapIncluded: Object.keys(connectionMap).length > 0
-      });
-      
+
       // 设置超时处理
       const timeoutId = setTimeout(() => {
         toast.error('Request is taking too long. Check console for details.');
-        console.log('Process outputs request timeout - request continues in background');
         setIsExecuting(false);
         setShowStreamingModal(false);
       }, 30000); // 30秒超时
@@ -1092,9 +1011,7 @@ export default function AIWorkflow() {
         throw new Error(`Failed to process outputs: ${errorData.error || response.statusText || 'Unknown error'}`);
       }
 
-      const result = await response.json();
-      console.log("Workflow final outputs:", result);
-      
+      const result = await response.json();      
       setExecutionResult(result);
       setShowStreamingModal(false);
       toast.success(t('workflowExecuted'));

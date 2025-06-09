@@ -330,7 +330,6 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
       })
       .select()
       .single();
-    console.log(notionPageData);
     //update the notion_page id into the task table, page_id column
     const { data: newTaskData, error: taskError } = await supabase
       .from('task')
@@ -338,7 +337,6 @@ export default function FileTools({ isOpen, onClose, taskId, teamId, currentPath
         page_id: notionPageData.id
       })
       .eq('id', taskId);
-    console.log(newTaskData);
     
     // 5. 更新section的task_ids
     try {

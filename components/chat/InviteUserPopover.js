@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, createContext, useContext } from 'react';
 import { useTranslations } from 'next-intl';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,70 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import useGetUser from '@/lib/hooks/useGetUser';
+import ExternalBadge from '@/components/users/ExternalBadge';
+import { checkUserRelationship, checkUserRelationshipBatch } from '@/lib/utils/checkUserRelationship';
+import { useConfirm } from '@/hooks/use-confirm';
+
+// Context for storing user relationship data
+const UserRelationshipsContext = createContext({});
+
+// User item component to show user with external badge if needed
+const UserItem = ({ user, onClick }) => {
+  const relationships = useContext(UserRelationshipsContext);
+  const relationshipData = relationships[user.id] || { isExternal: false, isLoading: true };
+  
+  return (
+    <div
+      className="flex items-center gap-3 p-2 hover:bg-accent rounded-md cursor-pointer"
+      onClick={onClick}
+    >
+      <Avatar className="h-8 w-8">
+        <AvatarImage src={user.avatar_url} />
+        <AvatarFallback>{user.name?.[0]}</AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <p className="font-medium truncate">{user.name}</p>
+          {!relationshipData.isLoading && relationshipData.isExternal && (
+            <ExternalBadge className="ml-1 py-0 px-1 text-[10px]" />
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground truncate">
+          {user.email}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 export default function InviteUserPopover({ sessionId, onInvite, inDropdown = false }) {
   const t = useTranslations('Chat');
   const [isOpen, setIsOpen] = useState(false);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useGetUser();
+  const { confirm } = useConfirm();
+  const [relationships, setRelationships] = useState({});
+  
+  // Helper function to check relationships in batch
+  const checkRelationshipsForUsers = async (users) => {
+    if (!users?.length || !user?.id) return;
+    
+    try {
+      const userIds = users.map(user => user.id);
+      const relationshipData = await checkUserRelationshipBatch(user.id, userIds);
+      
+      setRelationships(prev => ({
+        ...prev,
+        ...relationshipData
+      }));
+    } catch (error) {
+      console.error('Error checking relationships for users:', error);
+    }
+  };
   
   // 搜索用户
   const searchUsers = async (query) => {
@@ -49,6 +104,9 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
 
       if (error) throw error;
       setSearchResults(data);
+      
+      // Check relationships for search results in batch
+      await checkRelationshipsForUsers(data);
     } catch (error) {
       console.error('Error searching users:', error);
     } finally {
@@ -64,15 +122,69 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
   };
 
   // 选择/取消选择用户
-  const toggleUser = (user) => {
-    setSelectedUsers(prev => {
-      const isSelected = prev.some(u => u.id === user.id);
-      if (isSelected) {
-        return prev.filter(u => u.id !== user.id);
-      } else {
+  const toggleUser = async (user) => {
+    // Check if this user is already selected
+    const isSelected = selectedUsers.some(u => u.id === user.id);
+    
+    if (isSelected) {
+      // If already selected, simply remove the user
+      setSelectedUsers(prev => prev.filter(u => u.id !== user.id));
+      return;
+    }
+    
+    // Get the relationship data from context, or fetch it if not available
+    let isExternal = relationships[user.id]?.isExternal;
+    
+    if (isExternal === undefined) {
+      // If relationship data isn't already available, fetch it
+      const result = await checkUserRelationship(user.id, user.id);
+      isExternal = result.isExternal;
+      
+      // Update the relationships state
+      setRelationships(prev => ({
+        ...prev,
+        [user.id]: result
+      }));
+    }
+    
+    if (isExternal) {
+      // Prevent popover from closing
+      setIsConfirmDialogOpen(true);
+      
+      // Show confirmation dialog for external users
+      confirm({
+        title: t('externalUserConfirmTitle') || 'Add External User',
+        description: t('externalUserConfirmDescription', { name: user.name }) || `${user.name} is not a member of any of your teams. Are you sure you want to invite this external user?`,
+        confirmText: t('confirm') || 'Confirm',
+        cancelText: t('cancel') || 'Cancel',
+        preventClose: true,
+        onConfirm: () => {
+          setSelectedUsers(prev => {
+            // First check if the user is already in the array (extra safety check)
+            if (prev.find(u => u.id === user.id)) {
+              return prev; // User already exists, don't add again
+            }
+            // Add the user
+            return [...prev, user];
+          });
+          // Reset confirmation dialog state
+          setIsConfirmDialogOpen(false);
+        },
+        onCancel: () => {
+          // Reset confirmation dialog state
+          setIsConfirmDialogOpen(false);
+        }
+      });
+    } else {
+      // For internal users, add without confirmation
+      setSelectedUsers(prev => {
+        // First check if the user is already in the array (extra safety check)
+        if (prev.find(u => u.id === user.id)) {
+          return prev; // User already exists, don't add again
+        }
         return [...prev, user];
-      }
-    });
+      });
+    }
   };
 
   // 邀请用户
@@ -143,7 +255,7 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
         sessionData.participantsCount = allParticipants.length;
         
         // 确保created_by字段被保留
-        console.log("Refreshed session data with owner:", sessionData.created_by);
+        
       }
 
       // 更新toast为成功状态
@@ -161,6 +273,14 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
     } catch (error) {
       console.error('Error inviting users:', error);
       // 这里不需要再次显示错误toast，因为已经在上面处理了
+    }
+  };
+
+  // Save popover state when confirmation dialog opens
+  const onPopoverOpenChange = (open) => {
+    // Only allow closing if confirmation dialog is not open
+    if (!isConfirmDialogOpen || open) {
+      setIsOpen(open);
     }
   };
 
@@ -194,38 +314,29 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
           />
         </div>
 
-        <ScrollArea className="max-h-[200px] overflow-y-auto mt-2">
-          <div className="p-1">
-            {isLoading ? (
-              <div className="text-center py-4 text-sm text-muted-foreground">
-                {t('searching')}...
-              </div>
-            ) : searchResults.length > 0 ? (
-              searchResults.map(user => (
-                <div
-                  key={user.id}
-                  className="flex items-center gap-3 p-2 hover:bg-accent rounded-md cursor-pointer"
-                  onClick={() => toggleUser(user)}
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar_url} />
-                    <AvatarFallback>{user.name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{user.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {user.email}
-                    </p>
-                  </div>
+        <UserRelationshipsContext.Provider value={relationships}>
+          <ScrollArea className="max-h-[200px] overflow-y-auto mt-2">
+            <div className="p-1">
+              {isLoading ? (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  {t('searching')}...
                 </div>
-              ))
-            ) : searchQuery ? (
-              <div className="text-center py-4 text-sm text-muted-foreground">
-                {t('noResults')}
-              </div>
-            ) : null}
-          </div>
-        </ScrollArea>
+              ) : searchResults.length > 0 ? (
+                searchResults.map(user => (
+                  <UserItem
+                    key={user.id}
+                    user={user}
+                    onClick={() => toggleUser(user)}
+                  />
+                ))
+              ) : searchQuery ? (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  {t('noResults')}
+                </div>
+              ) : null}
+            </div>
+          </ScrollArea>
+        </UserRelationshipsContext.Provider>
 
         {selectedUsers.length > 0 && (
           <div className="mt-3">
@@ -244,7 +355,7 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
 
   // 标准的 Popover 实现
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen} onOpenChange={onPopoverOpenChange}>
       <PopoverTrigger asChild>
         <Button 
           variant="ghost" 
@@ -255,7 +366,12 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
           <UserPlus className="h-5 w-5" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
+      <PopoverContent className="w-80 p-0" align="end" onInteractOutside={(e) => {
+          // Prevent closing the popover when interacting with confirm dialog
+          if (e.target.closest('[role="dialog"]')) {
+            e.preventDefault();
+          }
+        }}>
         <div className="p-4 border-b">
           <div className="flex items-center gap-2 mb-3">
             {selectedUsers.map(user => (
@@ -284,38 +400,29 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
           </div>
         </div>
 
-        <ScrollArea className="max-h-[300px] overflow-y-auto">
-          <div className="p-2">
-            {isLoading ? (
-              <div className="text-center py-4 text-sm text-muted-foreground">
-                {t('searching')}...
-              </div>
-            ) : searchResults.length > 0 ? (
-              searchResults.map(user => (
-                <div
-                  key={user.id}
-                  className="flex items-center gap-3 p-2 hover:bg-accent rounded-md cursor-pointer"
-                  onClick={() => toggleUser(user)}
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar_url} />
-                    <AvatarFallback>{user.name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{user.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {user.email}
-                    </p>
-                  </div>
+        <UserRelationshipsContext.Provider value={relationships}>
+          <ScrollArea className="max-h-[300px] overflow-y-auto">
+            <div className="p-2">
+              {isLoading ? (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  {t('searching')}...
                 </div>
-              ))
-            ) : searchQuery ? (
-              <div className="text-center py-4 text-sm text-muted-foreground">
-                {t('noResults')}
-              </div>
-            ) : null}
-          </div>
-        </ScrollArea>
+              ) : searchResults.length > 0 ? (
+                searchResults.map(user => (
+                  <UserItem
+                    key={user.id}
+                    user={user}
+                    onClick={() => toggleUser(user)}
+                  />
+                ))
+              ) : searchQuery ? (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  {t('noResults')}
+                </div>
+              ) : null}
+            </div>
+          </ScrollArea>
+        </UserRelationshipsContext.Provider>
 
         {selectedUsers.length > 0 && (
           <div className="p-4 border-t">

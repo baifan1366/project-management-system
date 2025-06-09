@@ -11,7 +11,7 @@ export async function POST(request) {
   try {
     // Parse the request body
     const body = await request.json();
-    console.log('Received request body:', body);
+    
     
     // Validate required fields
     if (!body.email || !body.type) {
@@ -54,24 +54,22 @@ export async function POST(request) {
       contactData.role = body.role || null;
       contactData.purchase_timeline = body.timeline || null;
       contactData.user_quantity = body.userQty || null;
-    } else if (body.type === 'downgrade') {
-      // Validate required downgrade fields
-      if (!body.userId || !body.currentSubscriptionId || !body.targetPlanId || !body.reason) {
-        console.log('Missing downgrade fields:', { 
-          userId: !!body.userId, 
-          currentSubscriptionId: !!body.currentSubscriptionId, 
-          targetPlanId: !!body.targetPlanId, 
-          reason: !!body.reason 
-        });
+    } else if (body.type === 'refund') {
+      // Validate required refund fields
+      if (!body.userId || !body.currentSubscriptionId || !body.firstName || !body.lastName || 
+          !body.selectedReason || !body.details) {
+        
         return NextResponse.json(
-          { error: 'User ID, current subscription, target plan, and reason are required for downgrade requests' },
+          { error: 'User ID, current subscription, first name, last name, reason, and details are required for refund requests' },
           { status: 400 }
         );
       }
-      contactData.message = body.reason;
+      contactData.first_name = body.firstName;
+      contactData.last_name = body.lastName;
+      contactData.message = body.details;
     }
 
-    console.log('Preparing to insert contact data:', contactData);
+    
     
     // Insert contact record and get the generated ID
     const { data: contact, error: contactError } = await supabase
@@ -89,37 +87,57 @@ export async function POST(request) {
       );
     }
 
-    console.log('Successfully created contact:', contact);
+    
 
-    // If this is a downgrade request, create the downgrade request record
-    if (body.type === 'downgrade') {
-      const downgradeData = {
+    // If this is a refund request, create the refund request record
+    if (body.type === 'refund') {
+      // Fetch the most recent payment for this subscription
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payment')
+        .select('*')
+        .eq('user_id', body.userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (paymentError) {
+        console.error('Error fetching payment record:', paymentError);
+        return NextResponse.json(
+          { error: 'Could not find payment record for refund' },
+          { status: 400 }
+        );
+      }
+      
+      const refundData = {
         contact_id: contact.id,
         user_id: body.userId,
+        payment_id: paymentData.id,
         current_subscription_id: body.currentSubscriptionId,
-        target_plan_id: body.targetPlanId,
-        reason: body.reason,
+        first_name: body.firstName,
+        last_name: body.lastName,
+        reason: body.selectedReason,
+        details: body.details,
         status: 'PENDING',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      console.log('Preparing to insert downgrade data:', downgradeData);
+      
 
-      const { error: downgradeError } = await supabase
-        .from('downgrade_request')
-        .insert([downgradeData]);
+      const { error: refundError } = await supabase
+        .from('refund_request')
+        .insert([refundData]);
 
-      if (downgradeError) {
-        console.error('Error creating downgrade request:', downgradeError);
-        console.error('Downgrade data that failed:', downgradeData);
+      if (refundError) {
+        console.error('Error creating refund request:', refundError);
+        console.error('Refund data that failed:', refundData);
         return NextResponse.json(
-          { error: `Failed to submit downgrade request: ${downgradeError.message}` },
+          { error: `Failed to submit refund request: ${refundError.message}` },
           { status: 500 }
         );
       }
 
-      console.log('Successfully created downgrade request');
+      
     }
     
     // Return success response

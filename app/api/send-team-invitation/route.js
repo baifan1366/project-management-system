@@ -32,21 +32,16 @@ export async function POST(request) {
       },
     });
     
-    // 更新日志输出
-    console.log('SMTP Config:', {
-      host: process.env.NEXT_PUBLIC_SMTP_HOSTNAME,
-      port: process.env.NEXT_PUBLIC_SMTP_PORT,
-      user: process.env.NEXT_PUBLIC_SMTP_USERNAME,
-      secure: process.env.NEXT_PUBLIC_SMTP_SECURE,
-    });
-    
     // 测试 SMTP 连接
     try {
       await transporter.verify();
-      console.log('SMTP 连接成功');
     } catch (error) {
       console.error('SMTP 连接失败:', error);
     }
+
+    const LOGO_URL = "https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/public/public-resources/email/logo.png";
+    const HIGH_FIVE_URL = "https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/public/public-resources/email/blackhighFive_noBG.png";
+    const LOCK_URL = "https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/public/public-resources/email/blackLock_noBG.png";
     
     // 如果没有提供 HTML，但提供了订单详情，则创建默认模板
     let emailHtml = html;
@@ -71,7 +66,7 @@ export async function POST(request) {
         <!-- Logo and Brand Name - At the top left of the white card -->
         <div style="display: flex; align-items: center; margin-bottom: 16px">
           <img
-            src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/logo.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvbG9nby5wbmciLCJpYXQiOjE3NDI1Mjk1ODIsImV4cCI6MTgzNzEzNzU4Mn0.qDeS69M-0yTevXDoiuDc0rO_v_tsvxs0Z59C_snMRsE"
+            src="${LOGO_URL}"
             alt="Team Sync"
             style="height: 30px; width: 30px; margin-right: 8px"
           />
@@ -92,7 +87,7 @@ export async function POST(request) {
           <!-- High Five Icon -->
           <div style="text-align: center; margin: 16px 0">
             <img
-              src="https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/sign/%20public-resources/emails/blackhighFive_noBG.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiIgcHVibGljLXJlc291cmNlcy9lbWFpbHMvYmxhY2toaWdoRml2ZV9ub0JHLnBuZyIsImlhdCI6MTc0MjUyOTU1MCwiZXhwIjoxODM3MTM3NTUwfQ.ax1W0LxDSdZm4xYJXo6Xi9EkPmOKD__-8DE9Yk_kVnQ"
+              src="${HIGH_FIVE_URL}"
               alt="High Five Icon"
               style="height: 150px; width: 150px"
             />
@@ -169,7 +164,7 @@ export async function POST(request) {
 
           <!-- Note for non-recognizing users -->
           <p style="color: #6b7280; font-size: 14px; line-height: 20px; margin: 0 0 8px 0;">
-            If you’re not sure why you received this invitation, you can safely ignore this email.
+            If you're not sure why you received this invitation, you can safely ignore this email.
           </p>
 
           <div style="color: #6b7280; font-size: 14px">
@@ -182,9 +177,7 @@ export async function POST(request) {
 </html>
       `;
     }
-    
-    // 发送邮件
-    console.log('Sending email to:', to);
+
     const info = await transporter.sendMail({
       from: `"Team Sync" <${process.env.NEXT_PUBLIC_SMTP_FROM || process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
       to: to,
@@ -192,9 +185,6 @@ export async function POST(request) {
       text: text || 'Welcome to join us.',
       html: emailHtml,
     });
-    
-    console.log('Message sent: %s', info.messageId);
-    console.log('Response:', info.response);
     
     return NextResponse.json({
       success: true,

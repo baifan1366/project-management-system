@@ -74,7 +74,6 @@ export default function PaymentSuccess() {
   // Send confirmation email
   const sendEmail = async (email, orderDetails) => {
     try {
-      console.log('Sending confirmation email to:', email);
       const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
@@ -97,7 +96,6 @@ export default function PaymentSuccess() {
         throw new Error('Failed to send email');
       }
 
-      console.log('Email sent successfully');
     } catch (err) {
       console.error('Error sending confirmation email:', err);
     }
@@ -149,7 +147,6 @@ export default function PaymentSuccess() {
       
       // Deactivate ALL active subscription plans
       if (activeSubscriptions && activeSubscriptions.length > 0) {
-        console.log(`Deactivating ${activeSubscriptions.length} active subscription plans`);
         
         for (const subscription of activeSubscriptions) {
           // Deactivate each active subscription plan
@@ -161,7 +158,6 @@ export default function PaymentSuccess() {
             })
             .eq('id', subscription.id);
             
-          console.log(`Deactivated subscription plan: ${subscription.id}`);
         }
       }
       
@@ -219,7 +215,6 @@ export default function PaymentSuccess() {
       
       if (result.error) throw result.error;
       
-      console.log('User subscription updated successfully');
       return true;
     } catch (error) {
       console.error('Error updating subscription:', error);
@@ -266,14 +261,10 @@ export default function PaymentSuccess() {
   // Create payment record
   const createPaymentRecord = async (paymentData) => {
     try {
-      console.log('Creating payment record:', paymentData);
       
       // Get orderId from the metadata
       const orderId = paymentData.metadata?.orderId || metadata?.orderId;
-      console.log('Order ID from metadata:', orderId);
-      console.log('Full payment data:', paymentData);
-      console.log('Full metadata:', metadata);
-      
+
       if (!orderId) {
         throw new Error('No order ID found in payment metadata');
       }
@@ -307,7 +298,6 @@ export default function PaymentSuccess() {
         
       if (error) throw error;
       
-      console.log('Payment record created successfully:', data);
       
       return data;
     } catch (err) {
@@ -319,18 +309,13 @@ export default function PaymentSuccess() {
   // Create payment record for Alipay
   const createAlipayPaymentRecord = async (paymentData) => {
     try {
-      console.log('Creating Alipay payment record:', paymentData);
       
       // 从元数据中获取订单ID
       const orderId = paymentData.metadata?.orderId || metadata?.orderId;
-      console.log('Order ID from metadata:', orderId);
       
       if (!orderId) {
         throw new Error('No order ID found in payment metadata');
       }
-      
-      // 检查支付状态
-      console.log('Payment status for Alipay record:', paymentData.status);
       
       // 确定支付状态 - 支付宝可能返回不同的成功状态
       let paymentStatus = 'FAILED';
@@ -373,9 +358,7 @@ export default function PaymentSuccess() {
         .single();
         
       if (error) throw error;
-      
-      console.log('Alipay payment record created successfully:', data);
-      
+            
       return data;
     } catch (err) {
       console.error('Error creating Alipay payment record:', err);
@@ -390,25 +373,17 @@ export default function PaymentSuccess() {
         const paymentIntent = searchParams.get('payment_intent');
         const sessionId = searchParams.get('session_id');
         
-        console.log('Payment success params:', { 
-          paymentIntent, 
-          sessionId, 
-          storedSessionId 
-        });
-        
         // 使用URL中的会话ID或Redux中存储的会话ID
         const activeSessionId = sessionId || storedSessionId;
         
         // 如果有会话ID（支付宝支付通常会返回会话ID）
         if (activeSessionId) {
-          console.log('Processing payment with session ID (likely Alipay):', activeSessionId);
           await processPaymentWithSession(activeSessionId);
           return;
         }
         
         // 如果直接有支付意图ID（信用卡支付通常会返回支付意图ID）
         if (paymentIntent) {
-          console.log('Processing payment with payment intent (likely Credit Card):', paymentIntent);
           await processPaymentWithIntent(paymentIntent);
           return;
         }
@@ -438,16 +413,10 @@ export default function PaymentSuccess() {
       try {
         // Fetch session details from Stripe
         const sessionResult = await dispatch(fetchSessionDetails(sessionId)).unwrap();
-        console.log('Session details:', sessionResult);
-        
-        // 检查会话状态和支付状态
-        console.log('Session payment_status:', sessionResult.payment_status);
-        console.log('Session status:', sessionResult.status);
         
         // 支付宝支付可能没有 payment_intent，但仍然可以是成功的
         // 检查支付状态是否表示成功
         const isSuccessfulPayment = ['paid', 'complete', 'completed'].includes(sessionResult.payment_status?.toLowerCase());
-        console.log('Is successful payment based on status:', isSuccessfulPayment);
         
         if (!sessionResult.payment_intent && !isSuccessfulPayment) {
           throw new Error('No payment intent found in session and payment is not successful');
@@ -485,7 +454,6 @@ export default function PaymentSuccess() {
             // 从CNY转回USD
             const exchangeRate = 7.2;
             amount = amount / exchangeRate;
-            console.log(`Converting ${sessionResult.amount_total/100} CNY back to USD: $${amount.toFixed(2)}`);
           }
           
           // 更新Redux中的元数据
@@ -499,8 +467,6 @@ export default function PaymentSuccess() {
           // 如果会话中有用户ID和计划ID，但processPaymentWithIntent没有处理（例如支付宝支付可能没有常规的payment_intent），
           // 或者支付已成功但没有处理，在这里直接处理订阅更新和支付记录
           if ((userId && planId && (!paymentDetails || isSuccessfulPayment))) {
-            console.log('Creating payment record and updating subscription directly from session');
-            console.log('Payment status from session:', sessionResult.payment_status);
             
             // 获取用户邮箱
             const email = await fetchUserEmail(userId);
@@ -563,7 +529,6 @@ export default function PaymentSuccess() {
       
       // Fetch payment status from Stripe
       const result = await dispatch(fetchPaymentStatus(paymentIntentId)).unwrap();
-      console.log('Payment status result:', result);
       
       if (result.metadata) {
         dispatch(setPaymentMetadata({
@@ -641,14 +606,6 @@ export default function PaymentSuccess() {
 
     initializePaymentSuccess();
   }, [dispatch, searchParams, storedSessionId, router]);
-
-  console.log('Current payment state:', {
-    status,
-    paymentDetails,
-    metadata,
-    sessionDetails,
-    error
-  });
 
   if (loading) {
     return (

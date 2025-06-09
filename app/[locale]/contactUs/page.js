@@ -34,6 +34,16 @@ const userQty = [
     { id: 5, name: '500+' }
 ];
 
+// Refund reasons
+const refundReasons = [
+    { id: 1, name: 'Not satisfied with the service' },
+    { id: 2, name: 'Found a better alternative' },
+    { id: 3, name: 'Technical issues' },
+    { id: 4, name: 'Financial constraints' },
+    { id: 5, name: 'Features not as expected' },
+    { id: 6, name: 'Other' }
+];
+
 export default function ContactUs(){
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -48,7 +58,7 @@ export default function ContactUs(){
     
     // Move all state declarations to the top
     const [selectedOption, setSelectedOption] = useState(
-        defaultForm === 'downgrade' ? 'downgrade' : 
+        defaultForm === 'refund' ? 'refund' : 
         defaultForm === 'enterprise' ? 'enterprise' : 
         'general'
     );
@@ -64,14 +74,8 @@ export default function ContactUs(){
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [messageSent, setMessageSent] = useState(false);
-    const [targetPlan, setTargetPlan] = useState(searchParams.get('to') ? searchParams.get('to').toString() : '');
-    const [reason, setReason] = useState('');
-    const [fromPlan, setFromPlan] = useState(searchParams.get('from') ? searchParams.get('from').toString() : '');
-
-    // Debug effect for targetPlan
-    useEffect(() => {
-        console.log('targetPlan changed:', targetPlan, typeof targetPlan);
-    }, [targetPlan]);
+    const [selectedRefundReason, setSelectedRefundReason] = useState('');
+    const [refundDetails, setRefundDetails] = useState('');
     
     // Effect to handle form type changes while preserving email
     useEffect(() => {
@@ -83,10 +87,12 @@ export default function ContactUs(){
         setSelectedRole('');
         setSelectedTimeline('');
         setSelectedUserQty('');
+        setSelectedRefundReason('');
+        setRefundDetails('');
         
-        // Only reset targetPlan and fromPlan if not provided in URL
-        if (selectedOption === 'downgrade') {
-            // For downgrade form, ensure we have the account email
+        // For refund form, ensure we have the account email
+        if (selectedOption === 'refund') {
+            // For refund form, ensure we have the account email
             if (!accountEmail && user?.email) {
                 setAccountEmail(user.email);
             }
@@ -95,22 +101,10 @@ export default function ContactUs(){
             if (accountEmail) {
                 setEmail(accountEmail);
             }
-            
-            if (!targetPlan && searchParams.get('to')) {
-                setTargetPlan(searchParams.get('to').toString());
-            }
-            if (!fromPlan && searchParams.get('from')) {
-                setFromPlan(searchParams.get('from').toString());
-            }
-        } else {
-            // Reset these fields when not in downgrade form
-            setTargetPlan('');
-            setFromPlan('');
-            setReason('');
         }
         
         setMessageSent(false);
-    }, [selectedOption, searchParams, targetPlan, fromPlan, accountEmail, user]);
+    }, [selectedOption, searchParams, accountEmail, user]);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -142,131 +136,6 @@ export default function ContactUs(){
 
                     if (!error && subscriptionData) {
                         setUserSubscription(subscriptionData);
-                        
-                        // Fetch available downgrade plans based on current plan type
-                        if (subscriptionData.subscription_plan) {
-                            const currentPlanType = subscriptionData.subscription_plan.type;
-                            const currentPlanId = subscriptionData.subscription_plan.id;
-                            console.log('Current plan:', subscriptionData.subscription_plan);
-                            
-                            const { data: plans, error: plansError } = await supabase
-                                .from('subscription_plan')
-                                .select(`
-                                    id, 
-                                    name, 
-                                    type, 
-                                    price,
-                                    max_projects,
-                                    max_teams,
-                                    max_members,
-                                    max_ai_chat,
-                                    max_ai_task,
-                                    max_ai_workflow,
-                                    max_storage
-                                `)
-                                .eq('is_active', true)
-                                .in('type', getAvailableDowngradePlans(currentPlanType))
-                                .order('price', { ascending: true });
-
-                            if (!plansError && plans) {
-                                console.log('Available downgrade plans before filtering:', plans);
-                                
-                                // Additional filtering: only include plans with lower ID than current plan
-                                // This ensures proper downgrade hierarchy
-                                const filteredPlans = plans.filter(plan => {
-                                    // Always include FREE plans as downgrade options
-                                    if (plan.type === 'FREE') return true;
-                                    
-                                    // Special case for "daniel" plan (ID 13)
-                                    if (Number(currentPlanId) === 13 && plan.name !== 'daniel') {
-                                        // Allow all other plans as downgrade options except itself
-                                        return true;
-                                    }
-                                    
-                                    // Never show ENTERPRISE plans as downgrade options from PRO plans
-                                    if (currentPlanType === 'PRO' && plan.type === 'ENTERPRISE') {
-                                        return false;
-                                    }
-                                    
-                                    // Compare resource limits - a plan is a downgrade if it has lower limits in most categories
-                                    const currentPlan = subscriptionData.subscription_plan;
-                                    
-                                    // Calculate how many resource limits are lower in the potential downgrade plan
-                                    const limitFields = [
-                                        'max_projects', 
-                                        'max_teams', 
-                                        'max_members', 
-                                        'max_ai_chat', 
-                                        'max_ai_task', 
-                                        'max_ai_workflow', 
-                                        'max_storage'
-                                    ];
-                                    
-                                    // Count how many limits are lower in the potential downgrade plan
-                                    let lowerLimitsCount = 0;
-                                    let totalNonZeroFields = 0;
-                                    let hasSignificantDowngrade = false;
-                                    
-                                    limitFields.forEach(field => {
-                                        // Only count fields where current plan has non-zero values
-                                        const currentValue = Number(currentPlan[field]);
-                                        const planValue = Number(plan[field]);
-                                        
-                                        // Special handling for "unlimited" values (represented as 0)
-                                        const isCurrentUnlimited = currentValue === 0;
-                                        const isPlanUnlimited = planValue === 0;
-                                        
-                                        // If current plan has unlimited value for this field
-                                        if (isCurrentUnlimited) {
-                                            totalNonZeroFields++;
-                                            // If potential plan is not unlimited, it's a downgrade
-                                            if (!isPlanUnlimited) {
-                                                lowerLimitsCount++;
-                                                hasSignificantDowngrade = true; // Going from unlimited to limited is significant
-                                            }
-                                        } 
-                                        // Normal comparison for non-zero values
-                                        else if (currentValue > 0) {
-                                            totalNonZeroFields++;
-                                            
-                                            // If plan is unlimited, it's not a downgrade for this field
-                                            if (isPlanUnlimited) {
-                                                // Not counted as lower
-                                            }
-                                            // Normal comparison
-                                            else if (planValue < currentValue) {
-                                                lowerLimitsCount++;
-                                                
-                                                // Check if this is a significant downgrade (50% or more reduction)
-                                                if (planValue <= currentValue * 0.5) {
-                                                    hasSignificantDowngrade = true;
-                                                }
-                                            }
-                                        }
-                                    });
-                                    
-                                    // Consider it a downgrade if:
-                                    // 1. Price is lower AND
-                                    // 2. At least half of the resource limits are lower OR there's at least one significant downgrade
-                                    const isPriceLower = Number(plan.price) < Number(currentPlan.price);
-                                    const isResourceDowngrade = totalNonZeroFields > 0 && 
-                                        (lowerLimitsCount / totalNonZeroFields >= 0.5 || hasSignificantDowngrade);
-                                    
-                                    // Special case for PRO plans with same name but different billing interval
-                                    if (plan.name === currentPlan.name && plan.type === currentPlan.type && isPriceLower) {
-                                        // Allow downgrade between same plan types with different billing intervals
-                                        return true;
-                                    }
-                                    
-                                    console.log(`Plan ${plan.name} comparison: Price lower: ${isPriceLower}, Resource downgrade: ${isResourceDowngrade}, Lower limits: ${lowerLimitsCount}/${totalNonZeroFields}, Has significant downgrade: ${hasSignificantDowngrade}`);
-                                    
-                                    return isPriceLower && isResourceDowngrade;
-                                });
-                                
-                                console.log('Available downgrade plans after filtering:', filteredPlans);
-                                setAvailablePlans(filteredPlans);
-                            }
-                        }
 
                         if (user.email) {
                             setEmail(user.email);
@@ -284,19 +153,8 @@ export default function ContactUs(){
             }
             
             // 如果URL中有form参数，强制选择对应表单
-            if (defaultForm === 'downgrade') {
-                setSelectedOption('downgrade');
-                
-                // 设置from和to计划ID
-                if (searchParams.get('from')) {
-                    setFromPlan(searchParams.get('from').toString());
-                }
-                
-                if (searchParams.get('to')) {
-                    const toParam = searchParams.get('to').toString();
-                    setTargetPlan(toParam);
-                    console.log('Setting target plan from URL:', toParam);
-                }
+            if (defaultForm === 'refund') {
+                setSelectedOption('refund');
             } else if (defaultForm === 'enterprise') {
                 setSelectedOption('enterprise');
             }
@@ -310,7 +168,7 @@ export default function ContactUs(){
 
     // Helper function to determine available downgrade plans
     const getAvailableDowngradePlans = (currentPlanType) => {
-        console.log('Current plan type:', currentPlanType);
+        
         switch (currentPlanType) {
             case 'ENTERPRISE':
                 return ['PRO', 'FREE'];
@@ -351,25 +209,28 @@ export default function ContactUs(){
                 formData.role = selectedRole;
                 formData.timeline = selectedTimeline;
                 formData.userQty = selectedUserQty;
-            } else if(selectedOption === 'downgrade'){
+            } else if(selectedOption === 'refund'){
                 if (!user?.id) {
-                    throw new Error('You must be logged in to submit a downgrade request');
+                    throw new Error('You must be logged in to submit a refund request');
                 }
                 if (!userSubscription?.id) {
                     throw new Error('No active subscription found');
                 }
-                if (!targetPlan) {
-                    throw new Error('Please select a target plan');
-                }
+                if (!firstName) throw new Error('First name is required');
+                if (!lastName) throw new Error('Last name is required');
+                if (!selectedRefundReason) throw new Error('Please select a reason for refund');
+                if (!refundDetails) throw new Error('Please provide details for your refund request');
 
                 formData.userId = user.id;
                 formData.currentSubscriptionId = userSubscription.id;
-                formData.targetPlanId = targetPlan.toString();
-                formData.reason = reason;
+                formData.firstName = firstName;
+                formData.lastName = lastName;
+                formData.selectedReason = selectedRefundReason;
+                formData.details = refundDetails;
                 formData.email = accountEmail;
             }
 
-            console.log('Sending form data:', formData);
+            
 
             const response = await fetch('/api/contactUs', {
                 method: 'POST',
@@ -395,11 +256,11 @@ export default function ContactUs(){
             setSelectedRole('');
             setSelectedTimeline('');
             setSelectedUserQty('');
-            setTargetPlan('');
-            setReason('');
+            setSelectedRefundReason('');
+            setRefundDetails('');
             
-            // Only reset email for non-downgrade forms
-            if (selectedOption !== 'downgrade') {
+            // Only reset email for non-refund forms
+            if (selectedOption !== 'refund') {
                 // Optionally reset email for other forms if needed
             }
 
@@ -421,10 +282,10 @@ export default function ContactUs(){
             { id: 'enterprise', label: 'Enterprise' }
         ];
 
-        // Add downgrade option only for authenticated users with active paid subscription
+        // Add refund option only for authenticated users with active paid subscription
         if (isAuthenticated && userSubscription?.status === 'ACTIVE' && 
             userSubscription.subscription_plan?.type !== 'FREE') {
-            options.push({ id: 'downgrade', label: 'Downgrade' });
+            options.push({ id: 'refund', label: 'Refund' });
         }
 
         return (
@@ -437,7 +298,7 @@ export default function ContactUs(){
                                 'w-1/2': options.length === 2,
                                 'w-1/3': options.length === 3,
                                 'translate-x-full': selectedOption === 'enterprise',
-                                'translate-x-[200%]': selectedOption === 'downgrade',
+                                'translate-x-[200%]': selectedOption === 'refund',
                                 'translate-x-0': selectedOption === 'general'
                             }
                         )}
@@ -679,27 +540,56 @@ export default function ContactUs(){
                     </div>
                 )}
 
-                {/* Add Downgrade Request Form */}
-                {selectedOption === 'downgrade' && (
+                {/* Add Refund Request Form */}
+                {selectedOption === 'refund' && (
                     <div>
                     <form onSubmit={handleSubmit} className="space-y-6">
-                    <span className="text-2xl font-bold mb-6">Request Plan Downgrade</span>
+                    <span className="text-2xl font-bold mb-6">Request Refund</span>
+                    <p className="text-gray-400 mb-4">
+                        Refund requests are subject to our terms and conditions. Your eligibility for a refund will be evaluated according to these terms.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label htmlFor="firstName" className="block mb-2">First Name</label>
+                            <input
+                                type="text"
+                                id="firstName"
+                                value={firstName}
+                                onChange={(e) => setFirstName(e.target.value)}
+                                className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
+                                required
+                            />
+                        </div>
+                        
+                        <div>
+                            <label htmlFor="lastName" className="block mb-2">Last Name</label>
+                            <input
+                                type="text"
+                                id="lastName"
+                                value={lastName}
+                                onChange={(e) => setLastName(e.target.value)}
+                                className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
+                                required
+                            />
+                        </div>
+                    </div>
                     
                     <div>
-                        <label htmlFor="accountEmail" className="block mb-2">Account Email</label>
+                        <label htmlFor="accountEmail" className="block mb-2">Email Address</label>
                         <input
                         type="email"
                         id="accountEmail"
                         value={accountEmail}
                         className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
                         required
-                        placeholder="Your account email"
                         disabled
                         />
+                        <p className="text-xs text-gray-400 mt-1">This email is associated with your account and cannot be changed.</p>
                     </div>
 
                     <div>
-                        <label htmlFor="currentPlan" className="block mb-2">Current Plan</label>
+                        <label htmlFor="currentPlan" className="block mb-2">Current Plan Information</label>
                         <div className="space-y-2">
                             <div>
                                 <label className="text-sm text-gray-400">Plan Name</label>
@@ -713,41 +603,43 @@ export default function ContactUs(){
                                     {userSubscription?.subscription_plan?.type}
                                 </div>
                             </div>
+                            <div>
+                                <label className="text-sm text-gray-400">Price</label>
+                                <div className="w-full p-3 bg-gray-800 border border-gray-700 rounded">
+                                    ${userSubscription?.subscription_plan?.price}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div>
-                        <label htmlFor="targetPlan" className="block mb-2">Target Plan</label>
-                        <select
-                        id="targetPlan"
-                        value={targetPlan}
-                        onChange={(e) => setTargetPlan(e.target.value)}
-                        className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
-                        required
-                        >
-                            <option value="">Select desired plan</option>
-                            {availablePlans.map((plan) => {
-                                // Compare as strings for exact matching
-                                const isSelected = targetPlan === plan.id.toString();
-                                console.log(`Option: plan.id=${plan.id}, isSelected=${isSelected}, targetPlan=${targetPlan}`);
-                                return (
-                                    <option key={plan.id} value={plan.id.toString()}>
-                                        {plan.name} ({plan.type})
-                                    </option>
-                                );
-                            })}
-                        </select>
+                        <label htmlFor="refundReason" className="block mb-2">Reason for Refund <span className="text-pink-500">*</span></label>
+                        <div className="flex flex-wrap gap-2">
+                            {refundReasons.map((reason) => (
+                                <div 
+                                    key={reason.id} 
+                                    className={clsx(
+                                        "border border-gray-700 rounded p-2 cursor-pointer transition-colors duration-200",
+                                        selectedRefundReason === reason.name ? "bg-white text-black" : "bg-gray-900"
+                                    )}
+                                    onClick={() => {setSelectedRefundReason(reason.name)}}
+                                >
+                                    {reason.name}
+                                </div>
+                            ))}
+                        </div>
+                        {!selectedRefundReason && <p className="text-xs text-pink-500 mt-1">Please select a reason for your refund request</p>}
                     </div>
 
                     <div>
-                        <label htmlFor="reason" className="block mb-2">Reason for Downgrade</label>
+                        <label htmlFor="refundDetails" className="block mb-2">Additional Details</label>
                         <textarea
-                        id="reason"
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
+                            id="refundDetails"
+                            value={refundDetails}
+                            onChange={(e) => setRefundDetails(e.target.value)}
                         className="w-full p-3 bg-gray-900 border border-gray-700 rounded h-32"
                         required
-                        placeholder="Please explain why you want to downgrade your plan"
+                            placeholder="Please provide additional details about your refund request"
                         />
                     </div>
 
@@ -755,7 +647,7 @@ export default function ContactUs(){
                         type="submit"
                         className="w-full py-3 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded"
                     >
-                        Submit Downgrade Request
+                        Submit Refund Request
                     </button>
                     </form>
                     </div>

@@ -218,7 +218,7 @@ export async function POST(req) {
       .limit(1);
     
     // Log found subscriptions for debugging
-    console.log('Found subscriptions:', activeSubscriptions);
+    
     
     // Update the subscription if one exists and it's not a free plan
     if (!subscriptionError && activeSubscriptions && activeSubscriptions.length > 0 && !isFreePlan) {
@@ -246,7 +246,7 @@ export async function POST(req) {
       );
     } else {
       // If no active subscription exists, log this fact
-      console.log('No active subscription found for user', userId);
+      
     }
 
     return NextResponse.json({

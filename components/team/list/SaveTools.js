@@ -77,7 +77,6 @@ export function useSaveTools() {
       // 示例：
       // await dispatch(saveTagOrder({ teamId, order: tagOrder }));
       // await dispatch(saveTagWidths({ teamId, widths: tagWidths }));
-      console.log('保存表格设置到后端', { teamId, tagOrder, tagWidths });
     } catch (error) {
       console.error('保存表格设置到后端失败:', error);
     }

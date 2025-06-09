@@ -23,6 +23,7 @@ import { Lock, Eye, Pencil, Unlock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { createTeamValidationSchema, teamFormTransforms } from '@/components/validation/teamSchema'
+import { TeamGuard } from '@/components/team/TeamGuard'
 
 export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const t = useTranslations('CreateTeam')
@@ -123,6 +124,20 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
         role: 'OWNER',
         created_by: userId
       })).unwrap();
+      
+      if (data.teamAccess === 'can_edit') {
+        try {          
+          // 确保团队对象的access属性与表单数据一致
+          const teamForGuard = {
+            ...team,
+            access: data.teamAccess // 使用表单数据中的访问权限值
+          };
+          
+          await TeamGuard.handleTeamCreation(teamForGuard, projectId, userId);
+        } catch (guardError) {
+          console.error('TeamDialog: TeamGuard调用失败', guardError);
+        }
+      }
 
       // 创建团队自定义字段
       // 获取所有默认自定义字段
@@ -218,8 +233,6 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
             userId: userId
           })).unwrap();
         }
-      } else {
-        console.log('未找到LIST类型的自定义字段，跳过更新标签');
       }
 
       // 重置状态并关闭对话框

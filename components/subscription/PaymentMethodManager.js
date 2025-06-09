@@ -62,7 +62,7 @@ export default function PaymentMethodManager() {
     setProcessingAction(true);
     
     try {
-      console.log('Creating payment method with Stripe...');
+      
       // Create payment method with Stripe
       const { error, paymentMethod } = await stripe.createPaymentMethod({
         type: 'card',
@@ -74,7 +74,7 @@ export default function PaymentMethodManager() {
         throw error;
       }
       
-      console.log('Payment method created successfully:', paymentMethod.id);
+      
       
       // Save payment method to database
       const response = await fetch('/api/payment-methods', {
@@ -90,7 +90,7 @@ export default function PaymentMethodManager() {
       });
       
       const responseData = await response.json();
-      console.log('API response:', responseData);
+      
       
       if (!response.ok) {
         throw new Error(responseData.error || t('subscription.payments.saveError'));

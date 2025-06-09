@@ -27,7 +27,6 @@ export default function BodyContent({ projectId, teamId, teamCFId }) {
             setPosts([]);
             
             if (forceReload) {
-                console.log('Posts data reload completed');
             }
             
         } catch (error) {

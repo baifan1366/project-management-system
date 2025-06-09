@@ -68,7 +68,7 @@ export function Header() {
     
     // Only one Header component should handle notifications
     if (headerHasMounted && !headerSubscriptionRef.current) {
-      console.log('Another Header component is already managing notifications');
+      
       return;
     }
     
@@ -79,21 +79,21 @@ export function Header() {
       try {
         // Avoid redundant subscription setup for the same user
         if (lastSubscribedUserId === user.id && isSubscribed) {
-          console.log('Header: Already subscribed for this user, skipping setup');
+          
           headerSubscriptionRef.current = true;
           return;
         }
         
         // Only fetch notifications once on initial mount or when user changes
         if (!initialFetchDoneRef.current || lastSubscribedUserId !== user.id) {
-          console.log('Header: Performing initial notification fetch');
+          
           await dispatch(fetchNotifications(user.id));
           initialFetchDoneRef.current = true;
         }
         
         // Subscribe to realtime notifications if not already subscribed
         if (!isSubscribed && isMountedRef.current) {
-          console.log('Header: Starting realtime subscription for notifications');
+          
           await dispatch(subscribeToNotifications(user.id));
           headerSubscriptionRef.current = true;
           lastSubscribedUserId = user.id;
@@ -112,7 +112,7 @@ export function Header() {
         
         // Only unsubscribe if this component created the subscription
         if (headerSubscriptionRef.current) {
-          console.log('Header: Cleaning up notification subscription on unmount');
+          
           dispatch(unsubscribeFromNotifications());
           headerSubscriptionRef.current = false;
           initialFetchDoneRef.current = false;

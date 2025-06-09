@@ -233,7 +233,7 @@ export default function MyTasksPage() {
       // 合并所有任务
       combinedTasks = [...combinedTasks, ...standaloneTasks];
       
-      console.log('加载的任务列表:', combinedTasks);
+      
       setTasks(combinedTasks);
       setMyTasks(userMyTasks);
       setFilteredTasks(combinedTasks);
@@ -600,8 +600,8 @@ export default function MyTasksPage() {
       expected_completion_date: task.expected_completion_date || null // Ensure field exists even if null
     };
     
-    console.log("Original task for details:", task);
-    console.log("Task being passed to TaskDetailsDialog:", detailTask);
+    
+    
     setSelectedTask(detailTask);
     setShowTaskDetailsDialog(true);
   };
@@ -620,8 +620,8 @@ export default function MyTasksPage() {
       expected_completion_date: task.expected_completion_date || null // Ensure field exists even if null
     };
     
-    console.log("Original task before edit:", task);
-    console.log("Task being passed to EditTaskDialog:", editTask);
+    
+    
     setSelectedTask(editTask);
     setShowEditTaskDialog(true);
   };
@@ -811,7 +811,6 @@ export default function MyTasksPage() {
                                     <h3 className="font-medium text-sm">
                                       {getTaskTitle(task) || t_tasks('noTitle')}
                                     </h3>
-                                    {console.log(`Task priority for ${task.id}:`, task.priority, getTaskPriority(task))}
                                     <Badge 
                                       variant={getPriorityVariant(getTaskPriority(task))}
                                       className={getPriorityVariant(getTaskPriority(task)) === 'yellow' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}

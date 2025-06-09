@@ -39,7 +39,7 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
   const formatDueDate = () => {
     try {
       const dueDate = task.expected_completion_date;
-      console.log("Due date raw value:", dueDate);
+      
       
       if (!dueDate) {
         return t('noDueDate');
@@ -47,7 +47,7 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
       
       // 尝试格式化日期，添加错误处理
       const formattedDate = formatDateToUserTimezone(dueDate);
-      console.log("Formatted due date:", formattedDate);
+      
       return formattedDate || t('noDueDate');
     } catch (error) {
       console.error('Error formatting due date:', error);
@@ -59,7 +59,7 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
   const formatStartDate = () => {
     try {
       const startDate = task.expected_start_time;
-      console.log("Start date raw value:", startDate);
+      
       
       if (!startDate) {
         return t('noStartDate');
@@ -67,7 +67,7 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
       
       // 尝试格式化日期，添加错误处理
       const formattedDate = formatDateToUserTimezone(startDate);
-      console.log("Formatted start date:", formattedDate);
+      
       return formattedDate || t('noStartDate');
     } catch (error) {
       console.error('Error formatting start date:', error);
@@ -109,7 +109,7 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
         throw new Error('Invalid task ID');
       }
       
-      console.log("Deleting task with ID:", taskId);
+      
       
       const { error } = await supabase
         .from('mytasks')

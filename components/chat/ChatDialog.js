@@ -121,7 +121,20 @@ const ChatMessage = memo(({
                       <img 
                         src={attachment.file_url} 
                         alt={attachment.file_name || "Image"}
-                        className="max-w-full rounded-lg"
+                        className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => window.open(attachment.file_url, '_blank')}
+                        loading="lazy"
+                        onError={(e) => {
+                          console.error("Failed to load image:", attachment.file_url);
+                          e.target.onerror = null;
+                          e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
+                          e.target.style.padding = "20px";
+                          e.target.style.background = "#f0f0f0";
+                        }}
+                        style={{
+                          maxHeight: "200px",
+                          objectFit: "contain"
+                        }}
                       />
                     ) : (
                       <a 
@@ -197,7 +210,8 @@ export default function ChatDialog({
   isMinimized,
   sessionId,
   user,
-  sessionName
+  sessionName,
+  position = 0
 }) {
   const [message, setMessage] = useState('');
   const [sessionMessages, setSessionMessages] = useState([]);
@@ -207,6 +221,36 @@ export default function ChatDialog({
   const { user: currentUser } = useGetUser();
   const [replyTo, setReplyTo] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // Calculate right position based on the position prop
+  const dialogPosition = useMemo(() => {
+    // Base position is 1rem (16px) from right edge
+    // Each additional dialog will be positioned with a gap of 16px + dialog width (384px)
+    const basePosition = 16; // 1rem = 16px
+    const dialogWidth = 384; // w-96 = 24rem = 384px
+    const gap = 16; // 1rem gap between dialogs
+    
+    return basePosition + (position * (dialogWidth + gap));
+  }, [position]);
+
+  // Handle responsive behavior for mobile and small screens
+  const [isMobileView, setIsMobileView] = useState(false);
+  
+  // Add window resize listener for responsive behavior
+  useEffect(() => {
+    const checkMobileView = () => {
+      setIsMobileView(window.innerWidth < 768); // 768px is the md breakpoint in Tailwind
+    };
+
+    // Initial check
+    checkMobileView();
+
+    // Add resize listener
+    window.addEventListener('resize', checkMobileView);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', checkMobileView);
+  }, []);
 
   // Create a debounced version of the message setter
   const debouncedSetMessage = useCallback(
@@ -314,15 +358,18 @@ export default function ChatDialog({
 
     fetchMessages();
 
-    // Subscribe to new messages
+    // Subscribe to new messages - with specific filter for this session only
     const channel = supabase
-      .channel(`chat_${sessionId}`)
+      .channel(`chat_dialog_${sessionId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'chat_message',
         filter: `session_id=eq.${sessionId}`
       }, async (payload) => {
+        // Only process messages for this specific session
+        if (payload.new.session_id !== sessionId) return;
+        
         // Directly fetch message with user info
         const { data: messageData, error: messageError } = await supabase
           .from('chat_message')
@@ -466,7 +513,7 @@ export default function ChatDialog({
       // 发送消息获取消息ID
       const sentMessage = await sendMessage(
         sessionId,
-        messageText || '发送了附件', // 如果没有消息文本，则使用默认文本
+        messageText || 'Sent an attachment', // 如果没有消息文本，则使用默认文本
         replyTo?.id || null,
         [] // 空数组作为mentions参数
       );
@@ -481,7 +528,8 @@ export default function ChatDialog({
               file_url: attachment.file_url,
               file_name: attachment.file_name,
               file_type: attachment.file_type,
-              is_image: attachment.is_image
+              is_image: attachment.is_image,
+              uploaded_by: currentUser.id // Use currentUser.id from the useGetUser hook
             });
             
           if (attachmentError) {
@@ -543,9 +591,17 @@ export default function ChatDialog({
   return (
     <div 
       className={cn(
-        "fixed bottom-0 right-4 w-96 bg-background rounded-t-lg shadow-lg flex flex-col transition-all duration-200",
+        "fixed bottom-0 bg-background rounded-t-lg shadow-lg flex flex-col transition-all duration-200",
         isMinimized ? "h-12" : "h-[520px]"
       )}
+      style={{ 
+        right: isMobileView ? '16px' : `${dialogPosition}px`,  // On mobile, always position at the right edge
+        width: isMobileView ? 'calc(100% - 32px)' : '384px', // Full width on mobile with margin
+        maxWidth: isMobileView ? '100%' : '384px',
+        // On mobile with multiple dialogs open, stack them with slight offset
+        bottom: isMobileView && position > 0 ? `${position * 10}px` : 0,
+        zIndex: isMobileView ? 50 - position : 50 // Higher dialogs appear on top
+      }}
     >
       {/* Dialog header */}
       <div className="flex items-center justify-between p-2 border-b">

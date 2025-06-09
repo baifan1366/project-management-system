@@ -6,9 +6,7 @@ export async function POST(request) {
   try {
     // 获取请求数据
     const data = await request.json();
-    
-    console.log('【API接收参数】创建冲刺:', data);
-    
+        
     // 验证数据
     if (!data.team_id) {
       console.error('【API错误】团队ID不能为空');
@@ -43,9 +41,7 @@ export async function POST(request) {
       console.error('【API错误】创建冲刺失败:', error);
       throw error;
     }
-    
-    console.log('【API响应】冲刺创建成功:', newSprint);
-    
+        
     return NextResponse.json(newSprint);
   } catch (error) {
     console.error('【API错误】处理请求时出错:', error);

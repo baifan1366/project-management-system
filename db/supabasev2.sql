@@ -81,7 +81,8 @@ CREATE TABLE "team" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "star" BOOL DEFAULT FALSE,
   "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD')) DEFAULT 'PENDING',
-  "archive" BOOL DEFAULT FALSE
+  "archive" BOOL DEFAULT FALSE,
+  "label" JSONB DEFAULT '{"TAGS": [""], "MULTI-SELECT": [""], "SINGLE-SELECT": [""]}'
 );
 
 -- user and team relationship table (many-to-many)
@@ -134,27 +135,6 @@ CREATE TABLE IF NOT EXISTS "notion_page" (
   "last_edited_by" UUID REFERENCES "user"("id") ON DELETE SET NULL
 );
 
--- Table for page collaborators (for access control at page level if needed)
-CREATE TABLE IF NOT EXISTS "notion_page_collaborator" (
-  "page_id" INT NOT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "permission" TEXT NOT NULL CHECK ("permission" IN ('CAN_EDIT', 'CAN_COMMENT', 'CAN_VIEW')),
-  "added_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "added_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY ("page_id", "user_id")
-);
-
--- Table for page comments
-CREATE TABLE IF NOT EXISTS "notion_page_comment" (
-  "id" SERIAL PRIMARY KEY,
-  "page_id" INT NOT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "content" TEXT NOT NULL,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "resolved" BOOLEAN DEFAULT FALSE
-);
-
 -- Table for page favorites/bookmarks
 CREATE TABLE IF NOT EXISTS "notion_page_favorite" (
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -163,13 +143,52 @@ CREATE TABLE IF NOT EXISTS "notion_page_favorite" (
   PRIMARY KEY ("user_id", "page_id")
 );
 
+CREATE TABLE "team_agile" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
+  "start_date" TIMESTAMP NOT NULL,
+  "duration" INT DEFAULT 2,
+  "goal" TEXT,
+  "task_ids" JSONB DEFAULT '{}',
+  "status" TEXT NOT NULL CHECK ("status" IN ('PLANNING', 'PENDING', 'RETROSPECTIVE')) DEFAULT 'PENDING',
+  "whatWentWell" JSONB,
+  "toImprove" JSONB,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "agile_role" (
+  "id" SERIAL PRIMARY KEY,
+  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
+  "name" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "agile_member" (
+  "id" SERIAL PRIMARY KEY,
+  "agile_id" INT NOT NULL REFERENCES "team_agile"("id") ON DELETE CASCADE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "role_id" INT NOT NULL REFERENCES "agile_role"("id") ON DELETE CASCADE,
+  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
 -- task table
 CREATE TABLE "task" (
   "id" SERIAL PRIMARY KEY,
   "tag_values" JSONB DEFAULT '{}',
   "attachment_ids" INT[] DEFAULT '{}', -- 存储附件ID数组
-  "like" UUID[] DEFAULT '{}',
+  "likes" UUID[] DEFAULT '{}',
   "page_id" INT NULL REFERENCES "notion_page"("id") ON DELETE CASCADE,
+  "agile_id" INT NULL REFERENCES "team_agile"("id") ON DELETE CASCADE,
+  "agile_status" TEXT NULL CHECK ("agile_status" IN ('TODO', 'IN_PROGRESS', 'DONE')) DEFAULT 'TODO',
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -234,42 +253,6 @@ CREATE TABLE "team_post" (
   "attachment_id" INT[] DEFAULT '{}', -- Array of attachments associated with the post
   "is_pinned" BOOLEAN DEFAULT FALSE,
   "reactions" JSONB DEFAULT '{}', -- Store reactions as {emoji: [user_ids]} format
-  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE "agile_role" (
-  "id" SERIAL PRIMARY KEY,
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "name" VARCHAR(255) NOT NULL,
-  "description" TEXT,
-  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE "team_agile" (
-  "id" SERIAL PRIMARY KEY,
-  "team_id" INT NOT NULL REFERENCES "team"("id") ON DELETE CASCADE,
-  "name" VARCHAR(255) NOT NULL,
-  "start_date" TIMESTAMP NOT NULL,
-  "duration" INT DEFAULT 2,
-  "goal" TEXT,
-  "task_ids" JSONB DEFAULT '{}',
-  "status" TEXT NOT NULL CHECK ("status" IN ('PLANNING', 'PENDING', 'RETROSPECTIVE')) DEFAULT 'PENDING',
-  "whatWentWell" JSONB,
-  "toImprove" JSONB,
-  "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE "agile_member" (
-  "id" SERIAL PRIMARY KEY,
-  "agile_id" INT NOT NULL REFERENCES "team_agile"("id") ON DELETE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "role_id" INT NOT NULL REFERENCES "agile_role"("id") ON DELETE CASCADE,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -521,7 +504,7 @@ CREATE TABLE "promo_code" (
 -- contact table (for storing contact form submissions)
 CREATE TABLE "contact" (
   "id" SERIAL PRIMARY KEY,
-  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE', 'DOWNGRADE')), -- 添加 DOWNGRADE 类型
+  "type" TEXT NOT NULL CHECK ("type" IN ('GENERAL', 'ENTERPRISE', 'REFUND')), -- Contact form types
   "email" VARCHAR(255) NOT NULL,
   "message" TEXT, -- 用于一般查询的消息
   -- 企业查询特有字段
@@ -550,17 +533,55 @@ CREATE TABLE "admin_user" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- downgrade request table
-CREATE TABLE "downgrade_request" (
+-- Payment table for Stripe integration
+CREATE TABLE "payment" (
+  "id" SERIAL PRIMARY KEY,
+  "order_id" UUID NOT NULL UNIQUE,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "amount" DECIMAL(10, 2) NOT NULL,
+  "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
+  "payment_method" TEXT NOT NULL,
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
+  "transaction_id" VARCHAR(255),
+  "discount_amount" DECIMAL(10, 2) DEFAULT 0,
+  "discount_percentage" DECIMAL(5, 2) DEFAULT 0,
+  "applied_promo_code" VARCHAR(50),
+  "stripe_payment_id" VARCHAR(255),
+  "metadata" JSONB,
+  "is_processed" BOOLEAN DEFAULT FALSE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Store user payment methods for automatic renewal
+CREATE TABLE "payment_methods" (
+  "id" SERIAL PRIMARY KEY,
+  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "stripe_payment_method_id" VARCHAR(255) NOT NULL,
+  "card_last4" VARCHAR(4),
+  "card_brand" VARCHAR(50),
+  "card_exp_month" INT,
+  "card_exp_year" INT,
+  "is_default" BOOLEAN DEFAULT FALSE,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- refund request table
+CREATE TABLE "refund_request" (
   "id" SERIAL PRIMARY KEY,
   "contact_id" INT NOT NULL REFERENCES "contact"("id") ON DELETE CASCADE,
+  "payment_id" INT NOT NULL REFERENCES "payment"("id") ON DELETE CASCADE,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "current_subscription_id" INT NOT NULL REFERENCES "user_subscription_plan"("id") ON DELETE CASCADE,
-  "target_plan_id" INT NOT NULL REFERENCES "subscription_plan"("id") ON DELETE CASCADE,
-  "reason" TEXT NOT NULL,
+  "first_name" VARCHAR(255) NOT NULL,
+  "last_name" VARCHAR(255) NOT NULL,
+  "reason" VARCHAR(255) NOT NULL,
+  "details" TEXT NOT NULL,
   "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'APPROVED', 'REJECTED')) DEFAULT 'PENDING',
   "processed_by" INT REFERENCES "admin_user"("id") ON DELETE SET NULL,
   "processed_at" TIMESTAMP,
+  "refund_amount" DECIMAL(10, 2),
   "notes" TEXT,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -659,40 +680,6 @@ CREATE TABLE "landing_page_content" (
   "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('h1', 'h2', 'span', 'video', 'image', 'solution_card')),
   "content" TEXT NOT NULL, -- text content or media URL
   "sort_order" INT NOT NULL DEFAULT 0
-);
-
--- Payment table for Stripe integration
-CREATE TABLE "payment" (
-  "id" SERIAL PRIMARY KEY,
-  "order_id" UUID NOT NULL UNIQUE,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "amount" DECIMAL(10, 2) NOT NULL,
-  "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
-  "payment_method" TEXT NOT NULL,
-  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
-  "transaction_id" VARCHAR(255),
-  "discount_amount" DECIMAL(10, 2) DEFAULT 0,
-  "discount_percentage" DECIMAL(5, 2) DEFAULT 0,
-  "applied_promo_code" VARCHAR(50),
-  "stripe_payment_id" VARCHAR(255),
-  "metadata" JSONB,
-  "is_processed" BOOLEAN DEFAULT FALSE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Store user payment methods for automatic renewal
-CREATE TABLE "payment_methods" (
-  "id" SERIAL PRIMARY KEY,
-  "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "stripe_payment_method_id" VARCHAR(255) NOT NULL,
-  "card_last4" VARCHAR(4),
-  "card_brand" VARCHAR(50),
-  "card_exp_month" INT,
-  "card_exp_year" INT,
-  "is_default" BOOLEAN DEFAULT FALSE,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE task_links (
@@ -849,9 +836,6 @@ CREATE INDEX idx_team_custom_field_field ON "team_custom_field"("custom_field_id
 CREATE INDEX IF NOT EXISTS idx_notion_page_parent ON "notion_page"("parent_id");
 CREATE INDEX IF NOT EXISTS idx_notion_page_created_by ON "notion_page"("created_by");
 
--- Index for faster comment lookups
-CREATE INDEX IF NOT EXISTS idx_notion_page_comment_page ON "notion_page_comment"("page_id");
-
 -- Create indexes for better performance
 CREATE INDEX idx_team_post_team_id ON "team_post"("team_id");
 CREATE INDEX idx_team_post_attachment_id ON "team_post"("attachment_id");
@@ -921,12 +905,12 @@ CREATE INDEX IF NOT EXISTS idx_file_folders_task_id ON "file_folders"("task_id")
 CREATE INDEX IF NOT EXISTS idx_file_folders_parent_path ON "file_folders"("parent_path");
 CREATE INDEX IF NOT EXISTS idx_attachment_file_path ON "attachment"("file_path");
 
--- Create indexes for downgrade_request
-CREATE INDEX idx_downgrade_request_user_id ON "downgrade_request"("user_id");
-CREATE INDEX idx_downgrade_request_contact_id ON "downgrade_request"("contact_id");
-CREATE INDEX idx_downgrade_request_current_subscription ON "downgrade_request"("current_subscription_id");
-CREATE INDEX idx_downgrade_request_target_plan ON "downgrade_request"("target_plan_id");
-CREATE INDEX idx_downgrade_request_status ON "downgrade_request"("status");
+-- Create indexes for refund_request
+CREATE INDEX idx_refund_request_user_id ON "refund_request"("user_id");
+CREATE INDEX idx_refund_request_contact_id ON "refund_request"("contact_id");
+CREATE INDEX idx_refund_request_current_subscription ON "refund_request"("current_subscription_id");
+CREATE INDEX idx_refund_request_status ON "refund_request"("status");
+CREATE INDEX idx_refund_request_created_at ON "refund_request"("created_at");
 
 -- Create indexes for better performance
 CREATE INDEX idx_contact_reply_contact_id ON "contact_reply"("contact_id");

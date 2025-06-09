@@ -55,12 +55,9 @@ export async function POST(request) {
 //update section taskIds
 export async function PATCH(request) {
     const body = await request.json();
-    console.log('接收到的请求体:', body);
     
     if(body.sectionData) {
-        const { sectionId, sectionData, teamId } = body;
-        console.log('更新分区名称:', { sectionId, teamId, sectionData });
-        
+        const { sectionId, sectionData, teamId } = body;        
         // 确保 ID 是数字
         const numericSectionId = Number(sectionId);
         const numericTeamId = Number(teamId);
@@ -85,7 +82,6 @@ export async function PATCH(request) {
             return NextResponse.json({ error: error.message }, { status: 500 })
         }
         
-        console.log('更新分区成功:', section);
         return NextResponse.json(section)
     }
     if(body.newTaskIds) {
@@ -128,9 +124,7 @@ export async function PATCH(request) {
                 error: '无效的参数。需要：teamId 和 sectionIds 数组' 
             }, { status: 400 })
         }
-        
-        console.log('更新分区顺序:', { teamId, sectionIds });
-        
+                
         // 开始事务以确保所有更新原子性执行
         const updatePromises = sectionIds.map((sectionId, index) => {
             return supabase
@@ -159,7 +153,6 @@ export async function PATCH(request) {
                 return NextResponse.json({ error: fetchError.message }, { status: 500 })
             }
             
-            console.log('分区顺序更新成功!');
             return NextResponse.json(updatedSections)
         } catch (error) {
             console.error('更新分区顺序错误:', error);

@@ -40,6 +40,7 @@ import { useSearchParams } from 'next/navigation';
 import UserProfileDialog from '@/components/chat/UserProfileDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+// Removed useUserRelationship and ExternalBadge imports
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -275,7 +276,9 @@ const MemoizedMessage = memo(function Message({
           "flex items-baseline gap-2",
           isMe ? "flex-row-reverse" : ""
         )}>
-          <span className="font-medium truncate">{msg.user?.name}</span>
+          <div className="font-medium truncate flex items-center gap-1">
+            <span>{msg.user?.name}</span>
+          </div>
           <span className="text-xs text-muted-foreground flex-shrink-0">
             {adjustTimeByOffset && new Date(msg.created_at) ? 
               adjustTimeByOffset(new Date(msg.created_at)).toLocaleTimeString([], {
@@ -1099,7 +1102,7 @@ export default function ChatPage() {
     }
     
     // Add debug logging
-    console.log('Updating chat name, created_by:', currentSession.created_by);
+    
     
     try {
       const { error } = await supabase
@@ -1135,9 +1138,9 @@ export default function ChatPage() {
     if (currentSession?.type !== 'GROUP') return;
     
     // Debug logging
-    console.log('Current session:', currentSession);
-    console.log('Chat owner ID:', currentSession.created_by);
-    console.log('Current user ID:', currentUser?.id);
+    
+    
+    
     
     // Check permission using the same logic as for menu items:
     // 1. If created_by is missing, allow the first participant (likely creator) to edit
@@ -1165,7 +1168,7 @@ export default function ChatPage() {
     
     // Only update if the name has actually changed
     if (trimmedName === currentSession.name) {
-      console.log('Name unchanged, skipping update');
+      
       setIsEditingName(false);
       return;
     }
@@ -1198,18 +1201,12 @@ export default function ChatPage() {
   // Handle leaving a group chat
   const handleLeaveGroup = () => {
     if (!currentSession || currentSession.type !== 'GROUP') {
-      console.log('No se puede salir: No es un chat de grupo o no hay sesión actual', currentSession);
+      
       return;
     }
     
     // Debug info
-    console.log('Intentando salir del grupo:', {
-      sessionId: currentSession.id,
-      sessionType: currentSession.type,
-      isCreator: currentUser?.id === currentSession.created_by,
-      currentUserId: currentUser?.id,
-      creatorId: currentSession.created_by
-    });
+    
     
     confirm({
       title: t('leaveGroup') || 'Leave Group',
@@ -1561,7 +1558,7 @@ export default function ChatPage() {
                           onInvite={(updatedSession) => {
                             // 确保完全保留更新后的会话数据（包括created_by字段）
                             if (updatedSession) {
-                              console.log("Updated session with owner:", updatedSession.created_by);
+                              
                               // 为了确保保留created_by字段，检查它是否存在
                               if (!updatedSession.created_by && currentSession?.created_by) {
                                 updatedSession.created_by = currentSession.created_by;
@@ -1575,9 +1572,6 @@ export default function ChatPage() {
                         />
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
-                    
-                    {/* 确保在导入中添加一个console.log调试信息 */}
-                    {process.env.NODE_ENV === 'development' && console.log("Current user ID:", currentUser?.id, "Session owner:", currentSession?.created_by, "Is owner:", currentUser?.id === currentSession?.created_by)}
                     
                     {/* 确保即使created_by字段缺失，也能正确处理 */}
                     {((!currentSession.created_by && currentUser?.id === currentSession.participants?.[0]?.id) || currentSession.created_by === currentUser?.id) && (

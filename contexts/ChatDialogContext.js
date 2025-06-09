@@ -14,6 +14,23 @@ export function ChatDialogProvider({ children }) {
   const { messages, sendMessage, currentSession, setCurrentSession } = useChat();
   const { user:currentUser } = useGetUser();
   const pathname = usePathname();
+  const [isMobileView, setIsMobileView] = useState(false);
+  
+  // Check for mobile view
+  useEffect(() => {
+    const checkMobileView = () => {
+      setIsMobileView(window.innerWidth < 768); // 768px is the md breakpoint in Tailwind
+    };
+
+    // Initial check
+    checkMobileView();
+
+    // Add resize listener
+    window.addEventListener('resize', checkMobileView);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', checkMobileView);
+  }, []);
   
   // 监听新消息
   useEffect(() => {
@@ -31,7 +48,7 @@ export function ChatDialogProvider({ children }) {
           if (pathname.includes('/chat')) return;
           
           // 如果消息不是自己发的，且不是当前打开的会话，则显示对话框
-          if (payload.new.user_id !== currentUser.id) {
+          if (payload.new.user_id !== currentUser.id && payload.new.session_id !== currentSession?.id) {
             // 获取发送者信息
             const { data: senderData } = await supabase
               .from('user')
@@ -64,7 +81,9 @@ export function ChatDialogProvider({ children }) {
                     avatar_url: senderData.avatar_url || senderData.name.charAt(0),
                     online: true
                   },
-                  sessionName: sessionData.name
+                  sessionName: sessionData.name,
+                  isMinimized: false,
+                  position: newMap.size // 设置新对话框的position
                 });
               }
               return newMap;
@@ -94,19 +113,65 @@ export function ChatDialogProvider({ children }) {
     }
   }, [currentSession]);
 
+  // 重新计算位置，确保没有空缺
+  const recalculatePositions = useCallback(() => {
+    let position = 0;
+    const activeDialogs = Array.from(openDialogs.entries())
+      .filter(([_, dialog]) => dialog.isOpen)
+      .sort((a, b) => (a[1].position || 0) - (b[1].position || 0));
+
+    const updatedDialogs = new Map(openDialogs);
+    
+    activeDialogs.forEach(([sessionId, dialog]) => {
+      updatedDialogs.set(sessionId, {
+        ...dialog,
+        position: position++
+      });
+    });
+    
+    return updatedDialogs;
+  }, [openDialogs]);
+
   const openDialog = (sessionId, user, sessionName) => {
     // 如果是当前会话，不打开对话框
     if (sessionId === currentSession?.id) return;
 
     setOpenDialogs(prev => {
       const newMap = new Map(prev);
-      newMap.set(sessionId, {
-        isOpen: true,
-        sessionId,
-        user,
-        sessionName
-      });
-      return newMap;
+      const existingDialog = newMap.get(sessionId);
+      
+      // 在移动设备上，限制同时打开的对话框数量为1个
+      if (isMobileView) {
+        // 关闭所有其他对话框，只保留当前打开的
+        newMap.forEach((dialog, id) => {
+          if (id !== sessionId && dialog.isOpen) {
+            dialog.isOpen = false;
+          }
+        });
+      }
+      
+      if (existingDialog) {
+        // 更新已存在的对话框
+        newMap.set(sessionId, {
+          ...existingDialog,
+          isOpen: true,
+          isMinimized: false
+        });
+      } else {
+        // 创建新的对话框，位置为当前打开对话框数量
+        const openCount = Array.from(newMap.values()).filter(d => d.isOpen).length;
+        newMap.set(sessionId, {
+          isOpen: true,
+          sessionId,
+          user,
+          sessionName,
+          isMinimized: false,
+          position: openCount // 设置新对话框的位置
+        });
+      }
+      
+      // 重新计算所有打开对话框的位置
+      return recalculatePositions();
     });
   };
 
@@ -116,7 +181,9 @@ export function ChatDialogProvider({ children }) {
       if (newMap.has(sessionId)) {
         newMap.get(sessionId).isOpen = false;
       }
-      return newMap;
+      
+      // 重新计算所有打开对话框的位置
+      return recalculatePositions();
     });
   };
 
@@ -138,8 +205,9 @@ export function ChatDialogProvider({ children }) {
     <ChatDialogContext.Provider value={{ openDialog, closeDialog, minimizeDialog }}>
       {children}
       {/* 渲染所有打开的对话框 */}
-      {Array.from(openDialogs.entries()).map(([sessionId, dialog]) => (
-        dialog.isOpen && (
+      {Array.from(openDialogs.entries())
+        .filter(([_, dialog]) => dialog.isOpen)
+        .map(([sessionId, dialog]) => (
           <ChatDialog
             key={sessionId}
             isOpen={true}
@@ -147,11 +215,11 @@ export function ChatDialogProvider({ children }) {
             user={dialog.user}
             sessionName={dialog.sessionName}
             isMinimized={dialog.isMinimized}
+            position={dialog.position || 0}
             onClose={() => closeDialog(sessionId)}
             onMinimize={() => minimizeDialog(sessionId)}
           />
-        )
-      ))}
+        ))}
     </ChatDialogContext.Provider>
   );
 }

@@ -41,7 +41,7 @@ async function checkCalendarScope(accessToken) {
 async function refreshAccessToken(refreshToken) {
   try {
     // Add logging for debugging
-    console.log('Attempting to refresh Google token...');
+    
     
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -63,7 +63,7 @@ async function refreshAccessToken(refreshToken) {
     }
     
     const data = await response.json();
-    console.log('Token refresh successful');
+    
     return data.access_token;
   } catch (error) {
     console.error('Error refreshing access token:', error);

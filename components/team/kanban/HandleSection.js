@@ -15,9 +15,7 @@ export default function HandleSection({ teamId, onSectionChange }) {
     const { confirm } = useConfirm();
     const sectionInfo = useSelector((state) => state.sections?.sections || []);
 
-    const CreateSection = async (sectionData) => {
-        console.log('正在创建新分区:', sectionData);
-        
+    const CreateSection = async (sectionData) => {        
         try {
             if (!sectionData.name || !sectionData.name.trim()) {
                 console.error('分区名称不能为空');
@@ -32,9 +30,7 @@ export default function HandleSection({ teamId, onSectionChange }) {
                     createdBy: user?.id
                 }
             })).unwrap();
-            
-            console.log('分区创建成功:', result);
-            
+                        
             if (onSectionChange) {
                 onSectionChange();
             }
@@ -45,9 +41,7 @@ export default function HandleSection({ teamId, onSectionChange }) {
         }
     }
 
-    const UpdateSection = async (sectionId, editingTitle) => {
-        console.log('正在更新分区:', { sectionId, editingTitle });
-        
+    const UpdateSection = async (sectionId, editingTitle) => {        
         try {
             const numericSectionId = Number(sectionId);
             
@@ -57,16 +51,13 @@ export default function HandleSection({ teamId, onSectionChange }) {
             }
             
             const currentSections = sectionInfo.map(s => ({ id: s.id, name: s.name }));
-            console.log('当前状态中的分区列表:', currentSections);
             
             const result = await dispatch(updateSection({
                 sectionId: numericSectionId,
                 teamId,
                 sectionData: editingTitle
             })).unwrap();
-            
-            console.log('分区更新成功:', result);
-            
+                        
             if (onSectionChange) {
                 onSectionChange();
             }

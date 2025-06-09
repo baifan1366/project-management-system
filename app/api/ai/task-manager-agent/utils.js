@@ -83,8 +83,6 @@ export function safeParseJSON(jsonString) {
       // Fix truncated object with properties that lack values
       sanitizedContent = sanitizedContent.replace(/"([^"]+)"\s*:(?!\s*["{\[0-9tfn])/g, '"$1": null');
       
-      console.log("Sanitized JSON:", sanitizedContent.substring(0, 100) + "...");
-      
       // Try parsing the sanitized JSON
       try {
         const result = JSON.parse(sanitizedContent);
@@ -166,7 +164,7 @@ export function isInvitationInstruction(instruction) {
   const containsEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g.test(lowerInstruction);
   
   const result = containsInviteTerm && containsEmail;
-  console.log(`Checking if instruction is invitation: ${result}`);
+  
   return result;
 } 
 

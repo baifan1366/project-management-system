@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server';
 import { executeWorkflow, getUserWorkflows, createWorkflow, updateWorkflow, getWorkflow } from '../../../[locale]/ai-workflow/workflow-service';
 import { supabase } from '@/lib/supabase';
 
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 second timeout (max for hobby plan)
+
 export async function POST(request) {
   try {    
-    console.log('Main API: POST request received');
+    
     
     // Parse request body
     const body = await request.json();
@@ -19,10 +22,10 @@ export async function POST(request) {
     
     // Allow processing without userId in development (using a default)
     const userIdentifier = userId || 'default-user-id';
-    console.log('Using user identifier:', userIdentifier);
+    
     
     // Execute the workflow
-    console.log(`Main API: Executing workflow ${workflowId}`);
+    
     const result = await executeWorkflow(
       workflowId, 
       inputs, 
@@ -37,7 +40,7 @@ export async function POST(request) {
       }
     );
     
-    console.log('Main API: Workflow execution completed successfully');
+    
     
     return new NextResponse(JSON.stringify(result), {
       status: 200,
@@ -54,7 +57,7 @@ export async function POST(request) {
 
 export async function GET(request) {
   try {
-    console.log('Main API: GET request received');
+    
     
     // Get the URL and extract parameters
     const url = new URL(request.url);
@@ -63,11 +66,11 @@ export async function GET(request) {
     
     // Allow processing without userId in development (using a default)
     const userIdentifier = userId || 'default-user-id';
-    console.log('Using user identifier:', userIdentifier);
+    
     
     if (id) {
       // Get a specific workflow
-      console.log(`Main API: Getting workflow ${id}`);
+      
       const workflow = await getWorkflow(id);
       return new NextResponse(JSON.stringify(workflow), {
         status: 200,
@@ -75,7 +78,7 @@ export async function GET(request) {
       });
     } else {
       // Get all workflows for user
-      console.log(`Main API: Getting workflows for user ${userIdentifier}`);
+      
       const workflows = await getUserWorkflows(userIdentifier);
       return new NextResponse(JSON.stringify(workflows), {
         status: 200,
@@ -93,7 +96,7 @@ export async function GET(request) {
 
 export async function PUT(request) {
   try {
-    console.log('Main API: PUT request received');
+    
     
     // Parse request body
     const body = await request.json();
@@ -108,13 +111,13 @@ export async function PUT(request) {
     
     // Allow processing without userId in development (using a default)
     const userIdentifier = userId || 'default-user-id';
-    console.log('Using user identifier:', userIdentifier);
+    
     
     // Update the workflow
-    console.log(`Main API: Updating workflow ${id}`);
+    
     const workflow = await updateWorkflow(id, updates, userIdentifier);
     
-    console.log('Main API: Workflow updated successfully');
+    
     
     return new NextResponse(JSON.stringify(workflow), {
       status: 200,
@@ -131,7 +134,7 @@ export async function PUT(request) {
 
 export async function DELETE(request) {
   try {
-    console.log('Main API: DELETE request received');
+    
     
     // Get the URL and extract parameters
     const url = new URL(request.url);
@@ -147,7 +150,7 @@ export async function DELETE(request) {
     
     // Allow processing without userId in development (using a default)
     const userIdentifier = userId || 'default-user-id';
-    console.log(`Main API: Attempting to delete workflow ${id} by user ${userIdentifier}`);
+    
     
     // First verify ownership
     const { data: workflow, error: fetchError } = await supabase
@@ -191,7 +194,7 @@ export async function DELETE(request) {
       });
     }
     
-    console.log(`Main API: Successfully deleted workflow ${id}`);
+    
     
     return new NextResponse(JSON.stringify({ success: true }), {
       status: 200,

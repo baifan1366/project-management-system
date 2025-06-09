@@ -71,7 +71,6 @@ function WorkflowNode({ data, selected, id }) {
     
     try {
       setIsLoadingChatSessions(true);
-      console.log(`[Debug] Fetching chat sessions for user ID: ${data.userId}`);
       const response = await fetch(`/api/chat/sessions?userId=${data.userId}`);
       
       if (!response.ok) {
@@ -79,10 +78,7 @@ function WorkflowNode({ data, selected, id }) {
       }
       
       const chatSessionData = await response.json();
-      console.log(`[Debug] All chat sessions:`, chatSessionData);
-      // Filter out AI type chat sessions
       const filteredSessions = chatSessionData.filter(session => session.type !== 'AI');
-      console.log(`[Debug] Filtered sessions (non-AI):`, filteredSessions);
       setChatSessions(filteredSessions);
     } catch (error) {
       console.error('Error fetching chat sessions:', error);
@@ -189,14 +185,12 @@ function WorkflowNode({ data, selected, id }) {
 
   // Toggle chat session selection
   const toggleChatSession = (sessionId) => {
-    console.log(`[Debug] Toggling chat session: ${sessionId}`);
     setSelectedChatSessions(prev => {
       const isSelected = prev.includes(sessionId);
       
       // If already selected, remove it
       if (isSelected) {
         const updated = prev.filter(id => id !== sessionId);
-        console.log(`[Debug] Removed session ${sessionId}. Updated selection:`, updated);
         // Save the updated selection
         if (data.handleInputChange) {
           data.handleInputChange(id, 'chatSessionIds', updated);
@@ -206,7 +200,6 @@ function WorkflowNode({ data, selected, id }) {
       // If not selected, add it
       else {
         const updated = [...prev, sessionId];
-        console.log(`[Debug] Added session ${sessionId}. Updated selection:`, updated);
         // Save the updated selection
         if (data.handleInputChange) {
           data.handleInputChange(id, 'chatSessionIds', updated);

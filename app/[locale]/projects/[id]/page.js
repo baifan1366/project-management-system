@@ -5,8 +5,7 @@ import { use } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, ListTodo, Calendar, BarChart2, Clock, Bot } from 'lucide-react';
-import TaskItem from '@/components/TaskItem';
+import { Plus, ListTodo, Users, Star, StarOff, Bot } from 'lucide-react';
 import ActivityLog from '@/components/ActivityLog';
 import { useTranslations } from 'use-intl';
 import { useDispatch, useSelector } from 'react-redux';
@@ -16,6 +15,7 @@ import TaskManagerAgent from '@/components/ui/TaskManagerAgent';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
+import { format } from 'date-fns';
 
 export default function Home({ params }) {
   // 使用React.use解包params对象
@@ -29,7 +29,7 @@ export default function Home({ params }) {
   const projectsStatus = useSelector(state => state.projects.status);
   const t = useTranslations('Projects');
   const t_pengy = useTranslations('pengy');
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeStatus, setActiveStatus] = useState('ALL');
   const [taskCount, setTaskCount] = useState({
     pending: 0,
     inProgress: 0,
@@ -37,6 +37,7 @@ export default function Home({ params }) {
     total: 0
   });
   const [loading, setLoading] = useState(true);
+  const [teamsLoading, setTeamsLoading] = useState(true);
   const [openAgentDialog, setOpenAgentDialog] = useState(false);
   const { user } = useGetUser();
   const router = useRouter();
@@ -44,6 +45,9 @@ export default function Home({ params }) {
   const [hasPermission, setHasPermission] = useState(false);
   const [permissionChecked, setPermissionChecked] = useState(false);
   const [showArchivedDialog, setShowArchivedDialog] = useState(false);
+  const [teams, setTeams] = useState([]);
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(true);
 
   // 使用Redux获取任务数据
   const dispatch = useDispatch();
@@ -71,6 +75,68 @@ export default function Home({ params }) {
     
     getCurrentUser();
   }, [user]);
+
+  // 获取项目中的团队数据
+  useEffect(() => {
+    async function fetchTeams() {
+      try {
+        if (!projectId) return;
+        
+        const response = await fetch(`/api/projects/${projectId}/teams`);
+        const data = await response.json();
+        
+        // 处理团队数据，将星标团队排在前面
+        const sortedTeams = data.sort((a, b) => {
+          if (a.star && !b.star) return -1;
+          if (!a.star && b.star) return 1;
+          return 0;
+        });
+        
+        // 获取每个团队的成员数量和任务数量
+        for (let team of sortedTeams) {
+          // 获取团队成员数量
+          const membersResponse = await fetch(`/api/teams/${team.id}/members`);
+          const membersData = await membersResponse.json();
+          team.memberCount = membersData.length;
+          
+          // 获取团队任务数量
+          const tasksResponse = await fetch(`/api/teams/${team.id}/tasks`);
+          const tasksData = await tasksResponse.json();
+          team.taskCount = tasksData.length;
+        }
+        
+        setTeams(sortedTeams);
+        setTeamsLoading(false);
+      } catch (err) {
+        console.error('Error fetching teams:', err);
+        setTeamsLoading(false);
+      }
+    }
+    
+    if (hasPermission && projectId) {
+      fetchTeams();
+    }
+  }, [projectId, hasPermission]);
+
+  // 获取项目成员
+  useEffect(() => {
+    async function fetchProjectMembers() {
+      try {
+        if (!projectId || !hasPermission) return;
+        
+        const response = await fetch(`/api/projects/${projectId}/members`);
+        const data = await response.json();
+        
+        setProjectMembers(data);
+        setMembersLoading(false);
+      } catch (err) {
+        console.error('Error fetching project members:', err);
+        setMembersLoading(false);
+      }
+    }
+    
+    fetchProjectMembers();
+  }, [projectId, hasPermission]);
 
   // 检查用户是否有权限访问此项目以及项目是否已归档
   useEffect(() => {
@@ -114,6 +180,34 @@ export default function Home({ params }) {
     
     checkProjectPermission();
   }, [userId, projectId, project]);
+
+  // 处理星标状态切换
+  const handleToggleStar = async (teamId, currentStarStatus) => {
+    try {
+      const response = await fetch(`/api/teams/${teamId}/star`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ star: !currentStarStatus }),
+      });
+      
+      if (response.ok) {
+        // 更新本地状态
+        setTeams(teams.map(team => 
+          team.id === teamId 
+            ? { ...team, star: !team.star } 
+            : team
+        ).sort((a, b) => {
+          if (a.star && !b.star) return -1;
+          if (!a.star && b.star) return 1;
+          return 0;
+        }));
+      }
+    } catch (err) {
+      console.error('Error toggling star status:', err);
+    }
+  };
 
   // 处理权限对话框关闭
   const handlePermissionDialogClose = () => {
@@ -165,34 +259,23 @@ export default function Home({ params }) {
     }
   }, [tasks]);
 
-  // 获取任务属性
-  const getTaskProperty = (task, property) => {
-    const tagValues = task.tag_values || {};
-    return tagValues[property] || '';
-  };
-
-  // 转换任务为显示格式
-  const transformTaskForDisplay = (task) => {
-    return {
-      id: task.id,
-      title: getTaskProperty(task, 'title') || '无标题任务',
-      description: getTaskProperty(task, 'description') || '',
-      dueDate: getTaskProperty(task, 'due_date') || '',
-      priority: getTaskProperty(task, 'priority')?.toLowerCase() || 'medium',
-      status: getTaskProperty(task, 'status')?.toLowerCase() || 'pending',
-      assignee: {
-        id: getTaskProperty(task, 'assignee_id') || '',
-        name: getTaskProperty(task, 'assignee_name') || '未分配',
-        avatar: getTaskProperty(task, 'assignee_name') ? getTaskProperty(task, 'assignee_name').substring(0, 2).toUpperCase() : '?'
-      },
-      comments: task.comments || 0
-    };
-  };
+  // 根据状态过滤团队
+  const filteredTeams = teams.filter(team => {
+    if (activeStatus === 'ALL') return true;
+    return team.status === activeStatus;
+  });
 
   // 立即检查项目是否存在
   if (projectsStatus === 'succeeded' && !project) {
-    // 如果项目加载完成但不存在，立即重定向
-    router.replace(`/${locale}/projects`);
+    // 使用useEffect处理重定向，而不是在渲染过程中
+    useEffect(() => {
+      // 使用setTimeout确保在渲染完成后执行
+      const redirectTimer = setTimeout(() => {
+        router.replace(`/${locale}/projects`);
+      }, 0);
+      
+      return () => clearTimeout(redirectTimer);
+    }, [projectsStatus, project, locale, router]);
     
     // 显示加载状态，直到重定向完成
     return (
@@ -204,9 +287,6 @@ export default function Home({ params }) {
       </div>
     );
   }
-
-  // 转换所有任务
-  const displayTasks = tasks.map(transformTaskForDisplay);
 
   // 如果权限检查未完成，显示加载状态
   if (!permissionChecked) {
@@ -262,7 +342,7 @@ export default function Home({ params }) {
     <div className="container px-4 py-6 max-h-screen overflow-y-auto">
       {/* 页面头部 */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">{t('overview')}</h1>
+        <h1 className="text-2xl font-bold">{project?.project_name || t('projectDetails')}</h1>
         <div className="flex space-x-2">
           <Dialog open={openAgentDialog} onOpenChange={setOpenAgentDialog}>
             <DialogTrigger asChild>
@@ -276,75 +356,116 @@ export default function Home({ params }) {
               <TaskManagerAgent userId={userId} projectId={projectId} />
             </DialogContent>
           </Dialog>
-          <Button 
-            variant={themeColor}
-            size="icon"
-          >
-            <Plus size={20} />
-          </Button>
         </div>
       </div>
 
       {/* 统计卡片部分 */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
         <StatsCard 
-          icon={<ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />} 
-          title={t('pendingTasks')}
-          value={loading ? "..." : taskCount.pending.toString()} 
+          icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />} 
+          title={t('teams')}
+          value={teamsLoading ? "..." : teams.length.toString()} 
         />
         <StatsCard 
-          icon={<Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />} 
-          title={t('inProgressTasks')} 
-          value={loading ? "..." : taskCount.inProgress.toString()} 
+          icon={<Star className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />} 
+          title={t('starredTeams')} 
+          value={teamsLoading ? "..." : teams.filter(team => team.star).length.toString()} 
         />
         <StatsCard 
-          icon={<Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />} 
-          title={t('completedTasks')} 
-          value={loading ? "..." : taskCount.completed.toString()} 
+          icon={<ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />} 
+          title={t('totalTasks')} 
+          value={loading ? "..." : taskCount.total.toString()} 
         />
         <StatsCard 
-          icon={<BarChart2 className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />} 
-          title={t('completionRate')} 
-          value={loading ? "..." : `${taskCount.total > 0 ? Math.round((taskCount.completed / taskCount.total) * 100) : 0}%`} 
+          icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />} 
+          title={t('projectMembers')} 
+          value={membersLoading ? "..." : projectMembers.length.toString()} 
         />
       </div>
 
-      {/* 标签页区域 */}
-      <Tabs defaultValue="overview" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
-          <TabsTrigger value="tasks">{t('tasks')}</TabsTrigger>
-          <TabsTrigger value="timeline">{t('timeline')}</TabsTrigger>
-          <TabsTrigger value="files">{t('files')}</TabsTrigger>
-        </TabsList>
+      {/* 主要内容区域 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader className="px-3 py-3 sm:p-6 pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base sm:text-lg">{t('projectTeams')}</CardTitle>
+                <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm">
+                  <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  {t('createTeam')}
+                </Button>
+              </div>
+            </CardHeader>
+            
+            {/* 状态过滤标签页 */}
+            <Tabs defaultValue="ALL" className="w-full" onValueChange={setActiveStatus}>
+              <div className="px-3 sm:px-6">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="ALL">{t('allTeams')}</TabsTrigger>
+                  <TabsTrigger value="PENDING">{t('pending')}</TabsTrigger>
+                  <TabsTrigger value="IN_PROGRESS">{t('inProgress')}</TabsTrigger>
+                  <TabsTrigger value="COMPLETED">{t('completed')}</TabsTrigger>
+                  <TabsTrigger value="ON_HOLD">{t('onHold')}</TabsTrigger>
+                  <TabsTrigger value="CANCELLED">{t('cancelled')}</TabsTrigger>
+                </TabsList>
+              </div>
+              
+              <TabsContent value="ALL" className="mt-0">
+                <TeamsContent 
+                  teams={filteredTeams} 
+                  loading={teamsLoading} 
+                  onToggleStar={handleToggleStar}
+                />
+              </TabsContent>
+              
+              <TabsContent value="PENDING" className="mt-0">
+                <TeamsContent 
+                  teams={filteredTeams} 
+                  loading={teamsLoading} 
+                  onToggleStar={handleToggleStar}
+                />
+              </TabsContent>
+              
+              <TabsContent value="IN_PROGRESS" className="mt-0">
+                <TeamsContent 
+                  teams={filteredTeams} 
+                  loading={teamsLoading} 
+                  onToggleStar={handleToggleStar}
+                />
+              </TabsContent>
+              
+              <TabsContent value="COMPLETED" className="mt-0">
+                <TeamsContent 
+                  teams={filteredTeams} 
+                  loading={teamsLoading} 
+                  onToggleStar={handleToggleStar}
+                />
+              </TabsContent>
+              
+              <TabsContent value="ON_HOLD" className="mt-0">
+                <TeamsContent 
+                  teams={filteredTeams} 
+                  loading={teamsLoading} 
+                  onToggleStar={handleToggleStar}
+                />
+              </TabsContent>
+              
+              <TabsContent value="CANCELLED" className="mt-0">
+                <TeamsContent 
+                  teams={filteredTeams} 
+                  loading={teamsLoading} 
+                  onToggleStar={handleToggleStar}
+                />
+              </TabsContent>
+            </Tabs>
+          </Card>
+        </div>
         
-        <TabsContent value="overview">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <TasksOverview tasks={displayTasks} loading={loading} />
-            </div>
-            <div className="lg:col-span-1">
-              <ActivityLog />
-            </div>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="tasks">
-          <TasksList tasks={displayTasks} loading={loading} />
-        </TabsContent>
-        
-        <TabsContent value="timeline">
-          <div className="h-96 flex items-center justify-center bg-accent/20 rounded-lg">
-            <p className="text-muted-foreground">{t('timeline')}</p>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="files">
-          <div className="h-96 flex items-center justify-center bg-accent/20 rounded-lg">
-            <p className="text-muted-foreground">{t('files')}</p>
-          </div>
-        </TabsContent>
-      </Tabs>
+        {/* 右侧活动日志 */}
+        <div className="lg:col-span-1">
+          <ActivityLog />
+        </div>
+      </div>
     </div>
   );
 }
@@ -366,94 +487,108 @@ function StatsCard({ icon, title, value }) {
   );
 }
 
-// 任务概览组件
-function TasksOverview({ tasks, loading }) {
+// 团队内容组件
+function TeamsContent({ teams, loading, onToggleStar }) {
   const t = useTranslations('Projects');
+  const router = useRouter();
   
-  // 获取最近的任务（按截止日期排序）
-  const recentTasks = loading ? [] : [...tasks]
-    .filter(task => task.status !== 'done')
-    .sort((a, b) => {
-      if (!a.dueDate) return 1;
-      if (!b.dueDate) return -1;
-      return new Date(a.dueDate) - new Date(b.dueDate);
-    })
-    .slice(0, 3);
+  // 将状态映射到颜色和标签
+  const getStatusDetails = (status) => {
+    switch(status?.toUpperCase()) {
+      case 'COMPLETED':
+        return { color: 'bg-green-100 text-green-800', label: t('completed') };
+      case 'IN_PROGRESS':
+        return { color: 'bg-yellow-100 text-yellow-800', label: t('inProgress') };
+      case 'ON_HOLD':
+        return { color: 'bg-orange-100 text-orange-800', label: t('onHold') };
+      case 'CANCELLED':
+        return { color: 'bg-red-100 text-red-800', label: t('cancelled') };
+      case 'PENDING':
+      default:
+        return { color: 'bg-blue-100 text-blue-800', label: t('pending') };
+    }
+  };
 
+  // 处理团队点击
+  const handleTeamClick = (teamId) => {
+    router.push(`/teams/${teamId}`);
+  };
+  
+  // 格式化日期
+  const formatDate = (dateString) => {
+    try {
+      return format(new Date(dateString), 'yyyy-MM-dd');
+    } catch (err) {
+      return dateString || t('unknown');
+    }
+  };
+  
   return (
-    <Card className="h-full">
-      <CardHeader className="px-3 py-3 sm:p-6">
-        <CardTitle className="text-base sm:text-lg">{t('upcomingTasks')}</CardTitle>
-      </CardHeader>
-      <CardContent className="px-3 pt-0 sm:px-6">
-        {loading ? (
-          <div className="flex justify-center items-center h-40">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-          </div>
-        ) : recentTasks.length === 0 ? (
-          <div className="text-center py-6 text-muted-foreground">
-            {t('noTasks')}
-          </div>
-        ) : (
-          <div className="space-y-2 sm:space-y-4">
-            {recentTasks.map((task) => (
-              <div key={task.id} className="flex items-center p-2 sm:p-3 bg-accent/20 rounded-lg">
-                <div className={`w-2 h-2 rounded-full mr-2 sm:mr-3 ${
-                  task.status === 'in_progress' ? 'bg-yellow-500' : 
-                  task.status === 'done' ? 'bg-green-500' : 'bg-blue-500'
-                }`}></div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs sm:text-sm font-medium truncate">{task.title}</h4>
-                  <p className="text-xs text-muted-foreground truncate">截止日期: {task.dueDate || '无'}</p>
-                </div>
-                <span className={`ml-2 px-1.5 py-0.5 sm:px-2 sm:py-1 text-xs rounded-full flex-shrink-0 ${
-                  task.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' : 
-                  task.status === 'done' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                }`}>
-                  {task.status === 'in_progress' ? '进行中' : 
-                   task.status === 'done' ? '已完成' : '待处理'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// 任务列表组件
-function TasksList({ tasks, loading }) {
-  const t = useTranslations('Projects');
-  return (
-    <Card>
-      <CardHeader className="px-3 py-3 sm:p-6">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base sm:text-lg">{t('allTasks')}</CardTitle>
-          <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm">
-            <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-            {t('addTask')}
-          </Button>
+    <CardContent className="px-3 pt-0 sm:px-6">
+      {loading ? (
+        <div className="flex justify-center items-center h-40">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
         </div>
-      </CardHeader>
-      <CardContent className="px-3 pt-0 sm:px-6">
-        {loading ? (
-          <div className="flex justify-center items-center h-40">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-          </div>
-        ) : tasks.length === 0 ? (
-          <div className="text-center py-6 text-muted-foreground">
-            {t('noTasks')}
-          </div>
-        ) : (
-          <div className="space-y-2 sm:space-y-3">
-            {tasks.map((task) => (
-              <TaskItem key={task.id} task={task} />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      ) : teams.length === 0 ? (
+        <div className="text-center py-6 text-muted-foreground">
+          {t('noTeams')}
+        </div>
+      ) : (
+        <div className="space-y-3 sm:space-y-4">
+          {teams.map((team) => {
+            const statusDetails = getStatusDetails(team.status);
+            
+            return (
+              <div key={team.id} className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between p-3 sm:p-4 border-b">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center">
+                      <h3 className="text-sm sm:text-base font-medium truncate">{team.name}</h3>
+                      <span className={`ml-2 px-1.5 py-0.5 sm:px-2 sm:py-1 text-xs rounded-full ${statusDetails.color}`}>
+                        {statusDetails.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{team.description || t('noDescription')}</p>
+                  </div>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleStar(team.id, team.star);
+                    }}
+                    className="p-1 rounded-full hover:bg-accent/30 transition-colors ml-2"
+                  >
+                    {team.star ? (
+                      <Star className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 fill-yellow-500" />
+                    ) : (
+                      <StarOff className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                    )}
+                  </button>
+                </div>
+                <div 
+                  className="p-3 sm:p-4 bg-accent/5 cursor-pointer" 
+                  onClick={() => handleTeamClick(team.id)}
+                >
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('members')}</p>
+                      <p className="font-medium">{team.memberCount || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('tasks')}</p>
+                      <p className="font-medium">{team.taskCount || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('created')}</p>
+                      <p className="font-medium">{formatDate(team.created_at)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </CardContent>
   );
 }
 

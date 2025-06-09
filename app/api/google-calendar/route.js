@@ -108,7 +108,6 @@ export async function GET(request) {
 
     // Fetch calendar events
     try {
-      console.log('Fetching Google Calendar events with access token:', accessToken.substring(0, 10) + '...');
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startDate}T00:00:00Z&timeMax=${endDate}T23:59:59Z&singleEvents=true&orderBy=startTime`,
         {
@@ -119,7 +118,7 @@ export async function GET(request) {
       );
 
       if (response.status === 401 && refreshToken) {
-        console.log('Access token expired, attempting to refresh token');
+        
         // Token expired, try to refresh
         const tokenData = await refreshAccessToken(refreshToken);
         if (!tokenData) {
@@ -130,7 +129,7 @@ export async function GET(request) {
           );
         }
 
-        console.log('Token refreshed successfully, retrying request with new token');
+        
         // Retry with new access token
         const retryResponse = await fetch(
           `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startDate}T00:00:00Z&timeMax=${endDate}T23:59:59Z&singleEvents=true&orderBy=startTime`,
@@ -152,12 +151,12 @@ export async function GET(request) {
         }
 
         const events = await retryResponse.json();
-        console.log(`Successfully fetched ${events.items?.length || 0} events after token refresh`);
+        
 
         // 更新用户的token信息 - 使用我们自己的数据库而不是Supabase Auth
         try {
           if (user) {
-            console.log('Updating user tokens in database');
+            
             const { error: updateError } = await supabase
               .from('user')
               .update({
@@ -188,7 +187,7 @@ export async function GET(request) {
       }
 
       const events = await response.json();
-      console.log(`Successfully fetched ${events.items?.length || 0} events`);
+      
       return NextResponse.json(events);
     } catch (error) {
       console.error('Unexpected error in Google Calendar API:', error);

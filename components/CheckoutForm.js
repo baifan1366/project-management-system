@@ -22,7 +22,7 @@ export default function CheckoutForm({ onPaymentSubmit }) {
       // Build the return URL with only planId
       const returnUrl = `${window.location.origin}/payment-success?plan_id=${planId}`;
       
-      console.log('Confirming payment with return URL:', returnUrl);
+      
       
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,

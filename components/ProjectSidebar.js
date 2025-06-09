@@ -434,7 +434,7 @@ export default function ProjectSidebar({ projectId }) {
                                         case 'can_check':
                                           return renderTooltip(Eye, t('canCheckTooltip'));
                                         case 'can_view':
-                                          return renderTooltip(Unlock, t('canViewTooltip'));
+                                          return renderTooltip(Eye, t('canViewTooltip'));
                                         default:
                                           return renderTooltip(Lock, t('inviteOnlyTooltip'));
                                       }

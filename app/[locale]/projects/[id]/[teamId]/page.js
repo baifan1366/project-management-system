@@ -44,7 +44,6 @@ export default function Team() {
           const teamData = await teamResponse.json();
           
           if (!teamData || (Array.isArray(teamData) && teamData.length === 0)) {
-            console.log('Team does not exist, redirecting to project page');
             setTeamExists(false);
             // 短暂延迟确保状态更新
             setTimeout(() => {

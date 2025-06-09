@@ -15,9 +15,7 @@ export async function DELETE(request) {
         { status: 400 }
       );
     }
-    
-    console.log(`API Route: 开始删除团队成员, teamId=${teamId}, userId=${userId}`);
-    
+        
     // 首先检查记录是否存在
     const { data: existingRecord, error: checkError } = await supabase
       .from('user_team')
@@ -49,9 +47,7 @@ export async function DELETE(request) {
         { status: 500 }
       );
     }
-    
-    console.log('API Route: 团队成员删除成功，删除的记录:', deletedRecord);
-    
+        
     return NextResponse.json({
       success: true,
       message: '团队成员已成功删除',
@@ -83,9 +79,7 @@ export async function PATCH(request) {
         { status: 400 }
       );
     }
-    
-    console.log(`API Route: 开始更新团队成员角色, teamId=${teamId}, userId=${userId}, role=${role}`);
-    
+        
     // 首先检查记录是否存在
     const { data: existingRecord, error: checkError } = await supabase
       .from('user_team')
@@ -104,7 +98,6 @@ export async function PATCH(request) {
     
     // 获取teamUser表的id作为entityId
     const teamUserId = existingRecord.id;
-    console.log('API Route: 找到的团队成员ID:', teamUserId);
     
     // 更新团队成员角色
     const { data: updatedRecord, error: updateError } = await supabase
@@ -124,7 +117,6 @@ export async function PATCH(request) {
     
     // 确保我们有返回数据
     if (!updatedRecord || updatedRecord.length === 0) {
-      console.log('API Route: 更新成功但没有返回记录');
       return NextResponse.json({
         success: true,
         message: '团队成员角色已成功更新',
@@ -134,9 +126,7 @@ export async function PATCH(request) {
         entityId: teamUserId
       });
     }
-    
-    console.log('API Route: 团队成员角色更新成功，更新的记录:', updatedRecord);
-    
+        
     return NextResponse.json({
       success: true,
       message: '团队成员角色已成功更新',

@@ -192,11 +192,6 @@ export default function CalendarTools({
       const assigneesTagId = await dispatch(getTagByName("Assignee")).unwrap()
       const startDateTagId = await dispatch(getTagByName("Start Date")).unwrap()
       
-      console.log('获取到的标签IDs:', {
-        titleTagId, descriptionTagId, dueDateTagId, 
-        assigneesTagId, startDateTagId
-      })
-      
       // 准备任务数据
       const taskData = {
         tag_values: {
@@ -215,9 +210,7 @@ export default function CalendarTools({
       if (selectedAssignees.length > 0) {
         taskData.tag_values[assigneesTagId] = selectedAssignees
       }
-      
-      console.log('准备创建的任务数据:', taskData)
-      
+            
       // 创建任务
       const result = await dispatch(createTask(taskData)).unwrap()
       //it may also create a notion_page, then update the notion_page id into the task table, page_id column
@@ -229,7 +222,6 @@ export default function CalendarTools({
         })
         .select()
         .single();
-      console.log(notionPageData);
       //update the notion_page id into the task table, page_id column
       const { data: newTaskData, error: taskError } = await supabase
         .from('task')
@@ -237,7 +229,6 @@ export default function CalendarTools({
           page_id: notionPageData.id
         })
         .eq('id', result.id);
-      console.log(newTaskData);
       
       // 如果任务创建成功且有分区ID，将任务添加到分区的task_ids中
       if (result && result.id && selectedSection) {
@@ -262,7 +253,6 @@ export default function CalendarTools({
               newTaskIds: updatedTaskIds
             })).unwrap()
             
-            console.log(`已将任务 ${result.id} 添加到分区 ${section.id} 的task_ids中`)
           } else {
             console.error(`未找到ID为 ${selectedSection} 的分区`)
           }
@@ -326,7 +316,7 @@ export default function CalendarTools({
                       {errorMessages.title}
                     </p>
                   ) : (
-                    <span className="text-xs text-muted-foreground opacity-0">占位</span>
+                    <span className="text-xs text-muted-foreground opacity-0"></span>
                   )}
                   <span className="text-xs text-muted-foreground">
                     {title.trim().length}/100
@@ -375,7 +365,7 @@ export default function CalendarTools({
                       {errorMessages.description}
                     </p>
                   ) : (
-                    <span className="text-xs text-muted-foreground opacity-0">占位</span>
+                    <span className="text-xs text-muted-foreground opacity-0"></span>
                   )}
                   <span className="text-xs text-muted-foreground">
                     {description.trim().length}/1000
@@ -420,70 +410,6 @@ export default function CalendarTools({
                     {errorMessages.dates}
                   </p>
                 )}
-              </div>
-            </div>            
-            
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">
-                {t('assignees')}
-              </Label>
-              <div className="col-span-3">
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {selectedAssignees.length === 0 ? (
-                    <div className="text-sm text-muted-foreground italic">
-                      {t('noAssignees')}
-                    </div>
-                  ) : (
-                    selectedAssignees.map(userId => {
-                      const member = teamMembers.find(m => m.id === userId)
-                      return member ? (
-                        <Badge 
-                          key={userId} 
-                          variant="secondary"
-                          className="flex items-center gap-1"
-                        >
-                          <Avatar className="h-4 w-4">
-                            <AvatarImage src={member.avatar} alt={member.name} />
-                            <AvatarFallback className="text-[8px]">{member.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <span className="max-w-24 truncate">{member.name}</span>
-                          <button 
-                            type="button"
-                            className="ml-1 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleToggleAssignee(userId)}
-                          >
-                            ×
-                          </button>
-                        </Badge>
-                      ) : null
-                    })
-                  )}
-                </div>
-                
-                <div className="border rounded-md">
-                  <ScrollArea className="h-32">
-                    <div className="p-2 space-y-1">
-                      {teamMembers.map(member => (
-                        <div 
-                          key={member.id} 
-                          className={cn(
-                            "flex items-center gap-2 p-1.5 rounded cursor-pointer",
-                            selectedAssignees.includes(member.id) 
-                              ? "bg-accent" 
-                              : "hover:bg-muted"
-                          )}
-                          onClick={() => handleToggleAssignee(member.id)}
-                        >
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={member.avatar} alt={member.name} />
-                            <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <div className="text-sm">{member.name}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
               </div>
             </div>
           </div>

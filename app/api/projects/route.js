@@ -41,7 +41,6 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json()
-    console.log('Received data:', body)
     
     if (!body || Object.keys(body).length === 0) {
       return NextResponse.json(
@@ -77,7 +76,6 @@ export async function PUT(request) {
     const projectId = searchParams.get('projectId')
 
     const body = await request.json()
-    console.log('Update data:', body)
     
     if (projectId) {
       // 更新单个项目

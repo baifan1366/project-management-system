@@ -3,13 +3,20 @@ import { getDefaultTagIdsForField } from './utils';
 
 // 创建项目
 export async function createProject(projectData, userId) {
-  console.log("正在创建项目:", projectData);
   
-  // 添加当前用户作为创建者
+  // Ensure all required fields have values
   const newProjectData = {
-    ...projectData,
-    created_by: userId
+    project_name: projectData.project_name || 'Untitled Project',
+    description: projectData.description || '',
+    visibility: projectData.visibility || 'private',
+    status: projectData.status || 'PENDING',
+    created_by: userId,
+    // Include any other fields from projectData
+    ...projectData
   };
+  
+  // Ensure created_by is set correctly (in case it was overwritten by projectData)
+  newProjectData.created_by = userId;
   
   // 插入项目到数据库
   const { data: createdProject, error: projectError } = await supabase
@@ -22,7 +29,6 @@ export async function createProject(projectData, userId) {
     throw new Error(`Failed to create project: ${projectError.message}`);
   }
   
-  console.log("项目创建成功，ID:", createdProject[0].id);
   return createdProject[0];
 }
 
@@ -33,10 +39,10 @@ export async function createTeam(projectId, projectName, userId) {
     description: "Default team for " + projectName,
     access: "can_edit",
     created_by: userId,
-    project_id: projectId
+    project_id: projectId,
+    status: 'PENDING'
   };
   
-  console.log("正在创建团队:", newTeamData);
   
   const { data: createdTeam, error: teamError } = await supabase
     .from('team')
@@ -49,13 +55,11 @@ export async function createTeam(projectId, projectName, userId) {
   }
   
   const teamId = createdTeam[0].id;
-  console.log("团队创建成功，ID:", teamId);
   return teamId;
 }
 
 // 创建团队自定义字段
 export async function createTeamCustomField(teamId, fieldData, userId) {
-  console.log(`正在关联自定义字段 ${fieldData.name} (ID: ${fieldData.id}) 到团队...`);
   
   // 创建team_custom_field关联
   const { data: teamCustomField, error: teamCustomFieldError } = await supabase
@@ -93,7 +97,6 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
   
   // If there's already a value for this field, skip creation
   if (existingValues && existingValues.length > 0) {
-    console.log(`${fieldData.name} view configuration already exists, skipping creation`);
     return;
   }
   
@@ -269,7 +272,6 @@ export async function createTeamCustomFieldValue(teamCustomFieldId, fieldData, u
 
 // Add user to team
 export async function addUserToTeam(userId, teamId) {
-  console.log("Adding user to team...");
   
   // First check if user is already in team
   const { data: existingUserTeam, error: checkError } = await supabase
@@ -286,7 +288,6 @@ export async function addUserToTeam(userId, teamId) {
   
   // If user is already in team, return success
   if (existingUserTeam && existingUserTeam.length > 0) {
-    console.log(`User ${userId} is already in team ${teamId}`);
     return;
   }
   
@@ -306,26 +307,20 @@ export async function addUserToTeam(userId, teamId) {
       if (userTeamError.code === '23505' && 
           userTeamError.message.includes('user_team_user_id_team_id_key')) {
         // User is already in team, this is fine
-        console.log(`User ${userId} is already in team ${teamId} (caught in error handler)`);
         return;
       }
       
       console.error("Failed to add user to team:", userTeamError);
       // Don't throw error - continue with the rest of the process
-      console.log("Continuing despite user_team error");
-    } else {
-      console.log(`Successfully added user ${userId} to team ${teamId}`);
     }
   } catch (error) {
     console.error("Error in addUserToTeam:", error);
     // Don't throw error - continue with the rest of the process
-    console.log("Continuing despite user_team error");
   }
 }
 
 // 邀请团队成员
 export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invitedBy) {
-  console.log(`正在邀请成员 ${email} 加入团队 ${teamId}，角色: ${role}...`);
   
   // 首先获取团队信息
   const { data: teamData, error: teamError } = await supabase
@@ -368,9 +363,7 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
       console.error("将用户添加到团队失败:", addMemberError);
       throw new Error(`Failed to add member to team: ${addMemberError.message}`);
     }
-    
-    console.log(`成功将用户 ${email} 添加到团队`);
-    
+        
     // 给用户发送通知
     await createTeamNotification(
       userId, 
@@ -388,6 +381,7 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
         user_email: email,
         team_id: teamId,
         role: role.toUpperCase(),
+        status: 'PENDING',  // Explicitly set status
         created_by: invitedBy
       }]);
       
@@ -396,11 +390,9 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
       throw new Error(`Failed to create team invitation: ${inviteError.message}`);
     }
     
-    console.log(`已为 ${email} 创建团队邀请记录`);
     
     // 发送邀请邮件
     try {
-      console.log("正在发送邀请邮件...");
       const invitationDetails = {
         teamId: teamId,
         teamName: teamData.name,
@@ -426,7 +418,6 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
         throw new Error(errorData.error || "Failed to send invitation email");
       }
       
-      console.log(`邀请邮件发送成功 to ${email}`);
     } catch (emailError) {
       console.error("发送邀请邮件失败:", emailError);
       // 即使邮件发送失败，我们仍然保留邀请记录，但记录错误
@@ -459,7 +450,6 @@ async function createTeamNotification(
   relatedEntityType = 'team'
 ) {
   try {
-    console.log(`为用户 ${userId} 创建通知: ${title}`);
     
     const notificationData = {
       user_id: userId,
@@ -485,7 +475,6 @@ async function createTeamNotification(
       throw new Error(`Failed to create notification: ${errorData.error || response.statusText}`);
     }
     
-    console.log('通知创建成功');
     return true;
   } catch (error) {
     console.error('创建通知失败:', error);
@@ -496,7 +485,6 @@ async function createTeamNotification(
 
 // Create default section
 export async function createSection(teamId, userId) {
-  console.log("Creating default section...");
   
   try {
     // First check if a section already exists for this team
@@ -513,7 +501,6 @@ export async function createSection(teamId, userId) {
     
     // If a section already exists for this team, return it
     if (existingSections && existingSections.length > 0) {
-      console.log(`Team ${teamId} already has a section, using existing section ID: ${existingSections[0].id}`);
       return existingSections[0];
     }
     
@@ -530,7 +517,8 @@ export async function createSection(teamId, userId) {
           name: "Section",
           team_id: teamId,
           created_by: userId,
-          task_ids: [] // Initialize as empty array
+          task_ids: [], // Initialize as empty array
+          order_index: 0 // Explicitly set order_index
         };
         
         // Add random ID for retry attempts
@@ -538,7 +526,6 @@ export async function createSection(teamId, userId) {
           // Generate a large random ID to avoid conflicts
           const randomId = Math.floor(100000 + Math.random() * 900000);
           insertData.id = randomId;
-          console.log(`Retry attempt ${retryCount} with random ID: ${randomId}`);
         }
         
         const { data: sectionData, error: sectionError } = await supabase
@@ -550,7 +537,6 @@ export async function createSection(teamId, userId) {
           throw sectionError;
         }
         
-        console.log(`Section created successfully, ID: ${sectionData[0].id}`);
         return sectionData[0];
       } catch (error) {
         lastError = error;
@@ -567,7 +553,6 @@ export async function createSection(teamId, userId) {
         }
         
         retryCount++;
-        console.log(`Section creation failed due to duplicate key (attempt ${retryCount}/${maxRetries}), retrying...`);
         
         // Short delay before next retry
         await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
@@ -575,7 +560,6 @@ export async function createSection(teamId, userId) {
     }
     
     // If all retries failed, try one last time to get an existing section
-    console.log("All section creation attempts failed, looking for any existing section as fallback");
     const { data: fallbackSection, error: fallbackError } = await supabase
       .from('section')
       .select('id')
@@ -583,7 +567,6 @@ export async function createSection(teamId, userId) {
       .limit(1);
       
     if (!fallbackError && fallbackSection && fallbackSection.length > 0) {
-      console.log(`Found existing section as fallback, ID: ${fallbackSection[0].id}`);
       return fallbackSection[0];
     }
     
@@ -598,9 +581,7 @@ export async function createSection(teamId, userId) {
 }
 
 // 查找用户ID通过名称或邮箱
-export async function getUserIdByNameOrEmail(nameOrEmail) {
-  console.log(`正在查找用户: ${nameOrEmail}`);
-  
+export async function getUserIdByNameOrEmail(nameOrEmail) {  
   if (!nameOrEmail) {
     return null;
   }
@@ -619,7 +600,6 @@ export async function getUserIdByNameOrEmail(nameOrEmail) {
     }
     
     if (userData && userData.length > 0) {
-      console.log(`找到用户邮箱匹配: ${nameOrEmail}, ID: ${userData[0].id}`);
       return userData[0].id;
     }
   }
@@ -637,17 +617,14 @@ export async function getUserIdByNameOrEmail(nameOrEmail) {
   }
   
   if (userData && userData.length > 0) {
-    console.log(`找到用户名称匹配: ${nameOrEmail}, ID: ${userData[0].id}`);
     return userData[0].id;
   }
   
-  console.log(`未找到用户: ${nameOrEmail}`);
   return null;
 }
 
 // 创建任务
 export async function createTask(taskInfo, userId) {
-  console.log("Creating task:", taskInfo.name);
   
   // Process assignee logic
   let assigneeId = null;
@@ -657,12 +634,6 @@ export async function createTask(taskInfo, userId) {
     // Get the first specified username or email from AI response
     const assigneeName = taskInfo.assignees[0];
     assigneeId = await getUserIdByNameOrEmail(assigneeName);
-    
-    if (assigneeId) {
-      console.log(`Task will be assigned to user: ${assigneeName} (ID: ${assigneeId})`);
-    } else {
-      console.log(`User ${assigneeName} not found, task will not be assigned`);
-    }
   }
   
   // Build standardized tag_values object
@@ -675,9 +646,6 @@ export async function createTask(taskInfo, userId) {
     3: taskInfo.status ||'IN PROGRESS',
     2: assigneeId || ''
   };
-  
-  // Debug output
-  console.log("Task data:", JSON.stringify(tagValues, null, 2));
   
   // Implement retry logic with exponential backoff
   const maxRetries = 5;
@@ -699,7 +667,6 @@ export async function createTask(taskInfo, userId) {
         throw taskError;
       }
       
-      console.log("Task created successfully, ID:", taskData[0].id);
       return taskData[0];
     } catch (error) {
       lastError = error;
@@ -717,7 +684,6 @@ export async function createTask(taskInfo, userId) {
       }
       
       retryCount++;
-      console.log(`Task creation failed due to duplicate key (attempt ${retryCount}/${maxRetries}), retrying...`);
       
       // For duplicate key errors, try with an explicit insert using a random ID
       // This is only for the retries, not the first attempt
@@ -738,7 +704,6 @@ export async function createTask(taskInfo, userId) {
           console.error(`Retry with random ID ${randomId} failed:`, taskError);
           // Continue to next iteration
         } else {
-          console.log(`Task created successfully with random ID ${randomId}`);
           return taskData[0];
         }
       } catch (retryError) {
@@ -774,7 +739,6 @@ export async function addTaskToSection(sectionId, taskId) {
   const currentTaskIds = currentSectionData.task_ids || [];
   
   // Update section's task_ids array
-  console.log("正在将任务添加到分区...");
   const { error: updateSectionError } = await supabase
     .from('section')
     .update({

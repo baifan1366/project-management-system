@@ -5,10 +5,8 @@ export async function POST(req) {
   try {
     // Log environment variables (without exposing full key)
     const stripeKeyExists = !!process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY;
-    console.log(`NEXT_PUBLIC_STRIPE_SECRET_KEY exists: ${stripeKeyExists}`);
     if (stripeKeyExists) {
       const keyPreview = process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY.substring(0, 7) + '...';
-      console.log(`NEXT_PUBLIC_STRIPE_SECRET_KEY preview: ${keyPreview}`);
     }
     
     // Validate Stripe key
@@ -22,7 +20,6 @@ export async function POST(req) {
     
     // Parse request body
     const body = await req.json();
-    console.log('Request body:', JSON.stringify(body, null, 2));
     
     const { planName, price, quantity, email, userId, planId, promoCode, discount, finalAmount } = body;
     
@@ -44,15 +41,12 @@ export async function POST(req) {
     
     // Calculate the amount to charge (use finalAmount if provided, otherwise use price)
     const amountToCharge = finalAmount || price;
-    console.log(`Creating Alipay session for ${planName}, amount: ${amountToCharge}`);
     
     // Convert USD to CNY (approximate exchange rate, in production you'd use a real-time rate)
     // As of 2024, roughly 1 USD = 7.2 CNY
     const exchangeRate = 7.2;
     const amountInCNY = Math.round(amountToCharge * exchangeRate * 100); // Convert to CNY cents
-    
-    console.log(`Converting ${amountToCharge} USD to CNY: ${amountInCNY/100} CNY`);
-    
+        
     // Create Alipay session with CNY currency
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['alipay'],
@@ -87,9 +81,7 @@ export async function POST(req) {
         exchangeRate: exchangeRate.toString()
       },
     });
-    
-    console.log('Alipay session created successfully, redirecting to:', session.url);
-    
+        
     // Return redirect URL and session ID
     return NextResponse.json({ 
       url: session.url,

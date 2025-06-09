@@ -95,7 +95,7 @@ async function handleLogin(data) {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     
     if (!isMatch) {
-      console.log(`Failed login attempt for user: ${user.email} - Invalid password`);
+      
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
@@ -208,7 +208,7 @@ async function handleLogin(data) {
       
       // Log all cookies for debugging
       const allCookies = await cookieStore.getAll();
-      console.log('All cookies:', Object.fromEntries(allCookies.map(c => [c.name, c.value])));
+      
     } catch (cookieError) {
       console.error('Error setting cookies:', cookieError);
       // Continue with response but log the issue
@@ -413,7 +413,7 @@ async function handleLogout() {
     
     // Log cookies after clearing
     const remainingCookies = await cookieStore.getAll();
-    console.log('Cookies after logout:', Object.fromEntries(remainingCookies.map(c => [c.name, c.value])));
+    
 
     return NextResponse.json({
       success: true,

@@ -19,13 +19,14 @@ export function ChatProvider({ children }) {
   const [aiConversationId, setAiConversationId] = useState(null);
   const [chatMode, setChatMode] = useState('normal');
   const { user:authSession, isLoading: authLoading } = useGetUser();
+  // Add storage for user relationships to avoid repeated API calls
+  const [userRelationships, setUserRelationships] = useState({});
 
   // Add useEffect to handle the case where authentication is taking too long
   useEffect(() => {
     // If auth is still loading after 5 seconds, set chat loading to false
     const timeoutId = setTimeout(() => {
       if (loading) {
-        console.log('Authentication timeout - forcing chat context to load');
         setLoading(false);
       }
     }, 5000);
@@ -60,7 +61,6 @@ export function ChatProvider({ children }) {
     
     // 监听重置会话ID事件
     const handleResetConversation = () => {
-      console.log('重置AI对话ID');
       const newConversationId = `${baseId.replace(/:/g, '')}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
       setAiConversationId(newConversationId);
     };
@@ -93,13 +93,11 @@ export function ChatProvider({ children }) {
 
       // 如果已经存在AI聊天会话，返回现有会话
       if (existingSessions && existingSessions.length > 0) {
-        console.log('发现现有AI会话:', existingSessions[0].id);
         return existingSessions[0];
       }
     }
 
     // 创建新的AI聊天会话
-    console.log('正在创建全新的AI会话');
     const { data: newSession, error: createError } = await supabase
       .from('chat_session')
       .insert({
@@ -115,7 +113,6 @@ export function ChatProvider({ children }) {
       return null;
     }
 
-    console.log('新AI会话创建成功:', newSession.id);
     
     // 将当前用户添加为会话参与者
     const { error: participantError } = await supabase
@@ -170,10 +167,8 @@ export function ChatProvider({ children }) {
       } else if (existingSessions && existingSessions.length > 0) {
         // 如果已存在AI会话，直接使用
         aiChatSession = existingSessions[0];
-        console.log('使用现有AI会话:', aiChatSession.id);
       } else if (message.role === 'user') {
         // 只有在用户发送消息时才创建新的AI会话
-        console.log('创建新的AI会话');
         aiChatSession = await createAIChatSession();
       }
       
@@ -235,8 +230,6 @@ export function ChatProvider({ children }) {
                 `${msg.role === 'user' ? '用户' : 'AI'}: ${msg.content.substring(0, 100)}`
               ).join('\n');
               
-              // 使用AI生成标题
-              console.log('正在为对话生成标题...');
               
               // 构建请求，使用简化版的请求直接调用AI API，而不是标准的聊天流程
               const titleResponse = await fetch('/api/ai/generate-title', {
@@ -254,7 +247,6 @@ export function ChatProvider({ children }) {
                 const { title } = await titleResponse.json();
                 
                 if (title) {
-                  console.log(`AI生成的聊天标题: ${title}`);
                   
                   // 更新会话名称
                   const { error: updateError } = await supabase
@@ -309,7 +301,6 @@ export function ChatProvider({ children }) {
     }
     
     // 更新会话名称
-    console.log(`使用简单标题: ${title}`);
     const { error: updateError } = await supabase
       .from('chat_session')
       .update({ name: title })
@@ -488,23 +479,19 @@ export function ChatProvider({ children }) {
         created_at: msg.timestamp // 确保AI消息使用timestamp作为created_at
       };
       
-      console.log(`AI消息: ${aiMsg.session_id}, 内容: ${aiMsg.content.substring(0, 20)}..., 时间: ${aiMsg.created_at}`);
       
       if (!lastMessagesBySession[aiMsg.session_id]) {
         // 如果没有该会话的消息，直接使用此AI消息
         lastMessagesBySession[aiMsg.session_id] = aiMsg;
-        console.log(`为会话 ${aiMsg.session_id} 添加首条AI消息`);
       } else {
         // 如果已有消息，比较时间戳并取最新的
         const existingMsg = lastMessagesBySession[aiMsg.session_id];
         const aiMsgTime = new Date(aiMsg.created_at).getTime();
         const existingMsgTime = new Date(existingMsg.created_at).getTime();
         
-        console.log(`比较时间戳 - AI消息: ${aiMsgTime}, 现有消息: ${existingMsgTime}`);
         
         if (aiMsgTime > existingMsgTime) {
           lastMessagesBySession[aiMsg.session_id] = aiMsg;
-          console.log(`会话 ${aiMsg.session_id} 的消息已更新为更新的AI消息`);
         }
       }
     });
@@ -542,7 +529,53 @@ export function ChatProvider({ children }) {
     });
 
     setSessions(sessionsWithMessages);
+    
+    // Fetch all user relationships in one batch
+    fetchAllUserRelationships(sessionsWithMessages);
+    
     setLoading(false);
+  };
+
+  // Add a function to fetch all user relationships at once
+  const fetchAllUserRelationships = async (sessionsData) => {
+    try {
+      if (!authSession || !sessionsData.length) return;
+      
+      // Extract all user IDs from private chat sessions
+      const userIds = [];
+      
+      sessionsData.forEach(session => {
+        if (session.type === 'PRIVATE' && session.participants?.[0]?.id) {
+          userIds.push(session.participants[0].id);
+        }
+      });
+      
+      // Remove duplicates
+      const uniqueUserIds = [...new Set(userIds)];
+      
+      if (uniqueUserIds.length === 0) return;
+      
+      // Batch fetch all relationships at once
+      const response = await fetch('/api/users/checkRelationshipBatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserIds: uniqueUserIds,
+          userId: authSession.id
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // The API returns the results directly (not nested under a "relationships" property)
+        setUserRelationships(data);
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to batch fetch user relationships:', errorText);
+      }
+    } catch (error) {
+      console.error('Error fetching user relationships:', error);
+    }
   };
 
   // 获取会话消息
@@ -666,7 +699,6 @@ export function ChatProvider({ children }) {
       return;
     }
     
-    console.log(`准备标记 ${unreadMessages?.length || 0} 条未读消息为已读`);
     
     if (unreadMessages && unreadMessages.length > 0) {
       // 使用批量更新，按复合主键更新
@@ -680,7 +712,6 @@ export function ChatProvider({ children }) {
       
       try {
         await Promise.all(updatePromises);
-        console.log(`成功将 ${unreadMessages.length} 条消息标记为已读`);
         
         // 已经标记为已读，立即更新未读计数
         updateUnreadCount(sessionId);
@@ -1266,7 +1297,6 @@ export function ChatProvider({ children }) {
           }
           
           if (readStatusList && readStatusList.length > 0) {
-            console.log(`标记当前会话新消息 ${messageData.id} 为已读`);
             
             // 使用直接更新，按复合主键更新
             const { error: updateError } = await supabase
@@ -1433,7 +1463,6 @@ export function ChatProvider({ children }) {
           }
           
           if (readStatusList && readStatusList.length > 0) {
-            console.log(`标记当前会话新消息 ${messageData.id} 为已读`);
             
             // 使用直接更新，按复合主键更新
             const { error: updateError } = await supabase
@@ -1624,7 +1653,6 @@ export function ChatProvider({ children }) {
         // 特别确保created_by被正确保留
         created_by: session.created_by || currentSession.created_by
       };
-      console.log("切换到会话，保留created_by:", mergedSession.created_by);
       setCurrentSession(mergedSession);
       
       // 如果是普通会话，确保将其消息标记为已读
@@ -1632,7 +1660,6 @@ export function ChatProvider({ children }) {
         setMessagesRead();
       }
     } else {
-      console.log("切换到新会话，created_by:", session?.created_by);
       // 清除旧的消息
       if (session?.id !== currentSession?.id) {
         setMessages([]);
@@ -1663,7 +1690,8 @@ export function ChatProvider({ children }) {
       fetchMessages,
       deleteMessage,
       deleteChatSession,
-      leaveGroupChat
+      leaveGroupChat,
+      userRelationships
     }}>
       {children}
     </ChatContext.Provider>

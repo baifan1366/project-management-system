@@ -6,9 +6,7 @@ export async function DELETE(request, { params }) {
   try {
     const sprintId = params.sprintId;
     const index = parseInt(params.index, 10);
-    
-    console.log('【API接收参数】删除进展顺利:', { sprintId, index });
-    
+        
     // 验证数据
     if (!sprintId) {
       console.error('【API错误】冲刺ID不能为空');
@@ -58,9 +56,7 @@ export async function DELETE(request, { params }) {
       console.error(`【API错误】更新冲刺ID ${sprintId} 失败:`, updateError);
       throw updateError;
     }
-    
-    console.log(`【API响应】冲刺ID ${sprintId} 已删除进展顺利项:`, updatedSprint);
-    
+        
     return NextResponse.json(updatedSprint);
   } catch (error) {
     console.error('【API错误】处理请求时出错:', error);

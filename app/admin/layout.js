@@ -61,11 +61,11 @@ function AdminLayoutInner({ children }) {
         setLoading(true);
         
         // 使用 Redux 的 checkAdminSession 替代直接调用 supabase
-        console.log('Verifying admin session...');
+        
         const adminData = await dispatch(checkAdminSession()).unwrap();
         
         if (!adminData) {
-          console.log('No admin data returned from checkAdminSession');
+          
           throw new Error('No active session found or unauthorized access');
         }
 
@@ -73,28 +73,28 @@ function AdminLayoutInner({ children }) {
         try {
           const permissions = await dispatch(checkAdminPermissions(adminData.role)).unwrap();
           if (!permissions) {
-            console.log('No permissions returned from checkAdminPermissions');
+            
             // 不要抛出错误，允许继续
           }
           
           // Store permissions names in Redux state
           if (Array.isArray(permissions) && permissions.length > 0) {
             // This is handled in the Redux slice now
-            console.log(`Loaded ${permissions.length} permissions for role: ${adminData.role}`);
+            
           }
         } catch (permError) {
           console.error('Error checking permissions:', permError);
           // 不要阻止登录，继续执行
         }
         
-        console.log('Admin session verified successfully:', adminData.email);
+        
         setAdminData(adminData);
       } catch (error) {
         console.error('Admin session check failed:', error);
         
         // 尝试检查是否是URL中包含 adminLogin
         if (!pathname.includes('/adminLogin')) {
-          console.log('Redirecting to login page...');
+          
           // Redirect to admin login
           router.replace('/admin/adminLogin');
         }

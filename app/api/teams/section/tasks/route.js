@@ -36,7 +36,6 @@ export async function GET(request) {
     
     // 获取Assignee标签ID
     const assigneeTagId = await getTagIdByName('Assignee');
-    console.log('动态获取的Assignee标签ID:', assigneeTagId);
     
     // 如果未能获取到assigneeTagId，使用默认值"2"作为后备
     const effectiveAssigneeTagId = assigneeTagId || "2";
@@ -103,7 +102,6 @@ export async function GET(request) {
     }
     // 获取所有任务
     else if (fetchAll) {
-      console.log('Fetching all tasks');
       const { data: tasksData, error: tasksError } = await supabase
         .from('task')
         .select('*');
@@ -114,7 +112,6 @@ export async function GET(request) {
       }
       
       data = tasksData || [];
-      console.log(`Fetched ${data.length} tasks`);
     }
     // 如果提供了特定任务ID，则只获取该任务
     else if (taskId) {
@@ -129,9 +126,7 @@ export async function GET(request) {
       data = taskData ? [taskData] : []
     } 
     // 如果提供了用户ID，则获取分配给该用户的所有任务
-    else if (userId) {
-      console.log(`Fetching tasks for user: ${userId}`);
-      
+    else if (userId) {      
       // 获取用户创建的任务
       const { data: createdTasks, error: createdError } = await supabase
         .from('task')
@@ -180,7 +175,6 @@ export async function GET(request) {
         }
       });
       
-      console.log(`Found ${allUserTasks.length} tasks for user`);
       data = allUserTasks;
     }
     // 如果提供了章节ID，则获取该章节下的所有任务
@@ -291,7 +285,6 @@ export async function POST(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json()
-    console.log('Update data:', body)
     
     if (!body.id) {
       return NextResponse.json(

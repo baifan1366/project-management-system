@@ -55,7 +55,7 @@ export default function AIChatBot() {
       
       // 从会话切换或无会话时清空消息
       if (!currentSession) {
-        console.log('当前无选定会话，清空消息');
+        
         setMessages([]);
         setAiSession(null);
         setIsInitialLoad(false);
@@ -66,23 +66,23 @@ export default function AIChatBot() {
       let sessionToUse = null;
       
       if (currentSession && currentSession.type === 'AI') {
-        console.log('使用当前选择的AI会话:', currentSession.id);
+        
         sessionToUse = currentSession;
       } else {
         // 如果没有选择当前会话或当前会话不是AI类型，则查找AI类型的会话
         const currentAiSession = sessions.find(s => s.type === 'AI');
         if (currentAiSession) {
-          console.log('使用找到的AI会话:', currentAiSession.id);
+          
           sessionToUse = currentAiSession;
         } else {
-          console.log('未找到AI会话');
+          
         }
       }
       
       setAiSession(sessionToUse);
       
       if (sessionToUse) {
-        console.log('正在加载会话ID为', sessionToUse.id, '的消息');
+        
         
         // 从 ai_chat_message 表获取消息并关联用户信息
         const { data, error } = await supabase
@@ -98,7 +98,7 @@ export default function AIChatBot() {
         }
 
         if (data && data.length > 0) {
-          console.log(`找到 ${data.length} 条消息记录`);
+          
           // 格式化消息，包含用户信息
           setMessages(data.map(msg => ({
             role: msg.role,
@@ -111,7 +111,7 @@ export default function AIChatBot() {
         }
       } else {
         // 没有选中的AI会话，显示空白对话
-        console.log('无有效AI会话，显示空白对话');
+        
         setMessages([]);
       }
       
@@ -119,7 +119,7 @@ export default function AIChatBot() {
     };
     
     if (chatMode === 'ai') {
-      console.log('AI聊天模式激活，开始加载消息');
+      
       loadAIChatMessages();
     }
   }, [chatMode, sessions, currentSession]);
@@ -127,7 +127,7 @@ export default function AIChatBot() {
   // 监听清空聊天事件
   useEffect(() => {
     const handleClearChat = () => {
-      console.log('接收到清空AI聊天事件，正在清空会话和消息');
+      
       setMessages([]);
       setAiSession(null);
       setIsInitialLoad(true); // 设置为初始加载状态，避免显示过渡动画
@@ -187,12 +187,12 @@ export default function AIChatBot() {
       // 无论是否有 aiSession，都强制创建新会话 - 确保点击 New Chat 后真正创建新会话
       if (!currentSession || !aiSession) {
         // 创建新的AI会话
-        console.log('创建新的AI会话');
+        
         try {
           // 使用 true 参数强制创建新会话，而不是复用现有会话
           const newSession = await createAIChatSession(true);
           if (newSession) {
-            console.log('成功创建新的AI会话:', newSession.id);
+            
             setAiSession(newSession);
             setCurrentSession(newSession); // 同时更新currentSession
             currentSessionId = newSession.id;
@@ -213,7 +213,7 @@ export default function AIChatBot() {
         }
       } else {
         // 使用现有会话
-        console.log('使用现有AI会话:', aiSession.id);
+        
         currentSessionId = aiSession.id;
       }
       
@@ -230,7 +230,7 @@ export default function AIChatBot() {
       };
       
       // 保存消息到数据库
-      console.log('保存消息到会话:', currentSessionId);
+      
       await saveAIChatMessage({...userMessage, session_id: currentSessionId});
       await saveAIChatMessage(aiMessage);
     } catch (error) {
@@ -362,7 +362,7 @@ export default function AIChatBot() {
 
   // 清除聊天记录
   const clearChatHistory = async () => {
-    console.log('手动清空AI聊天历史');
+    
     setMessages([]);
     setAiSession(null);
     setCurrentSession(null);

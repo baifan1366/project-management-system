@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { createSelector } from '@reduxjs/toolkit';
 import InvitationDialog from './InvitationDialog';
+import { handleAccessChangeFromInviteOnlyToCanEdit, handleAccessChangeFromCanEditToInviteOnly, handleAccessChangeFromInviteOnlyToCanView, handleAccessChangeFromCanViewToInviteOnly, handleAccessChangeFromCanViewToCanEdit, handleAccessChangeFromCanEditToCanView } from './TeamGuard';
 
 // 组件外部：创建记忆化的 selector 工厂函数
 const selectTeamUsers = createSelector(
@@ -130,6 +131,54 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
         updated_at: new Date().toISOString()
       })).unwrap();
       
+      if (team.access === 'can_edit' && access === 'invite_only') {
+        await handleAccessChangeFromCanEditToInviteOnly(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+      
+      if (team.access === 'invite_only' && access === 'can_edit') {
+        await handleAccessChangeFromInviteOnlyToCanEdit(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+
+      if (team.access === 'can_view' && access === 'invite_only') {
+        await handleAccessChangeFromCanViewToInviteOnly(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+
+      if (team.access === 'invite_only' && access === 'can_view') {
+        await handleAccessChangeFromInviteOnlyToCanView(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+
+      if (team.access === 'can_view' && access === 'can_edit') {
+        await handleAccessChangeFromCanViewToCanEdit(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+
+      if (team.access === 'can_edit' && access === 'can_view') {
+        await handleAccessChangeFromCanEditToCanView(
+          { ...team, access }, // 更新后的团队数据
+          team, // 更新前的团队数据
+          userId // 执行更新的用户ID
+        );
+      }
+      
       // 处理待处理的成员角色变更
       const pendingRolePromises = Object.entries(pendingRoleChanges).map(([memberId, newRole]) => {
         return dispatch(updateTeamUser({
@@ -177,9 +226,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
     if (deleteConfirmText !== team?.name) return;
     try {
       // 这里调用删除团队的API并等待操作完成
-      const teamId = team?.id;
-      // console.log(team);
-      
+      const teamId = team?.id;      
       // Delete all team members first to avoid orphaned records
       // This ensures proper cleanup of user associations before removing the team
       await dispatch(deleteTeamUserByTeamId({userId, teamId})).unwrap();

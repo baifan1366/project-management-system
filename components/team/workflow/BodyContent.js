@@ -7,11 +7,12 @@ import { fetchTasksBySectionId, updateTask, fetchTaskById, createTask, deleteTas
 import { getSectionByTeamId, createSection, updateTaskIds } from '@/lib/redux/features/sectionSlice';
 import { fetchAllTags, getTagByName } from '@/lib/redux/features/tagSlice';
 import { getTags } from '@/lib/redux/features/teamCFSlice';
-import { Plus, Edit, Check, X, CheckCircle2, Circle, Trash } from 'lucide-react';
+import { Plus, Edit, Check, X, CheckCircle2, Circle, Trash, Settings } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useConfirm } from '@/hooks/use-confirm';
+import WorkflowLabelManager from './WorkflowLabelManager';
 import { 
   Popover, 
   PopoverContent, 
@@ -20,12 +21,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { parseSingleSelectValue, generateColorFromLabel, renderStatusBadge } from './helpers';
 import { supabase } from '@/lib/supabase';
+import { getLabelByTeamId, updateLabel } from '@/lib/redux/features/teamLabelSlice';
+import { extractSingleSelectOptions } from './labelUtils';
 
 // 使用唯一键记录全局请求状态，避免重复请求
 const requestCache = {
   allTags: false,
   teamTags: {},
-  sections: {}
+  sections: {},
+  teamLabel: false
 };
 
 // 根据ID查找标签
@@ -33,16 +37,8 @@ const findTagById = (tagId, tags) => {
   return tags.find(tag => tag.id === parseInt(tagId) || tag.id === tagId || tag.id.toString() === tagId);
 };
 
-// 状态选项列表
-const statusOptions = [
-  { label: 'Pending', value: 'pending', color: '#f59e0b' },
-  { label: 'In Progress', value: 'in_progress', color: '#3b82f6' },
-  { label: 'Completed', value: 'completed', color: '#10b981' },
-  { label: 'Cancelled', value: 'cancelled', color: '#ef4444' },
-];
-
 // 状态选择器组件，与TagConfig.js中的renderSingleSelectCell完全一致
-const StatusSelector = ({ value, onChange, options }) => {
+const StatusSelector = ({ value, onChange, options, projectThemeColor }) => {
     const t = useTranslations('CreateTask');
     const [open, setOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -112,12 +108,10 @@ const StatusSelector = ({ value, onChange, options }) => {
     
     // 生成随机颜色
     const generateRandomColor = () => {
-        const colors = [
-            '#ef4444', '#f97316', '#f59e0b', '#84cc16', 
-            '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', 
-            '#d946ef', '#ec4899'
-        ];
-        return colors[Math.floor(Math.random() * colors.length)];
+        // 创建一个随机字符串
+        const randomString = Math.random().toString(36).substring(2, 8);
+        // 使用helpers.js中的函数生成颜色，确保一致性
+        return generateColorFromLabel(randomString);
     };
     
     return (
@@ -242,6 +236,7 @@ const StatusSelector = ({ value, onChange, options }) => {
                                         {t('cancel')}
                                     </Button>
                                     <Button
+                                        variant={projectThemeColor}
                                         size="sm"
                                         onClick={handleCreateOption}
                                         disabled={!newOption.label.trim()}
@@ -305,6 +300,7 @@ const StatusSelector = ({ value, onChange, options }) => {
                                             {t('cancel')}
                                         </Button>
                                         <Button
+                                            variant={projectThemeColor}
                                             onClick={handleEditOption}
                                             disabled={!editingOption.label.trim()}
                                         >
@@ -321,11 +317,15 @@ const StatusSelector = ({ value, onChange, options }) => {
     );
 };
 
-export default function BodyContent() {
+export default function BodyContent({ projectThemeColor }) {
     const dispatch = useDispatch();
     const t = useTranslations('CreateTask');
     const allTags = useSelector(state => state.tags.tags);
     const teamCFTags = useSelector(state => state.teamCF.tags);
+    // 获取团队标签数据 - 修正Redux状态选择器名称
+    const teamLabelState = useSelector(state => state.teamLabels || {});
+    const teamLabel = teamLabelState.label || {};
+    const teamLabelStatus = teamLabelState.status || 'idle';
     const { user } = useGetUser()
     const userId = user?.id;
     const { confirm } = useConfirm();
@@ -347,16 +347,18 @@ export default function BodyContent() {
     const [processedTasks, setProcessedTasks] = useState([]);
     const [tags, setTags] = useState([]);
     const [loading, setLoading] = useState(true);
+    // 状态选项，初始使用默认值，后续会根据团队标签更新
+    const [statusOptions, setStatusOptions] = useState();
     
     // 本地跟踪当前组件实例的已请求状态
     const localRequestTracker = useRef({
       allTagsFetched: false,
       teamTagsFetched: false,
-      sectionsFetched: false
+      sectionsFetched: false,
+      teamLabelFetched: false
     });
 
     // 动态标签ID状态
-    const [assigneeTagId, setAssigneeTagId] = useState(null);
     const [nameTagId, setNameTagId] = useState(null);
     const [descriptionTagId, setDescriptionTagId] = useState(null);
     const [statusTagId, setStatusTagId] = useState(null);
@@ -373,12 +375,46 @@ export default function BodyContent() {
         name: '',
         description: '',
         status: null,
-        assignee: '',
         dueDate: ''
     });
 
     // 获取今天的日期，格式为YYYY-MM-DD
     const today = new Date().toISOString().split('T')[0];
+
+    //replace statusOptions to team's label
+    //example label record: {"TAGS": [""], "MULTI-SELECT": [""], "SINGLE-SELECT": ["{\"label\":\"Completed\",\"value\":\"completed\",\"color\":\"#10b981\"}", "{\"label\":\"In Progress\",\"value\":\"inProgress\",\"color\":\"#123456\"}"]}
+    //find the SINGLE-SELECT as statusOptions
+    //example task record: {"1": "ssss", "3": "{\"label\":\"Completed\",\"value\":\"completed\",\"color\":\"#10b981\"}", "4": "2025-06-29", "5": "sssss"}
+
+    // 获取团队标签数据
+    useEffect(() => {
+      if (teamId) {
+        // 强制每次组件加载时都请求最新数据
+        console.log('准备获取团队标签数据, teamId:', teamId);
+        dispatch(getLabelByTeamId(teamId));
+        requestCache.teamLabel = true;
+        localRequestTracker.current.teamLabelFetched = true;
+      }
+    }, [dispatch, teamId]);
+    
+    // 当团队标签数据加载完成后处理状态选项
+    useEffect(() => {
+      console.log('团队标签数据状态变化:', teamLabelStatus, '数据:', teamLabel);
+      
+      if (teamLabelStatus === 'succeeded') {
+        // 从团队标签数据中提取SINGLE-SELECT选项
+        const extractedOptions = extractSingleSelectOptions(teamLabel);
+        console.log('提取到的状态选项:', extractedOptions);
+        
+        // 如果有提取到选项，则使用提取的选项替换默认选项
+        if (extractedOptions && extractedOptions.length > 0) {
+          console.log('设置新的状态选项');
+          setStatusOptions(extractedOptions);
+        } else {
+          console.log('未提取到有效选项，使用默认选项');
+        }
+      }
+    }, [teamLabel, teamLabelStatus]);
 
     // 获取所有通用标签
     useEffect(() => {
@@ -425,7 +461,6 @@ export default function BodyContent() {
             (workflowData && workflowData.nodes && workflowData.nodes.length === 0);
           
           if (shouldRefetch) {
-            console.log('BodyContent - 强制重新获取任务数据');
             // 重置请求缓存状态
             requestCache.sections[teamId] = false;
             localRequestTracker.current.sectionsFetched = false;
@@ -445,7 +480,6 @@ export default function BodyContent() {
             
             const allTasksData = tasksResults.flat();
             setAllTasks(allTasksData);
-            console.log('获取的原始任务数据:', allTasksData);
           }
         } catch (error) {
           console.error("获取工作流数据时出错:", error);
@@ -475,22 +509,13 @@ export default function BodyContent() {
             dispatch(getTagByName(t('description'))).unwrap(),
             dispatch(getTagByName(t('status'))).unwrap(),
             dispatch(getTagByName(t('dueDate'))).unwrap(),
-            dispatch(getTagByName(t('assignee'))).unwrap()
           ]);
           
           setNameTagId(nameTag);
           setDescriptionTagId(descriptionTag);
           setStatusTagId(statusTag);
           setDueDateTagId(dueDateTag);
-          setAssigneeTagId(assigneeTag);
-          
-          console.log('标签IDs已加载:', {
-            nameTag,
-            descriptionTag,
-            statusTag,
-            dueDateTag,
-            assigneeTag
-          });
+
         } catch (error) {
           console.error('获取标签ID失败:', error);
         }
@@ -507,7 +532,6 @@ export default function BodyContent() {
         name: `${t('task')} #${task.id}`,
         description: '',
         status: '-',
-        assignee: '',
         dueDate: '',
         originalTask: task
       };
@@ -539,21 +563,6 @@ export default function BodyContent() {
         }
       }
       
-      // Assignee 标签 - 使用动态获取的ID
-      if (assigneeTagId && tagValues[assigneeTagId]) {
-        const value = tagValues[assigneeTagId];
-        // 处理Assignee可能是数组的情况
-        if (Array.isArray(value)) {
-          // 如果是数组，显示多个指派人的数量
-          taskInfo.assignee = `${value.length} ${t('assignees')}`;
-          // 保存原始数组以便需要时使用
-          taskInfo.assigneeData = value;
-        } else {
-          // 单个指派人情况
-          taskInfo.assignee = String(value || '');
-        }
-      }
-      
       // Due Date 标签
       if (dueDateTagId && tagValues[dueDateTagId]) {
         const dueDateValue = tagValues[dueDateTagId];
@@ -561,7 +570,7 @@ export default function BodyContent() {
       }
       
       // 保持对老数据的兼容性，使用基于标签名称的处理
-      if (!nameTagId || !descriptionTagId || !statusTagId || !assigneeTagId || !dueDateTagId) {
+      if (!nameTagId || !descriptionTagId || !statusTagId || !dueDateTagId) {
         Object.entries(tagValues).forEach(([tagId, value]) => {
           const tag = findTagById(tagId, tags);
           if (tag) {
@@ -591,20 +600,6 @@ export default function BodyContent() {
                   }
                 }
                 break;
-              case t('assignee'):
-                if (!taskInfo.assignee) {
-                  // 处理Assignee可能是数组的情况
-                  if (Array.isArray(value)) {
-                    // 如果是数组，显示多个指派人的数量
-                    taskInfo.assignee = `${value.length} ${t('assignees')}`;
-                    // 保存原始数组以便需要时使用
-                    taskInfo.assigneeData = value;
-                  } else {
-                    // 单个指派人情况
-                    taskInfo.assignee = String(value || '');
-                  }
-                }
-                break;
               case t('dueDate'):
               case 'Due Date': // 保留兼容旧格式
               case 'DueDate': // 保留兼容旧格式
@@ -626,7 +621,6 @@ export default function BodyContent() {
       if (allTasks.length > 0 && tags.length > 0) {
         const taskList = allTasks.map(task => extractTaskInfo(task));
         setProcessedTasks(taskList);
-        console.log('处理后的任务数据:', taskList);
         
         // 更新工作流数据，为工作流工具提供实际的任务数据
         updateWorkflowData(taskList);
@@ -639,9 +633,7 @@ export default function BodyContent() {
     }, [allTasks, tags, selectedTaskId, setSelectedTaskId, setWorkflowData]);
     
     // 监听selectedTaskId的变化
-    useEffect(() => {
-      console.log('BodyContent - 选中的任务ID已更新:', selectedTaskId);
-      
+    useEffect(() => {      
       // 如果选中了任务，确保视图滚动到该任务
       if (selectedTaskId) {
         const taskElement = document.getElementById(`task-${selectedTaskId}`);
@@ -668,7 +660,7 @@ export default function BodyContent() {
             label: task.name, 
             description: task.description,
             status: task.status,
-            assignee: task.assignee,
+            statusData: task.statusData,
             dueDate: task.dueDate,
             originalTask: task.originalTask
           },
@@ -709,7 +701,6 @@ export default function BodyContent() {
                 name: editableTask.name,
                 description: editableTask.description,
                 status: editableTask.status,
-                assignee: editableTask.assignee,
                 dueDate: editableTask.dueDate
             };
             
@@ -732,8 +723,8 @@ export default function BodyContent() {
         // 如果是任务名称字段，限制最大长度为100个字符
         if (field === 'name') {
             // 限制长度
-            if (value.length > 100) {
-                value = value.slice(0, 100);
+            if (value.length > 50) {
+                value = value.slice(0, 50);
             }
         }
         // 如果是描述字段，限制最大长度为100个字符
@@ -855,10 +846,6 @@ export default function BodyContent() {
                 tagValues[dueDateTagId] = editingValues.dueDate;
             }
             
-            if (assigneeTagId && editingValues.assignee) {
-                tagValues[assigneeTagId] = editingValues.assignee;
-            }
-            
             // 调用更新API
             await dispatch(updateTask({
                 taskId: originalTask.id,
@@ -931,7 +918,6 @@ export default function BodyContent() {
                 name: '',
                 description: '',
                 status: null,
-                assignee: '',
                 dueDate: ''
             });
         }
@@ -939,13 +925,13 @@ export default function BodyContent() {
         setIsEditing(true);
         setEditingTask({...task}); // 确保完整复制任务对象
         
-        // 初始化编辑值
+        // 初始化编辑值，确保使用完整的statusData对象
         const initialValues = {
-            id: task.id, // 确保ID也包含在编辑值中
+            id: task.id, 
             name: task.name,
             description: task.description,
-            status: task.status,
-            assignee: task.assignee,
+            // 优先使用statusData对象（如果存在）
+            status: task.statusData || task.status,
             dueDate: task.dueDate
         };
         
@@ -962,7 +948,7 @@ export default function BodyContent() {
         return (
             <div className="mb-6 p-4 border rounded-lg">
                 <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-lg font-medium text-gray-700">{t('editTask')}</h3>
+                    <h3 className="text-lg font-medium">{t('editTask')}</h3>
                     <button 
                         className="p-1 rounded-full hover:bg-gray-100"
                         onClick={handleCancelEdit}
@@ -980,10 +966,10 @@ export default function BodyContent() {
                             onChange={(e) => handleInputChange('name', e.target.value)}
                             onBlur={(e) => handleFieldBlur('name', false)}
                             className="p-2 border rounded text-sm w-full focus:ring-1 focus:ring-primary focus:outline-none"
-                            maxLength={100}
+                            maxLength={50}
                         />
                         <div className="text-xs text-gray-500 mt-1 text-right">
-                            {(editingValues.name || '').length}/100
+                            {(editingValues.name || '').length}/50
                         </div>
                     </div>
                     
@@ -993,6 +979,7 @@ export default function BodyContent() {
                             value={editingValues.status}
                             onChange={(option) => handleInputChange('status', option)}
                             options={statusOptions}
+                            projectThemeColor={projectThemeColor}
                         />
                     </div>
                     <div className="flex flex-col">
@@ -1010,15 +997,6 @@ export default function BodyContent() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col">
-                            <label className="font-medium mb-1">{t('assignee')}:</label>
-                            <input
-                                type="text"
-                                value={editingValues.assignee || ''}
-                                onChange={(e) => handleInputChange('assignee', e.target.value)}
-                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
-                            />
-                        </div>
-                        <div className="flex flex-col">
                             <label className="font-medium mb-1">{t('dueDate')}:</label>
                             <input
                                 type="date"
@@ -1031,12 +1009,12 @@ export default function BodyContent() {
                     </div>
                     
                     <div className="flex justify-between items-center pt-4 mt-3 border-t">
-                        <button 
-                            className="flex items-center text-sm text-red-500 hover:text-red-600 py-2 px-3 rounded hover:bg-gray-50 transition-colors"
+                        <Button 
+                            variant="outline"
+                            className="flex items-center text-sm text-red-500 hover:text-red-600 py-2 px-3 rounded hover:bg-muted-background transition-colors"
                             onClick={() => {
                                 // 直接使用selectedTask，它是完整的任务对象
                                 if (selectedTask && selectedTask.id) {
-                                    console.log('删除任务ID:', selectedTask.id);
                                     handleCancelEdit(); // 先关闭编辑表单
                                     handleDeleteTask(selectedTask); 
                                 } else {
@@ -1048,17 +1026,18 @@ export default function BodyContent() {
                         >
                             <Trash className="w-4 h-4 mr-1" />
                             {t('delete')}
-                        </button>
+                        </Button>
                         
-                        <button 
-                            className="flex items-center text-sm text-green-500 hover:text-green-600 py-2 px-3 rounded hover:bg-gray-50 transition-colors"
+                        <Button 
+                            variant="outline"
+                            className="flex items-center text-sm text-green-500 hover:text-green-600 py-2 px-3 rounded hover:bg-muted-background transition-colors"
                             onClick={handleSaveTask}
                             disabled={!isNameValid}
                             type="button"
                         >
                             <Check className={`w-4 h-4 mr-1 ${!isNameValid ? 'text-gray-300' : ''}`} />
                             {t('save')}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -1070,8 +1049,8 @@ export default function BodyContent() {
         // 如果是任务名称字段，限制最大长度为100个字符
         if (field === 'name') {
             // 限制长度
-            if (value.length > 100) {
-                value = value.slice(0, 100);
+            if (value.length > 50) {
+                value = value.slice(0, 50);
             }
         }
         // 如果是描述字段，限制最大长度为100个字符
@@ -1094,7 +1073,6 @@ export default function BodyContent() {
             name: '',
             description: '',
             status: null,
-            assignee: '',
             dueDate: ''
         });
     };
@@ -1156,10 +1134,6 @@ export default function BodyContent() {
             
             if (dueDateTagId && newTaskValues.dueDate) {
                 tagValues[dueDateTagId] = newTaskValues.dueDate;
-            }
-            
-            if (assigneeTagId && newTaskValues.assignee) {
-                tagValues[assigneeTagId] = newTaskValues.assignee;
             }
             
             // 创建任务基础数据
@@ -1275,7 +1249,6 @@ export default function BodyContent() {
                 name: '',
                 description: '',
                 status: null,
-                assignee: '',
                 dueDate: ''
             });
             
@@ -1300,7 +1273,7 @@ export default function BodyContent() {
         return (
             <div className="mb-6 p-4 border rounded-lg">
                 <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-lg font-medium text-gray-700">{t('createTask')}</h3>
+                    <h3 className="text-lg font-medium">{t('createTask')}</h3>
                     <button 
                         className="p-1 rounded-full hover:bg-gray-100"
                         onClick={handleCancelCreate}
@@ -1320,10 +1293,10 @@ export default function BodyContent() {
                             placeholder={t('taskName')}
                             className="p-2 border rounded text-sm w-full focus:ring-1 focus:ring-primary focus:outline-none"
                             autoFocus
-                            maxLength={100}
+                            maxLength={50}
                         />
                         <div className="text-xs text-gray-500 mt-1 text-right">
-                            {newTaskValues.name.length}/100
+                            {newTaskValues.name.length}/50
                         </div>
                     </div>
                     
@@ -1333,7 +1306,8 @@ export default function BodyContent() {
                             value={newTaskValues.status}
                             onChange={(option) => handleNewTaskInputChange('status', option)}
                             options={statusOptions}
-                        />
+                            projectThemeColor={projectThemeColor}
+                        />  
                     </div>
                     <div className="flex flex-col">
                         <label className="font-medium mb-1">{t('description')}:</label>
@@ -1351,16 +1325,6 @@ export default function BodyContent() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col">
-                            <label className="font-medium mb-1">{t('assignee')}:</label>
-                            <input
-                                type="text"
-                                value={newTaskValues.assignee}
-                                onChange={(e) => handleNewTaskInputChange('assignee', e.target.value)}
-                                placeholder={t('assigneePlaceholder')}
-                                className="p-2 border rounded text-sm focus:ring-1 focus:ring-primary focus:outline-none"
-                            />
-                        </div>
-                        <div className="flex flex-col">
                             <label className="font-medium mb-1">{t('dueDate')}:</label>
                             <input
                                 type="date"
@@ -1373,15 +1337,16 @@ export default function BodyContent() {
                     </div>
                     
                     <div className="flex justify-end items-center pt-4 mt-3 border-t">
-                        <button 
-                            className="flex items-center text-sm text-green-500 hover:text-green-600 py-2 px-3 rounded hover:bg-gray-50 transition-colors"
+                        <Button 
+                            variant="outline"
+                            className="flex items-center text-sm text-green-500 hover:text-green-600 py-2 px-3 rounded hover:bg-muted-background transition-colors"
                             onClick={handleCreateTask}
                             disabled={!isNameValid}
                             type="button"
                         >
                             <Check className={`w-4 h-4 mr-1 ${!isNameValid ? 'text-gray-300' : ''}`} />
                             <span className={`${!isNameValid ? 'text-gray-300' : ''}`}>{t('create')}</span>
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -1401,9 +1366,7 @@ export default function BodyContent() {
     };
 
     // 处理删除任务
-    const handleDeleteTask = (task) => {
-        console.log('handleDeleteTask被调用，传入的任务对象:', task);
-        
+    const handleDeleteTask = (task) => {        
         // 检查任务对象是否有效
         if (!task) {
             console.error('删除任务失败: 任务对象为空');
@@ -1419,7 +1382,6 @@ export default function BodyContent() {
         }
         
         const taskId = task.id; // 保存任务ID以确保一致性
-        console.log('任务ID有效，将显示确认对话框，任务ID:', taskId);
         
         confirm({
             title: t('deleteTaskTitle'),
@@ -1428,7 +1390,6 @@ export default function BodyContent() {
             onConfirm: async () => {
                 try {
                     setLoading(true);
-                    console.log('用户确认删除，开始删除任务，任务ID:', taskId);
                     
                     // 获取任务所在的部分
                     const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
@@ -1447,7 +1408,6 @@ export default function BodyContent() {
                             sectionId: sectionWithTask.id,
                             userId // 添加用户ID到参数中
                         };
-                        console.log('调用deleteTask，参数:', deleteParams);
                         
                         // 删除任务
                         await dispatch(deleteTask(deleteParams)).unwrap();
@@ -1486,7 +1446,6 @@ export default function BodyContent() {
                             teamId,
                             userId // 添加用户ID到参数中
                         };
-                        console.log('找不到部分，仍调用deleteTask，参数:', deleteParams);
                         
                         // 删除任务
                         await dispatch(deleteTask(deleteParams)).unwrap();
@@ -1507,12 +1466,39 @@ export default function BodyContent() {
         });
     };
 
+    // 添加标签管理状态
+    const [showLabelManager, setShowLabelManager] = useState(false);
+
     if (loading) {
       return <div className="p-4 text-center">{t('loading')}</div>;
     }
 
     return (
         <div className="p-1">
+            {/* 添加标签管理器切换按钮 */}
+            <div className="mb-4 flex justify-end items-center">
+                <Button
+                    variant={projectThemeColor}
+                    size="sm"
+                    onClick={() => setShowLabelManager(!showLabelManager)}
+                    className="flex items-center gap-1"
+                >
+                    <Settings className="w-4 h-4" />
+                    {showLabelManager ? t('hideStatusManager') : t('manageStatusOptions')}
+                </Button>
+            </div>
+
+            {/* 标签管理器组件 */}
+            {showLabelManager && (
+                <div className="mb-6 border rounded-lg">
+                    <WorkflowLabelManager 
+                        teamId={teamId}
+                        tasks={allTasks}
+                        projectThemeColor={projectThemeColor}
+                    />
+                </div>
+            )}
+
             {selectedTask && !isEditing && (
                 <div className="mb-6 p-4 border rounded-lg">
                     <div className="flex justify-between items-center border-b pb-2 mb-3">
@@ -1522,27 +1508,23 @@ export default function BodyContent() {
                                 className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
                                 onClick={() => handleEditTask(selectedTask)}
                             >
-                                <Edit className="w-4 h-4 text-gray-500" />
+                                <Edit className="w-4 h-4" />
                             </button>
                         </div>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
                             <span className="font-medium">{t('status')}:</span>
-                            {renderStatusBadge(selectedTask.status)}
+                            {selectedTask.statusData ? renderStatusBadge(selectedTask.statusData) : renderStatusBadge(selectedTask.status)}
                         </div>
                         <div>
                             <span className="font-medium">{t('description')}:</span>
-                            <p className="text-gray-700 mt-1">{selectedTask.description || '-'}</p>
+                            <p className="text-gray-500 mt-1">{selectedTask.description || '-'}</p>
                         </div>
                         <div className="flex justify-between">
                             <div>
-                                <span className="font-medium">{t('assignee')}:</span>
-                                <p className="text-gray-700">{selectedTask.assignee || '-'}</p>
-                            </div>
-                            <div>
                                 <span className="font-medium">{t('dueDate')}:</span>
-                                <p className="text-gray-700">{selectedTask.dueDate || '-'}</p>
+                                <p className="text-gray-500">{selectedTask.dueDate || '-'}</p>
                             </div>
                         </div>
                     </div>
@@ -1565,11 +1547,10 @@ export default function BodyContent() {
                     >
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold break-words max-w-[80%]">{item.name}</h3>
-                            {item.status ? renderStatusBadge(item.status) : renderStatusBadge(null)}
+                            {item.statusData ? renderStatusBadge(item.statusData) : renderStatusBadge(item.status)}
                         </div>
                         <p className="text-gray-600 text-sm mt-1">{item.description || '-'}</p>
                         <div className="mt-2 text-sm text-gray-500 flex justify-between">
-                            <span className="mr-2">{t('assignee')}: {item.assignee || '-'}</span>
                             <span>{t('dueDate')}: {item.dueDate || '-'}</span>
                         </div>
                     </div>
@@ -1587,8 +1568,8 @@ export default function BodyContent() {
                 className="p-4 border rounded-md cursor-pointer hover:bg-accent flex items-center justify-center"
                 onClick={handleOpenCreateTask}
               >
-                <Plus className="w-4 h-4 mr-2 text-gray-500"/>
-                <span className="text-sm text-gray-600">{t('addTask')}</span>
+                <Plus className="w-4 h-4 mr-2"/>
+                <span className="text-sm">{t('addTask')}</span>
               </div>
             </div>
         </div>

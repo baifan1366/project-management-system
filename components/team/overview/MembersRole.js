@@ -7,6 +7,7 @@ import { fetchTeamUsers } from "@/lib/redux/features/teamUserSlice";
 import { fetchUserById } from "@/lib/redux/features/usersSlice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
+import { useTranslations } from 'next-intl';
 
 /**
  * 展示团队成员及其角色
@@ -18,37 +19,31 @@ export default function MembersRole({ teamId }) {
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const t = useTranslations('TeamOverview');
 
     useEffect(() => {
         const fetchMembers = async () => {
             try {
                 setLoading(true);
                 setError(null);
-                
-                console.log(`开始获取团队成员，teamId: ${teamId}`);
-                
+                                
                 // 获取团队成员及其角色
                 const teamUsers = await dispatch(fetchTeamUsers(teamId)).unwrap();
-                console.log('获取到的团队用户数据:', teamUsers);
                 
                 // 兼容不同返回结构 - 修正数据结构处理
                 const teamUsersArr = teamUsers?.users || 
                                     (Array.isArray(teamUsers) ? teamUsers : 
                                     teamUsers?.data || []);
-                console.log(`处理后的团队用户数组，长度: ${teamUsersArr.length}`, teamUsersArr);
                 
                 if (teamUsersArr.length === 0) {
-                    console.log('警告: 团队用户数组为空');
                 }
                 
                 // 并行获取每个成员的详细信息
                 const users = await Promise.all(
                     teamUsersArr.map(async (tu) => {
-                        console.log(`开始获取用户信息，userId:`, tu);
                         try {
                             // 根据返回数据结构调整获取用户ID的方式
                             const userId = tu.user_id || tu.user?.id || tu.id;
-                            console.log(`处理后的用户ID: ${userId}`);
                             
                             if (!userId) {
                                 console.error('无法获取用户ID:', tu);
@@ -56,7 +51,6 @@ export default function MembersRole({ teamId }) {
                             }
                             
                             const user = await dispatch(fetchUserById(userId)).unwrap();
-                            console.log(`获取到用户信息，userId: ${userId}`, user);
                             return {
                                 ...user,
                                 role: tu.role,
@@ -76,7 +70,6 @@ export default function MembersRole({ teamId }) {
                 // 过滤掉null值
                 const validUsers = users.filter(user => user !== null);
                 
-                console.log('所有团队成员信息获取完成:', validUsers);
                 setMembers(validUsers);
             } catch (err) {
                 console.error("获取团队成员失败:", err);
@@ -120,7 +113,7 @@ export default function MembersRole({ teamId }) {
     }
 
     if (members.length === 0) {
-        return <p className="text-sm text-muted-foreground p-2">该团队暂无成员</p>;
+        return <p className="text-sm text-muted-foreground p-2">{t('noTeamMemberFound')}</p>;
     }
 
     return (
@@ -133,7 +126,12 @@ export default function MembersRole({ teamId }) {
                     </Avatar>
                     <div className="flex flex-col">
                         <span className="text-sm font-medium">{user.name}</span>
-                        <span className="text-xs text-muted-foreground">{user.role}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {user.role === 'OWNER' ? t('OWNER') : 
+                             user.role === 'CAN_EDIT' ? t('CAN_EDIT') : 
+                             user.role === 'CAN_VIEW' ? t('CAN_VIEW') : 
+                             user.role}
+                        </span>
                     </div>
                 </div>
             ))}

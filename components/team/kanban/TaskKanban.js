@@ -1,21 +1,135 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useDispatch } from 'react-redux';
+import React, { useState, useEffect, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { PlusIcon, MoreHorizontal , Pen, Trash2, Check, User} from 'lucide-react';
+import { PlusIcon, MoreHorizontal , Pen, Trash2, Check, User, X} from 'lucide-react';
 import { Button } from '../../ui/button';
 import { useTranslations } from 'next-intl';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip';
 import { updateTaskOrder } from '@/lib/redux/features/sectionSlice'
 import { updateSectionOrder } from '@/lib/redux/features/sectionSlice'
-import { fetchTaskById } from '@/lib/redux/features/taskSlice';
+import { fetchTaskById, updateTask } from '@/lib/redux/features/taskSlice';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import BodyContent from './BodyContent';
 import HandleSection from './HandleSection';
 import LikeTask from './LikeTask';
 import HandleTask from './HandleTask';
+import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
+import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
+import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
+import { fetchUserById } from '@/lib/redux/features/usersSlice';
+import { createSelector } from '@reduxjs/toolkit';
+
+// 创建全局用户缓存
+const userCache = {};
+const pendingRequests = {};
+
+// 创建记忆化选择器
+const selectUserById = createSelector(
+  [(state) => state.users?.entities, (state, userId) => userId],
+  (usersEntities, userId) => usersEntities ? usersEntities[userId] : null
+);
+
+// 创建记忆化的团队成员选择器
+const selectTeamMembers = createSelector(
+  [(state, teamId) => state.teamUsers.teamUsers?.[teamId]],
+  (teamMembers) => teamMembers || []
+);
+
+// 创建记忆化的任务选择器
+const selectTaskById = createSelector(
+  [(state) => state.tasks?.entities, (state, taskId) => taskId],
+  (tasksEntities, taskId) => tasksEntities ? tasksEntities[taskId] : null
+);
+
+// 批量请求控制器 - 添加批量加载用户功能
+const batchUserLoader = {
+  queue: new Set(),
+  timer: null,
+  maxBatchSize: 10,
+  batchDelay: 200, // 毫秒
+  
+  add(userId, dispatch) {
+    if (!userId || pendingRequests[userId]) return;
+    
+    this.queue.add(userId);
+    pendingRequests[userId] = true;
+    
+    if (!this.timer) {
+      this.timer = setTimeout(() => this.processBatch(dispatch), this.batchDelay);
+    }
+  },
+  
+  processBatch(dispatch) {
+    const batch = Array.from(this.queue).slice(0, this.maxBatchSize);
+    if (batch.length > 0) {
+      
+      // 如果有批量API可以在这里调用批量加载API，这里模拟单个加载
+      batch.forEach(userId => {
+        dispatch(fetchUserById(userId));
+      });
+      
+      // 清空已处理的
+      batch.forEach(userId => this.queue.delete(userId));
+    }
+    
+    // 如果队列非空，继续处理
+    if (this.queue.size > 0) {
+      this.timer = setTimeout(() => this.processBatch(dispatch), this.batchDelay);
+    } else {
+      this.timer = null;
+    }
+  },
+  
+  reset() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.queue.clear();
+  }
+};
+
+// 添加防抖函数，避免频繁刷新
+const debounce = (func, delay) => {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => func(...args), delay);
+  };
+};
+
+// 添加任务预处理函数，提前识别所有需要加载的用户ID
+function preloadTaskUsers(tasks, columns, dispatch) {
+  if (!tasks || !columns) return;
+  
+  // 重置批处理器
+  batchUserLoader.reset();
+  
+  // 收集所有任务中的用户ID
+  const userIds = new Set();
+  
+  Object.values(tasks).forEach(task => {
+    if (task?.assignee?.assignee) {
+      userIds.add(task.assignee.assignee);
+    }
+    
+    if (task?.assignee?.assignees && Array.isArray(task.assignee.assignees)) {
+      task.assignee.assignees.forEach(userId => userIds.add(userId));
+    }
+  });
+  
+  // 批量加载用户数据
+  userIds.forEach(userId => {
+    batchUserLoader.add(userId, dispatch);
+  });
+}
+
+// DragDropContext修改为使用React.memo减少重渲染
+const MemoizedDragDropContext = React.memo(DragDropContext);
+const MemoizedDroppable = React.memo(Droppable);
 
 export default function TaskKanban({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
@@ -27,7 +141,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     teamId, 
     // 添加刷新回调
     onSectionChange: () => {
-      console.log('分区变更，重新加载数据...');
       // 强制重新加载看板数据
       loadData(true);
     } 
@@ -67,15 +180,39 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     message: ''
   });
   
+  // 添加看板加载状态管理
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // 使用防抖函数包装loadData
+  const debouncedLoadData = useRef(
+    debounce((forceRefresh) => {
+      setIsLoading(true);
+      // 包装loadData调用
+      const loadPromise = loadData(forceRefresh);
+      if (loadPromise && typeof loadPromise.then === 'function') {
+        loadPromise.finally(() => setIsLoading(false));
+      } else {
+        // 如果不是Promise，手动设置加载完成
+        setTimeout(() => setIsLoading(false), 500);
+      }
+    }, 300)
+  ).current;
+  
   // 只在组件挂载和初始数据变化时更新状态
   useEffect(() => {
     // 确保初始数据是对象而不是空字符串
     if (
-      (initialTasks && typeof initialTasks === 'object' && Object.keys(initialTasks).length > 0) ||
-      (initialColumns && typeof initialColumns === 'object' && Object.keys(initialColumns).length > 0)
+      initialTasks && typeof initialTasks === 'object' && 
+      initialColumns && typeof initialColumns === 'object'
     ) {
-      // 更新本地状态，无论是否已初始化
-      setTasks(initialTasks);
+      // 先更新本地状态，再进行预加载
+      setTasks(prevTasks => {
+        const updatedTasks = {...initialTasks};
+        // 预加载任务中的用户数据，减少后续单独请求
+        preloadTaskUsers(updatedTasks, initialColumns, dispatch);
+        return updatedTasks;
+      });
+      
       setColumns(initialColumns);
       setColumnOrder(initialColumnOrder);
       
@@ -84,12 +221,11 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
         isInitialized.current = true;
       }
     }
-  }, [initialTasks, initialColumns, initialColumnOrder]);
+  }, [initialTasks, initialColumns, initialColumnOrder, dispatch]);
   
   // 记录当前使用的assignee标签ID，用于调试
   useEffect(() => {
     if (assigneeTagId) {
-      console.log('正在使用的assignee标签ID:', assigneeTagId);
     }
   }, [assigneeTagId]);
   
@@ -134,11 +270,10 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
           userId: user.id
         })).unwrap();
         
-        console.log('分区顺序更新成功:', sectionIds);
       } catch (error) {
         console.error('更新分区顺序失败:', error);
-        // 如果发生错误，可以刷新看板恢复状态
-        loadData(true);
+        // 如果发生错误，延迟刷新看板恢复状态，避免UI阻塞
+        debouncedLoadData(true);
       }
       
       return;
@@ -171,7 +306,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
         newTaskIds: newTaskIds
       })).unwrap();
       
-      console.log('同列拖拽：更新任务顺序成功', newTaskIds);
       return;
     }
 
@@ -205,9 +339,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
         teamId: teamId,
         newTaskIds: sourceTaskIds
       })).unwrap();
-      
-      console.log('源列任务顺序已更新:', sourceTaskIds);
-      
+            
       // 2. 更新目标列的任务顺序
       const destSectionId = destColumn.originalId || destColumn.id;
       await dispatch(updateTaskOrder({
@@ -216,9 +348,9 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
         newTaskIds: destTaskIds
       })).unwrap();
     } catch (error) {
-      console.error('任务拖拽更新失败:', error);
-      // 如果发生错误，可以刷新看板恢复状态
-      loadData(true);
+      console.error('拖拽操作失败:', error);
+      // 如果发生错误，延迟刷新看板恢复状态，避免UI阻塞
+      debouncedLoadData(true);
     }
   };
   
@@ -264,7 +396,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     // 获取任务对象
     const task = tasks[taskId];
     if (!task) {
-      console.error('任务不存在:', taskId);
       return;
     }
     
@@ -533,6 +664,9 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     // 重置新任务状态
     setNewTaskId(null);
     setNewTaskContent('');
+    
+    // 清除错误状态
+    setError({ type: null, message: '' });
   };
 
   // 添加全局点击事件处理自动保存
@@ -577,16 +711,500 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     };
   }, [editingColumnId, editingTaskId, newTaskId, isAddingSection, editingTitle, editingTaskContent, newTaskContent, newSectionTitle]);
 
+  // 显示单个用户头像和名称的组件
+  const UserAvatar = React.memo(({ userId, size = "sm" }) => {
+    const dispatch = useDispatch();
+    
+    // 使用记忆化选择器获取用户数据
+    const cachedUser = useSelector(state => selectUserById(state, userId));
+    
+    const [user, setUser] = useState(cachedUser);
+    const [isLoading, setIsLoading] = useState(!cachedUser);
+    const [hasError, setHasError] = useState(false);
+    
+    // 使用userIdRef跟踪用户ID变化
+    const userIdRef = useRef(userId);
+    
+    useEffect(() => {
+      // 如果已经有缓存的用户数据，直接使用
+      if (cachedUser) {
+        setUser(cachedUser);
+        setIsLoading(false);
+        return;
+      }
+      
+      // 确保userId有效
+      if (!userId) {
+        console.warn('UserAvatar: 无效的userId');
+        setIsLoading(false);
+        setHasError(true);
+        return;
+      }
+      
+      // 防止重复请求和无效请求
+      if (hasError || pendingRequests[userId]) return;
+            
+      // 轻量化处理，使用批量加载器而不是直接触发API请求
+      batchUserLoader.add(userId, dispatch);
+      
+      // 设置加载状态
+      setIsLoading(true);
+      
+      // 更新跟踪的用户ID
+      if (userIdRef.current !== userId) {
+        userIdRef.current = userId;
+      }
+    }, [userId, dispatch, cachedUser, hasError]);
+    
+    // 当缓存用户变化时更新组件状态
+    useEffect(() => {
+      if (cachedUser) {
+        setUser(cachedUser);
+        setIsLoading(false);
+      }
+    }, [cachedUser]);
+    
+    const sizeClasses = {
+      sm: "h-6 w-6",
+      md: "h-8 w-8",
+      lg: "h-10 w-10"
+    };
+    
+    const avatarClass = sizeClasses[size] || sizeClasses.sm;
+    const displayName = user?.name || userId || '?';
+    const displayInitial = displayName?.[0] || '?';
+    
+    // 安全地检查是否有有效的头像URL - 更严格的检查
+    const hasValidAvatar = Boolean(user && typeof user === 'object' && 'avatar_url' in user && user.avatar_url);
+    
+    if (isLoading) {
+      return (
+        <Avatar className={`${avatarClass} bg-muted`}>
+          <AvatarFallback><User size={14} /></AvatarFallback>
+        </Avatar>
+      );
+    }
+    
+    return (
+      <Tooltip>
+        <TooltipTrigger>
+          <Avatar className={avatarClass}>
+            {hasValidAvatar ? (
+              <AvatarImage 
+                src={user.avatar_url} 
+                alt={displayName} 
+                onError={(e) => {
+                  console.warn(`头像加载失败: ${userId}`, e);
+                  // 标记元素已经出错，避免继续显示损坏的图像
+                  e.target.style.display = 'none';
+                }}
+              />
+            ) : (
+              <AvatarFallback>
+                {displayInitial?.toUpperCase() || <User size={14} />}
+              </AvatarFallback>
+            )}
+          </Avatar>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{displayName}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  });
+
+  // 添加负责人组件
+  const AddAssignee = ({ taskId }) => {
+    const t = useTranslations('CreateTask');
+    const [open, setOpen] = useState(false);
+    
+    // 使用记忆化选择器获取团队成员，避免获取整个Redux状态
+    const teamMembers = useSelector(state => selectTeamMembers(state, teamId), 
+      // 添加浅比较函数，避免不必要的重新渲染
+      (prev, next) => {
+        if (!prev || !next) return false;
+        if (prev.length !== next.length) return false;
+        return true;
+      }
+    );
+    
+    const teamUsersStatus = useSelector(state => state.teamUsers?.status);
+    
+    const [isLoading, setIsLoading] = useState(false);
+    const [requestSent, setRequestSent] = useState(false);
+    
+    // 加载团队成员
+    useEffect(() => {
+      const loadTeamMembers = async () => {
+        // 只有当弹窗打开时才请求数据
+        if (!teamId || !open) return;
+        
+        // 如果团队成员正在加载中或已经成功加载，则不重复请求
+        if (teamUsersStatus === 'loading' || (teamMembers.length > 0 && teamUsersStatus === 'succeeded')) {
+          return;
+        }
+        
+        setIsLoading(true);
+        try {
+          await dispatch(fetchTeamUsers(teamId)).unwrap();
+          setRequestSent(true);
+        } catch (error) {
+          console.error('获取团队成员失败:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      loadTeamMembers();
+    }, [teamId, open, dispatch, teamMembers.length, teamUsersStatus]);
+    
+    // 添加assignee的处理函数
+    const handleAddAssignee = async (userId) => {
+      if (!taskId || !userId) return;
+      
+      try {
+        // 先获取任务数据
+        const taskData = await dispatch(fetchTaskById(taskId)).unwrap();
+        const tagValues = taskData.tag_values || {};
+        
+        // 获取当前assignee列表（如果有）
+        const currentAssignees = Array.isArray(tagValues[assigneeTagId]) 
+          ? tagValues[assigneeTagId] 
+          : [];
+        
+        // 防止重复添加同一用户
+        if (currentAssignees.includes(userId)) {
+          return;
+        }
+        
+        // 添加新的assignee
+        const updatedAssignees = [...currentAssignees, userId];
+        
+        // 更新任务
+        await dispatch(updateTask({
+          taskId: taskId,
+          taskData: {
+            tag_values: {
+              ...tagValues,
+              [assigneeTagId]: updatedAssignees
+            }
+          }
+        })).unwrap();
+        
+        // 关闭弹窗后再刷新看板
+        setOpen(false);
+        // 使用防抖函数刷新
+        debouncedLoadData(true);
+      } catch (error) {
+        console.error('添加负责人失败:', error);
+        setOpen(false);
+      }
+    };
+    
+    // 添加移除assignee的处理函数
+    const handleRemoveAssignee = async (userId, e) => {
+      if (!taskId || !userId) return;
+      e.stopPropagation(); // 防止触发父元素的点击事件
+      
+      try {
+        // 先获取任务数据
+        const taskData = await dispatch(fetchTaskById(taskId)).unwrap();
+        const tagValues = taskData.tag_values || {};
+        
+        // 获取当前assignee列表（如果有）
+        const currentAssignees = Array.isArray(tagValues[assigneeTagId]) 
+          ? tagValues[assigneeTagId] 
+          : [];
+        
+        // 从列表中移除用户
+        const updatedAssignees = currentAssignees.filter(id => id !== userId);
+        
+        // 更新任务
+        await dispatch(updateTask({
+          taskId: taskId,
+          taskData: {
+            tag_values: {
+              ...tagValues,
+              [assigneeTagId]: updatedAssignees
+            }
+          }
+        })).unwrap();
+        
+        // 使用防抖函数刷新
+        debouncedLoadData(true);
+      } catch (error) {
+        console.error('移除负责人失败:', error);
+      }
+    };
+    
+    // 检查用户是否已分配为任务负责人
+    const isUserAssigned = async () => {
+      try {
+        const taskData = await dispatch(fetchTaskById(taskId)).unwrap();
+        const tagValues = taskData.tag_values || {};
+        
+        return Array.isArray(tagValues[assigneeTagId]) 
+          ? tagValues[assigneeTagId] 
+          : [];
+      } catch (error) {
+        console.error('获取任务负责人失败:', error);
+        return [];
+      }
+    };
+    
+    // 获取当前任务的assignee列表
+    const [assignedUsers, setAssignedUsers] = useState([]);
+    
+    // 加载任务的assignee信息
+    useEffect(() => {
+      if (open && taskId) {
+        const loadTaskAssignees = async () => {
+          try {
+            const taskData = await dispatch(fetchTaskById(taskId)).unwrap();
+            const tagValues = taskData.tag_values || {};
+            
+            const currentAssignees = Array.isArray(tagValues[assigneeTagId]) 
+              ? tagValues[assigneeTagId] 
+              : [];
+              
+            setAssignedUsers(currentAssignees);
+          } catch (error) {
+            console.error('获取任务负责人失败:', error);
+            setAssignedUsers([]);
+          }
+        };
+        
+        loadTaskAssignees();
+      }
+    }, [open, taskId, dispatch, assigneeTagId]);
+    
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button 
+            className="p-1 rounded-full hover:bg-gray-200 hover:dark:bg-gray-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <PlusIcon size={14} className="text-gray-500" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-60 p-2">
+          <h4 className="text-sm font-medium mb-2">{t('assignee')}</h4>
+          
+          {isLoading || teamUsersStatus === 'loading' ? (
+            <div className="flex items-center justify-center py-2">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <span className="ml-2 text-sm">{t('loading')}</span>
+            </div>
+          ) : teamMembers && teamMembers.length > 0 ? (
+            <div className="max-h-40 overflow-y-auto">
+              {teamMembers.map((member) => {
+                const isAssigned = assignedUsers.includes(member.user_id);
+                // 从member获取user数据，API返回的结构可能有嵌套的user对象
+                const userData = member.user || member;
+                
+                const userId = member.user_id || member.id;
+                const userName = userData.name || userId;
+                const userAvatar = userData.avatar_url;
+                // 更严格的头像检查
+                const hasAvatar = Boolean(userAvatar && typeof userAvatar === 'string' && userAvatar.length > 0);
+                const userInitial = userName?.[0]?.toUpperCase() || 'U';
+                
+                return (
+                  <div
+                    key={userId}
+                    className="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 hover:dark:bg-gray-800 cursor-pointer"
+                    onClick={() => !isAssigned && handleAddAssignee(userId)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        {hasAvatar ? (
+                          <AvatarImage 
+                            src={userAvatar} 
+                            alt={userName}
+                            onError={(e) => {
+                              console.warn(`头像加载失败: ${userId}`, e);
+                              // 标记元素已经出错，避免继续显示损坏的图像
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        ) : null}
+                        <AvatarFallback>
+                          {userInitial}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{userName}</span>
+                    </div>
+                    
+                    {isAssigned ? (
+                      <button 
+                        className="p-1 rounded-full hover:bg-red-100 hover:dark:bg-red-900 text-red-500"
+                        onClick={(e) => handleRemoveAssignee(userId, e)}
+                      >
+                        <X size={14} />
+                      </button>
+                    ) : (
+                      <span className="p-1 rounded-full hover:bg-green-100 hover:dark:bg-green-900 text-green-500">
+                        <Check size={14} />
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-sm text-center text-gray-500">
+              {teamUsersStatus === 'failed' ? t('failedToLoadUsers') : t('noUsers')}
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  // 删除负责人组件
+  const RemoveAssignee = ({ taskId, userId }) => {
+    const dispatch = useDispatch();
+    // 使用记忆化选择器获取最新任务数据
+    const task = useSelector(state => selectTaskById(state, taskId));
+    
+    // 移除assignee的处理函数
+    const handleRemoveAssignee = async (e) => {
+      e.stopPropagation();
+      
+      if (!taskId || !userId) return;
+      
+      try {
+        // 如果已经有任务数据，直接使用，否则请求
+        let tagValues;
+        if (task && task.tag_values) {
+          tagValues = task.tag_values;
+        } else {
+          // 请求任务数据
+          const taskData = await dispatch(fetchTaskById(taskId)).unwrap();
+          tagValues = taskData.tag_values || {};
+        }
+        
+        // 获取当前assignee列表
+        const currentAssignees = Array.isArray(tagValues[assigneeTagId]) 
+          ? tagValues[assigneeTagId] 
+          : [];
+        
+        // 如果用户不在列表中，不需要移除
+        if (!currentAssignees.includes(userId)) {
+          return;
+        }
+        
+        // 移除指定的assignee
+        const updatedAssignees = currentAssignees.filter(id => id !== userId);
+        
+        // 更新任务
+        await dispatch(updateTask({
+          taskId: taskId,
+          taskData: {
+            tag_values: {
+              ...tagValues,
+              [assigneeTagId]: updatedAssignees
+            }
+          }
+        })).unwrap();
+        
+        // 使用防抖函数刷新
+        debouncedLoadData(true);
+      } catch (error) {
+        console.error('移除负责人失败:', error);
+      }
+    };
+    
+    // 返回删除按钮
+    return (
+      <button 
+        className="p-1 rounded-full hover:bg-red-100 hover:dark:bg-red-900 text-red-500"
+        onClick={handleRemoveAssignee}
+      >
+        <X size={14} />
+      </button>
+    );
+  };
+
+  // 显示多个负责人的组件
+  const MultipleAssignees = ({ assignees, taskId }) => {
+    const t = useTranslations('CreateTask');
+    const [open, setOpen] = useState(false);
+    
+    // 如果没有assignees，返回添加按钮
+    if (!assignees || assignees.length === 0) {
+      return (
+        <div className="flex items-center">
+          {/* <span className="text-xs text-gray-500 mr-1">{t('unassigned')}</span> */}
+          <AddAssignee taskId={taskId} />
+        </div>
+      );
+    }
+    
+    // 如果只有一个assignee，显示头像和删除按钮
+    if (assignees.length === 1) {
+      return (
+        <div className="flex items-center gap-1">
+          <UserAvatar userId={assignees[0]} />
+          <AddAssignee taskId={taskId} />
+        </div>
+      );
+    }
+    
+    // 如果有多个assignee，显示数字和弹出菜单
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+            <div className="flex -space-x-1">
+              {assignees.slice(0, 2).map((userId) => (
+                <UserAvatar key={userId} userId={userId} />
+              ))}
+              {assignees.length > 2 && (
+                <Avatar className="h-6 w-6 bg-gray-200 dark:bg-gray-700">
+                  <AvatarFallback>+{assignees.length - 2}</AvatarFallback>
+                </Avatar>
+              )}
+            </div>
+          </div>
+        </PopoverTrigger>
+        <PopoverContent className="w-60 p-2">
+          <h4 className="text-sm font-medium mb-2">{t('assignees')}</h4>
+          <div className="space-y-2">
+            {assignees.map((userId) => (
+              <div key={userId} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserAvatar userId={userId} />
+                </div>
+                <RemoveAssignee taskId={taskId} userId={userId} />
+              </div>
+            ))}
+            <div className="pt-2 border-t mt-2">
+              <AddAssignee taskId={taskId} />
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
   return (
     <div className="p-2">
+      {/* 添加加载指示器 */}
+      {isLoading && (
+        <div>
+        </div>
+      )}
+      
       {/* 显示错误消息 */}
       {error.type && (
         <div className="bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 p-2 mb-4 rounded-md">
           {error.message}
         </div>
       )}
-      <DragDropContext onDragEnd={onDragEnd}>
-        <Droppable droppableId="all-columns" direction="horizontal" type="column">
+      <MemoizedDragDropContext onDragEnd={onDragEnd}>
+        <MemoizedDroppable droppableId="all-columns" direction="horizontal" type="column">
           {(provided) => (
             <div 
               {...provided.droppableProps}
@@ -756,49 +1374,62 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                               )}
                                             </div>
                                             <div className="flex-shrink-0">
-                                              <button 
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleUpdateTask(task.id);
-                                                }}
-                                                className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black"
-                                              >
-                                                <Pen size={14} className="text-gray-500" />
-                                              </button>
+                                              {newTaskId !== task.id && (
+                                                <button 
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleUpdateTask(task.id);
+                                                  }}
+                                                  className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black"
+                                                >
+                                                  <Pen size={14} className="text-gray-500" />
+                                                </button>
+                                              )}
                                             </div>
                                           </div>
                                           
                                           {/* 底部栏 */}
                                           <div className="flex justify-between items-center mt-2">
                                             <div className="flex items-center">
-                                              <User size={14} className="text-gray-500 mr-1" />
+                                              {/* <User size={14} className="text-gray-500 mr-1" /> */}
                                               {/* 显示assignee信息 */}
                                               {task.assignee ? (
-                                                <div className="flex items-center">
-                                                  {/* 处理多个assignee的情况 */}
-                                                  {task.assignee.assignees ? (
-                                                    <span className="text-xs text-gray-500">
-                                                      {task.assignee.assignees.length} {t('assignees')}
-                                                    </span>
-                                                  ) : (
-                                                    <span className="text-xs text-gray-500">
-                                                      {task.assignee.assignee || t('assigned')}
-                                                    </span>
-                                                  )}
-                                                </div>
+                                                task.assignee.assignees ? (
+                                                  <MultipleAssignees 
+                                                    assignees={task.assignee.assignees} 
+                                                    taskId={task.id} 
+                                                  />
+                                                ) : (
+                                                  <div className="flex items-center gap-1">
+                                                    <UserAvatar userId={task.assignee.assignee} />
+                                                    <RemoveAssignee taskId={task.id} userId={task.assignee.assignee} />
+                                                    <AddAssignee taskId={task.id} />
+                                                  </div>
+                                                )
                                               ) : (
-                                                <span className="text-xs text-gray-500">{t('unassigned')}</span>
+                                                <div className="flex items-center">
+                                                  {/* <span className="text-xs text-gray-500 mr-1">{t('unassigned')}</span> */}
+                                                  <AddAssignee taskId={task.id} />
+                                                </div>
                                               )}
                                             </div>
                                             <div>
                                               <button 
                                                 onClick={(e) => {
                                                   e.stopPropagation();
-                                                  handleDeleteTask({columnId: column?.id, taskId: task.id});
+                                                  if (newTaskId === task.id) {
+                                                    cancelNewTask();
+                                                  } else {
+                                                    handleDeleteTask({columnId: column?.id, taskId: task.id});
+                                                  }
                                                 }}
                                                 className="invisible group-hover:visible p-1 rounded-md hover:bg-white hover:dark:bg-black"
                                               >
-                                                <Trash2 size={14} className="text-red-500" />
+                                                {newTaskId === task.id ? (
+                                                  <span className="text-red-500 text-xs">{t('cancel')}</span>
+                                                ) : (
+                                                  <Trash2 size={14} className="text-red-500" />
+                                                )}
                                               </button>
                                             </div>
                                           </div>
@@ -862,8 +1493,8 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
               {provided.placeholder}
             </div>
           )}
-        </Droppable>
-      </DragDropContext>
+        </MemoizedDroppable>
+      </MemoizedDragDropContext>
     </div>
   );
 }

@@ -89,11 +89,9 @@ export function useDndTools() {
     
     if (type === 'TASK') {
       // 任务拖拽逻辑（实际实现会涉及Redux和后端操作）
-      console.log('将任务从', source, '移动到', destination);
       // TODO: 实现任务拖拽后端保存逻辑
     } else if (type === 'SECTION') {
       // 部门拖拽逻辑
-      console.log('将部门从', source.index, '移动到', destination.index);
       // TODO: 实现部门拖拽后端保存逻辑
     }
   };

@@ -79,13 +79,12 @@ export default function ExpirationReminderModal() {
         
         // If it's been less than the reminder interval, don't show the modal
         if (timeSinceLastReminder < reminderInterval) {
-          console.log(`User was reminded recently (${Math.round(timeSinceLastReminder / (60 * 60 * 1000))} hours ago), skipping modal`);
           return;
         }
       }
       
       // Show the modal and update the last reminder timestamp
-      console.log('Showing subscription expiration reminder modal');
+      
       setOpen(true);
     }
   }, [subscriptionStatus]);
@@ -143,11 +142,11 @@ export default function ExpirationReminderModal() {
         show: () => setOpen(true),
         clearLastReminder: () => {
           localStorage.removeItem('subscription_reminder_timestamp');
-          console.log('Cleared last reminder timestamp');
+          
         },
         simulateExpiringSoon: () => {
           const fakeDaysRemaining = 3;
-          console.log(`Simulating subscription expiring in ${fakeDaysRemaining} days`);
+          
           
           // Override the getDaysRemaining function temporarily
           const originalGetDaysRemaining = getDaysRemaining;
@@ -159,12 +158,11 @@ export default function ExpirationReminderModal() {
           // Restore the original function after 1 minute
           setTimeout(() => {
             window.getDaysRemaining = originalGetDaysRemaining;
-            console.log('Restored original getDaysRemaining function');
+            
           }, 60000);
         }
       };
       
-      console.log('Expiration modal test helpers available. Use window.testExpirationModal.show() to test.');
     }
     
     // Cleanup

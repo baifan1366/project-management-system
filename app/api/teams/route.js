@@ -52,9 +52,7 @@ export async function GET(request) {
 // POST /api/teams - Create a new team
 export async function POST(request) {
   try {
-    const body = await request.json()
-    console.log('Received data:', body)
-    
+    const body = await request.json()    
     // 验证必需字段
     if (!body.name || !body.access || !body.project_id || !body.created_by) {
       return NextResponse.json(
@@ -135,7 +133,6 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json()
-    console.log(body)
     // 处理单个团队更新
     if (body.id) {
       const updateData = { ...body };

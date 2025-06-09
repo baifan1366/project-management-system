@@ -13,9 +13,7 @@ useEffect(() => {
     const missingRoleIds = roleIds.filter(roleId => 
       !agileRoles.some(role => role.id && roleId && role.id.toString() === roleId.toString())
     );
-    
-    console.log('需要获取详情的角色IDs:', missingRoleIds);
-    
+        
     // 为缺失的角色ID获取详细信息
     missingRoleIds.forEach(roleId => {
       if (roleId) {

@@ -25,7 +25,8 @@ export const WorkflowTools = () => {
     selectedTaskId, 
     setSelectedTaskId, 
     workflowData, 
-    setWorkflowData
+    setWorkflowData,
+    refreshWorkflow
   } = useContext(WorkflowContext);
   const t = useTranslations('CreateTask');
   const [nodes, setNodes] = useState([]);
@@ -36,7 +37,6 @@ export const WorkflowTools = () => {
     if (workflowData && workflowData.nodes && workflowData.nodes.length > 0) {
       setNodes(workflowData.nodes);
       setEdges(workflowData.edges || []);
-      console.log('工作流图形数据已更新:', workflowData);
     }
   }, [workflowData]);
 
@@ -76,7 +76,6 @@ export const WorkflowTools = () => {
       // 确保ID类型一致，如果任务ID存储为数字，则转换为数字类型
       const taskId = parseInt(node.data.id) || node.data.id;
       setSelectedTaskId(taskId);
-      console.log('选中任务ID:', taskId);
     },
     [setSelectedTaskId]
   );

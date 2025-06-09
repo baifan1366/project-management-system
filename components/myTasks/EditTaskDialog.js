@@ -51,16 +51,13 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
     const processTaskDates = () => {
       if (!task || !isOpen) return;
       
-      console.log("初始化日期字段:", {
-        expected_completion_date: task.expected_completion_date,
-        expected_start_time: task.expected_start_time
-      });
+      
       
       // 处理截止日期
       if (task.expected_completion_date) {
         try {
           const dateObj = adjustTimeByOffset(task.expected_completion_date);
-          console.log("调整后的截止日期:", dateObj);
+          
           setDueDate(dateObj);
           
           // Extract time from expected_completion_date
@@ -78,7 +75,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
       if (task.expected_start_time) {
         try {
           const dateObj = adjustTimeByOffset(task.expected_start_time);
-          console.log("调整后的开始日期:", dateObj);
+          
           setStartDate(dateObj);
           
           // Extract time from expected_start_time
@@ -100,7 +97,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
   // 调试用，查看任务对象
   useEffect(() => {
     if (task && isOpen) {
-      console.log("Task object in EditTaskDialog:", task);
+      
     }
   }, [task, isOpen]);
   
@@ -157,11 +154,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
         // Create UTC version of the selected time
         const startDateTimeUTC = new Date(startDateTime.toISOString());
         
-        console.log("Time validation:", {
-          now: now.toISOString(),
-          startDateTime: startDateTime.toISOString(),
-          isPast: startDateTimeUTC < nowUTC
-        });
+
         
         if (startDateTimeUTC < nowUTC) {
           // Use an existing translation key that likely exists
@@ -262,17 +255,10 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
       // The task should now have the correct ID format from the parent component
       const taskId = task.id;
       
-      console.log("Updating task with ID:", taskId);
-      console.log("Task original data:", task);
-      console.log("Date fields being saved:", { 
-        dueDateISO, 
-        startDateISO,
-        dueDate: dueDate ? dueDate.toString() : null,
-        startDate: startDate ? startDate.toString() : null,
-        dueTime,
-        startTime
-      });
-      console.log("Full update data:", updateData);
+      
+      
+
+      
       
       if (!taskId) {
         throw new Error(t('invalidTaskId'));

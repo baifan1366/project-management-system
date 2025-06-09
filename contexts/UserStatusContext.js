@@ -54,7 +54,7 @@ export function UserStatusProvider({ children }) {
         return;
       }
 
-      console.log('User data:', userData);
+      
 
       // Get user's active subscription - don't use single() to avoid 406 errors
       const { data: subscriptions, error: subscriptionError } = await supabase
@@ -85,11 +85,7 @@ export function UserStatusProvider({ children }) {
         return;
       }
 
-      console.log('Subscription query results:', {
-        userId,
-        subscriptions,
-        query: `SELECT * FROM user_subscription_plan WHERE user_id = '${userId}' AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1`
-      });
+      
 
       // Check if we have a subscription
       if (subscriptions && subscriptions.length > 0) {
@@ -269,14 +265,14 @@ export function UserStatusProvider({ children }) {
     if (!currentUser?.id) return false;
     
     try {
-      console.log(`Attempting to set auto-renewal to ${enabled} for user ${currentUser.id}`);
+      
       
       // First check if user has a payment method if enabling auto-renewal
       if (enabled) {
         const paymentMethodResponse = await fetch('/api/payment-methods');
         const paymentMethodData = await paymentMethodResponse.json();
         
-        console.log('Payment methods:', paymentMethodData);
+        
         
         if (!paymentMethodResponse.ok || !paymentMethodData.payment_methods || paymentMethodData.payment_methods.length === 0) {
           console.error('No payment methods available for auto-renewal');
@@ -294,11 +290,7 @@ export function UserStatusProvider({ children }) {
       });
       
       const responseText = await response.text();
-      console.log('Auto-renewal API response:', { 
-        status: response.status, 
-        ok: response.ok,
-        text: responseText 
-      });
+      
       
       // Parse the response as JSON (if it is JSON)
       let result;
@@ -334,7 +326,7 @@ export function UserStatusProvider({ children }) {
     sendHeartbeat();
     
     // 设置定时器，每100秒发送一次心跳
-    const intervalId = setInterval(sendHeartbeat, 100000);
+    const intervalId = setInterval(sendHeartbeat, 600000);
     
     // 页面可见性变化时更新
     const handleVisibilityChange = () => {

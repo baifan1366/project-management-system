@@ -1,5 +1,5 @@
 import createIntlMiddleware from 'next-intl/middleware';
-
+import { NextResponse } from 'next/server';
 
 // 创建国际化中间件
 const intlMiddleware = createIntlMiddleware({
@@ -9,7 +9,28 @@ const intlMiddleware = createIntlMiddleware({
 });
 
 export async function middleware(request) {
-    // 应用国际化中间件
+    // Handle API routes with authentication headers
+    if (request.nextUrl.pathname.startsWith('/api')) {
+        // Forward the auth token from cookies to Authorization header
+        const authToken = request.cookies.get('auth_token')?.value;
+        
+        // Clone the request headers
+        const requestHeaders = new Headers(request.headers);
+        
+        // Add Authorization header if token exists
+        if (authToken) {
+            requestHeaders.set('Authorization', `Bearer ${authToken}`);
+        }
+        
+        // Return response with modified headers
+        return NextResponse.next({
+            request: {
+                headers: requestHeaders,
+            },
+        });
+    }
+    
+    // For non-API routes, apply internationalization middleware
     return intlMiddleware(request);
 }
 

@@ -62,7 +62,6 @@ export default function PaymentPage() {
       return;
     }
 
-    console.log('Received parameters:', { planId });
     setLoading(false);
   }, [planId, router]);
 
@@ -100,13 +99,11 @@ export default function PaymentPage() {
       try {
         // 等待用户认证状态确定
         if (!isAuthenticated) {
-          console.log('User authentication state is being checked...');
           return;
         }
 
         // 如果用户未认证，重定向到登录页面
         if (isAuthenticated === false) {
-          console.log('User is not authenticated, redirecting to login...');
           router.push(`/${locale}/login?redirect=payment&plan_id=${planId}`);
           return;
         }
@@ -121,7 +118,6 @@ export default function PaymentPage() {
         if (error) {
           throw new Error('Failed to fetch plan details');
         }
-        console.log('Plan details:', data);
         setPlanDetails(data);
       } catch (err) {
         console.error('Error fetching plan details:', err);
@@ -141,15 +137,6 @@ export default function PaymentPage() {
           console.error('Missing required parameters');
           return;
         }
-
-        // Log the current values of all required parameters
-        console.log('Payment initialization parameters:', { 
-          planId, 
-          userId: user.id,
-          planPrice: planDetails?.price,
-          discount,
-          finalAmount: calculateFinalTotal()
-        });
         
         // Verify all required parameters are present
         if (!planId) {
@@ -189,7 +176,6 @@ export default function PaymentPage() {
           payment_method: 'card'
         };
 
-        console.log('Setting payment metadata:', paymentMetadata);
         dispatch(setPaymentMetadata(paymentMetadata));
 
         // 创建支付意向 - Make sure to use finalAmount
@@ -210,7 +196,6 @@ export default function PaymentPage() {
           }
         })).unwrap();
 
-        console.log('Payment intent created:', result);
         
         if (result.clientSecret) {
           setClientSecret(result.clientSecret);
@@ -243,6 +228,7 @@ export default function PaymentPage() {
   const options = {
     clientSecret,
     appearance,
+    locale: locale, // Use the actual locale from the URL parameters
   };
   
   // Callback function to receive the payment handler from CheckoutForm
@@ -260,7 +246,6 @@ export default function PaymentPage() {
 
     // Calculate the final total with any applied discounts
     const finalAmount = calculateFinalTotal();
-    console.log('Final amount for payment:', finalAmount);
     
     // Store the final total in Redux
     dispatch(setFinalTotal(finalAmount));
@@ -329,7 +314,6 @@ export default function PaymentPage() {
 
   const handleAlipayPayment = async () => {
     if (!planDetails || !planDetails.price || !planDetails.name || !user?.id) {
-      console.log('Missing required details for payment');
       toast.error('Missing payment details', {
         description: 'Please ensure all payment details are complete.'
       });
@@ -338,7 +322,6 @@ export default function PaymentPage() {
     
     // Calculate the final total with any applied discounts
     const finalAmount = calculateFinalTotal();
-    console.log('Final amount for Alipay payment:', finalAmount);
     
     // Store the final total in Redux
     dispatch(setFinalTotal(finalAmount));
@@ -351,14 +334,6 @@ export default function PaymentPage() {
     });
     
     try {
-      console.log('Sending Alipay payment request with data:', {
-        planName: planDetails.name,
-        price: planDetails.price,
-        finalAmount: finalAmount,
-        email: email,
-        userId: user.id,
-        planId: planId
-      });
       
       const response = await fetch('/api/create-alipay-session', {
         method: 'POST',
@@ -411,18 +386,15 @@ export default function PaymentPage() {
       }
       
       const data = await response.json();
-      console.log('Alipay session created:', data);
       
       if (data && data.url) {
         // Store the session ID in Redux if available
         if (data.sessionId) {
-          console.log('Storing session ID in Redux:', data.sessionId);
           dispatch(setSessionId(data.sessionId));
         } else {
           // Extract session ID from URL if not directly provided
           const sessionId = new URL(data.url).searchParams.get('session_id');
           if (sessionId) {
-            console.log('Extracted session ID from URL:', sessionId);
             dispatch(setSessionId(sessionId));
           }
         }
@@ -621,19 +593,12 @@ export default function PaymentPage() {
 
   // Update the button click handler to use the appropriate payment function
   const handlePaymentButtonClick = async () => {
-    // First, log the current state
-    console.log('Payment button clicked with method:', selectedPaymentMethod);
-    console.log('Current userId:', user?.id);
-    console.log('Current planId:', planId);
-    console.log('Current metadata:', metadata);
-    
+
     if (selectedPaymentMethod === 'card' && handleCardPayment) {
       // Use the Stripe card payment handler provided by CheckoutForm
-      console.log('Using card payment handler');
       await handleCardPayment();
     } else if (selectedPaymentMethod === 'alipay') {
       // Use the Alipay payment handler
-      console.log('Using Alipay payment handler');
       await handleAlipayPayment();
     } else {
       console.error('No valid payment method selected or handler available');
@@ -889,10 +854,7 @@ export default function PaymentPage() {
                           {clientSecret ? (
                             <Elements 
                               stripe={stripePromise} 
-                              options={{
-                                clientSecret,
-                                appearance,
-                              }}
+                              options={options}
                             >
                               <CheckoutForm onPaymentSubmit={onPaymentSubmit} />
                             </Elements>

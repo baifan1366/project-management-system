@@ -71,7 +71,6 @@ export default function CalendarPage() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (userLoading) {
-        console.log('User loading taking too long, proceeding anyway');
         setUserLoadTimeout(true);
       }
     }); // 3 seconds timeout
@@ -98,11 +97,9 @@ export default function CalendarPage() {
   useEffect(() => {
     async function checkGoogleConnection() {
       try {
-        console.log('Checking Google connection, userLoading:', userLoading, 'currentUser:', !!currentUser, 'timeout:', userLoadTimeout);
         
         // 使用自定义hook获取用户信息
         if (!currentUser) {
-          console.log('用户未登录 - skipping connection check');
           setIsGoogleConnected(false);
           setIsLoading(false); // 如果未登录，立即结束加载状态
           return;
@@ -110,7 +107,6 @@ export default function CalendarPage() {
         
         // 使用google_provider_id检查是否连接了Google，而不是provider字段
         if (currentUser?.google_provider_id) {
-          console.log('Detected Google provider ID, checking tokens...');
           // 从用户元数据中获取 tokens，而不是从 supabase session 中获取
           const response = await fetch('/api/users/tokens?provider=google');
           if (!response.ok) {
@@ -124,11 +120,9 @@ export default function CalendarPage() {
           const refreshToken = tokens.refresh_token;
           
           if (accessToken || refreshToken) {
-            console.log('Google令牌可用，连接已建立');
             
             // 尝试调用API验证令牌有效性
             try {
-              console.log('Validating token with calendar scope API...');
               const testResponse = await fetch(`/api/check-calendar-scope`, {
                 method: 'POST',
                 headers: {
@@ -142,19 +136,11 @@ export default function CalendarPage() {
               });
               
               const testData = await testResponse.json();
-              console.log('Calendar scope API response:', testData);
-              
-              // If token was refreshed, use the new one
-              if (testData.access_token && testData.access_token !== accessToken) {
-                console.log('Token was refreshed, using new token');
-              }
               
               // 更新连接状态
               if (testData.hasCalendarScope) {
-                console.log('成功验证Google日历访问权限');
                 setIsGoogleConnected(true);
               } else {
-                console.log('Google令牌有效但缺少日历权限');
                 toast.error(t('googleAuthExpired'), {
                   action: {
                     label: t('goToSettings'),
@@ -168,11 +154,9 @@ export default function CalendarPage() {
               setIsGoogleConnected(false);
             }
           } else {
-            console.log('尽管使用Google提供商，但没有可用的Google令牌');
             setIsGoogleConnected(false);
           }
         } else {
-          console.log('未使用Google连接，provider_id:', currentUser?.google_provider_id);
           setIsGoogleConnected(false);
         }
       } catch (error) {
@@ -190,14 +174,10 @@ export default function CalendarPage() {
     
     // Only run the check when user loading completes OR timeout occurs AND we have a user
     if ((!userLoading || userLoadTimeout) && currentUser) {
-      console.log('User available, running Google connection check');
       checkGoogleConnection();
     } else if ((!userLoading || userLoadTimeout) && !currentUser) {
-      console.log('User loading completed or timed out but no user found');
       setIsGoogleConnected(false);
       setIsLoading(false);
-    } else {
-      console.log('User still loading, deferring Google connection check');
     }
   }, [currentUser, userLoading, t, userLoadTimeout]);
 
@@ -236,7 +216,6 @@ export default function CalendarPage() {
         
         if (myTasksError) throw myTasksError;
         
-        console.log('原始 mytasks 数据:', userMyTasks);
         
         // 准备合并的任务列表
         let combinedTasks = [];
@@ -302,7 +281,6 @@ export default function CalendarPage() {
         // 合并所有任务
         combinedTasks = [...combinedTasks, ...standaloneTasks];
         
-        console.log('处理后的任务数据:', combinedTasks);
         setTasks(combinedTasks);
       } catch (error) {
         console.error('获取任务失败:', error);
@@ -376,10 +354,8 @@ export default function CalendarPage() {
 
   // 获取Google日历事件
   useEffect(() => {
-    console.log('Google events fetch effect triggered - isGoogleConnected:', isGoogleConnected);
     
     if (!isGoogleConnected) {
-      console.log('Google not connected, skipping calendar events fetch');
       if (isViewLoading) {
         setIsViewLoading(false);
       }
@@ -387,19 +363,16 @@ export default function CalendarPage() {
     }
     
     if (!currentUser && !userLoadTimeout) {
-      console.log('User not loaded yet, deferring Google calendar fetch');
       return;
     }
     
     async function fetchGoogleEvents() {
-      console.log('Starting Google events fetch');
       setIsLoadingGoogle(true);
       try {
         const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
         const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
         
         // 使用我们的自定义API端点获取Google令牌，而不是Supabase session
-        console.log('Fetching Google tokens');
         const tokensResponse = await fetch('/api/users/tokens?provider=google');
         if (!tokensResponse.ok) {
           console.error('获取Google令牌失败:', tokensResponse.status);
@@ -407,7 +380,6 @@ export default function CalendarPage() {
         }
         
         const tokens = await tokensResponse.json();
-        console.log('Received tokens:', { hasAccess: !!tokens.access_token, hasRefresh: !!tokens.refresh_token });
         const accessToken = tokens.access_token;
         const refreshToken = tokens.refresh_token;
         
@@ -417,7 +389,6 @@ export default function CalendarPage() {
         }
         
         // Add user_id for token refreshing
-        console.log('Fetching Google calendar events with user ID:', currentUser?.id);
         const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}&user_id=${currentUser?.id || ''}`);
         
         if (response.status === 401) {
@@ -439,7 +410,6 @@ export default function CalendarPage() {
         }
         
         const data = await response.json();
-        console.log('Received Google calendar data, event count:', data.items?.length);
         setGoogleEvents(data.items || []);
       } catch (error) {
         console.error('获取Google日历事件异常:', error);
@@ -1032,21 +1002,12 @@ export default function CalendarPage() {
 
   // Update WeekView component
   const handleUpdateComponentsForTasks = () => {
-    // Make sure both WeekView and DayView look for both due_date and expected_completion_date fields
-    
-    // 添加调试日志，检查收到的任务数据
-    console.log('Tasks before filtering:', tasks);
-    
+
     const filteredTasks = filters.tasks ? tasks.map(task => {
       // Ensure we have a date field for display on the calendar
       // We prioritize due_date and fall back to expected_completion_date
       if (!task.due_date && task.expected_completion_date) {
         task.due_date = task.expected_completion_date;
-        console.log(`Assigned expected_completion_date to due_date for task ${task.id}:`, task.due_date);
-      } else if (!task.due_date && !task.expected_completion_date) {
-        console.log(`No date found for task ${task.id} - no due_date or expected_completion_date`);
-      } else {
-        console.log(`Task ${task.id} already has due_date:`, task.due_date);
       }
       
       // Make sure all tasks have a title
@@ -1062,14 +1023,12 @@ export default function CalendarPage() {
           const date = parseISO(dueDate);
           // Set to beginning of the day, but preserve the date
           task.expected_start_time = format(set(date, { hours: 9, minutes: 0, seconds: 0 }), "yyyy-MM-dd'T'HH:mm:ss");
-          console.log(`Created default expected_start_time for task ${task.id}:`, task.expected_start_time);
         }
       }
       
       return task;
     }) : [];
     
-    console.log('Tasks after processing:', filteredTasks);
     return filteredTasks;
   };
 
@@ -1078,10 +1037,6 @@ export default function CalendarPage() {
     const monthStart = startOfMonth(currentDate);
     const startDate = startOfWeek(monthStart);
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    
-    // 添加调试日志
-    console.log('月视图渲染，总Google事件数:', filteredGoogleEvents?.length);
-    console.log('当前月份:', format(currentDate, 'yyyy-MM'));
 
     // 创建日历头部 (星期几)
     const calendarHeader = (
@@ -1184,9 +1139,7 @@ export default function CalendarPage() {
         newEnd,
         originalEvent: eventToUpdate
       };
-      
-      console.log('Updating event with data:', eventData);
-      
+            
       // 调用事件更新函数
       await handleEventUpdate(eventData);
       

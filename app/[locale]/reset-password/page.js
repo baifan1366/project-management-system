@@ -81,7 +81,7 @@ export default function ResetPasswordPage() {
       // Verify token with server
       const verifyToken = async () => {
         try {
-          console.log('Verifying reset password token with server...');
+          
           setVerifyingToken(true);
           const response = await fetch('/api/auth/verify/token', {
             method: 'POST',
@@ -92,17 +92,17 @@ export default function ResetPasswordPage() {
           });
           
           const data = await response.json();
-          console.log('Token verification response:', data);
+          
           
           if (response.ok && data.valid) {
-            console.log('Token validation successful');
+            
             setTokenValidated(true);
           } else {
             console.error('Token validation failed:', data.error);
             
             // Handle token expiration specifically
             if (data.error && (data.error.includes('expired') || data.error.includes('Expired'))) {
-              console.log('Token expired - attempting to refresh token...');
+              
               setRefreshingToken(true);
               
               // Try refreshing the token through our refresh endpoint
@@ -116,21 +116,21 @@ export default function ResetPasswordPage() {
                 });
                 
                 const refreshData = await refreshResponse.json();
-                console.log('Token refresh response:', refreshData);
+                
                 
                 if (refreshResponse.ok && refreshData.success) {
-                  console.log('Token refreshed successfully, new token received');
+                  
                   // Use the new token if provided
                   if (refreshData.token) {
                     // Redirect to reset page with new token
-                    console.log('Redirecting with new token...');
+                    
                     const currentPath = window.location.pathname;
                     const baseResetPath = currentPath.split('?')[0];
                     router.push(`${baseResetPath}?token=${refreshData.token}`);
                     return;
                   } else {
                     // If no new token but success is true, proceed with current token
-                    console.log('No new token but refresh successful, proceeding with current token');
+                    
                     setTokenValidated(true);
                     setRefreshingToken(false);
                     return;

@@ -36,7 +36,7 @@ export function RootLayoutClient({ children, locale, messages }) {
           });
           
           const result = await response.json();
-          console.log('Subscription test result:', result);
+          
           return result;
         } catch (error) {
           console.error('Error testing subscription expiration:', error);
@@ -44,11 +44,6 @@ export function RootLayoutClient({ children, locale, messages }) {
         }
       };
       
-      console.log('🧪 Developer utilities loaded');
-      console.log('Test subscription expiration:');
-      console.log('- window.testSubscriptionExpiration("expire", 0) - Set subscription to expire immediately');
-      console.log('- window.testSubscriptionExpiration("makeExpiringSoon") - Set subscription to expire in 5 days');
-      console.log('- window.testSubscriptionExpiration("resetToActive") - Reset subscription to active (30 days)');
     }
   }, []);
 

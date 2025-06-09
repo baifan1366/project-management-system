@@ -162,11 +162,9 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
       // If already fetched, return from cache
       if (userMap[userId]) return;
       
-      console.log(`获取用户信息: ${userId}`);
       const response = await api.users.getById(userId);
       
       if (response.success && response.data) {
-        console.log(`用户信息获取成功: ${userId}`, response.data);
         setUserMap(prev => ({
           ...prev,
           [userId]: response.data
@@ -533,12 +531,10 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   // 获取帖子评论数量
   const fetchPostCommentCount = async (postId) => {
     try {
-      console.log(`获取帖子(${postId})评论数量`);
       // 通过帖子ID获取评论
       const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
       // 计算获取到的评论总数
       const count = comments ? comments.length : 0;
-      console.log(`帖子(${postId})有 ${count} 条评论`);
       
       // 更新评论计数缓存
       setCommentCounts(prev => ({
@@ -586,9 +582,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           (!post.comments || post.comments.length > 0)
         );
         
-        if (postsWithoutCounts.length > 0) {
-          console.log(`获取 ${postsWithoutCounts.length} 个帖子的评论计数`);
-          
+        if (postsWithoutCounts.length > 0) {          
           // 并发获取评论计数，但限制并发数以避免过多请求
           const batchSize = 3;
           for (let i = 0; i < postsWithoutCounts.length; i += batchSize) {
@@ -609,9 +603,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
       try {
         // 如果评论还未加载，则加载评论
         if (!commentsMap[postId]) {
-          console.log('开始加载帖子评论:', postId);
           const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
-          console.log('获取到的评论:', comments);
           
           // 更新评论计数
           setCommentCounts(prev => ({
@@ -621,7 +613,6 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           
           // 获取评论中的用户信息
           if (comments && comments.length > 0) {
-            console.log(`加载 ${comments.length} 个评论的用户信息`);
             for (const comment of comments) {
               if (comment.user_id) {
                 // 确保异步加载不会阻塞UI
@@ -675,9 +666,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         text: newCommentText.trim(),
         user_id: user?.id // 确保传递用户ID
       };
-      
-      console.log("提交评论数据:", commentData);
-      
+            
       // 使用Redux action创建评论
       const result = await dispatch(createComment(commentData)).unwrap();
       
@@ -980,6 +969,212 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     );
     
   };
+  
+  // 渲染帖子编辑表单
+  const renderEditForm = (post) => (
+    <Card 
+      className="mb-4 mt-2 overflow-hidden border bg-background border-[#E1DFDD] dark:border-[#3B3A39] dark:text-white"
+    >
+      <div className="p-4">
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex items-center space-x-3 flex-grow">
+            <Avatar className="border-2">
+              <AvatarImage src={user?.avatar_url || "/placeholder-avatar.jpg"} />
+              <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white">
+                {user?.name?.substring(0, 2).toUpperCase() || 'UN'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0 w-full max-w-full">
+              <div className="grid gap-2">
+                <div className="">
+                  <div className="relative">
+                    <Input
+                      id="edit-title"
+                      autoFocus
+                      placeholder={t('postTitlePlaceholder')}
+                      value={editPostTitle}
+                      onChange={(e) => setEditPostTitle(e.target.value)}
+                      className="text-lg border-border border shadow-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[#252423] dark:text-white w-full focus:border-gray-500 dark:focus:border-white pr-16"
+                      maxLength={50}
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-[#605E5C] dark:text-[#C8C6C4]">
+                      <span className="font-medium">
+                        {editPostTitle.trim().length}/50
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2 ml-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+              onClick={() => handleDeletePost(post.id)}
+            >
+              <Trash2 className="h-4 w-4 text-red-500 hover:text-red-600" />
+            </Button>
+          </div>
+        </div>
+        
+        <div className="border-t pt-4 border-[#E1DFDD] dark:border-[#3B3A39]">
+          <div className="grid gap-4">
+            <div className="relative mb-6">
+              <RichEditor
+                placeholder={t('postDescriptionPlaceholder')}
+                value={editPostContent}
+                onChange={setEditPostContent}
+                className="h-[150px] min-h-[150px] max-h-[250px] overflow-y-auto text-[#252423] dark:text-white border-[#E1DFDD] dark:border-[#3B3A39]"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-between items-center pt-3 border-t border-[#E1DFDD] dark:border-[#3B3A39]">
+          <div className="flex items-center space-x-2">
+            <EmojiPicker 
+              onEmojiSelect={(emojiData) => setEditPostContent(prev => prev + emojiData.emoji)}
+              position="right"
+              offset={5}
+            />
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+            >
+              <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
+            </Button>
+          </div>
+          
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={cancelEditingPost}
+              className="rounded-md border-[#E1DFDD] text-[#252423] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:text-white dark:hover:bg-[#3B3A39]"
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              variant={themeColor}
+              size="sm"
+              onClick={saveEditedPost}
+              disabled={!isEditFormValid || isLoading}
+              className="rounded-md min-w-[80px]"
+            >
+              {isLoading ? 
+                t('saving')
+              : 
+                t('save')
+              }
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+  
+  // Render inline post editor
+  const renderInlineEditor = () => (
+    <Card 
+      ref={inlineEditorRef}
+      className="mb-4 mt-2 overflow-hidden border bg-background border-[#E1DFDD] dark:border-[#3B3A39] dark:text-white"
+    >
+      <div className="p-4">
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex items-center space-x-3 flex-grow">
+            <Avatar className="border-2">
+              <AvatarImage src={user?.avatar_url || "/placeholder-avatar.jpg"} />
+              <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white">
+                {user?.name?.substring(0, 2).toUpperCase() || 'UN'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0 w-full max-w-full">
+              <div className="grid gap-2">
+                <div className="">
+                  <div className="relative">
+                    <Input
+                      id="new-title"
+                      autoFocus
+                      placeholder={t('postTitlePlaceholder')}
+                      value={newPostTitle}
+                      onChange={(e) => setNewPostTitle(e.target.value)}
+                      className="text-lg border-border border shadow-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[#252423] dark:text-white w-full focus:border-gray-500 dark:focus:border-white pr-16"
+                      maxLength={50}
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-[#605E5C] dark:text-[#C8C6C4]">
+                      <span className="font-medium">
+                        {newPostTitle.trim().length}/50
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="border-t pt-4 border-[#E1DFDD] dark:border-[#3B3A39]">
+          <div className="grid gap-4">
+            <div className="relative mb-6">
+              <RichEditor
+                placeholder={t('postDescriptionPlaceholder')}
+                value={newPostContent}
+                onChange={setNewPostContent}
+                className="h-[150px] min-h-[150px] max-h-[250px] overflow-y-auto text-[#252423] dark:text-white border-[#E1DFDD] dark:border-[#3B3A39]"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-between items-center pt-3 border-t border-[#E1DFDD] dark:border-[#3B3A39]">
+          <div className="flex items-center space-x-2">
+            <EmojiPicker 
+              onEmojiSelect={(emojiData) => setNewPostContent(prev => prev + emojiData.emoji)}
+              position="right"
+              offset={5}
+            />
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+            >
+              <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
+            </Button>
+          </div>
+          
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInlineEditor(false)}
+              className="rounded-md border-[#E1DFDD] text-[#252423] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:text-white dark:hover:bg-[#3B3A39]"
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              variant={themeColor}
+              size="sm"
+              onClick={handleCreatePost}
+              disabled={!isFormValid || isLoading}
+              className="rounded-md min-w-[80px]"
+            >
+              {isLoading ? 
+                t('saving')
+              : 
+                t('post')
+              }
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
   
   // Render grid view of posts
   const renderGridView = () => (
@@ -1490,116 +1685,6 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
       setIsLoading(false);
     }
   };
-  
-  // Render inline post editor
-  const renderInlineEditor = () => (
-    <Card 
-      ref={inlineEditorRef}
-      className="mb-4 mt-2 overflow-hidden border bg-background border-[#E1DFDD] dark:border-[#3B3A39] dark:text-white"
-    >
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex items-center space-x-3 flex-grow">
-            <Avatar className="border-2">
-              <AvatarImage src={user?.avatar_url || "/placeholder-avatar.jpg"} />
-              <AvatarFallback style={{ backgroundColor: getColorHexCode(themeColor) }} className="text-white">
-                {user?.name?.substring(0, 2).toUpperCase() || 'UN'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0 w-full max-w-full">
-              <div className="grid gap-2">
-                <div className="">
-                  <div className="relative">
-                    <Input
-                      id="edit-title"
-                      autoFocus
-                      placeholder={t('postTitlePlaceholder')}
-                      value={editPostTitle}
-                      onChange={(e) => setEditPostTitle(e.target.value)}
-                      className="text-lg border-border border shadow-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[#252423] dark:text-white w-full focus:border-gray-500 dark:focus:border-white pr-16"
-                      maxLength={50}
-                    />
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-[#605E5C] dark:text-[#C8C6C4]">
-                      <span className="font-medium">
-                        {editPostTitle.trim().length}/50
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2 ml-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-              onClick={() => handleDeletePost(post.id)}
-            >
-              <Trash2 className="h-4 w-4 text-red-500 hover:text-red-600" />
-            </Button>
-          </div>
-        </div>
-        
-        <div className="border-t pt-4 border-[#E1DFDD] dark:border-[#3B3A39]">
-          <div className="grid gap-4">
-            <div className="relative mb-6">
-              <RichEditor
-                placeholder={t('postDescriptionPlaceholder')}
-                value={editPostContent}
-                onChange={setEditPostContent}
-                className="h-[150px] min-h-[150px] max-h-[250px] overflow-y-auto text-[#252423] dark:text-white border-[#E1DFDD] dark:border-[#3B3A39]"
-              />
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex justify-between items-center pt-3 border-t border-[#E1DFDD] dark:border-[#3B3A39]">
-          <div className="flex items-center space-x-2">
-            
-            <EmojiPicker 
-              onEmojiSelect={(emojiData) => setEditPostContent(prev => prev + emojiData.emoji)}
-              position="right"
-              offset={5}
-            />
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
-            >
-              <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
-            </Button>
-          </div>
-          
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={cancelEditingPost}
-              className="rounded-md border-[#E1DFDD] text-[#252423] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:text-white dark:hover:bg-[#3B3A39]"
-            >
-              {t('cancel')}
-            </Button>
-            <Button
-              variant={themeColor}
-              size="sm"
-              onClick={saveEditedPost}
-              disabled={!isEditFormValid || isLoading}
-              className="rounded-md min-w-[80px]"
-            >
-              {isLoading ? 
-                t('saving')
-              : 
-                t('save')
-              }
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
   
   // 添加离开编辑器的确认提示状态
   const handleConfirmLeave = () => {
