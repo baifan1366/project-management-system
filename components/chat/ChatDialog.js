@@ -563,7 +563,7 @@ export default function ChatDialog({
     // Example translation API call
     try {
       // This is a placeholder - you would use an actual translation service
-      const translatedText = await fetch('/api/translate', {
+      const translatedText = await fetch('/api/googleTranslate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: content, targetLang: 'en' }) // Default to English
