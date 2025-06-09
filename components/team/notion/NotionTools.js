@@ -42,7 +42,8 @@ export default function NotionTools({
   parentPage = null,
   onPageCreated,
   onPageUpdated,
-  selectedSectionId = null
+  selectedSectionId = null,
+  projectThemeColor
 }) {
   const t = useTranslations('Notion')
   const { user: currentUser } = useGetUser()
@@ -552,6 +553,8 @@ export default function NotionTools({
                 placeholder={t('pageTitlePlaceholder')}
                 className="col-span-3"
                 required
+                autoFocus
+                maxLength={50}
               />
             </div>
             
@@ -587,6 +590,7 @@ export default function NotionTools({
                 onChange={(e) => setContent(e.target.value)}
                 placeholder={t('contentPlaceholder')}
                 className="col-span-3 min-h-40"
+                maxLength={10000}
               />
             </div>
           </div>
@@ -600,7 +604,7 @@ export default function NotionTools({
             >
               {t('cancel')}
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} variant={projectThemeColor}>
               {isSubmitting ? (
                 <>
                   {editingPage ? t('updating') : t('creating')}

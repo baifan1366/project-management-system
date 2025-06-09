@@ -81,7 +81,8 @@ CREATE TABLE "team" (
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "star" BOOL DEFAULT FALSE,
   "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD')) DEFAULT 'PENDING',
-  "archive" BOOL DEFAULT FALSE
+  "archive" BOOL DEFAULT FALSE,
+  "label" JSONB DEFAULT '{"TAGS": [""], "MULTI-SELECT": [""], "SINGLE-SELECT": [""]}'
 );
 
 -- user and team relationship table (many-to-many)

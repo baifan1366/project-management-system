@@ -25,7 +25,8 @@ export const WorkflowTools = () => {
     selectedTaskId, 
     setSelectedTaskId, 
     workflowData, 
-    setWorkflowData
+    setWorkflowData,
+    refreshWorkflow
   } = useContext(WorkflowContext);
   const t = useTranslations('CreateTask');
   const [nodes, setNodes] = useState([]);

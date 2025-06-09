@@ -193,7 +193,16 @@ export default function TaskNotion({ projectId, teamId }) {
   const [selectedSectionId, setSelectedSectionId] = useState(null)
   const [isCreateSectionOpen, setIsCreateSectionOpen] = useState(false)
   const [isFavoritesExpanded, setIsFavoritesExpanded] = useState(true)
+  const [projectThemeColor, setProjectThemeColor] = useState('#ffffff');
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
   
+  useEffect(() => {
+    if (project?.theme_color) {
+      setProjectThemeColor(project.theme_color);
+    }
+  }, [project]);
   // Fetch team details
   useEffect(() => {
     async function fetchTeamDetails() {
@@ -1191,6 +1200,7 @@ export default function TaskNotion({ projectId, teamId }) {
             <Button 
               className="w-full mt-2"
               onClick={() => setIsCreatePageOpen(true)}
+              variant={projectThemeColor}
             >
               <Plus className="h-4 w-4 mr-2" />
               {t('createPage')}
@@ -1468,7 +1478,7 @@ export default function TaskNotion({ projectId, teamId }) {
             <FileText className="h-16 w-16 text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">{t('noPageSelected')}</h2>
             <p className="text-muted-foreground mb-4">{t('selectPageFromSidebar')}</p>
-            <Button onClick={() => setIsCreatePageOpen(true)}>
+            <Button onClick={() => setIsCreatePageOpen(true)} variant={projectThemeColor}>
               <Plus className="h-4 w-4 mr-2" />
               {t('createFirstPage')}
             </Button>
@@ -1484,6 +1494,7 @@ export default function TaskNotion({ projectId, teamId }) {
         parentPage={selectedPage}
         onPageCreated={handlePageCreated}
         selectedSectionId={selectedSectionId}
+        projectThemeColor={projectThemeColor}
       />
       
       <NotionTools
@@ -1493,6 +1504,7 @@ export default function TaskNotion({ projectId, teamId }) {
         editingPage={selectedPage}
         onPageUpdated={handlePageUpdated}
         selectedSectionId={selectedSectionId}
+        projectThemeColor={projectThemeColor}
       />
       
       {/* Create Section dialog */}
