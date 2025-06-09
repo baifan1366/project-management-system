@@ -35,7 +35,6 @@ export async function GET(request) {
         // 返回用户创建的任务
         // 注意：由于JSONB查询复杂性，我们暂时只返回用户创建的任务
         // 在前端我们可以使用过滤器来处理assignee_id
-        console.log(`成功获取用户创建的任务，找到 ${createdTasks.length} 个任务`);
         return NextResponse.json(createdTasks);
     } catch (error) {
         console.error('处理获取用户任务请求时出错:', error);

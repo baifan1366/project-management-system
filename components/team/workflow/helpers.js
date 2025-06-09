@@ -43,7 +43,6 @@ export function parseSingleSelectValue(value) {
         }
       }
     } catch (e) {
-      console.log('解析状态JSON时出错:', e);
       // 解析失败，尝试作为普通字符串处理
     }
     

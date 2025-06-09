@@ -357,17 +357,12 @@ const SprintPlanning = ({
         return null;
       }
       
-      console.log('有效的日期对象:', dateObj);
       const durationInDays = parseInt(duration) * 7; // 将周转换为天数
-      console.log('持续天数:', durationInDays);
       
       dateObj.setDate(dateObj.getDate() + durationInDays);
-      console.log('计算后的结束日期:', dateObj);
-      console.log('=== calculateEndDate 调试结束 ===');
       return dateObj;
     } catch (e) {
       console.error('计算结束日期时出错:', e);
-      console.log('=== calculateEndDate 调试结束(出错) ===');
       return null;
     }
   };
@@ -801,45 +796,33 @@ const SprintPlanning = ({
 
     // 调试日期格式
     if (selectedSprint.startDate) {
-      console.log('--- 日期调试信息 ---');
-      console.log('Sprint ID:', selectedSprint.id);
-      console.log('原始开始日期:', selectedSprint.startDate);
-      console.log('开始日期类型:', typeof selectedSprint.startDate);
       
       // 检查开始日期格式
       let formattedStartDate = selectedSprint.startDate;
       if (typeof selectedSprint.startDate === 'string') {
         if (selectedSprint.startDate.includes(' ')) {
           formattedStartDate = selectedSprint.startDate.split(' ')[0];
-          console.log('空格日期格式，处理后:', formattedStartDate);
-        } else if (selectedSprint.startDate.includes('T')) {
+        } 
+        if (selectedSprint.startDate.includes('T')) {
           formattedStartDate = selectedSprint.startDate.split('T')[0];
-          console.log('ISO日期格式，处理后:', formattedStartDate);
-        } else {
-          console.log('其他字符串格式，保持原样:', formattedStartDate);
         }
       }
       
       // 打印结束日期信息
       if (selectedSprint.endDate) {
-        console.log('原始结束日期:', selectedSprint.endDate);
-        console.log('结束日期类型:', typeof selectedSprint.endDate);
         
         let formattedEndDate = selectedSprint.endDate;
         if (typeof selectedSprint.endDate === 'string') {
           if (selectedSprint.endDate.includes(' ')) {
             formattedEndDate = selectedSprint.endDate.split(' ')[0];
-            console.log('空格结束日期格式，处理后:', formattedEndDate);
-          } else if (selectedSprint.endDate.includes('T')) {
+          } 
+          if (selectedSprint.endDate.includes('T')) {
             formattedEndDate = selectedSprint.endDate.split('T')[0];
-            console.log('ISO结束日期格式，处理后:', formattedEndDate);
-          } else {
-            console.log('其他字符串格式结束日期，保持原样:', formattedEndDate);
-          }
+          } 
         }
+        
       }
       
-      console.log('--- 日期调试信息结束 ---');
     }
 
     // 根据所选冲刺状态和类型显示不同组件
@@ -1029,7 +1012,6 @@ const SprintPlanning = ({
                   {(() => {
                     // 获取日期字段，兼容start_date和startDate两种命名
                     const dateValue = selectedSprint.startDate || selectedSprint.start_date;
-                    console.log('开始日期字段:', dateValue);
                     
                     if (!dateValue) return "-";
                     
@@ -1040,12 +1022,10 @@ const SprintPlanning = ({
                       // 如果包含空格，取前面部分
                       if (dateValue.includes(' ')) {
                         formattedDate = dateValue.split(' ')[0];
-                        console.log('渲染：含空格的日期，处理为:', formattedDate);
                       }
                       // 如果包含T，取前面部分
                       else if (dateValue.includes('T')) {
                         formattedDate = dateValue.split('T')[0];
-                        console.log('渲染：ISO格式的日期，处理为:', formattedDate);
                       }
                     }
                     

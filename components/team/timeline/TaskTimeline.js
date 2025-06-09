@@ -185,9 +185,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
       }));
 
       // 检查action状态
-      if (createTaskLink.fulfilled.match(resultAction)) {
-        console.log("任务链接创建成功", resultAction.payload);
-        
+      if (createTaskLink.fulfilled.match(resultAction)) {        
         // 刷新甘特图数据
         setRefreshFlag(prev => prev + 1);
         
@@ -215,9 +213,7 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
       const resultAction = await dispatch(deleteTaskLink({ user_id, linkId }));
       
       // 检查action状态
-      if (deleteTaskLink.fulfilled.match(resultAction)) {
-        console.log("任务链接删除成功", resultAction.payload);
-        
+      if (deleteTaskLink.fulfilled.match(resultAction)) {        
         // 刷新甘特图数据
         setRefreshFlag(prev => prev + 1);
         
@@ -256,7 +252,6 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
       // 触发数据刷新
       setRefreshFlag(prev => prev + 1);
       
-      console.log('task', task);
     } catch (error) {
       console.error("Error adding task:", error);
       alert("添加任务时出错，请检查日期格式");
@@ -559,15 +554,12 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
       
       if (mode == gantt.config.drag_mode.resize) {
         // 调整了任务持续时间
-        console.log("任务持续时间已更新:", updatedTask.duration);
       } 
       else if (mode == gantt.config.drag_mode.move) {
         // 移动了任务（更改了开始日期）
-        console.log("任务开始日期已更新:", updatedTask.start_date);
       }
       else if (mode == gantt.config.drag_mode.progress) {
         // 调整了任务进度
-        console.log("任务进度已更新:", updatedTask.progress);
       }
       
       // 创建与 EditTaskDialog 相同格式的任务数据
@@ -659,8 +651,6 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
           previousTaskData
         }
       })).unwrap();
-
-      console.log("任务已成功更新到数据库");
       
       // 确保数据库更新后刷新甘特图
       gantt.refreshData();

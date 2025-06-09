@@ -44,12 +44,10 @@ export async function POST(request) {
     const { searchParams } = new URL(request.url)
     const teamId = searchParams.get('teamId')
     const body = await request.json()
-    console.log('接收到的请求体:', body);
     
     const { customFieldId, order_index, created_by } = body
 
     if (!teamId || !customFieldId) {
-      console.log('缺少必需参数:', { teamId, customFieldId });
       return NextResponse.json({ error: '缺少必需参数' }, { status: 400 })
     }
     const { data, error } = await supabase
@@ -68,7 +66,6 @@ export async function POST(request) {
       throw error;
     }
 
-    console.log('创建成功，返回数据:', data);
     return NextResponse.json({ data })
   } catch (error) {
     console.error('创建团队自定义字段失败:', error)

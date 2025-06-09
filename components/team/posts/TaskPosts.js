@@ -162,11 +162,9 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
       // If already fetched, return from cache
       if (userMap[userId]) return;
       
-      console.log(`获取用户信息: ${userId}`);
       const response = await api.users.getById(userId);
       
       if (response.success && response.data) {
-        console.log(`用户信息获取成功: ${userId}`, response.data);
         setUserMap(prev => ({
           ...prev,
           [userId]: response.data
@@ -533,12 +531,10 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   // 获取帖子评论数量
   const fetchPostCommentCount = async (postId) => {
     try {
-      console.log(`获取帖子(${postId})评论数量`);
       // 通过帖子ID获取评论
       const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
       // 计算获取到的评论总数
       const count = comments ? comments.length : 0;
-      console.log(`帖子(${postId})有 ${count} 条评论`);
       
       // 更新评论计数缓存
       setCommentCounts(prev => ({
@@ -586,9 +582,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           (!post.comments || post.comments.length > 0)
         );
         
-        if (postsWithoutCounts.length > 0) {
-          console.log(`获取 ${postsWithoutCounts.length} 个帖子的评论计数`);
-          
+        if (postsWithoutCounts.length > 0) {          
           // 并发获取评论计数，但限制并发数以避免过多请求
           const batchSize = 3;
           for (let i = 0; i < postsWithoutCounts.length; i += batchSize) {
@@ -609,9 +603,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
       try {
         // 如果评论还未加载，则加载评论
         if (!commentsMap[postId]) {
-          console.log('开始加载帖子评论:', postId);
           const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
-          console.log('获取到的评论:', comments);
           
           // 更新评论计数
           setCommentCounts(prev => ({
@@ -621,7 +613,6 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           
           // 获取评论中的用户信息
           if (comments && comments.length > 0) {
-            console.log(`加载 ${comments.length} 个评论的用户信息`);
             for (const comment of comments) {
               if (comment.user_id) {
                 // 确保异步加载不会阻塞UI
@@ -675,9 +666,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         text: newCommentText.trim(),
         user_id: user?.id // 确保传递用户ID
       };
-      
-      console.log("提交评论数据:", commentData);
-      
+            
       // 使用Redux action创建评论
       const result = await dispatch(createComment(commentData)).unwrap();
       

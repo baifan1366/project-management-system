@@ -749,6 +749,7 @@
     "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
   },
   "CreateTask": {
+    "upgrade_plan_required": "Upgrade plan required",
     "noUsers": "No users",
     "sectionNameRequired": "Section Name required.",
     "taskNameRequired": "Task Name must contain at least 2 characters and not more than 50 characters.",
@@ -1347,6 +1348,13 @@
     "tag": "Tag"
   },
   "Calendar": {
+    "cannotCreateTaskInPast": "Cannot create task in the past",
+    "errorRefreshingCalendar": "Error refreshing calendar",	
+    "noTitle": "No Title",
+    "allDay": "All Day",
+    "schedule": "Schedule",
+    "notasks": "No Tasks",
+    "newTask": "New Task",
     "calendar": "Calendar",
     "month": "Month",
     "week": "Week",
@@ -2018,6 +2026,14 @@
     "cancelGenerationDesc": "Are you sure you want to cancel the content generation?"
   },
   "TeamOverview": {
+    "updateSuccess": "Announcement updated successfully",
+    "updateFailed": "Announcement update failed",
+    "announcementPinned": "Announcement pinned successfully",
+    "announcementUnpinned": "Announcement unpinned successfully",
+    "announcementPinError": "Announcement pin error",
+    "announcementDeleted": "Announcement deleted successfully",
+    "announcementDeleteError": "Announcement delete error",
+    "loadingError": "Loading error",
     "noTeamMemberFound": "No team members found",
     "OWNER": "Owner",
     "CAN_EDIT": "Editor",

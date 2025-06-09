@@ -159,7 +159,6 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
       setLoading(true);
       setError(null);
       
-      console.log("projectData", projectData);
       // 使用传入的项目数据
       if (projectData) {
         const themeColor = projectData[0].theme_color || '';
@@ -210,19 +209,16 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
   const fetchTeams = async () => {
     try {
       const teamsData = await api.teams.listByProject(projectId);
-      console.log('获取到的团队数据:', teamsData);
       setTeams(teamsData);
       
       // 获取每个团队的成员
       const teamMembersObj = {};
       for (const team of teamsData) {
-        console.log('处理团队:', team.id, team.name);
         const teamUsers = await api.teams.getTeamUsers(team.id);
         // 确保团队ID作为键时使用字符串类型
         teamMembersObj[String(team.id)] = teamUsers;
       }
       
-      console.log('团队成员对象:', teamMembersObj);
       setTeamMembers(teamMembersObj);
       processAllMembers(teamMembersObj);
       setLoading(false);
@@ -237,10 +233,7 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
     const userMap = new Map();
     
     // 遍历所有团队和团队成员
-    Object.entries(teamMembersObj).forEach(([teamId, members]) => {
-      console.log('teams', teams);
-      console.log('teamId from teamMembersObj', teamId, 'type:', typeof teamId);
-      
+    Object.entries(teamMembersObj).forEach(([teamId, members]) => {      
       // 确保类型一致进行比较（将两者都转换为字符串）
       const team = teams.find(t => String(t.id) === String(teamId));
       const teamName = team ? team.name : `团队 ${teamId}`;
@@ -337,9 +330,7 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
       
       // 调用API更新项目信息
       const updatedProject = await api.projects.update(projectId, dataToSave);
-      
-      console.log("项目更新成功:", updatedProject);
-      
+            
       // 如果有设置项目数据的函数，更新父组件状态
       if (setProjectData && updatedProject) {
         // 使用原始的项目数据结构，只更新修改过的字段

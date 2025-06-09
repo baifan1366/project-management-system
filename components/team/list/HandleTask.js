@@ -295,9 +295,7 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
         })
         .select()
         .single();
-      
-      console.log(notionPageData);
-      
+            
       //update the notion_page id into the task table, page_id column
       if (notionPageData && notionPageData.id) {
         const { data: newTaskData, error: taskError } = await supabase
@@ -309,8 +307,6 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
           
         if (taskError) {
           console.error('更新任务页面ID失败:', taskError);
-        } else {
-          console.log('任务页面ID已更新:', newTaskData);
         }
       }
       

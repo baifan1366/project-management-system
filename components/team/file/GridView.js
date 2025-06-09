@@ -63,7 +63,6 @@ export default function GridView({
   
   // 处理拖拽开始
   const handleDragStart = (e, file) => {
-    console.log('Drag started', file.id, file.name)
     e.dataTransfer.setData('application/json', JSON.stringify({
       id: file.id,
       name: file.name,
@@ -114,7 +113,6 @@ export default function GridView({
       
       try {
         const data = JSON.parse(e.dataTransfer.getData('application/json'))
-        console.log('Drop received', data, 'onto folder', file.name)
         
         if (data && data.id) {
           if (onDrop) onDrop(data, file)

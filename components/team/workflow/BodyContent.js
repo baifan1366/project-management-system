@@ -425,7 +425,6 @@ export default function BodyContent() {
             (workflowData && workflowData.nodes && workflowData.nodes.length === 0);
           
           if (shouldRefetch) {
-            console.log('BodyContent - 强制重新获取任务数据');
             // 重置请求缓存状态
             requestCache.sections[teamId] = false;
             localRequestTracker.current.sectionsFetched = false;
@@ -445,7 +444,6 @@ export default function BodyContent() {
             
             const allTasksData = tasksResults.flat();
             setAllTasks(allTasksData);
-            console.log('获取的原始任务数据:', allTasksData);
           }
         } catch (error) {
           console.error("获取工作流数据时出错:", error);
@@ -483,14 +481,7 @@ export default function BodyContent() {
           setStatusTagId(statusTag);
           setDueDateTagId(dueDateTag);
           setAssigneeTagId(assigneeTag);
-          
-          console.log('标签IDs已加载:', {
-            nameTag,
-            descriptionTag,
-            statusTag,
-            dueDateTag,
-            assigneeTag
-          });
+
         } catch (error) {
           console.error('获取标签ID失败:', error);
         }
@@ -626,7 +617,6 @@ export default function BodyContent() {
       if (allTasks.length > 0 && tags.length > 0) {
         const taskList = allTasks.map(task => extractTaskInfo(task));
         setProcessedTasks(taskList);
-        console.log('处理后的任务数据:', taskList);
         
         // 更新工作流数据，为工作流工具提供实际的任务数据
         updateWorkflowData(taskList);
@@ -639,9 +629,7 @@ export default function BodyContent() {
     }, [allTasks, tags, selectedTaskId, setSelectedTaskId, setWorkflowData]);
     
     // 监听selectedTaskId的变化
-    useEffect(() => {
-      console.log('BodyContent - 选中的任务ID已更新:', selectedTaskId);
-      
+    useEffect(() => {      
       // 如果选中了任务，确保视图滚动到该任务
       if (selectedTaskId) {
         const taskElement = document.getElementById(`task-${selectedTaskId}`);
@@ -1036,7 +1024,6 @@ export default function BodyContent() {
                             onClick={() => {
                                 // 直接使用selectedTask，它是完整的任务对象
                                 if (selectedTask && selectedTask.id) {
-                                    console.log('删除任务ID:', selectedTask.id);
                                     handleCancelEdit(); // 先关闭编辑表单
                                     handleDeleteTask(selectedTask); 
                                 } else {
@@ -1401,9 +1388,7 @@ export default function BodyContent() {
     };
 
     // 处理删除任务
-    const handleDeleteTask = (task) => {
-        console.log('handleDeleteTask被调用，传入的任务对象:', task);
-        
+    const handleDeleteTask = (task) => {        
         // 检查任务对象是否有效
         if (!task) {
             console.error('删除任务失败: 任务对象为空');
@@ -1419,7 +1404,6 @@ export default function BodyContent() {
         }
         
         const taskId = task.id; // 保存任务ID以确保一致性
-        console.log('任务ID有效，将显示确认对话框，任务ID:', taskId);
         
         confirm({
             title: t('deleteTaskTitle'),
@@ -1428,7 +1412,6 @@ export default function BodyContent() {
             onConfirm: async () => {
                 try {
                     setLoading(true);
-                    console.log('用户确认删除，开始删除任务，任务ID:', taskId);
                     
                     // 获取任务所在的部分
                     const sectionsData = await dispatch(getSectionByTeamId(teamId)).unwrap();
@@ -1447,7 +1430,6 @@ export default function BodyContent() {
                             sectionId: sectionWithTask.id,
                             userId // 添加用户ID到参数中
                         };
-                        console.log('调用deleteTask，参数:', deleteParams);
                         
                         // 删除任务
                         await dispatch(deleteTask(deleteParams)).unwrap();
@@ -1486,7 +1468,6 @@ export default function BodyContent() {
                             teamId,
                             userId // 添加用户ID到参数中
                         };
-                        console.log('找不到部分，仍调用deleteTask，参数:', deleteParams);
                         
                         // 删除任务
                         await dispatch(deleteTask(deleteParams)).unwrap();

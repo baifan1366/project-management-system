@@ -6,9 +6,7 @@ export async function POST(request) {
   try {
     // 获取请求数据
     const memberData = await request.json();
-    
-    console.log('【API接收参数】分配角色:', memberData);
-    
+      
     // 验证数据
     if (!memberData.user_id) {
       console.error('【API错误】用户ID不能为空');
@@ -60,7 +58,6 @@ export async function POST(request) {
         throw updateError;
       }
       
-      console.log('【API响应】成员角色更新成功:', updatedMember);
       result = updatedMember;
     } else {
       // 插入新记录
@@ -75,7 +72,6 @@ export async function POST(request) {
         throw insertError;
       }
       
-      console.log('【API响应】角色分配成功:', newMember);
       result = newMember;
     }
     

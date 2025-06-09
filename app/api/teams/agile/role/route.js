@@ -6,9 +6,7 @@ export async function POST(request) {
   try {
     // 获取请求数据
     const roleData = await request.json();
-    
-    console.log('【API接收参数】创建角色:', roleData);
-    
+        
     // 验证数据
     if (!roleData.team_id) {
       console.error('【API错误】团队ID不能为空');
@@ -42,9 +40,7 @@ export async function POST(request) {
       console.error('【API错误】创建角色失败:', error);
       throw error;
     }
-    
-    console.log('【API响应】角色创建成功:', newRole);
-    
+        
     return NextResponse.json(newRole);
   } catch (error) {
     console.error('【API错误】处理请求时出错:', error);

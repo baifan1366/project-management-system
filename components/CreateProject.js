@@ -66,7 +66,6 @@ export default function CreateProjectDialog({ open, onOpenChange }) {
         if (user?.id) {
           const limitInfo = await getSubscriptionLimit(user.id, 'create_project');
           setSubscriptionInfo(limitInfo);
-          console.log('订阅信息:', limitInfo);
           
           // 检查是否已达到限制
           if (!limitInfo.allowed) {

@@ -7,9 +7,7 @@ export async function PATCH(request, { params }) {
     const sprintId = params.sprintId;
     // 获取请求数据
     const { content } = await request.json();
-    
-    console.log('【API接收参数】添加待改进:', { sprintId, content });
-    
+        
     // 验证数据
     if (!sprintId) {
       console.error('【API错误】冲刺ID不能为空');
@@ -49,9 +47,7 @@ export async function PATCH(request, { params }) {
       console.error(`【API错误】更新冲刺ID ${sprintId} 失败:`, updateError);
       throw updateError;
     }
-    
-    console.log(`【API响应】冲刺ID ${sprintId} 已添加待改进:`, updatedSprint);
-    
+        
     return NextResponse.json(updatedSprint);
   } catch (error) {
     console.error('【API错误】处理请求时出错:', error);

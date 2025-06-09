@@ -12,6 +12,7 @@ import { updateInvitationStatus } from '@/lib/redux/features/teamUserInvSlice';
 import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { handleInvitationAccepted } from '@/components/team/TeamGuard';
 
 export default function TeamInvitation() {
   const t = useTranslations('TeamInvitation');
@@ -37,7 +38,6 @@ export default function TeamInvitation() {
         }
 
         if (!user) {
-          console.log("用户未登录，重定向到登录页面");
           const currentPath = window.location.pathname;
           
           // 使用不带locale前缀的路径，因为登录页面会自动添加locale
@@ -46,7 +46,6 @@ export default function TeamInvitation() {
           const searchParams = new URLSearchParams();
           searchParams.append('redirect', redirectPath);
           
-          console.log(`重定向到登录页面，参数: ${searchParams.toString()}`);
           router.push(`/${params.locale}/login?${searchParams.toString()}`);
           return;
         }
@@ -181,8 +180,19 @@ export default function TeamInvitation() {
         invitationId: invitationInfo.id,
         status: 'ACCEPTED'
       })).unwrap();
+      
+      // handleInvitationAccepted
+      // 6. 处理邀请接受后的其他团队权限变更
+      const invitationData = {
+        ...currentInvitation,
+        status: 'ACCEPTED',
+        project_id: teamData.project_id
+      };
+      
+      await handleInvitationAccepted(invitationData, invitationInfo.userId);
 
-      // 6. 重定向到项目页面
+
+      // 7. 重定向到项目页面
       router.push(`/${params.locale}/projects/${teamData.project_id}`);
     } catch (error) {
       // console.error('Failed to accept invitation:', error);

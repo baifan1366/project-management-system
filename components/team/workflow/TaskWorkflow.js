@@ -16,9 +16,7 @@ export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey}) 
     const [editableTask, setEditableTask] = useState(null);
 
     // 添加一个新的 useEffect 来响应 refreshKey 变化
-    useEffect(() => {
-        console.log('TaskWorkflow - refreshKey 变化，重新加载数据:', refreshKey);
-        
+    useEffect(() => {        
         // 重置工作流数据，以便 BodyContent 组件重新获取任务数据
         setWorkflowData({
             nodes: [],
@@ -30,20 +28,13 @@ export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey}) 
         setEditableTask(null);
     }, [refreshKey]);
 
-    // 监听selectedTaskId的变化并记录日志
-    useEffect(() => {
-        console.log('TaskWorkflow - 选中任务ID已更新:', selectedTaskId);
-    }, [selectedTaskId]);
-
     // 创建一个包装函数来设置选中的任务ID
     const handleSetSelectedTaskId = useCallback((taskId) => {
-        console.log('设置新的选中任务ID:', taskId);
         setSelectedTaskId(taskId);
     }, []);
 
     // 处理任务编辑
     const handleTaskEdit = useCallback((task) => {
-        console.log('准备编辑任务:', task);
         setEditableTask(task);
         setSelectedTaskId(task.id);
     }, []);
@@ -51,9 +42,7 @@ export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey}) 
     // 处理任务更新后刷新工作流
     const handleWorkflowRefresh = useCallback((updatedTasks) => {
         if (!updatedTasks || updatedTasks.length === 0) return;
-        
-        console.log('刷新工作流数据:', updatedTasks);
-        
+                
         // 更新工作流中的节点数据
         const updatedNodes = workflowData.nodes.map(node => {
             const matchingTask = updatedTasks.find(task => 

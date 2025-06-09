@@ -26,31 +26,24 @@ export default function MembersRole({ teamId }) {
             try {
                 setLoading(true);
                 setError(null);
-                
-                console.log(`开始获取团队成员，teamId: ${teamId}`);
-                
+                                
                 // 获取团队成员及其角色
                 const teamUsers = await dispatch(fetchTeamUsers(teamId)).unwrap();
-                console.log('获取到的团队用户数据:', teamUsers);
                 
                 // 兼容不同返回结构 - 修正数据结构处理
                 const teamUsersArr = teamUsers?.users || 
                                     (Array.isArray(teamUsers) ? teamUsers : 
                                     teamUsers?.data || []);
-                console.log(`处理后的团队用户数组，长度: ${teamUsersArr.length}`, teamUsersArr);
                 
                 if (teamUsersArr.length === 0) {
-                    console.log('警告: 团队用户数组为空');
                 }
                 
                 // 并行获取每个成员的详细信息
                 const users = await Promise.all(
                     teamUsersArr.map(async (tu) => {
-                        console.log(`开始获取用户信息，userId:`, tu);
                         try {
                             // 根据返回数据结构调整获取用户ID的方式
                             const userId = tu.user_id || tu.user?.id || tu.id;
-                            console.log(`处理后的用户ID: ${userId}`);
                             
                             if (!userId) {
                                 console.error('无法获取用户ID:', tu);
@@ -58,7 +51,6 @@ export default function MembersRole({ teamId }) {
                             }
                             
                             const user = await dispatch(fetchUserById(userId)).unwrap();
-                            console.log(`获取到用户信息，userId: ${userId}`, user);
                             return {
                                 ...user,
                                 role: tu.role,
@@ -78,7 +70,6 @@ export default function MembersRole({ teamId }) {
                 // 过滤掉null值
                 const validUsers = users.filter(user => user !== null);
                 
-                console.log('所有团队成员信息获取完成:', validUsers);
                 setMembers(validUsers);
             } catch (err) {
                 console.error("获取团队成员失败:", err);

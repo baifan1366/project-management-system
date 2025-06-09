@@ -441,9 +441,7 @@ export function renderPeopleCell(userIdStr, taskId, teamId, editable = true) {
   const t = useTranslations('Team');
   const dispatch = useDispatch();
   const [userIds, setUserIds] = useState(parseUserIds(userIdStr));
-  
-  console.log("renderPeopleCell调用:", { userIdStr, taskId, teamId, userIds });
-  
+    
   // 添加useEffect监听userIdStr变化
   useEffect(() => {
     setUserIds(parseUserIds(userIdStr));
@@ -579,9 +577,7 @@ export function EditablePeopleCell({ value, taskId, teamId, editable = true }) {
   const dispatch = useDispatch();
   const [userIds, setUserIds] = useState(parseUserIds(value));
   const [open, setOpen] = useState(false);
-  
-  console.log("EditablePeopleCell调用:", { value, taskId, teamId, userIds });
-  
+    
   // 添加useEffect监听value变化
   useEffect(() => {
     setUserIds(parseUserIds(value));
@@ -589,7 +585,6 @@ export function EditablePeopleCell({ value, taskId, teamId, editable = true }) {
   
   // 处理添加用户后的操作
   const handleUserAdded = (userId) => {
-    console.log("用户已添加:", userId);
     // 刷新任务数据并更新本地状态
     refreshTaskData();
     setOpen(false);
@@ -597,7 +592,6 @@ export function EditablePeopleCell({ value, taskId, teamId, editable = true }) {
   
   // 处理移除用户后的操作
   const handleUserRemoved = (userId) => {
-    console.log("用户已移除:", userId);
     // 刷新任务数据并更新本地状态
     refreshTaskData();
   };
@@ -607,7 +601,6 @@ export function EditablePeopleCell({ value, taskId, teamId, editable = true }) {
     try {
       // 获取最新的任务信息
       const taskResult = await dispatch(fetchTaskById(taskId)).unwrap();
-      console.log("刷新后的任务数据:", taskResult);
       
       // 获取最新的负责人列表
       const tagValues = taskResult.tag_values || {};
@@ -886,23 +879,17 @@ function RemoveUserFromAssignee({ taskId, userIdToRemove, onRemoved }) {
   // 处理用户移除操作
   const handleRemoveUser = async () => {
     if (!taskId || !userIdToRemove) {
-      console.log("Missing taskId or userIdToRemove:", { taskId, userIdToRemove });
       return;
     }
     
-    try {
-      console.log("开始移除负责人:", userIdToRemove, "从任务:", taskId);
-      
+    try {      
       // 获取当前任务信息
       const taskResult = await dispatch(fetchTaskById(taskId)).unwrap();
-      console.log("获取到任务:", taskResult);
       
       // 获取当前负责人列表
       const tagValues = taskResult.tag_values || {};
       const currentAssignees = tagValues[assigneeTagId] || [];
-      
-      console.log("当前负责人:", currentAssignees);
-      
+            
       // 如果没有找到assignee标签值或者不是数组，则不执行操作
       if (!Array.isArray(currentAssignees)) {
         console.error('负责人数据格式错误', currentAssignees);
@@ -911,7 +898,6 @@ function RemoveUserFromAssignee({ taskId, userIdToRemove, onRemoved }) {
       
       // 移除指定用户ID
       const updatedAssignees = currentAssignees.filter(userId => userId !== userIdToRemove);
-      console.log("更新后负责人:", updatedAssignees);
       
       // 获取当前所有 tag_values
       const allTagValues = taskResult.tag_values || {};
@@ -923,16 +909,13 @@ function RemoveUserFromAssignee({ taskId, userIdToRemove, onRemoved }) {
       };
       
       // 更新任务
-      console.log("更新任务，完整 tag_values:", updatedTagValues);
       const updatedTask = await dispatch(updateTask({
         taskId: taskId, 
         taskData: {
           tag_values: updatedTagValues
         }
       })).unwrap();
-      
-      console.log('成功移除负责人, 响应:', updatedTask);
-      
+            
       // 如果提供了回调函数，则调用
       if (typeof onRemoved === 'function') {
         onRemoved(userIdToRemove);
@@ -997,8 +980,6 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
   const [error, setError] = useState(null);
   const [lastFetchedTeamId, setLastFetchedTeamId] = useState(null);
   
-  console.log("AddUserToAssignee rendered with:", { teamId, taskId }); // 调试日志
-
   // 使用useEffect进行防抖获取
   useEffect(() => {
     if (!teamId || !taskId) return;
@@ -1016,7 +997,6 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
         const cachedData = teamMembersCache.get(cacheKey);
         
         if (cachedData && (Date.now() - cachedData.timestamp < CACHE_TIME)) {
-          console.log("使用缓存的团队数据:", cachedData.users.length);
           setTeamMembers(cachedData.users);
           setLastFetchedTeamId(teamId);
           
@@ -1026,7 +1006,6 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
         }
         
         // 没有缓存或缓存过期，获取新数据
-        console.log("开始获取团队成员数据");
         const teamResponse = await dispatch(fetchTeamUsers(teamId)).unwrap();
         
         // 处理响应数据
@@ -1091,13 +1070,10 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
   // 处理添加负责人操作
   const handleAddUserToAssignee = async (userId) => {
     if (!userId || !taskId) {
-      console.log("Missing userId or taskId in add operation:", { userId, taskId });
       return;
     }
     
-    try {
-      console.log("开始添加负责人:", userId);
-      
+    try {      
       // 先获取最新的任务信息，确保有最新的tag_values
       const taskResponse = await dispatch(fetchTaskById(taskId)).unwrap();
       const currentTagValues = taskResponse?.tag_values || {};
@@ -1115,7 +1091,6 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
       };
       
       // 更新任务
-      console.log("更新任务, 完整tag_values:", updatedTagValues);
       const result = await dispatch(updateTask({
         taskId: taskId, 
         taskData: {
@@ -1123,7 +1098,6 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
         }
       })).unwrap();
       
-      console.log("添加负责人成功, 响应:", result);
       
       // 更新本地状态
       setAssignedMembers(updatedAssignees);
@@ -1210,14 +1184,11 @@ export function AssigneeManager({ teamId, taskId }) {
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
   const assigneeTagId = 2; // 负责人标签ID
-  
-  console.log("AssigneeManager初始化:", { teamId, taskId });
-  
+    
   // 加载当前任务负责人
   useEffect(() => {
     const loadAssignees = async () => {
       if (!taskId) {
-        console.log("没有taskId，无法加载负责人");
         setIsLoading(false);
         return;
       }
@@ -1225,11 +1196,9 @@ export function AssigneeManager({ teamId, taskId }) {
       setIsLoading(true);
       
       try {
-        console.log("开始获取任务:", taskId);
         // 获取任务信息
         const taskAction = await dispatch(fetchTaskById(taskId));
         const taskData = taskAction.payload || {};
-        console.log("获取到任务数据:", taskData);
         
         // 获取任务中的负责人ID列表
         const tagValues = taskData.tag_values || {};
@@ -1237,7 +1206,6 @@ export function AssigneeManager({ teamId, taskId }) {
         
         // 确保assigneeValues是数组
         const assigneeArray = Array.isArray(assigneeValues) ? assigneeValues : [];
-        console.log("设置负责人列表:", assigneeArray);
         setAssignees(assigneeArray);
       } catch (error) {
         console.error('加载负责人失败:', error);
@@ -3167,7 +3135,7 @@ export function validateTextInput(value, options = {}) {
  * @returns {JSX.Element} 渲染的文本单元格组件
  */
 export function renderTextCell(value, onChange, options = {}) {
-  const { multiline = false, placeholder = '输入文本...' } = options;
+  const { multiline = false, placeholder = 'Please enter...' } = options;
   
   return (
     <div className="w-full">
@@ -3178,6 +3146,7 @@ export function renderTextCell(value, onChange, options = {}) {
           placeholder={placeholder}
           className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded p-1 text-sm"
           rows={2}
+          max={100}
         />
       ) : (
         <input
@@ -3186,6 +3155,7 @@ export function renderTextCell(value, onChange, options = {}) {
           onChange={(e) => onChange && onChange(e.target.value)}
           placeholder={placeholder}
           className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded p-1 text-sm"
+          max={50}
         />
       )}
     </div>

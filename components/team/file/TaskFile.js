@@ -58,7 +58,6 @@ const FileItem = ({ file, handleSelectFile, selectedFiles, openFileMenu, navigat
 
   // 处理拖拽开始
   const handleDragStart = (e) => {
-    console.log('Drag started', file.id, file.name);
     e.dataTransfer.setData('application/json', JSON.stringify({
       id: file.id,
       name: file.name,
@@ -108,9 +107,7 @@ const FileItem = ({ file, handleSelectFile, selectedFiles, openFileMenu, navigat
       e.currentTarget.classList.remove('border-2', 'border-dashed', 'border-green-500');
       
       try {
-        const data = JSON.parse(e.dataTransfer.getData('application/json'));
-        console.log('Drop received', data, 'onto folder', file.name);
-        
+        const data = JSON.parse(e.dataTransfer.getData('application/json'));        
         if (data && data.id) {
           if (onDrop) onDrop(data, file);
         }
@@ -495,7 +492,6 @@ export default function TaskFile({ taskId, teamId }) {
   // Handle drag start
   const handleDragStart = (file) => {
     setDraggedItem(file);
-    console.log('Drag started for file:', file.name);
   };
 
   // Handle drag over
@@ -510,11 +506,8 @@ export default function TaskFile({ taskId, teamId }) {
 
   // Handle drop
   const handleDrop = (droppedFile, targetFolder) => {
-    console.log(`Dropping ${droppedFile.name} into ${targetFolder.name}`);
-    
     // Avoid dropping onto self
     if (droppedFile.id === targetFolder.id) {
-      console.log('Cannot drop onto self');
       return;
     }
     
@@ -538,8 +531,6 @@ export default function TaskFile({ taskId, teamId }) {
   const moveFileToFolder = async (file, targetFolder) => {
     try {
       const targetPath = targetFolder.path;
-      console.log(`Moving ${file.name} to folder ${targetFolder.name} (path: ${targetPath})`);
-
       if (file.type === 'folder') {
         // Get folder ID
         const folderId = file.id.toString().replace('folder_', '');
@@ -649,7 +640,6 @@ export default function TaskFile({ taskId, teamId }) {
       if (sections && sections.length > 0) {
         // Use first section
         sectionId = sections[0].id
-        console.log('使用现有section:', sectionId)
       } else {
         // Create new section
         try {
@@ -661,16 +651,12 @@ export default function TaskFile({ taskId, teamId }) {
                 createdBy: userId
             }
           }));
-          
-          // 检查newSection返回值
-          console.log('创建的新section:', newSection)
-          
+                    
           if (!newSection || !newSection.id) {
             throw new Error('创建section后未返回有效ID')
           }
           
           sectionId = newSection.id
-          console.log('新创建的sectionId:', sectionId)
         } catch (error) {
           console.error('创建section失败:', error)
           throw new Error(`创建section失败: ${error.message}`)
@@ -706,7 +692,6 @@ export default function TaskFile({ taskId, teamId }) {
         }
         
         const sectionDetails = await api.teams.teamSection.getSectionById(teamId, sectionId)
-        console.log('获取到的section详情:', sectionDetails)
         
         if (!sectionDetails) {
           throw new Error('无法获取section详情')

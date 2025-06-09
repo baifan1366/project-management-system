@@ -65,7 +65,6 @@ const batchUserLoader = {
   processBatch(dispatch) {
     const batch = Array.from(this.queue).slice(0, this.maxBatchSize);
     if (batch.length > 0) {
-      console.log(`批量加载${batch.length}个用户数据:`, batch);
       
       // 如果有批量API可以在这里调用批量加载API，这里模拟单个加载
       batch.forEach(userId => {
@@ -126,22 +125,11 @@ function preloadTaskUsers(tasks, columns, dispatch) {
   userIds.forEach(userId => {
     batchUserLoader.add(userId, dispatch);
   });
-  
-  console.log(`预加载了${userIds.size}个用户数据`);
 }
 
 // DragDropContext修改为使用React.memo减少重渲染
 const MemoizedDragDropContext = React.memo(DragDropContext);
 const MemoizedDroppable = React.memo(Droppable);
-
-// 添加一个帮助函数来打印Redux状态
-const logReduxState = (state, teamId) => {
-  console.log('Redux 团队用户状态:', {
-    allTeamUserState: state.teamUsers,
-    teamIdData: state.teamUsers?.teamUsers?.[teamId],
-    status: state.teamUsers?.status
-  });
-};
 
 export default function TaskKanban({ projectId, teamId, teamCFId }) {
   const t = useTranslations('CreateTask');
@@ -153,7 +141,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     teamId, 
     // 添加刷新回调
     onSectionChange: () => {
-      console.log('分区变更，重新加载数据...');
       // 强制重新加载看板数据
       loadData(true);
     } 
@@ -232,7 +219,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
       // 标记为已初始化
       if (!isInitialized.current) {
         isInitialized.current = true;
-        console.log('看板数据初始化完成');
       }
     }
   }, [initialTasks, initialColumns, initialColumnOrder, dispatch]);
@@ -240,7 +226,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
   // 记录当前使用的assignee标签ID，用于调试
   useEffect(() => {
     if (assigneeTagId) {
-      console.log('正在使用的assignee标签ID:', assigneeTagId);
     }
   }, [assigneeTagId]);
   
@@ -285,7 +270,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
           userId: user.id
         })).unwrap();
         
-        console.log('分区顺序更新成功:', sectionIds);
       } catch (error) {
         console.error('更新分区顺序失败:', error);
         // 如果发生错误，延迟刷新看板恢复状态，避免UI阻塞
@@ -322,7 +306,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
         newTaskIds: newTaskIds
       })).unwrap();
       
-      console.log('同列拖拽：更新任务顺序成功', newTaskIds);
       return;
     }
 
@@ -356,9 +339,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
         teamId: teamId,
         newTaskIds: sourceTaskIds
       })).unwrap();
-      
-      console.log('源列任务顺序已更新:', sourceTaskIds);
-      
+            
       // 2. 更新目标列的任务顺序
       const destSectionId = destColumn.originalId || destColumn.id;
       await dispatch(updateTaskOrder({
@@ -415,7 +396,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     // 获取任务对象
     const task = tasks[taskId];
     if (!task) {
-      console.error('任务不存在:', taskId);
       return;
     }
     
@@ -742,25 +722,12 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     const [isLoading, setIsLoading] = useState(!cachedUser);
     const [hasError, setHasError] = useState(false);
     
-    // 添加调试日志
-    useEffect(() => {
-      if (userId) {
-        console.log(`UserAvatar - userId: ${userId}`, { 
-          cachedUser, 
-          hasData: !!user, 
-          avatarUrl: user?.avatar_url,
-          isLoading
-        });
-      }
-    }, [userId, cachedUser, user, isLoading]);
-    
     // 使用userIdRef跟踪用户ID变化
     const userIdRef = useRef(userId);
     
     useEffect(() => {
       // 如果已经有缓存的用户数据，直接使用
       if (cachedUser) {
-        console.log(`UserAvatar - 使用缓存的用户数据: ${userId}`, cachedUser);
         setUser(cachedUser);
         setIsLoading(false);
         return;
@@ -776,9 +743,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
       
       // 防止重复请求和无效请求
       if (hasError || pendingRequests[userId]) return;
-      
-      console.log('UserAvatar: 尝试加载用户数据:', userId);
-      
+            
       // 轻量化处理，使用批量加载器而不是直接触发API请求
       batchUserLoader.add(userId, dispatch);
       
@@ -868,15 +833,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     const [isLoading, setIsLoading] = useState(false);
     const [requestSent, setRequestSent] = useState(false);
     
-    // 调试输出
-    useEffect(() => {
-      if (open) {
-        console.log('添加负责人组件 - teamId:', teamId);
-        console.log('添加负责人组件 - teamMembers:', teamMembers);
-        console.log('添加负责人组件 - 加载状态:', teamUsersStatus);
-      }
-    }, [open, teamId, teamMembers, teamUsersStatus]);
-    
     // 加载团队成员
     useEffect(() => {
       const loadTeamMembers = async () => {
@@ -890,7 +846,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
         
         setIsLoading(true);
         try {
-          console.log(`加载团队(${teamId})成员数据`);
           await dispatch(fetchTeamUsers(teamId)).unwrap();
           setRequestSent(true);
         } catch (error) {
@@ -1047,16 +1002,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                 const isAssigned = assignedUsers.includes(member.user_id);
                 // 从member获取user数据，API返回的结构可能有嵌套的user对象
                 const userData = member.user || member;
-                
-                // 详细记录成员数据结构，方便调试
-                console.log('团队成员数据:', {
-                  member,
-                  userData,
-                  user_id: member.user_id || member.id,
-                  user: member.user,
-                  avatar_url: userData.avatar_url,
-                  name: userData.name
-                });
                 
                 const userId = member.user_id || member.id;
                 const userName = userData.name || userId;

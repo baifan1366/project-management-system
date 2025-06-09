@@ -91,10 +91,7 @@ const SprintList = ({ teamId, onViewDetails }) => {
       ...sprintData,
       created_by: userId
     };
-    
-    // 调试日志
-    console.log('提交冲刺数据:', sprintDataWithCreator);
-    
+        
     dispatch(createSprint(sprintDataWithCreator))
       .unwrap()
       .then(() => {

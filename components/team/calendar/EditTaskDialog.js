@@ -63,7 +63,6 @@ export default function EditTaskDialog({
           date = new Date(task.startDate);
         }
         
-        console.log('解析开始日期:', task.startDate, '结果:', date);
         if (!isNaN(date.getTime())) return date;
       } catch (e) {
         console.error('无效的开始日期:', e, task.startDate);
@@ -86,7 +85,6 @@ export default function EditTaskDialog({
           date = new Date(task.dueDate);
         }
         
-        console.log('解析截止日期:', task.dueDate, '结果:', date);
         if (!isNaN(date.getTime())) return date;
       } catch (e) {
         console.error('无效的截止日期:', e, task.dueDate);
