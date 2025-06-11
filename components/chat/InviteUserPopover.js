@@ -152,13 +152,13 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
       setIsConfirmDialogOpen(true);
       
       // Show confirmation dialog for external users
-      confirm({
-        title: t('externalUserConfirmTitle') || 'Add External User',
-        description: t('externalUserConfirmDescription', { name: user.name }) || `${user.name} is not a member of any of your teams. Are you sure you want to invite this external user?`,
-        confirmText: t('confirm') || 'Confirm',
-        cancelText: t('cancel') || 'Cancel',
-        preventClose: true,
-        onConfirm: () => {
+      // confirm({
+      //   title: t('externalUserConfirmTitle') || 'Add External User',
+      //   description: t('externalUserConfirmDescription', { name: user.name }) || `${user.name} is not a member of any of your teams. Are you sure you want to invite this external user?`,
+      //   confirmText: t('confirm') || 'Confirm',
+      //   cancelText: t('cancel') || 'Cancel',
+      //   preventClose: true,
+      //   onConfirm: () => {
           setSelectedUsers(prev => {
             // First check if the user is already in the array (extra safety check)
             if (prev.find(u => u.id === user.id)) {
@@ -167,14 +167,14 @@ export default function InviteUserPopover({ sessionId, onInvite, inDropdown = fa
             // Add the user
             return [...prev, user];
           });
-          // Reset confirmation dialog state
-          setIsConfirmDialogOpen(false);
-        },
-        onCancel: () => {
-          // Reset confirmation dialog state
-          setIsConfirmDialogOpen(false);
-        }
-      });
+      //     // Reset confirmation dialog state
+      //     setIsConfirmDialogOpen(false);
+      //   },
+      //   onCancel: () => {
+      //     // Reset confirmation dialog state
+      //     setIsConfirmDialogOpen(false);
+      //   }
+      // });
     } else {
       // For internal users, add without confirmation
       setSelectedUsers(prev => {
