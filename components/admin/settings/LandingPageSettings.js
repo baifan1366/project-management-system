@@ -36,16 +36,13 @@ export default function LandingPageSettings() {
   });
   const [dragActive, setDragActive] = useState(false);
   
-  // 用于未保存更改提醒的状态
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [navigateUrl, setNavigateUrl] = useState('');
   
-  // 自动检测未保存更改并提醒用户
   const [lastSaveTime, setLastSaveTime] = useState(Date.now());
   const [showSaveReminder, setShowSaveReminder] = useState(false);
   const [showFullScreenReminder, setShowFullScreenReminder] = useState(false);
   
-  // 跟踪已删除但尚未保存的元素
   const [deletedItems, setDeletedItems] = useState({
     features: [],
     solutionCards: []
@@ -502,7 +499,6 @@ export default function LandingPageSettings() {
   };
 
   const removeFeature = (index) => {
-    // 不直接删除，而是标记为已删除
     handleDeleteFeature(index);
     toast.success(`Feature ${index + 1} has been marked for deletion. Save changes to confirm.`);
   };
@@ -561,31 +557,24 @@ export default function LandingPageSettings() {
     );
   }, [unsavedChanges, originalData, deletedItems, promoBannerSection]);
 
-  // 删除功能
   const handleDeleteFeature = (index) => {
-    // 不直接删除，而是标记为已删除
     setDeletedItems(prev => ({
       ...prev,
       features: [...prev.features, index]
     }));
     
-    // 标记为有未保存的更改
     setHasUnsavedChanges(true);
   };
 
-  // 删除解决方案卡片
   const handleDeleteSolutionCard = (index) => {
-    // 不直接删除，而是标记为已删除
     setDeletedItems(prev => ({
       ...prev,
       solutionCards: [...prev.solutionCards, index]
     }));
     
-    // 标记为有未保存的更改
     setHasUnsavedChanges(true);
   };
 
-  // 恢复已删除的功能
   const handleRestoreFeature = (index) => {
     setDeletedItems(prev => ({
       ...prev,
@@ -593,7 +582,6 @@ export default function LandingPageSettings() {
     }));
   };
 
-  // 恢复已删除的解决方案卡片
   const handleRestoreSolutionCard = (index) => {
     setDeletedItems(prev => ({
       ...prev,
@@ -601,7 +589,6 @@ export default function LandingPageSettings() {
     }));
   };
 
-  // 修改原始的handleSave函数，在内部添加更新最后保存时间的逻辑
   const handleSave = async () => {
     try {
       setLoading(true);
@@ -666,7 +653,7 @@ export default function LandingPageSettings() {
       const featureContents = [];
       
       if (featuresSection.features && Array.isArray(featuresSection.features)) {
-        // 过滤掉已删除的功能
+
         const activeFeatures = featuresSection.features.filter((_, index) => 
           !deletedItems.features.includes(index)
         );
@@ -729,7 +716,6 @@ export default function LandingPageSettings() {
       
       // Add card contents
       if (solutionsSection.cards && Array.isArray(solutionsSection.cards)) {
-        // 过滤掉已删除的卡片
         const activeCards = solutionsSection.cards.filter((_, index) => 
           !deletedItems.solutionCards.includes(index)
         );
@@ -780,7 +766,6 @@ export default function LandingPageSettings() {
       
       toast.success("Landing page settings saved successfully");
       
-      // 更新原始数据，清除已删除项标记
       const updatedFeatures = featuresSection.features.filter((_, index) => 
         !deletedItems.features.includes(index)
       );
@@ -789,7 +774,6 @@ export default function LandingPageSettings() {
         !deletedItems.solutionCards.includes(index)
       );
       
-      // 更新状态
       setFeaturesSection(prev => ({ ...prev, features: updatedFeatures }));
       setSolutionsSection(prev => ({ ...prev, cards: updatedCards }));
       
@@ -814,16 +798,11 @@ export default function LandingPageSettings() {
         promoBanner: false
       });
       
-      // 清空已删除项列表
       setDeletedItems({
         features: [],
         solutionCards: []
       });
-      
-      // 更新最后保存时间
       setLastSaveTime(Date.now());
-      
-      // 如果有待导航的URL，保存后导航到该URL
       if (navigateUrl) {
         window.location.href = navigateUrl;
       }
@@ -924,28 +903,22 @@ export default function LandingPageSettings() {
     }
   };
 
-  // 添加页面离开提醒
   useEffect(() => {
-    // 处理浏览器的beforeunload事件
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges) {
         e.preventDefault();
-        // 大多数现代浏览器不再允许自定义消息
-        e.returnValue = "您有未保存的更改，确定要离开吗？";
+        e.returnValue = "You have unsaved changes, are you sure you want to leave?";
         return e.returnValue;
       }
     };
 
-    // 添加事件监听器
     window.addEventListener('beforeunload', handleBeforeUnload);
     
-    // 清理函数
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [hasUnsavedChanges]);
   
-  // 处理确认离开
   const handleConfirmNavigation = () => {
     setShowUnsavedModal(false);
     if (navigateUrl) {
@@ -953,42 +926,37 @@ export default function LandingPageSettings() {
     }
   };
 
-  // 处理取消离开
   const handleCancelNavigation = () => {
     setShowUnsavedModal(false);
     setNavigateUrl('');
   };
 
-  // 处理链接点击
   const handleLinkClick = (e) => {
-    // 如果有未保存的更改，阻止默认行为并显示模态框
     if (hasUnsavedChanges) {
       const target = e.target.closest('a');
       if (target && target.href) {
         e.preventDefault();
-        e.stopPropagation(); // 阻止事件冒泡
+        e.stopPropagation();
         setNavigateUrl(target.href);
         setShowUnsavedModal(true);
       }
     }
   };
 
-  // 添加链接点击监听
   useEffect(() => {
-    // 无论是否有未保存更改，都添加事件监听器
-    document.addEventListener('click', handleLinkClick, true); // 使用捕获阶段
+
+    document.addEventListener('click', handleLinkClick, true);
     
     return () => {
       document.removeEventListener('click', handleLinkClick, true);
     };
   }, [hasUnsavedChanges]);
 
-  // 添加键盘快捷键监听（例如Ctrl+S）
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // 检测Ctrl+S或Cmd+S
+
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault(); // 阻止默认的保存行为
+        e.preventDefault(); 
         if (hasUnsavedChanges) {
           handleSave();
         }
@@ -1039,44 +1007,12 @@ export default function LandingPageSettings() {
       window.removeEventListener('popstate', handlePopState);
     };
   }, [hasUnsavedChanges]);
-
-  // 定期检查是否有未保存更改，如果有则显示提醒
-  useEffect(() => {
-    let reminderTimer;
-    let fullScreenReminderTimer;
-    
-    if (hasUnsavedChanges) {
-      // 如果有未保存的更改，每3分钟提醒一次
-      reminderTimer = setInterval(() => {
-        const minutesSinceLastSave = Math.floor((Date.now() - lastSaveTime) / (1000 * 60));
-        if (minutesSinceLastSave >= 3) {
-          setShowSaveReminder(true);
-          // 显示5秒后自动隐藏
-          setTimeout(() => setShowSaveReminder(false), 5000);
-        }
-      }, 180000); // 3分钟
-      
-      // 如果有未保存的更改，每10分钟显示一次全屏提醒
-      fullScreenReminderTimer = setInterval(() => {
-        const minutesSinceLastSave = Math.floor((Date.now() - lastSaveTime) / (1000 * 60));
-        if (minutesSinceLastSave >= 10) {
-          setShowFullScreenReminder(true);
-        }
-      }, 600000); // 10分钟
-    }
-    
-    return () => {
-      if (reminderTimer) clearInterval(reminderTimer);
-      if (fullScreenReminderTimer) clearInterval(fullScreenReminderTimer);
-    };
-  }, [hasUnsavedChanges, lastSaveTime]);
   
-  // 关闭全屏提醒
+
   const closeFullScreenReminder = () => {
     setShowFullScreenReminder(false);
   };
   
-  // 保存并关闭全屏提醒
   const saveAndCloseReminder = async () => {
     await handleSave();
     setShowFullScreenReminder(false);
@@ -1324,7 +1260,6 @@ export default function LandingPageSettings() {
                     borderStyle: 'solid'
                   }}
                 >
-                  {/* 删除状态指示器 */}
                   {deletedItems.features.includes(index) && (
                     <div className="absolute inset-0 bg-red-900 bg-opacity-20 flex items-center justify-center z-10 rounded-lg">
                       <div className="bg-red-800 text-white px-4 py-2 rounded-md flex items-center gap-2">
@@ -1664,7 +1599,6 @@ export default function LandingPageSettings() {
                       borderStyle: 'solid'
                     }}
                   >
-                    {/* 删除状态指示器 */}
                     {deletedItems.solutionCards.includes(index) && (
                       <div className="absolute inset-0 bg-red-900 bg-opacity-20 flex items-center justify-center z-10 rounded-lg">
                         <div className="bg-red-800 text-white px-4 py-2 rounded-md flex items-center gap-2">

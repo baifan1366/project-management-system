@@ -463,7 +463,9 @@ export default function LandingPage() {
           <h1 className="text-5xl md:text-7xl font-bold py-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
             {content.content}
             <div>
-              <button className="mt-6 px-6 py-2 text-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-full shadow-md hover:shadow-purple-500/20 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50">
+              <button className="mt-6 px-6 py-2 text-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-full shadow-md hover:shadow-purple-500/20 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
+              onClick={() => window.location.href = '/signup'}
+              >
                 Get Started for Free
               </button>
             </div>
