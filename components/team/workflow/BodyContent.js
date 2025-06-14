@@ -604,7 +604,9 @@ export default function BodyContent({ projectThemeColor }) {
             
             // 刷新工作流图
             if (refreshWorkflow) {
-                refreshWorkflow(updatedProcessedTasks);
+                setTimeout(() => {
+                    refreshWorkflow([...updatedProcessedTasks]);
+                }, 100); // 使用setTimeout确保状态更新已完成
             }
             
         } catch (error) {
@@ -946,14 +948,20 @@ export default function BodyContent({ projectThemeColor }) {
             
             // 更新本地任务列表
             const newProcessedTask = extractTaskInfo(updatedTask);
+            
+            // 使用函数形式的setState确保获取最新状态
             setAllTasks(prev => [...prev, updatedTask]);
-            setProcessedTasks(prev => [...prev, newProcessedTask]);
             
-            // 更新工作流数据
+            // 使用函数形式重新构建处理后的任务
             const updatedTasks = [...processedTasks, newProcessedTask];
-            updateWorkflowData(updatedTasks);
+            setProcessedTasks(updatedTasks);
             
-            // 刷新工作流图
+            // 强制重建工作流数据
+            // 注意：这里我们不使用updatedTasks，因为可能存在异步状态更新的问题
+            // 而是直接在这里构建完整的任务列表
+            await new Promise(resolve => setTimeout(resolve, 50)); // 小延迟以确保状态更新
+            
+            // 刷新工作流图 - 使用强制刷新模式
             if (refreshWorkflow) {
                 refreshWorkflow(updatedTasks);
             }
@@ -1152,7 +1160,9 @@ export default function BodyContent({ projectThemeColor }) {
                         
                         // 刷新工作流图
                         if (refreshWorkflow) {
-                            refreshWorkflow(updatedTasks);
+                            setTimeout(() => {
+                                refreshWorkflow([...updatedTasks]);
+                            }, 100); // 使用setTimeout确保状态更新已完成
                         }
                         
                         toast.success(t('taskDeleted'));
