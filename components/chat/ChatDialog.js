@@ -210,7 +210,8 @@ export default function ChatDialog({
   isMinimized,
   sessionId,
   user,
-  sessionName
+  sessionName,
+  position = 0
 }) {
   const [message, setMessage] = useState('');
   const [sessionMessages, setSessionMessages] = useState([]);
@@ -220,6 +221,36 @@ export default function ChatDialog({
   const { user: currentUser } = useGetUser();
   const [replyTo, setReplyTo] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // Calculate right position based on the position prop
+  const dialogPosition = useMemo(() => {
+    // Base position is 1rem (16px) from right edge
+    // Each additional dialog will be positioned with a gap of 16px + dialog width (384px)
+    const basePosition = 16; // 1rem = 16px
+    const dialogWidth = 384; // w-96 = 24rem = 384px
+    const gap = 16; // 1rem gap between dialogs
+    
+    return basePosition + (position * (dialogWidth + gap));
+  }, [position]);
+
+  // Handle responsive behavior for mobile and small screens
+  const [isMobileView, setIsMobileView] = useState(false);
+  
+  // Add window resize listener for responsive behavior
+  useEffect(() => {
+    const checkMobileView = () => {
+      setIsMobileView(window.innerWidth < 768); // 768px is the md breakpoint in Tailwind
+    };
+
+    // Initial check
+    checkMobileView();
+
+    // Add resize listener
+    window.addEventListener('resize', checkMobileView);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', checkMobileView);
+  }, []);
 
   // Create a debounced version of the message setter
   const debouncedSetMessage = useCallback(
@@ -532,7 +563,7 @@ export default function ChatDialog({
     // Example translation API call
     try {
       // This is a placeholder - you would use an actual translation service
-      const translatedText = await fetch('/api/translate', {
+      const translatedText = await fetch('/api/googleTranslate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: content, targetLang: 'en' }) // Default to English
@@ -560,9 +591,17 @@ export default function ChatDialog({
   return (
     <div 
       className={cn(
-        "fixed bottom-0 right-4 w-96 bg-background rounded-t-lg shadow-lg flex flex-col transition-all duration-200",
+        "fixed bottom-0 bg-background rounded-t-lg shadow-lg flex flex-col transition-all duration-200",
         isMinimized ? "h-12" : "h-[520px]"
       )}
+      style={{ 
+        right: isMobileView ? '16px' : `${dialogPosition}px`,  // On mobile, always position at the right edge
+        width: isMobileView ? 'calc(100% - 32px)' : '384px', // Full width on mobile with margin
+        maxWidth: isMobileView ? '100%' : '384px',
+        // On mobile with multiple dialogs open, stack them with slight offset
+        bottom: isMobileView && position > 0 ? `${position * 10}px` : 0,
+        zIndex: isMobileView ? 50 - position : 50 // Higher dialogs appear on top
+      }}
     >
       {/* Dialog header */}
       <div className="flex items-center justify-between p-2 border-b">

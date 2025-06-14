@@ -465,14 +465,7 @@ export default function AIChatBot() {
                 disabled={loading}
               />
               
-              {/* 字符计数器 - 当接近限制时显示 */}
-              {input.length > 700 && (
-                <div className={`text-xs absolute bottom-2 right-3 ${
-                  input.length > 1000 ? 'text-destructive font-medium' : 'text-muted-foreground'
-                }`}>
-                  {input.length}/1000
-                </div>
-              )}
+              {/* 字符计数器已移至表单下方 */}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -490,6 +483,15 @@ export default function AIChatBot() {
             </button>
           </div>
         </form>
+        
+        {/* 字符计数器 - 当接近限制时显示 */}
+        {input.length > 700 && (
+          <div className={`text-xs text-right mt-1 mr-2 ${
+            input.length > 1000 ? 'text-destructive font-medium' : 'text-muted-foreground'
+          }`}>
+            {input.length}/1000
+          </div>
+        )}
       </div>
     </div>
   );

@@ -595,7 +595,9 @@
     "deleteConfirmationMessage": "Are you sure you want to delete this task? This action cannot be undone.",
     "noDueDate": "No due date",
     "noStartDate": "No start date",
-    "startDate": "Start Date"
+    "startDate": "Start Date",
+    "taskCreated":"Task has been created successfully",
+    "cannotSelectPastDate":"Cannot select past date"
   },
   "notifications": {
     "title": "Notifications",
@@ -1577,7 +1579,8 @@
     "externalUserConfirmTitle": "Add External User",
     "externalUserConfirmDescription": "{name} is not a member of any of your teams. Are you sure you want to invite this external user?",
     "userCheckFailed": "Failed to check user details",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "schedule": "Schedule"
   },
   "CreateTag": {
     "createTag": "Create New Field",
