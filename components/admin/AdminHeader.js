@@ -10,31 +10,43 @@ import AdminProfileModal from './AdminProfileModal';
  * @param {Object} props
  * @param {string} props.title - The page title to display
  * @param {Object} props.adminData - The admin user data
+ * @param {Function} props.onAdminDataUpdate - Optional callback when admin data is updated
  * @param {React.ReactNode} props.extraContent - Optional additional content to display in the header (e.g., filters, date selectors)
  * @param {boolean} props.showThemeToggle - Whether to show the theme toggle button
  */
 const AdminHeader = ({ 
   title, 
   adminData, 
+  onAdminDataUpdate,
   extraContent,
   showThemeToggle = true
 }) => {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [localAdminData, setLocalAdminData] = useState(adminData);
 
   // To avoid hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(()=>{
-    
-  })
+  // Update local admin data when prop changes
+  useEffect(() => {
+    setLocalAdminData(adminData);
+  }, [adminData]);
 
   // Handle theme toggle
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  // Handle profile updates
+  const handleProfileUpdate = (updatedData) => {
+    setLocalAdminData(updatedData);
+    if (onAdminDataUpdate) {
+      onAdminDataUpdate(updatedData);
+    }
   };
 
   return (
@@ -67,18 +79,25 @@ const AdminHeader = ({
               <FaBell />
             </button>
             
-            {adminData && (
+            {localAdminData && (
               <div 
                 className="flex items-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-3 rounded-lg transition-colors"
                 onClick={() => setIsProfileModalOpen(true)}
               >
                 {/* avatar */}
-                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold mr-2">
-                  {adminData?.username?.charAt(0).toUpperCase() || 'A'}
+                <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-indigo-500 text-white font-semibold mr-2">
+                  {localAdminData?.avatar_url ? (
+                    <img 
+                      src={localAdminData.avatar_url} 
+                      alt="Admin Avatar" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>{localAdminData?.username?.charAt(0).toUpperCase() || 'A'}</span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{adminData?.username}</p>
-                  
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{localAdminData?.username}</p>
                 </div>
               </div>
             )}
@@ -89,7 +108,8 @@ const AdminHeader = ({
       <AdminProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        adminData={adminData}
+        adminData={localAdminData}
+        onProfileUpdate={handleProfileUpdate}
       />
     </header>
   );

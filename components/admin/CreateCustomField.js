@@ -23,10 +23,10 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
     const validTypes = ['LIST', 'OVERVIEW', 'TIMELINE', 'NOTE', 'GANTT', 'CALENDAR', 'AGILE', 'WORKFLOW', 'KANBAN', 'FILES', 'POSTS'];
     const { user } = useGetUser();
     
-    // 设置自定义验证器
+
     const validateField = (name, value) => {
         const schema = createCustomFieldSchema(tValidation);
-        // 应用转换
+
         const transformedValue = customFieldFormTransforms[name] ? 
             customFieldFormTransforms[name](value) : value;
         
@@ -34,7 +34,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
         return validation.isValid ? true : validation.message;
     };
     
-    // 设置表单
+
     const form = useForm({
         defaultValues: {
             name: '',
@@ -44,7 +44,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
         },
     });
     
-    // 当 field 或 isOpen 改变时重置表单
+
     useEffect(() => {
         if (field) {
             form.reset({
@@ -71,7 +71,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                 throw new Error('User not authenticated');
             }
             
-            // 应用转换
+
             const transformedData = {
                 name: customFieldFormTransforms.name(data.name),
                 type: customFieldFormTransforms.type(data.type),
@@ -79,12 +79,12 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                 icon: customFieldFormTransforms.icon(data.icon),
             };
             
-            // 验证所有字段
+
             const schema = createCustomFieldSchema(tValidation);
             const validation = schema.validate(transformedData);
             
             if (!validation.isValid) {
-                // 设置表单错误
+
                 Object.entries(validation.errors).forEach(([field, message]) => {
                     form.setError(field, {
                         type: 'manual',
@@ -103,7 +103,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                 created_by: user.id,
             };
             
-            // 如果编辑现有字段，传递其 ID
+
             if (field?.id) {
                 fieldData.id = field.id;
             }
@@ -140,7 +140,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         <div className="grid grid-cols-2 gap-6">
-                            {/* 左列 */}
+
                             <div className="space-y-6">
                                 <FormField
                                     control={form.control}
@@ -233,7 +233,7 @@ export default function CreateCustomField({ isOpen, onClose, field, setField }) 
                                 />
                             </div>
                             
-                            {/* 右列 */}
+                                        
                             <div className="space-y-6">
                                 <FormField
                                     control={form.control}

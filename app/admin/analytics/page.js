@@ -133,19 +133,14 @@ export default function AdminAnalytics() {
         successRate: 0
       });
       
-      // 获取收入数据
       await fetchRevenueData(startDate, endDate);
       
-      // 获取用户增长数据
       await fetchUserGrowthData(startDate, endDate);
       
-      // 获取支付方式分布
       await fetchPaymentMethodDistribution(startDate, endDate);
       
-      // 获取订阅计划分布
       await fetchPlanDistribution(startDate, endDate);
       
-      // 获取摘要统计数据
       await fetchSummaryStatistics(startDate, endDate);
 
       // Dismiss loading toast and show success
@@ -168,10 +163,8 @@ export default function AdminAnalytics() {
     }
   };
   
-  // 获取收入数据
   const fetchRevenueData = async (startDate, endDate) => {
     try {
-      // 获取日期范围内的支付数据
       const { data, error } = await supabase
         .from('payment')
         .select('amount, created_at, status')
@@ -182,22 +175,18 @@ export default function AdminAnalytics() {
         
       if (error) throw error;
       
-      // 按天汇总数据
       const dailyRevenue = {};
       const days = getDaysArray(startDate, endDate);
       
-      // 初始化每天的收入为0
       days.forEach(day => {
         dailyRevenue[day] = 0;
       });
       
-      // 计算每天的收入
       data.forEach(payment => {
         const date = new Date(payment.created_at).toISOString().split('T')[0];
         dailyRevenue[date] = (dailyRevenue[date] || 0) + parseFloat(payment.amount);
       });
       
-      // 准备图表数据
       const chartData = {
         labels: Object.keys(dailyRevenue),
         datasets: [
@@ -219,10 +208,8 @@ export default function AdminAnalytics() {
     }
   };
   
-  // 获取用户增长数据
   const fetchUserGrowthData = async (startDate, endDate) => {
     try {
-      // 获取日期范围内的新用户
       const { data, error } = await supabase
         .from('user')
         .select('created_at')
@@ -232,22 +219,18 @@ export default function AdminAnalytics() {
         
       if (error) throw error;
       
-      // 按天汇总数据
       const dailySignups = {};
       const days = getDaysArray(startDate, endDate);
       
-      // 初始化每天的注册为0
       days.forEach(day => {
         dailySignups[day] = 0;
       });
-      
-      // 计算每天的注册
+
       data.forEach(user => {
         const date = new Date(user.created_at).toISOString().split('T')[0];
         dailySignups[date] = (dailySignups[date] || 0) + 1;
       });
       
-      // 准备图表数据
       const chartData = {
         labels: Object.keys(dailySignups),
         datasets: [
@@ -275,7 +258,6 @@ export default function AdminAnalytics() {
     }
   };
   
-  // 获取支付方式分布
   const fetchPaymentMethodDistribution = async (startDate, endDate) => {
     try {
       const { data, error } = await supabase
@@ -288,7 +270,6 @@ export default function AdminAnalytics() {
         
       if (error) throw error;
       
-      // 处理支付方法统计
       const paymentMethods = {};
       const paymentAmounts = {};
       const paymentColors = {
@@ -504,10 +485,8 @@ export default function AdminAnalytics() {
     }
   };
   
-  // 获取摘要统计数据
   const fetchSummaryStatistics = async (startDate, endDate) => {
     try {
-      // 获取支付成功的订单
       const { data: paymentData, error: paymentError } = await supabase
         .from('payment')
         .select('amount, status')
@@ -516,21 +495,16 @@ export default function AdminAnalytics() {
         
       if (paymentError) throw paymentError;
       
-      // 计算总收入
       const completedPayments = paymentData.filter(p => p.status === 'COMPLETED');
       const totalRevenue = completedPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
-                                            //累计  //累计器sum //累计的项   //从string转换成float       //sum的initial 
-      // 计算平均订单价值 (completedPayments.length, totalRevenue)
       const averageOrderValue = completedPayments.length > 0 
         ? totalRevenue / completedPayments.length 
         : 0;
       
-      // 计算支付成功率 (paymentData.length, completedPayments.length)
       const successRate = paymentData.length > 0 
         ? (completedPayments.length / paymentData.length) * 100 
         : 0;
       
-      // 获取注册用户和付费用户 //todo: 拿正确的user 
       const { count: totalUsers } = await supabase
         .from('user')
         .select('id', { count: 'exact', head: true })
@@ -544,12 +518,10 @@ export default function AdminAnalytics() {
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
       
-      // 计算转化率
       const conversionRate = totalUsers > 0 
         ? (payingUsers / totalUsers) * 100 
         : 0;
       
-      // 更新统计数据
       setSummaryStats({
         totalRevenue,
         averageOrderValue,
@@ -562,7 +534,6 @@ export default function AdminAnalytics() {
     }
   };
   
-  // 辅助函数 - 获取日期范围内的所有日期
   const getDaysArray = (start, end) => {
     const arr = [];
     const dt = new Date(start);
@@ -575,7 +546,6 @@ export default function AdminAnalytics() {
     return arr;
   };
   
-  // 格式化货币
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -583,7 +553,6 @@ export default function AdminAnalytics() {
     }).format(amount);
   };
   
-  // Chart.js 配置
   const lineOptions = {
     responsive: true,
     interaction: {

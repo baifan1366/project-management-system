@@ -14,6 +14,8 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true);
   const sectionsRef = useRef([]);
   const solutionsRef = useRef(null);
+  const pricingRef = useRef(null);
+  const footerRef = useRef(null);
   const cardsRef = useRef([]);
   const [activeCard, setActiveCard] = useState(1);  // Track active card index
   
@@ -55,7 +57,7 @@ export default function LandingPage() {
               end: "bottom 20%", // End when element bottom reaches 20% of viewport
               toggleActions: "play none none reset", // play on enter, reset on exit
               once: false, // Allow animation to replay when scrolling back up
-              markers: false // Set to true for debugging
+
             }
           }
         );
@@ -65,6 +67,59 @@ export default function LandingPage() {
     // Solutions section special animation with improved scroll triggering
     if (solutionsRef.current && cardsRef.current.length > 0) {
       animateCards();
+    }
+    
+    // Pricing section animation
+    if (pricingRef.current) {
+      const pricingItems = pricingRef.current.querySelectorAll('.content-item');
+      if (pricingItems.length > 0) {
+        pricingItems.forEach((item, i) => {
+          gsap.fromTo(
+            item,
+            { opacity: 0, y: 50 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.8,
+              delay: i * 0.1,
+              ease: "power3.out",
+              scrollTrigger: {
+                trigger: item,
+                start: "top 80%",
+                end: "bottom 20%",
+                toggleActions: "play none none reset",
+                once: false
+              }
+            }
+          );
+        });
+      }
+    }
+    
+    // Footer animation
+    if (footerRef.current) {
+      const footerItems = footerRef.current.querySelectorAll('.footer-item');
+      if (footerItems.length > 0) {
+        footerItems.forEach((item, i) => {
+          gsap.fromTo(
+            item,
+            { opacity: 0, y: 30 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.6,
+              delay: i * 0.1,
+              ease: "power2.out",
+              scrollTrigger: {
+                trigger: item,
+                start: "top 90%",
+                toggleActions: "play none none none",
+                once: false,
+              }
+            }
+          );
+        });
+      }
     }
 
     return () => {
@@ -111,6 +166,30 @@ export default function LandingPage() {
 
   const fetchLandingPageContent = async () => {
     try {
+      // First check if promo_banner section exists
+      const { data: promoBannerSection, error: promoBannerError } = await supabase
+        .from('landing_page_section')
+        .select('*')
+        .eq('name', 'promo_banner')
+        .single();
+
+      if (promoBannerError && promoBannerError.code !== 'PGRST116') {
+        // If error is not "no rows returned" then throw it
+        throw promoBannerError;
+      }
+
+      // If promo_banner section doesn't exist, create it
+      if (!promoBannerSection) {
+        const { error: createError } = await supabase
+          .from('landing_page_section')
+          .insert([
+            { name: 'promo_banner', sort_order: 0 } // Set sort_order to 0 to ensure it's always first
+          ]);
+
+        if (createError) throw createError;
+      }
+
+      // Now fetch all sections including the newly created one
       const { data: sectionsData, error: sectionsError } = await supabase
         .from('landing_page_section')
         .select('*, landing_page_content(*)')
@@ -221,7 +300,7 @@ export default function LandingPage() {
     switch (section.name) {
       case 'hero':
         return (
-          <div className=" herooo flex flex-col items-center text-center ">
+          <div className=" hero flex flex-col items-center text-center ">
             {contents.map((content) => (
               <div key={content.id} className="w-1/2 flex justify-center">
                 {renderContent(content)}
@@ -241,7 +320,7 @@ export default function LandingPage() {
         const maxPairs = Math.max(headers.length, texts.length, media.length);
         
         return (
-          <div className="flex flex-col gap-24">
+          <div className="flex flex-col gap-28 my-12">
             {/* Render each feature as a full section with alternating layouts */}
             {Array.from({ length: maxPairs }).map((_, index) => {
               const header = headers[index];
@@ -250,9 +329,9 @@ export default function LandingPage() {
               const isEven = index % 2 === 0;
               
               return (
-                <div key={`feature-${index}`} className="w-full flex flex-col md:flex-row items-center justify-between gap-12">
+                <div key={`feature-${index}`} className="w-3/4 flex flex-col md:flex-row items-center justify-center gap-14 py-6 mx-auto">
                   {/* Text content */}
-                  <div className={`w-full md:w-1/2 flex flex-col ${isEven ? 'md:order-1' : 'md:order-2'}`}>
+                  <div className={`w-3/4 md:w-1/2 flex flex-col ${isEven ? 'md:order-1' : 'md:order-2'}`}>
                     {header && (
                       <div className="content-item">
                         {renderContent(header)}
@@ -359,16 +438,6 @@ export default function LandingPage() {
                     <polyline points="9 18 15 12 9 6"></polyline>
                   </svg>
                 </button>
-                
-                {/* Slide indicators */}
-                {/* <div className="flex justify-center mt-6 space-x-2">
-                  {Array.from({ length: solutionCards.length }).map((_, i) => (
-                    <div 
-                      key={i} 
-                      className={`h-2 w-2 rounded-full transition-all ${i === 1 ? 'bg-white' : 'bg-white/30'}`}
-                    />
-                  ))}
-                </div> */}
               </div>
             )}
           </div>
@@ -393,6 +462,13 @@ export default function LandingPage() {
         return (
           <h1 className="text-5xl md:text-7xl font-bold py-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
             {content.content}
+            <div>
+              <button className="mt-6 px-6 py-2 text-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-full shadow-md hover:shadow-purple-500/20 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
+              onClick={() => window.location.href = '/signup'}
+              >
+                Get Started for Free
+              </button>
+            </div>
           </h1>
         );
       case 'h2':
@@ -409,17 +485,24 @@ export default function LandingPage() {
         );
       case 'video':
         return (
-          <div className="relative aspect-video rounded-lg overflow-hidden shadow-2xl">
-            <ReactPlayer
-              url={content.content}
-              controls={false}  // 👈 disables all default controls
-              playing={true}     // autoplay if needed
-              loop={true}        // optional
-              muted={true}     
-              width="100%"
-              height="100%"
-              style={{ borderRadius: "12px" }}
-            />
+          <div className="relative aspect-video rounded-xl overflow-hidden w-full" style={{minHeight: "300px"}}>
+            {/* Glowing border effect */}
+            <div className="absolute inset-0 rounded-xl p-[1px] bg-gradient-to-r from-indigo-500/20 via-purple-500/30 to-pink-500/20 shadow-[0_0_15px_rgba(139,92,246,0.3)]"></div>
+            
+            {/* Video container */}
+            <div className="relative z-10 overflow-hidden rounded-xl flex items-center justify-center w-full h-full">
+              <ReactPlayer
+                url={content.content}
+                controls={false}
+                playing={true}
+                loop={true}
+                muted={true}
+                width="100%"
+                height="100%"
+                className="absolute top-0 left-0"
+
+              />
+            </div>
           </div>
         );
       case 'image':
@@ -435,13 +518,12 @@ export default function LandingPage() {
       case 'solution_card':
         const cardData = JSON.parse(content.content);
         return (
-          <div className="bg-gradient-to-b from-[#1e9e6a] to-[#0d8c5c] rounded-xl shadow-xl p-8 text-white h-full">
-            <h3 className="text-2xl font-bold mb-4 text-center">{cardData.title}</h3>
-            <p className="text-gray-100 text-center mb-6">{cardData.description}</p>
+          <div className="backdrop-blur-md bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/20 rounded-2xl shadow-[0_0_15px_rgba(139,92,246,0.3)] p-8 text-white h-full transition-all duration-300 hover:shadow-[0_0_25px_rgba(139,92,246,0.4)] hover:scale-[1.02]">
+            <div className="mb-6 flex justify-center">
+            </div>
+            <h3 className="text-2xl font-bold mb-3 text-center bg-clip-text text-transparent bg-gradient-to-r from-indigo-200 to-purple-200">{cardData.title}</h3>
+            <p className="text-indigo-100/80 text-center mb-6">{cardData.description}</p>
             <div className="flex justify-center">
-              <button className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
-                Learn More
-              </button>
             </div>
           </div>
         );
@@ -458,19 +540,193 @@ export default function LandingPage() {
     );
   }
 
+  // 渲染 promo banner
+  const renderPromoBanner = () => {
+    const promoBannerSection = sections.find(section => section.name === 'promo_banner');
+    console.log('Found promo banner section:', promoBannerSection); // 调试日志
+
+    if (!promoBannerSection || !promoBannerSection.landing_page_content || promoBannerSection.landing_page_content.length === 0) {
+      console.log('No promo banner content found'); // 调试日志
+      return null;
+    }
+
+    const bannerContent = promoBannerSection.landing_page_content[0];
+    if (!bannerContent) {
+      console.log('No banner content found'); // 调试日志
+      return null;
+    }
+
+    try {
+      const bannerSettings = JSON.parse(bannerContent.content);
+      console.log('Banner settings:', bannerSettings); // 调试日志
+      
+      // 移除 isEnabled 检查，只检查是否有 promo code
+      if (!bannerSettings.selectedPromoCode) {
+        console.log('No promo code selected'); // 调试日志
+        return null;
+      }
+
+      return (
+        <div style={{ 
+          position: 'relative', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          width: '100%', 
+          backgroundColor: '#a855f7', 
+          color: 'white', 
+          padding: '0.5rem 0', 
+          zIndex: 20 
+        }} className="shadow-lg">
+          <div className="container mx-auto px-4">
+            <div className="text-center text-lg font-bold tracking-wide">
+              {bannerSettings.selectedPromoCode && (
+                <>
+                  Special Offer! Use code{' '}
+                  <span className="font-black bg-purple-700 px-3 py-1 rounded mx-1">
+                    "{bannerSettings.selectedPromoCode}"
+                  </span>
+                  {' '}for a discount!
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    } catch (e) {
+      console.error('Error parsing promo banner settings:', e);
+      return null;
+    }
+  };
+
+  const promoBanner = renderPromoBanner();
+  
   return (
-    <div className="min-h-screen bg-black relative overflow-x-hidden">
-      <div className="container mx-auto px-4 z-10">
-        {sections.map((section, index) => (
-          <section
-            key={section.id}
-            ref={el => sectionsRef.current[index] = el}
-            className={`w-full py-16 ${section.name === 'hero'}`}
-          >
-            {renderSectionContent(section)}
+    <>
+      {promoBanner}
+      <div className="min-h-screen bg-black relative overflow-x-hidden">
+        {/* Add padding-top to account for the fixed header and promo banner */}
+        <div style={{ width: '100%', paddingTop: promoBanner ? '3rem' : '0' }}>
+          {/* Futuristic Grid Background */}
+          <div className="absolute inset-0 z-0 overflow-hidden">
+            {/* Grid Lines */}
+            <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.25)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+            
+            {/* Horizontal Lines */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+            
+            {/* Vertical Lines */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+            
+            {/* Darker Purple-Blue Gradient Overlays */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-purple-950/30 via-indigo-950/20 to-blue-950/30"></div>
+            <div className="absolute inset-0 bg-gradient-to-bl from-blue-950/20 via-violet-950/20 to-purple-950/30"></div>
+            <div className="absolute inset-0 bg-[conic-gradient(from_0deg_at_50%_50%,rgba(58,30,98,0.15)_0%,rgba(67,26,107,0.15)_25%,rgba(30,64,175,0.15)_50%,rgba(79,70,229,0.15)_75%,rgba(58,30,98,0.15)_100%)]"></div>
+            
+            {/* Animated Gradient Border */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-purple-800 to-transparent opacity-25"></div>
+            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-blue-800 to-transparent opacity-25"></div>
+            <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-indigo-800 to-transparent opacity-25"></div>
+            <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-violet-800 to-transparent opacity-25"></div>
+            
+            {/* Darker Purple-Blue Glowing Orbs */}
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-900/20 to-indigo-900/20 rounded-full filter blur-[100px]"></div>
+            <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-gradient-to-r from-blue-900/20 to-indigo-900/20 rounded-full filter blur-[100px]"></div>
+            <div className="absolute top-2/3 left-1/3 w-64 h-64 bg-gradient-to-r from-violet-900/20 to-purple-900/20 rounded-full filter blur-[80px]"></div>
+            <div className="absolute top-1/3 right-1/3 w-72 h-72 bg-gradient-to-r from-indigo-900/20 to-blue-900/20 rounded-full filter blur-[90px]"></div>
+          </div>
+          
+          <div className="container mx-auto px-4 z-10 relative">
+            {sections.map((section, index) => (
+              <section
+                key={section.id}
+                ref={el => sectionsRef.current[index] = el}
+                className={`w-full py-10 ${section.name === 'hero'}`}
+              >
+                {renderSectionContent(section)}
+              </section>
+            ))}
+          </div>
+
+          {/* Pricing Page Redirect section */}
+          <section className="w-full mt-0" ref={pricingRef}>
+            <div className="flex flex-col items-center text-center content-item">
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
+                Our Pricing
+              </h2>
+              <p className="text-gray-300 text-lg mb-8 max-w-2xl">
+                Choose the perfect plan for your needs. Start free and scale as you grow.
+              </p>
+              <button 
+                className="px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-full shadow-lg hover:shadow-purple-500/20 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
+                onClick={() => window.location.href = '/pricing'}
+              >
+                View Pricing Plans
+              </button>
+            </div>
+            <div className="h-24"></div>
           </section>
-        ))}
+
+          {/* Footer Section */}
+          <footer className="w-full py-12 mt-16 border-t border-gray-800" ref={footerRef}>
+            <div className="container mx-auto px-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div className="mb-8 md:mb-0 footer-item">
+                  <h3 className="text-xl font-bold mb-4 text-white">Project Management</h3>
+                  <p className="text-gray-400">Simplify your workflow and boost productivity with our intuitive project management solution.</p>
+                </div>
+                
+                <div className="mb-8 md:mb-0 footer-item">
+                  <h4 className="text-lg font-semibold mb-4 text-white">Product</h4>
+                  <ul className="space-y-2">
+                    <li><a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">Features</a></li>
+                    <li><a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">Solutions</a></li>
+                    <li><a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">Pricing</a></li>
+                    <li><a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">Updates</a></li>
+                  </ul>
+                </div>
+                
+                <div className="mb-8 md:mb-0 footer-item">
+                  <h4 className="text-lg font-semibold mb-4 text-white">Company</h4>
+                  <ul className="space-y-2">
+                    <li><a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">About</a></li>
+                    <li><a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">Blog</a></li>
+                    <li><a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">Careers</a></li>
+                    <li><a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">Contact</a></li>
+                  </ul>
+                </div>
+                
+                <div className="footer-item">
+                  <h4 className="text-lg font-semibold mb-4 text-white">Connect</h4>
+                  <div className="flex space-x-4">
+                    <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+                    </a>
+                    <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>
+                    </a>
+                    <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                    </a>
+                    <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+                    </a>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center footer-item">
+                <p className="text-gray-400 text-sm mb-4 md:mb-0">© 2025 Team Sync Project Management System. All rights reserved.</p>
+                <div className="flex space-x-6">
+                  <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Privacy Policy</a>
+                  <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Terms of Service</a>
+                  <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Cookie Policy</a>
+                </div>
+              </div>
+            </div>
+          </footer>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
