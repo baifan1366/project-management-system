@@ -1025,7 +1025,8 @@
     "unclassified": "Unclassified",
     "noStatusOptions": "No status options available",
     "noTasksOrGrouping": "No tasks or status groupings available",
-    "editTaskFailed": "Failed to edit task"
+    "editTaskFailed": "Failed to edit task",
+    "random": "Random"
   },
   "ChatDialog": {
     "privateMessages": "Private Messages",
