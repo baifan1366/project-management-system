@@ -110,6 +110,41 @@ async function handleLogin(data) {
       );
     }
 
+    // Check if 2FA is enabled
+    if (user.is_mfa_enabled || user.is_email_2fa_enabled) {
+      let twoFactorTypes = [];
+      if (user.is_mfa_enabled) {
+        twoFactorTypes.push('totp');
+      }
+      if (user.is_email_2fa_enabled) {
+        twoFactorTypes.push('email');
+      }
+      
+      // If email 2FA is enabled, send verification code automatically
+      if (user.is_email_2fa_enabled) {
+        try {
+          // Send email verification code
+          await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/users/${user.id}/email-2fa`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+          });
+        } catch (emailError) {
+          console.error('Error sending 2FA email:', emailError);
+          // Continue anyway as we'll handle this on the frontend
+        }
+      }
+      
+      // Return response indicating 2FA is needed
+      return NextResponse.json({
+        requiresTwoFactor: true,
+        userId: user.id,
+        twoFactorTypes
+      });
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { 

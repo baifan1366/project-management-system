@@ -24,11 +24,11 @@ export async function POST() {
       .from('user_heartbeats')
       .select('id')
       .eq('user_id', userId)
-      .single();
+      .limit(1);
     
     let result;
     
-    if (existingHeartbeat) {
+    if (existingHeartbeat && existingHeartbeat.length > 0) {
       // Update existing heartbeat
       result = await supabase
         .from('user_heartbeats')
@@ -83,14 +83,16 @@ async function checkSubscriptionRenewal(userId) {
       .from('user')
       .select('auto_renew_enabled, default_payment_method_id, stripe_customer_id')
       .eq('id', userId)
-      .single();
+      .limit(1);
 
-    if (userError) {
+    if (userError || !user || user.length === 0) {
       
       return;
     }
 
-    if (!user.auto_renew_enabled) {
+    const userRecord = user[0];
+    
+    if (!userRecord.auto_renew_enabled) {
       // Auto-renew not enabled
       
       return;
@@ -157,7 +159,7 @@ async function checkSubscriptionRenewal(userId) {
     }
 
     // Check if user has a default payment method in the user table
-    if (!user.default_payment_method_id) {
+    if (!userRecord.default_payment_method_id) {
       // Check if there's a payment method marked as default in the payment_methods table
       const { data: defaultPaymentMethods, error: paymentMethodError } = await supabase
         .from('payment_methods')
@@ -186,7 +188,7 @@ async function checkSubscriptionRenewal(userId) {
           // Continue with the payment method we found, even if updating the user record failed
         } else {
           // Update the local user object with the new payment method ID
-          user.default_payment_method_id = defaultPaymentMethodId;
+          userRecord.default_payment_method_id = defaultPaymentMethodId;
           
         }
       } else {
@@ -218,8 +220,8 @@ async function checkSubscriptionRenewal(userId) {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(subscription.plan.price * 100), // Convert to cents
         currency: 'usd',
-        customer: user.stripe_customer_id,
-        payment_method: user.default_payment_method_id,
+        customer: userRecord.stripe_customer_id,
+        payment_method: userRecord.default_payment_method_id,
         confirm: true,
         off_session: true,
         description: `Subscription renewal for ${subscription.plan.name}`,
@@ -287,13 +289,13 @@ async function checkSubscriptionRenewal(userId) {
           .from('user')
           .select('email, name')
           .eq('id', userId)
-          .single();
+          .limit(1);
           
-        if (!userDataError && userData) {
+        if (!userDataError && userData && userData.length > 0) {
           // Send email notification for successful renewal
           await sendSubscriptionRenewalSuccessEmail({
-            to: userData.email,
-            name: userData.name || 'Valued Customer',
+            to: userData[0].email,
+            name: userData[0].name || 'Valued Customer',
             planName: subscription.plan.name,
             amount: (subscription.plan.price / 100).toFixed(2), // Convert from cents to dollars
             newExpiryDate: new Date(newEndDate).toLocaleDateString('en-US', {
@@ -325,13 +327,13 @@ async function checkSubscriptionRenewal(userId) {
           .from('user')
           .select('email, name')
           .eq('id', userId)
-          .single();
+          .limit(1);
           
-        if (!userDataError && userData) {
+        if (!userDataError && userData && userData.length > 0) {
           // Send email notification for failed renewal
           await sendSubscriptionRenewalFailureEmail({
-            to: userData.email,
-            name: userData.name || 'Valued Customer',
+            to: userData[0].email,
+            name: userData[0].name || 'Valued Customer',
             planName: subscription.plan.name,
             errorReason: 'Payment requires additional action',
             expiryDate: new Date(subscription.end_date).toLocaleDateString('en-US', {
@@ -363,13 +365,13 @@ async function checkSubscriptionRenewal(userId) {
         .from('user')
         .select('email, name')
         .eq('id', userId)
-        .single();
+        .limit(1);
         
-      if (!userDataError && userData) {
+      if (!userDataError && userData && userData.length > 0) {
         // Send email notification for failed renewal
         await sendSubscriptionRenewalFailureEmail({
-          to: userData.email,
-          name: userData.name || 'Valued Customer',
+          to: userData[0].email,
+          name: userData[0].name || 'Valued Customer',
           planName: subscription.plan.name,
           errorReason: `Payment failed: ${stripeError.message || 'Unknown error'}`,
           expiryDate: new Date(subscription.end_date).toLocaleDateString('en-US', {
@@ -466,9 +468,9 @@ async function checkSubscriptionExpiration(userId) {
       .eq('user_id', userId)
       .eq('plan_id', FREE_PLAN_ID)
       .or('status.eq.ACTIVE,status.eq.active')
-      .single();
+      .limit(1);
     
-    if (!existingFreePlan) {
+    if (!existingFreePlan || existingFreePlan.length === 0) {
       // Check for an existing deactivated free plan to reactivate
       const { data: inactiveFreePlan } = await supabase
         .from('user_subscription_plan')
@@ -477,10 +479,9 @@ async function checkSubscriptionExpiration(userId) {
         .eq('plan_id', FREE_PLAN_ID)
         .or('status.eq.DEACTIVATED,status.eq.INACTIVE,status.eq.EXPIRED')
         .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
       
-      if (inactiveFreePlan) {
+      if (inactiveFreePlan && inactiveFreePlan.length > 0) {
         // Reactivate the existing free plan
         await supabase
           .from('user_subscription_plan')
@@ -490,7 +491,7 @@ async function checkSubscriptionExpiration(userId) {
             end_date: null, // Free plans don't expire
             updated_at: now
           })
-          .eq('id', inactiveFreePlan.id);
+          .eq('id', inactiveFreePlan[0].id);
         
         
       } else {
