@@ -69,7 +69,7 @@ import {
   validateTextInput
 } from './TagConfig';
 
-export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading, validationErrors) {
+export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading, validationErrors, handleDeleteTask) {
   const t = useTranslations('CreateTask');
   const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
@@ -1200,6 +1200,19 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                   </svg>
                                 )}
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                                onClick={() => handleDeleteTask(task.id, sectionId)}
+                                disabled={isTaskLoading}
+                              >
+                                {isTaskLoading ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <Trash size={16} className="text-red-500 hover:text-red-600" />
+                                )}
+                              </Button>
                             </div>
                           )}
                         </div>
@@ -1219,7 +1232,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                 {externalIsLoading ? (
                   <Loader2 size={16} className="animate-spin text-muted-foreground" />
                 ) : (
-                  <Plus size={16} className="text-muted-foreground" />
+                  <Plus size={16} className="text-muted-foreground" />                    
                 )}
               </Button>
             </div>

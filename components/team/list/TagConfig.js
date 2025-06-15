@@ -6,7 +6,7 @@
 import { FileText, File, Sheet, FileCode, X, User, Calendar, Fingerprint, Copy, CheckCheck, Trash, Plus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUserById } from '@/lib/redux/features/usersSlice';
 import { useTranslations } from 'next-intl';
@@ -700,8 +700,57 @@ export function EditablePeopleCell({ value, taskId, teamId, editable = true }) {
  * @returns {JSX.Element} 人员显示组件
  */
 function PeopleDisplay({ userId }) {
+  const dispatch = useDispatch();
   const { users, isLoading } = useUserData(userId);
   const user = users[0]; // 单个用户ID只会有一个结果
+  
+  // 使用useMemo缓存渲染结果，避免不必要的重渲染
+  const userInfo = useMemo(() => {
+    if (!user) return {
+      name: '未知用户',
+      email: userId ? `ID: ${userId.substring(0, 8)}...` : '未知ID',
+      title: '',
+      department: '',
+      avatar: null,
+      initial: ''
+    };
+    
+    return {
+      name: user.name || '未知用户',
+      email: user.email || `ID: ${userId.substring(0, 8)}...`,
+      title: user.title || '',
+      department: user.department || '',
+      avatar: user.avatar_url || null,
+      initial: user.name?.[0] || ''
+    };
+  }, [user, userId]);
+  
+  // 预取用户详细信息
+  useEffect(() => {
+    // 检查缓存状态
+    if (!userId || 
+        (userInfoCache.has(userId) && 
+        Date.now() - userInfoCache.get(userId).timestamp < USER_CACHE_TIME)
+      ) {
+      return; // 缓存中有有效数据，不需要预取
+    }
+    
+    // 异步预取用户详情，不阻塞渲染
+    dispatch(fetchUserById(userId))
+      .unwrap()
+      .then(result => {
+        if (result) {
+          userInfoCache.set(userId, {
+            user: result,
+            timestamp: Date.now()
+          });
+        }
+      })
+      .catch(error => {
+        // 静默失败，不影响UI
+        console.log(`无法预取用户信息 (ID: ${userId}):`, error);
+      });
+  }, [userId, dispatch]);
   
   if (isLoading) {
     return (
@@ -729,30 +778,30 @@ function PeopleDisplay({ userId }) {
     <Popover>
       <PopoverTrigger className="flex items-center gap-2 hover:bg-accent p-1 rounded-md transition-colors group">
         <Avatar className="h-7 w-7 transition-transform group-hover:scale-105">
-          <AvatarImage src={user.avatar_url} />
-          <AvatarFallback className="bg-primary/10 text-primary font-medium">{user.name?.[0] || <User size={14} />}</AvatarFallback>
+          <AvatarImage src={userInfo.avatar} />
+          <AvatarFallback className="bg-primary/10 text-primary font-medium">{userInfo.initial || <User size={14} />}</AvatarFallback>
         </Avatar>
-        <span className="text-sm font-medium group-hover:text-primary transition-colors truncate">{user.name || user.email || userId.substring(0, 8)}</span>
+        <span className="text-sm font-medium group-hover:text-primary transition-colors truncate">{userInfo.name}</span>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
         <div className="flex flex-col">
           <div className="bg-primary/5 p-4 flex items-start gap-4 border-b">
             <Avatar className="h-14 w-14">
-            <AvatarImage src={user.avatar_url} />
-              <AvatarFallback className="bg-primary/10 text-primary font-medium text-lg">{user.name?.[0] || <User size={24} />}</AvatarFallback>
+            <AvatarImage src={userInfo.avatar} />
+              <AvatarFallback className="bg-primary/10 text-primary font-medium text-lg">{userInfo.initial || <User size={24} />}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-              <span className="font-medium text-base">{user.name || '未知用户'}</span>
-            <span className="text-sm text-muted-foreground">{user.email || `ID: ${userId.substring(0, 8)}...`}</span>
-            {user.title && (
-                <span className="text-xs text-muted-foreground mt-1 bg-muted px-2 py-0.5 rounded-full w-fit">{user.title}</span>
+              <span className="font-medium text-base">{userInfo.name}</span>
+            <span className="text-sm text-muted-foreground">{userInfo.email}</span>
+            {userInfo.title && (
+                <span className="text-xs text-muted-foreground mt-1 bg-muted px-2 py-0.5 rounded-full w-fit">{userInfo.title}</span>
             )}
           </div>
           </div>
-          {user.department && (
+          {userInfo.department && (
             <div className="px-4 py-2 text-sm">
               <span className="text-muted-foreground">部门: </span>
-              <span>{user.department}</span>
+              <span>{userInfo.department}</span>
             </div>
           )}
         </div>
@@ -769,8 +818,37 @@ function PeopleDisplay({ userId }) {
  */
 function MultipleUsers({ userIds }) {
   const t = useTranslations('Team');  
+  const dispatch = useDispatch();
   const { users, isLoading } = useUserData(userIds);
   const displayCount = 3; // 最多显示3个头像
+  
+  // 预取所有用户信息
+  useEffect(() => {
+    if (!userIds.length) return;
+    
+    // 使用批量预取函数获取用户信息
+    // 这不会阻塞组件渲染，但会确保缓存中有完整的用户数据
+    prefetchUsersInfo(userIds, dispatch).catch(error => {
+      console.log("预取多人员组件的用户信息失败:", error);
+    });
+  }, [JSON.stringify(userIds), dispatch]);
+  
+  // 优化显示逻辑，防止不必要的渲染
+  const userAvatars = useMemo(() => {
+    return users.slice(0, displayCount).map((user, idx) => (
+      <Avatar 
+        key={user?.id || idx} 
+        className={`h-7 w-7 border-2 border-background transition-all ${
+          idx > 0 ? "group-hover:-translate-x-1" : ""
+        }`}
+      >
+        <AvatarImage src={user?.avatar_url} />
+        <AvatarFallback className="bg-primary/10 text-primary font-medium">
+          {user?.name?.[0] || <User size={14} />}
+        </AvatarFallback>
+      </Avatar>
+    ));
+  }, [users]);
   
   return (
     <Popover>
@@ -778,40 +856,27 @@ function MultipleUsers({ userIds }) {
         <div className="flex items-center">
           {/* 头像堆叠显示 */}
           <div className="flex -space-x-3 mr-2">
-            {/* 只显示前三个用户头像 */}
-          {users.slice(0, displayCount).map((user, idx) => (
-              <Avatar 
-                key={user?.id || idx} 
-                className={`h-7 w-7 border-2 border-background transition-all ${
-                  idx > 0 ? "group-hover:-translate-x-1" : ""
-                }`}
-              >
-              <AvatarImage src={user?.avatar_url} />
-                <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                {user?.name?.[0] || <User size={14} />}
-              </AvatarFallback>
-            </Avatar>
-          ))}
-          
-          {/* 如果有更多用户，显示额外数量 */}
-          {userIds.length > displayCount && (
+            {userAvatars}
+            
+            {/* 如果有更多用户，显示额外数量 */}
+            {userIds.length > displayCount && (
               <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background font-medium transition-transform group-hover:-translate-x-1">
-              +{userIds.length - displayCount}
-            </div>
-          )}
-          
-          {/* 如果还在加载中，显示加载指示器 */}
-          {isLoading && users.length === 0 && (
+                +{userIds.length - displayCount}
+              </div>
+            )}
+            
+            {/* 如果还在加载中，显示加载指示器 */}
+            {isLoading && users.length === 0 && (
               <div className="h-7 w-7 rounded-full bg-muted animate-pulse border-2 border-background"></div>
-          )}
-        </div>
+            )}
+          </div>
           
           {/* 用户数量文本 */}
           <span className="text-sm font-medium">
             {userIds.length > 1 ? 
               `${userIds.length} ${t('users') || '用户'}` : 
               (users[0]?.name || users[0]?.email || '用户')}
-        </span>
+          </span>
         </div>
       </PopoverTrigger>
       
@@ -980,6 +1045,22 @@ function useDebounce(value, delay) {
 const teamMembersCache = new Map();
 const CACHE_TIME = 60000; // 缓存1分钟
 
+// 添加全局用户缓存
+const userInfoCache = new Map();
+const USER_CACHE_TIME = 300000; // 用户信息缓存5分钟
+
+/**
+ * 清理过期的用户缓存
+ */
+export function cleanExpiredUserCache() {
+  const now = Date.now();
+  for (const [id, data] of userInfoCache.entries()) {
+    if (now - data.timestamp >= USER_CACHE_TIME) {
+      userInfoCache.delete(id);
+    }
+  }
+}
+
 /**
  * 添加负责人组件
  * @param {Object} props - 组件参数
@@ -1001,6 +1082,7 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [enrichedMembers, setEnrichedMembers] = useState([]);
   const [loadingUserDetails, setLoadingUserDetails] = useState(false);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // 添加防抖搜索
   
   // 使用useEffect进行防抖获取
   useEffect(() => {
@@ -1237,16 +1319,19 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
     }
   };
 
-  // 过滤团队成员
-  const filteredTeamMembers = enrichedMembers.filter(member => {
-    const memberName = member.name?.toLowerCase() || '';
-    const memberEmail = member.email?.toLowerCase() || '';
-    const search = searchTerm.toLowerCase();
-    return memberName.includes(search) || 
-           memberEmail.includes(search) || 
-           member.user_id.toLowerCase().includes(search);
-  });
-
+  // 过滤团队成员 - 使用防抖后的搜索词
+  const filteredTeamMembers = useMemo(() => {
+    return enrichedMembers.filter(member => {
+      const memberName = member.name?.toLowerCase() || '';
+      const memberEmail = member.email?.toLowerCase() || '';
+      // 添加默认值，防止debouncedSearchTerm为undefined
+      const search = (debouncedSearchTerm || '').toLowerCase();
+      return memberName.includes(search) || 
+             memberEmail.includes(search) || 
+             member.user_id.toLowerCase().includes(search);
+    });
+  }, [enrichedMembers, debouncedSearchTerm]);
+  
   // 检查用户是否已被分配
   const isUserAssigned = (userId) => {
     return assignedMembers.includes(userId);
@@ -3320,7 +3405,7 @@ export function validateTextInput(value, options = {}) {
   if (required && (!value || value.trim() === '')) {
     return {
       isValid: false,
-      message: '此字段不能为空'
+      message: 'This field is required.'
     };
   }
   
@@ -3387,4 +3472,121 @@ export function renderTextCell(value, onChange, options = {}) {
       )}
     </div>
   );
+}
+
+/**
+ * 用户缓存管理组件，用于定期清理过期缓存并提供预取功能
+ * 可以添加到应用的根组件中
+ */
+export function UserCacheManager({ prefetchUserIds = [] }) {
+  const dispatch = useDispatch();
+  
+  // 定期清理过期缓存
+  useEffect(() => {
+    const intervalId = setInterval(cleanExpiredUserCache, USER_CACHE_TIME);
+    return () => clearInterval(intervalId);
+  }, []);
+  
+  // 预取用户信息
+  useEffect(() => {
+    if (!prefetchUserIds.length) return;
+    
+    // 过滤出缓存中不存在或已过期的用户ID
+    const userIdsToFetch = prefetchUserIds.filter(id => 
+      !userInfoCache.has(id) || 
+      Date.now() - userInfoCache.get(id).timestamp >= USER_CACHE_TIME
+    );
+    
+    if (!userIdsToFetch.length) return;
+    
+    // 批量预取用户信息
+    const prefetchUsers = async () => {
+      try {
+        // 并发获取多个用户信息，但限制并发数为5
+        const batchSize = 5;
+        for (let i = 0; i < userIdsToFetch.length; i += batchSize) {
+          const batch = userIdsToFetch.slice(i, i + batchSize);
+          await Promise.all(batch.map(userId => 
+            dispatch(fetchUserById(userId))
+              .unwrap()
+              .then(result => {
+                if (result) {
+                  userInfoCache.set(userId, {
+                    user: result,
+                    timestamp: Date.now()
+                  });
+                }
+              })
+              .catch(error => {
+                console.log(`预取用户信息失败 (ID: ${userId}):`, error);
+              })
+          ));
+        }
+      } catch (error) {
+        console.error("批量预取用户信息失败:", error);
+      }
+    };
+    
+    prefetchUsers();
+  }, [prefetchUserIds, dispatch]);
+  
+  return null; // 这是一个纯功能性组件，不渲染任何UI
+}
+
+/**
+ * 预取指定用户ID数组的用户信息
+ * @param {Array} userIds - 用户ID数组
+ * @param {Function} dispatch - Redux dispatch函数
+ * @returns {Promise} - 完成预取的Promise
+ */
+export async function prefetchUsersInfo(userIds, dispatch) {
+  if (!Array.isArray(userIds) || !userIds.length || !dispatch) {
+    return Promise.resolve();
+  }
+  
+  try {
+    // 过滤出缓存中不存在或已过期的用户ID
+    const userIdsToFetch = userIds.filter(id => 
+      !userInfoCache.has(id) || 
+      Date.now() - userInfoCache.get(id).timestamp >= USER_CACHE_TIME
+    );
+    
+    if (!userIdsToFetch.length) {
+      return Promise.resolve();
+    }
+    
+    // 批量获取，但限制并发数
+    const batchSize = 5;
+    const batches = [];
+    
+    for (let i = 0; i < userIdsToFetch.length; i += batchSize) {
+      const batch = userIdsToFetch.slice(i, i + batchSize);
+      const batchPromise = Promise.all(
+        batch.map(userId => 
+          dispatch(fetchUserById(userId))
+            .unwrap()
+            .then(result => {
+              if (result) {
+                userInfoCache.set(userId, {
+                  user: result,
+                  timestamp: Date.now()
+                });
+              }
+              return result;
+            })
+            .catch(error => {
+              console.log(`批量获取用户信息失败 (ID: ${userId}):`, error);
+              return null;
+            })
+        )
+      );
+      
+      batches.push(batchPromise);
+    }
+    
+    return Promise.all(batches);
+  } catch (error) {
+    console.error("预取用户信息失败:", error);
+    return Promise.reject(error);
+  }
 }

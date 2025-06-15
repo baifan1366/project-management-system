@@ -53,7 +53,6 @@ const selectTeamUsers = createSelector(
 
 const TeamCustomFieldPage = () => {
   const t = useTranslations('CreateTask');
-  const tProjects = useTranslations('Projects');
   const dispatch = useDispatch();
   const params = useParams();
   const tConfirm = useTranslations('confirmation');
@@ -477,13 +476,13 @@ const TeamCustomFieldPage = () => {
       <AlertDialog open={showTeamNotFound} onOpenChange={setShowTeamNotFound}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{tConfirm.warning}</AlertDialogTitle>
+            <AlertDialogTitle>{tConfirm('warning')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tConfirm.teamNotFound}
+              {tConfirm('teamNotFound')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={handleCloseTeamNotFound}>{tConfirm.close}</AlertDialogAction>
+            <AlertDialogAction onClick={handleCloseTeamNotFound}>{tConfirm('close')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -496,13 +495,13 @@ const TeamCustomFieldPage = () => {
       <AlertDialog open={showArchivedDialog} onOpenChange={setShowArchivedDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{tProjects('projectArchived')}</AlertDialogTitle>
+            <AlertDialogTitle>{t('projectArchived')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tProjects('projectArchivedDescription')}
+              {t('projectArchivedDescription')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={handleArchivedDialogClose}>{tProjects('close')}</AlertDialogAction>
+            <AlertDialogAction onClick={handleArchivedDialogClose}>{t('close')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -830,14 +829,14 @@ const TeamCustomFieldPage = () => {
       <AlertDialog open={showVisibilityDialog} onOpenChange={setShowVisibilityDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{tProjects('projectNotPublic')}</AlertDialogTitle>
+            <AlertDialogTitle>{t('projectNotPublic')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tProjects('projectNotPublicDescription')}
+              {t('projectNotPublicDescription')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowVisibilityDialog(false)}>
-              {tProjects('ok')}
+              {t('ok')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useDispatch, useSelector } from 'react-redux';
-import { createTask, updateTask } from '@/lib/redux/features/taskSlice';
+import { createTask, updateTask, deleteTask } from '@/lib/redux/features/taskSlice';
 import { updateTaskIds } from '@/lib/redux/features/sectionSlice';
 import { useTranslations } from 'next-intl';
 import { useTableContext } from './TableProvider';
@@ -458,7 +458,7 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
           
           if (!value || (typeof value === 'string' && value.trim() === '')) {
             preValidationFailed = true;
-            errors[tagId] = '此字段不能为空';
+            errors[tagId] = 'This field is required';
           }
         }
       }
