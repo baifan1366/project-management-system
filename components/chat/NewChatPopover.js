@@ -51,7 +51,7 @@ const UserItem = ({ user, onClick }) => {
 
 export default function NewChatPopover({ className, buttonContent }) {
   const t = useTranslations('Chat');
-  const { chatMode, createAIChatSession, setCurrentSession, setChatMode } = useChat();
+  const { chatMode, createAIChatSession, setCurrentSession, setChatMode, fetchMessages } = useChat();
   const [isOpen, setIsOpen] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -434,11 +434,24 @@ export default function NewChatPopover({ className, buttonContent }) {
   // 创建新的AI聊天
   const handleAIChatClick = async () => {
     try {
-      const aiSession = await createAIChatSession();
+      // First clear the current session to ensure messages are cleared
+      setCurrentSession(null);
+      
+      // Pass true to force creating a new session instead of reusing existing ones
+      const aiSession = await createAIChatSession(true);
+      
+      // Set the current session to the new AI session
       setCurrentSession(aiSession);
+      
+      // Load fresh messages for this session (this will be empty for a new session)
+      if (aiSession && aiSession.id) {
+        fetchMessages(aiSession.id);
+      }
+      
       if (chatMode === 'normal') {
         setChatMode('ai');
       }
+      
       setIsOpen(false);
       setSelectedUsers([]);
     } catch (error) {
