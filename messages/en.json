@@ -2244,6 +2244,14 @@
     "durationRequired": "Duration is required."
   },
   "Team": {
+    "manage_assignees": "Manage Assignees",
+    "no_assignees": "No assignees",
+    "searchMembers": "Search Members",
+    "no_matching_members": "No matching members",
+    "dateInPastError": "Start date cannot be in the past",
+    "suggestedTags": "Suggested Tags",
+    "assigned": "Assigned",
+    "users": "Users",
     "add_assignee": "Add Assignee",
     "no_available_members": "No available members",
     "details": "Details",
