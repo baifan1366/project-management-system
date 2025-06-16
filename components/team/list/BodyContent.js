@@ -620,7 +620,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                     <div
                       ref={taskProvided.innerRef}
                       {...taskProvided.draggableProps}
-                      className={`border-b border-border h-10 ${
+                      className={`border-b border-border h-10 relative ${
                         snapshot.isDragging ? 'shadow-lg bg-accent/30' : ''
                       } ${hoveredTaskRow === task.id ? 'bg-accent/20' : ''} ${
                         isEditing || isCurrentTaskBeingAdded ? 'bg-accent/10' : ''
@@ -1200,18 +1200,31 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                   </svg>
                                 )}
                               </Button>
+                            </div>
+                          )}
+
+                          {/* 非编辑状态下的操作按钮 - 在鼠标悬停时显示 */}
+                          {!isEditing && !isCurrentTaskBeingAdded && hoveredTaskRow === task.id && (
+                            <div className="flex items-center px-2 gap-1 absolute right-2">
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
-                                onClick={() => handleDeleteTask(task.id, sectionId)}
-                                disabled={isTaskLoading}
+                                className="h-7 w-7 p-0 mt-1.5 text-muted-foreground hover:text-red-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  confirm({
+                                    title: tConfirm('confirmDeleteTask'),
+                                    description: `${tConfirm('task')} "${task.tag_values?.['1'] || ''}" ${tConfirm('willBeDeleted')}`,
+                                    variant: 'error',
+                                    onConfirm: () => {
+                                      handleDeleteTask(task.id, sectionId);
+                                    }
+                                  });
+                                }}
+                                disabled={externalIsLoading}
+                                title={t('delete')}
                               >
-                                {isTaskLoading ? (
-                                  <Loader2 size={16} className="animate-spin" />
-                                ) : (
-                                  <Trash size={16} className="text-red-500 hover:text-red-600" />
-                                )}
+                                <Trash size={16} className="text-red-500 hover:text-red-600" />
                               </Button>
                             </div>
                           )}
