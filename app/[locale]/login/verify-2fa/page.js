@@ -34,7 +34,7 @@ export default function VerifyTwoFactorPage() {
   // Handle successful verification
   const handleVerified = (data) => {
     // Add safety checks for data structure
-    console.log("2FA verification result:", data);
+    
     
     // Redirect to the original destination or default
     const target = redirectUrl.startsWith('/') ? redirectUrl : `/${redirectUrl}`;

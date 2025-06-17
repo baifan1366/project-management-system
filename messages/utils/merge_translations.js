@@ -27,5 +27,4 @@ const updatedZh = deepMerge(zh, missingTranslations);
 // Write the updated translations back to zh.json
 fs.writeFileSync('./messages/zh_updated.json', JSON.stringify(updatedZh, null, 2), 'utf8');
 
-console.log('Updated Chinese translations have been written to messages/zh_updated.json');
-console.log('Please review the file and rename it to zh.json if it looks correct.'); 
+

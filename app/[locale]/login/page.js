@@ -201,7 +201,7 @@ export default function LoginPage() {
       const result = await response.json();
       
       // Debug: log the entire login response
-      console.log('Login API Response:', result);
+      
 
       // Check if 2FA is required
       if (result.requiresTwoFactor) {

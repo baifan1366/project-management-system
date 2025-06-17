@@ -103,7 +103,7 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
           const fileName = `admin_${adminData.id}_${Date.now()}.${fileExt}`;
           const filePath = `${fileName}`;
           
-          console.log('Attempting to upload to admin-avatars bucket...');
+          
           
           // Upload to Supabase Storage
           const { error: uploadError, data: uploadData } = await supabase.storage
@@ -118,14 +118,14 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
             throw new Error(getErrorMessage(uploadError));
           }
           
-          console.log('Upload successful:', uploadData);
+          
           
           // Get the public URL
           const { data: { publicUrl } } = supabase.storage
             .from('admin-avatars')
             .getPublicUrl(filePath);
           
-          console.log('Generated public URL:', publicUrl);
+          
           
           // Update the admin user record
           const { error: updateError } = await supabase

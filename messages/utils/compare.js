@@ -19,10 +19,10 @@ function findMissingKeys(enObj, zhObj, path = '') {
 
 findMissingKeys(en, zh);
 
-console.log('Missing keys in zh.json:');
+
 if (missingKeys.length === 0) {
-  console.log('No missing keys found.');
+  
 } else {
-  console.log(`Found ${missingKeys.length} missing keys:`);
-  missingKeys.forEach(key => console.log(key));
+  
+  missingKeys.forEach(key => 
 } 

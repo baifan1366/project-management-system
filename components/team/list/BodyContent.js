@@ -66,7 +66,9 @@ import {
   isTextType,
   isTextColumn,
   renderTextCell,
-  validateTextInput
+  validateTextInput,
+  EnhancedSingleSelect,
+  SingleSelectManager
 } from './TagConfig';
 
 export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading, validationErrors, handleDeleteTask) {
@@ -741,16 +743,20 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                       } else if (isIdColumn(tag) || (tagObj && isIdType(tagObj))) {
                                         return renderIdCell(currentValue);
                                       } else if (isSingleSelectColumn(tag) || (tagObj && isSingleSelectType(tagObj))) {
-                                        return renderSingleSelectCell(
-                                          currentValue, 
-                                          getTaskOptions(task.id, tagId), 
-                                          (option) => {
-                                            const newValue = JSON.stringify(option);
-                                            handleTaskValueChange(task.id, tagId, newValue);
-                                          },
-                                          (newOption) => handleCreateOption(task.id, tagId, newOption),
-                                          (editedOption) => handleEditOption(task.id, tagId, editedOption),
-                                          (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
+                                        return (
+                                          <EnhancedSingleSelect
+                                            value={currentValue}
+                                            options={getTaskOptions(task.id, tagId)}
+                                            onChange={(option) => {
+                                              const newValue = JSON.stringify(option);
+                                              handleTaskValueChange(task.id, tagId, newValue);
+                                            }}
+                                            onCreateOption={(newOption) => handleCreateOption(task.id, tagId, newOption)}
+                                            onEditOption={(editedOption) => handleEditOption(task.id, tagId, editedOption)}
+                                            onDeleteOption={(optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)}
+                                            teamId={teamId}
+                                            tagId={tagId}
+                                          />
                                         );
                                       } else if (isMultiSelectColumn(tag) || (tagObj && isMultiSelectType(tagObj))) {
                                         return renderMultiSelectCell(
@@ -930,10 +936,10 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                       } else if (isSingleSelectColumn(tag) || (tagObj && isSingleSelectType(tagObj))) {
                                         return (
                                           <div onClick={(e) => e.stopPropagation()}>
-                                            {renderSingleSelectCell(
-                                              currentValue, 
-                                              getTaskOptions(task.id, tagId), 
-                                              (option) => {
+                                            <EnhancedSingleSelect
+                                              value={currentValue}
+                                              options={getTaskOptions(task.id, tagId)}
+                                              onChange={(option) => {
                                                 // 激活编辑模式并设置新值
                                                 if (!isEditing) {
                                                   setEditingTask(task.id);
@@ -964,11 +970,13 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                                   const newValue = JSON.stringify(option);
                                                   handleTaskValueChange(task.id, tagId, newValue);
                                                 }
-                                              },
-                                              (newOption) => handleCreateOption(task.id, tagId, newOption),
-                                              (editedOption) => handleEditOption(task.id, tagId, editedOption),
-                                              (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
-                                            )}
+                                              }}
+                                              onCreateOption={(newOption) => handleCreateOption(task.id, tagId, newOption)}
+                                              onEditOption={(editedOption) => handleEditOption(task.id, tagId, editedOption)}
+                                              onDeleteOption={(optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)}
+                                              teamId={teamId}
+                                              tagId={tagId}
+                                            />
                                           </div>
                                         );
                                       } else if (isMultiSelectColumn(tag) || (tagObj && isMultiSelectType(tagObj))) {

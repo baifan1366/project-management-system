@@ -3,7 +3,8 @@
 //the type is used to check the field type
 //the type is TEXT, NUMBER, ID, SINGLE-SELECT, MULTI-SELECT, DATE, PEOPLE, TAGS, FILE
 
-import { FileText, File, Sheet, FileCode, X, User, Calendar, Fingerprint, Copy, CheckCheck, Trash, Plus } from 'lucide-react';
+import React from 'react';
+import { FileText, File, Sheet, FileCode, X, User, Calendar, Fingerprint, Copy, CheckCheck, Trash, Plus, Edit, Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEffect, useState, useMemo } from 'react';
@@ -13,6 +14,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
 import { fetchTaskById, updateTask } from '@/lib/redux/features/taskSlice';
+import TagLabelManager from './TagLabelManager';
 
 /**
  * 检查字段类型并返回类型常量
@@ -748,7 +750,7 @@ function PeopleDisplay({ userId }) {
       })
       .catch(error => {
         // 静默失败，不影响UI
-        console.log(`无法预取用户信息 (ID: ${userId}):`, error);
+        
       });
   }, [userId, dispatch]);
   
@@ -829,7 +831,7 @@ function MultipleUsers({ userIds }) {
     // 使用批量预取函数获取用户信息
     // 这不会阻塞组件渲染，但会确保缓存中有完整的用户数据
     prefetchUsersInfo(userIds, dispatch).catch(error => {
-      console.log("预取多人员组件的用户信息失败:", error);
+      
     });
   }, [JSON.stringify(userIds), dispatch]);
   
@@ -2108,9 +2110,29 @@ function getContrastTextColor(backgroundColor) {
  * @param {Function} onCreateOption - 创建新选项处理函数
  * @param {Function} onEditOption - 编辑选项处理函数
  * @param {Function} onDeleteOption - 删除选项处理函数
+ * @param {string} teamId - 团队ID
  * @returns {JSX.Element} 渲染的单选单元格组件
  */
-export function renderSingleSelectCell(value, options = [], onChange, onCreateOption, onEditOption, onDeleteOption) {
+export function renderSingleSelectCell(value, options = [], onChange, onCreateOption, onEditOption, onDeleteOption, teamId) {
+  
+  
+  // 如果提供了CRUD操作函数，使用增强版组件
+  if (onCreateOption || onEditOption || onDeleteOption) {
+    return (
+      <EnhancedSingleSelect
+        value={value}
+        options={options}
+        onChange={onChange}
+        teamId={teamId || null} // 添加teamId参数
+        tagId={null} // 在单元格内不需要tagId
+        onCreateOption={onCreateOption}
+        onEditOption={onEditOption}
+        onDeleteOption={onDeleteOption}
+      />
+    );
+  }
+  
+  // 否则使用原始实现（向后兼容）
   const t = useTranslations('Team');
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -3518,7 +3540,7 @@ export function UserCacheManager({ prefetchUserIds = [] }) {
                 }
               })
               .catch(error => {
-                console.log(`预取用户信息失败 (ID: ${userId}):`, error);
+                
               })
           ));
         }
@@ -3575,7 +3597,7 @@ export async function prefetchUsersInfo(userIds, dispatch) {
               return result;
             })
             .catch(error => {
-              console.log(`批量获取用户信息失败 (ID: ${userId}):`, error);
+              
               return null;
             })
         )
@@ -3589,4 +3611,496 @@ export async function prefetchUsersInfo(userIds, dispatch) {
     console.error("预取用户信息失败:", error);
     return Promise.reject(error);
   }
+}
+
+/**
+ * 单选选项管理器组件
+ * 用于管理SINGLE-SELECT类型的选项，支持添加、编辑和删除选项
+ * 
+ * @param {Object} props
+ * @param {string} props.teamId - 团队ID
+ * @param {Array} props.options - 当前可用的选项数组
+ * @param {string} props.tagId - 标签ID
+ * @param {Object} props.selectedValue - 当前选中的值
+ * @param {Function} props.onSelect - 选择事件回调
+ * @param {Function} props.onCreateOption - 创建选项回调
+ * @param {Function} props.onEditOption - 编辑选项回调
+ * @param {Function} props.onDeleteOption - 删除选项回调
+ * @param {boolean} props.selectionMode - 是否为选择模式
+ */
+export function SingleSelectManager({ 
+  teamId, 
+  options = [],
+  tagId,
+  selectedValue = null,
+  onSelect = () => {},
+  onCreateOption = null,
+  onEditOption = null,
+  onDeleteOption = null,
+  selectionMode = true
+}) {
+  const t = useTranslations('Team');
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
+  
+  // 新增选项状态
+  const [isCreating, setIsCreating] = useState(false);
+  const [newOption, setNewOption] = useState({
+    label: '',
+    color: '#10b981',
+    value: ''
+  });
+  
+  // 编辑选项状态
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingOption, setEditingOption] = useState(null);
+  
+  // 生成随机颜色
+  const generateRandomColor = () => {
+    const colors = [
+      '#ef4444', '#f97316', '#f59e0b', '#84cc16', 
+      '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', 
+      '#d946ef', '#ec4899'
+    ];
+    const index = Math.floor(Math.random() * colors.length);
+    return colors[index];
+  };
+  
+  // 处理创建新选项
+  const handleCreateOption = async () => {
+    if (!newOption.label.trim()) {
+      alert(t('optionNameRequired') || '选项名称不能为空');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // 生成value值（如未提供）
+      const optionToCreate = {
+        ...newOption,
+        value: newOption.value || newOption.label.toLowerCase().replace(/\s+/g, '_')
+      };
+      
+      // 调用父组件的创建函数
+      if (onCreateOption) {
+        await onCreateOption(optionToCreate);
+      }
+      
+      // 重置表单
+      setNewOption({
+        label: '',
+        color: '#10b981',
+        value: ''
+      });
+      setIsCreating(false);
+      
+      // 如果在选择模式下，自动选择新创建的选项
+      if (selectionMode && onSelect) {
+        onSelect(optionToCreate);
+      }
+      
+    } catch (error) {
+      console.error('创建选项失败:', error);
+      alert(t('createOptionFailed') || '创建选项失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // 处理更新选项
+  const handleUpdateOption = async () => {
+    if (!editingOption || !editingOption.label.trim()) {
+      alert(t('optionNameRequired') || '选项名称不能为空');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // 调用父组件的更新函数
+      if (onEditOption) {
+        await onEditOption(editingOption);
+      }
+      
+      // 重置表单
+      setEditingOption(null);
+      setIsEditing(false);
+      
+    } catch (error) {
+      console.error('更新选项失败:', error);
+      alert(t('updateOptionFailed') || '更新选项失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // 处理删除选项
+  const handleDeleteOption = async (option) => {
+    if (window.confirm(t('confirmDeleteOption') || '确定要删除此选项吗？')) {
+      try {
+        setLoading(true);
+        
+        // 调用父组件的删除函数
+        if (onDeleteOption) {
+          await onDeleteOption(option);
+        }
+        
+      } catch (error) {
+        console.error('删除选项失败:', error);
+        alert(t('deleteOptionFailed') || '删除选项失败');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+  
+  // 开始编辑选项
+  const startEditOption = (option) => {
+    setIsEditing(true);
+    setIsCreating(false);
+    setEditingOption({...option});
+  };
+  
+  // 处理选择选项
+  const handleSelectOption = (option) => {
+    if (selectionMode && onSelect) {
+      onSelect(option);
+    }
+  };
+  
+  return (
+    <div className="w-full rounded-md border">
+      <div className="p-3">
+        {/* 标题和创建按钮 */}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-medium text-sm">{selectionMode ? t('selectOption') || '选择选项' : t('manageOptions') || '管理选项'}</h3>
+          
+          {/* 只在管理模式下显示添加按钮 - 选择模式下在底部显示 */}
+          {!selectionMode && onCreateOption && !isCreating && !isEditing && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsCreating(true);
+                setIsEditing(false);
+              }}
+              disabled={loading}
+              className="h-8"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              {t('addOption') || '添加选项'}
+            </Button>
+          )}
+        </div>
+        
+        {/* 创建选项表单 - 在选择模式下也显示 */}
+        {isCreating && (
+          <div className="mb-4 p-3 border rounded-lg bg-background">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-medium text-sm">{t('addOption') || '添加选项'}</h4>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 rounded-full"
+                onClick={() => {
+                  setIsCreating(false);
+                  setNewOption({
+                    label: '',
+                    color: '#10b981',
+                    value: ''
+                  });
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm mb-1 font-medium">{t('optionName') || '选项名称'}</label>
+                <input
+                  type="text"
+                  value={newOption.label}
+                  onChange={(e) => setNewOption({...newOption, label: e.target.value})}
+                  className="w-full p-2 border rounded-md focus:ring-1 focus:outline-none text-sm"
+                  placeholder={t('enterOptionName') || '输入选项名称'}
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1 font-medium">{t('optionColor') || '选项颜色'}</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={newOption.color}
+                    onChange={(e) => setNewOption({...newOption, color: e.target.value})}
+                    className="w-full h-8"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setNewOption({...newOption, color: generateRandomColor()})}
+                    className="h-8"
+                  >
+                    🎲
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button
+                  size="sm"
+                  onClick={handleCreateOption}
+                  disabled={loading || !newOption.label.trim()}
+                  className="h-8"
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-background border-t-primary rounded-full animate-spin mr-1" />
+                  ) : null}
+                  {t('create') || '创建'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* 编辑选项表单 - 仅在非选择模式下显示 */}
+        {isEditing && !selectionMode && (
+          <div className="mb-4 p-3 border rounded-lg bg-background">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-medium text-sm">{t('editOption') || '编辑选项'}</h4>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 rounded-full"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditingOption(null);
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm mb-1 font-medium">{t('optionName') || '选项名称'}</label>
+                <input
+                  type="text"
+                  value={editingOption?.label || ''}
+                  onChange={(e) => setEditingOption({...editingOption, label: e.target.value})}
+                  className="w-full p-2 border rounded-md focus:ring-1 focus:outline-none text-sm"
+                  placeholder={t('enterOptionName') || '输入选项名称'}
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1 font-medium">{t('optionColor') || '选项颜色'}</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={editingOption?.color || '#10b981'}
+                    onChange={(e) => setEditingOption({...editingOption, color: e.target.value})}
+                    className="w-full h-8"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingOption({...editingOption, color: generateRandomColor()})}
+                    className="h-8"
+                  >
+                    🎲
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button
+                  size="sm"
+                  onClick={handleUpdateOption}
+                  disabled={loading || !editingOption?.label?.trim()}
+                  className="h-8"
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-background border-t-primary rounded-full animate-spin mr-1" />
+                  ) : null}
+                  {t('save') || '保存'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* 选项列表 */}
+        <div className="grid grid-cols-1 gap-2">
+          {options.length > 0 ? (
+            options.map((option, index) => (
+              <div 
+                key={index}
+                className={`flex items-center justify-between p-2 border ${selectedValue && selectedValue.value === option.value ? 'border-primary ring-1 ring-primary' : 'border-gray-300 dark:border-gray-700'} rounded-lg transition-all duration-200 ${selectionMode ? 'cursor-pointer hover:bg-accent/10' : ''}`}
+                style={{ borderLeft: `3px solid ${option.color}` }}
+                onClick={selectionMode ? () => handleSelectOption(option) : undefined}
+                tabIndex={selectionMode ? 0 : undefined}
+                role={selectionMode ? "button" : undefined}
+              >
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-4 h-4 rounded-full" 
+                    style={{ backgroundColor: option.color || '#e5e5e5' }}
+                  ></div>
+                  <span className="font-medium text-sm">{option.label}</span>
+                </div>
+                
+                {/* 在选择模式下显示选中标记，在管理模式下显示编辑删除按钮 */}
+                {!isCreating && !isEditing && (
+                  selectionMode ? (
+                    selectedValue && selectedValue.value === option.value && (
+                      <Check className="w-4 h-4 text-primary" />
+                    )
+                  ) : (
+                    <div className="flex gap-1">
+                      {onEditOption && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0.5 rounded-full opacity-70 hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditOption(option);
+                          }}
+                          disabled={loading}
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {onDeleteOption && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0.5 rounded-full text-destructive hover:text-destructive opacity-70 hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteOption(option);
+                          }}
+                          disabled={loading}
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-4 text-muted-foreground border border-gray-300 dark:border-gray-700 rounded-lg text-sm">
+              {selectionMode ? t('noOptions') || '没有可选项' : t('noStatusOptions') || '没有状态选项'}
+            </div>
+          )}
+        </div>
+        
+        {/* 在选择模式下显示添加选项按钮 */}
+        {selectionMode && onCreateOption && !isCreating && !isEditing && (
+          <div className="mt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsCreating(true);
+                setIsEditing(false);
+              }}
+              disabled={loading}
+              className="w-full h-8"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              {t('addOption') || '添加选项'}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 强化版的SINGLE-SELECT选择组件
+ * 集成了选项管理功能，支持创建、编辑和删除选项
+ * 
+ * @param {Object} props
+ * @param {string|Object} props.value - 当前选中的值
+ * @param {Array} props.options - 当前可用的选项数组
+ * @param {Function} props.onChange - 值改变回调
+ * @param {string} props.teamId - 团队ID
+ * @param {string} props.tagId - 标签ID
+ * @param {Function} props.onCreateOption - 外部创建选项回调
+ * @param {Function} props.onEditOption - 外部编辑选项回调
+ * @param {Function} props.onDeleteOption - 外部删除选项回调
+ */
+export function EnhancedSingleSelect({ 
+  value, 
+  options = [], 
+  onChange, 
+  teamId, 
+  tagId,
+  disabled = false,
+  onCreateOption: externalCreateOption,
+  onEditOption: externalEditOption,
+  onDeleteOption: externalDeleteOption
+}) {
+  const t = useTranslations('Team');
+  const [open, setOpen] = useState(false);
+  const [localOptions, setLocalOptions] = useState(options);
+  const selectedOption = parseSingleSelectValue(value);
+  
+  // 不再使用动态导入
+  // const TagLabelManager = React.lazy(() => import('./TagLabelManager'));
+  
+  // 同步外部options和内部状态
+  useEffect(() => {
+    setLocalOptions(options);
+  }, [options]);
+  
+  // 调试输出
+  useEffect(() => {
+    
+    
+    
+  }, [teamId, options, selectedOption]);
+  
+  // 处理选择选项
+  const handleSelectOption = (option) => {
+    
+    if (onChange) {
+      onChange(option);
+    }
+    setOpen(false);
+  };
+  
+  return (
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+      <PopoverTrigger asChild>
+        <div className={`flex items-center gap-2 justify-between rounded-md border p-2 ${disabled ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-accent/50'}`}>
+          {selectedOption ? (
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full flex-shrink-0" 
+                style={{ backgroundColor: selectedOption.color || '#e5e5e5' }}
+              ></div>
+              <span className="text-sm truncate">{selectedOption.label}</span>
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">{t('selectOption') || '选择选项'}</span>
+          )}
+          {!disabled && (
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-muted-foreground">
+              <path d="M4.93179 5.43179C4.75605 5.60753 4.75605 5.89245 4.93179 6.06819C5.10753 6.24392 5.39245 6.24392 5.56819 6.06819L7.49999 4.13638L9.43179 6.06819C9.60753 6.24392 9.89245 6.24392 10.0682 6.06819C10.2439 5.89245 10.2439 5.60753 10.0682 5.43179L7.81819 3.18179C7.73379 3.0974 7.61933 3.04999 7.49999 3.04999C7.38064 3.04999 7.26618 3.0974 7.18179 3.18179L4.93179 5.43179ZM10.0682 9.56819C10.2439 9.39245 10.2439 9.10753 10.0682 8.93179C9.89245 8.75606 9.60753 8.75606 9.43179 8.93179L7.49999 10.8636L5.56819 8.93179C5.39245 8.75606 5.10753 8.75606 4.93179 8.93179C4.75605 9.10753 4.75605 9.39245 4.93179 9.56819L7.18179 11.8182C7.26618 11.9026 7.38064 11.95 7.49999 11.95C7.61933 11.95 7.73379 11.9026 7.81819 11.8182L10.0682 9.56819Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
+            </svg>
+          )}
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start">
+        <TagLabelManager
+          teamId={teamId}
+          selectedValue={selectedOption}
+          onSelect={handleSelectOption}
+          selectionMode={true}
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
