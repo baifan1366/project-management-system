@@ -13,22 +13,26 @@ import { sendEmail } from '@/lib/email';
 // API to send verification code
 export async function POST(request, { params }) {
   try {
-    const { userId } = params;
+    const { userId } = await params;
+    const { action, password } = await request.json();
     
-    // Verify the current user matches the requested user ID
-    const userData = await getCurrentUser();
-    
-    if (!userData || !userData.user || userData.user.id !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Skip authentication check for login verification
+    if (action !== 'send_code') {
+      // Verify the current user matches the requested user ID
+      const userData = await getCurrentUser();
+      
+      if (!userData || !userData.user || userData.user.id !== userId) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
     }
     
     // Get user from database to get email
     const { data: user, error: userError } = await supabase
       .from('user')
-      .select('email, name')
+      .select('email, name, password_hash, is_email_2fa_enabled')
       .eq('id', userId)
       .single();
       
@@ -37,6 +41,34 @@ export async function POST(request, { params }) {
         { error: 'User not found' },
         { status: 404 }
       );
+    }
+    
+    // If action is to send a disable code, verify password and that email 2FA is enabled
+    if (action === 'send_disable_code') {
+      if (!password) {
+        return NextResponse.json(
+          { error: 'Password is required' },
+          { status: 400 }
+        );
+      }
+      
+      if (!user.is_email_2fa_enabled) {
+        return NextResponse.json(
+          { error: 'Email 2FA is not enabled' },
+          { status: 400 }
+        );
+      }
+      
+      // Verify password
+      const bcrypt = require('bcryptjs');
+      const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+      
+      if (!isPasswordValid) {
+        return NextResponse.json(
+          { error: 'Invalid password' },
+          { status: 401 }
+        );
+      }
     }
     
     // Generate a 6-digit code
@@ -54,66 +86,58 @@ export async function POST(request, { params }) {
       .eq('type', 'TWO_FACTOR')
       .single();
     
+    // If code exists, update it, otherwise create a new one
     if (existingCode) {
-      // Update existing code
-      const { error: updateError } = await supabase
+      await supabase
         .from('email_verification_codes')
         .update({
           code: verificationCode,
-          expires_at: expirationTime.toISOString(),
-          created_at: new Date().toISOString(),
-          used: false
+          expires_at: expirationTime,
+          used: false,
         })
         .eq('id', existingCode.id);
-      
-      if (updateError) {
-        console.error('Error updating verification code:', updateError);
-        return NextResponse.json(
-          { error: 'Failed to send verification code' },
-          { status: 500 }
-        );
-      }
     } else {
-      // Insert new code
-      const { error: insertError } = await supabase
+      await supabase
         .from('email_verification_codes')
         .insert({
           user_id: userId,
           code: verificationCode,
-          expires_at: expirationTime.toISOString(),
           type: 'TWO_FACTOR',
+          expires_at: expirationTime,
           used: false
         });
-      
-      if (insertError) {
-        console.error('Error inserting verification code:', insertError);
-        return NextResponse.json(
-          { error: 'Failed to send verification code' },
-          { status: 500 }
-        );
-      }
     }
     
-    // Send email with the code
+    // Create the email HTML
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Your Verification Code</h2>
-        <p>Hello ${user.name || 'User'},</p>
-        <p>Your two-factor authentication code is:</p>
-        <div style="background-color: #f4f4f4; padding: 10px; font-size: 24px; font-weight: bold; text-align: center; letter-spacing: 5px; margin: 20px 0;">
-          ${verificationCode}
+        <h1 style="color: #333;">Two-Factor Authentication Code</h1>
+        <p>Hello ${user.name},</p>
+        ${action === 'send_disable_code' 
+          ? `<p>You've requested to disable email-based two-factor authentication for your account. To confirm this action, please use this verification code:</p>` 
+          : `<p>To complete your sign-in, please use the following verification code:</p>`
+        }
+        <div style="background-color: #f4f4f4; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
+          <h2 style="margin: 0; font-size: 32px; letter-spacing: 5px; color: #4f46e5;">${verificationCode}</h2>
         </div>
-        <p>This code will expire in 5 minutes.</p>
-        <p>If you didn't request this code, please ignore this email or contact support if you have concerns.</p>
-        <p>Best regards,<br>Team Sync</p>
+        <p>This code will expire in 5 minutes for security reasons.</p>
+        ${action === 'send_disable_code'
+          ? `<p><strong>Warning:</strong> If you did not request to disable two-factor authentication, please reset your password immediately as your account may be compromised.</p>`
+          : `<p>If you didn't request this code, you can safely ignore this email. Someone may have typed your email address by mistake.</p>`
+        }
+        <p>Thank you,<br />The Support Team</p>
       </div>
     `;
     
     await sendEmail({
       to: user.email,
-      subject: 'Your Two-Factor Authentication Code',
+      subject: action === 'send_disable_code' 
+        ? 'Security Alert: Confirm Disabling Two-Factor Authentication' 
+        : 'Your Two-Factor Authentication Code',
       html: emailHtml,
-      text: `Your two-factor authentication code is: ${verificationCode}. This code will expire in 5 minutes.`
+      text: action === 'send_disable_code'
+        ? `Your verification code to disable two-factor authentication is: ${verificationCode}. This code will expire in 5 minutes. If you did not request to disable 2FA, please reset your password immediately.`
+        : `Your two-factor authentication code is: ${verificationCode}. This code will expire in 5 minutes.`
     });
     
     return NextResponse.json({
@@ -133,7 +157,7 @@ export async function POST(request, { params }) {
 // API to verify the code
 export async function PUT(request, { params }) {
   try {
-    const { userId } = params;
+    const { userId } = await params;
     const { code } = await request.json();
     
     if (!code) {
@@ -161,10 +185,14 @@ export async function PUT(request, { params }) {
     }
     
     // Check if code has expired
+    // Use UTC time for comparison to avoid timezone issues
     const now = new Date();
     const expiresAt = new Date(verificationData.expires_at);
     
-    if (now > expiresAt) {
+    // Add 8 hours to the expiration time to account for UTC+8 timezone
+    const adjustedExpiresAt = new Date(expiresAt.getTime() + (8 * 60 * 60 * 1000));
+    
+    if (now > adjustedExpiresAt) {
       return NextResponse.json(
         { error: 'Verification code has expired' },
         { status: 401 }

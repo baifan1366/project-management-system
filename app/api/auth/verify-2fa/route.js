@@ -80,10 +80,14 @@ export async function POST(request) {
       }
       
       // Check if code has expired
+      // Use UTC time for comparison to avoid timezone issues
       const now = new Date();
       const expiresAt = new Date(verificationData.expires_at);
       
-      if (now > expiresAt) {
+      // Add 8 hours to the expiration time to account for UTC+8 timezone
+      const adjustedExpiresAt = new Date(expiresAt.getTime() + (8 * 60 * 60 * 1000));
+      
+      if (now > adjustedExpiresAt) {
         return NextResponse.json(
           { error: 'Verification code has expired' },
           { status: 401 }
