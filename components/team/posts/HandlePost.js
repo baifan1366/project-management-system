@@ -29,7 +29,6 @@ export default function HandlePost({ teamId }) {
         created_at: new Date().toISOString(), // 添加创建时间
         is_pinned: false,
         reactions: {},
-        comment_id: [], // 使用新的comment_id字段
         attachment_id: [] // 使用新的attachment_id字段
       };
       

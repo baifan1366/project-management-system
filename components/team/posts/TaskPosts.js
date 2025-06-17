@@ -1067,9 +1067,9 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               className="rounded-md min-w-[80px]"
             >
               {isLoading ? 
-                t('saving')
+                t('posting')
               : 
-                t('save')
+                t('post')
               }
             </Button>
           </div>
@@ -1146,6 +1146,52 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
             >
               <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
             </Button>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-md border-[#E1DFDD] hover:bg-[#F5F5F5] dark:border-[#3B3A39] dark:text-white dark:hover:bg-[#3B3A39] flex items-center gap-1 text-[#252423]"
+                >
+                  <div className="flex items-center gap-1">
+                    {postType === 'post' ? (
+                      <MessageSquare className="h-4 w-4" />
+                    ) : (
+                      <MessageSquare className="h-4 w-4 rotate-180" />
+                    )}
+                    <span>{postType === 'post' ? t('post') : t('announcement')}</span>
+                  </div>
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-0">
+                <div className="py-1">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 rounded-none"
+                    onClick={() => setPostType('post')}
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      <span>{t('post')}</span>
+                    </div>
+                    {postType === 'post' && <Check className="h-4 w-4 ml-auto" />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 rounded-none"
+                    onClick={() => setPostType('announcement')}
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 rotate-180" />
+                      <span>{t('announcement')}</span>
+                    </div>
+                    {postType === 'announcement' && <Check className="h-4 w-4 ml-auto" />}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           
           <div className="flex space-x-2">
@@ -1165,7 +1211,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               className="rounded-md min-w-[80px]"
             >
               {isLoading ? 
-                t('saving')
+                t('posting')
               : 
                 t('post')
               }
