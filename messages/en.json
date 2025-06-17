@@ -112,6 +112,10 @@
     "passwordChanged": "Password has been changed successfully",
     "timezone": "Timezone",
     "timeFormat": "Time Format",
+    "phoneInvalid": "Invalid phone number",
+    "phoneMinDigits": "Phone number must be at least 8 digits",
+    "nameRequired": "Name is required",
+    "userNameMax": "Name must be less than 50 characters",
     "password": {
       "requirementsTitle": "Password Requirements:",
       "minLength": "At least 8 characters",
@@ -1816,7 +1820,8 @@
     "emailVerification": {
       "title": "Email Verification",
       "loading": "Verifying your email...",
-      "redirecting": "Redirecting you to login page..."
+      "redirecting": "Redirecting you to login page...",
+      "backToLogin": "Back to login"
     },
     "signup": {
       "title": "Sign up",
@@ -2271,7 +2276,8 @@
     "taskNameMin": "Task Name must be at least 2 characters.",
     "taskNameMax": "Task Name cannot exceed 100 characters.",
     "startDateRequired": "Start Date is required.",
-    "durationRequired": "Duration is required."
+    "durationRequired": "Duration is required.",
+    "userNameMax": "Name must be less than 50 characters."
   },
   "Team": {
     "deleteOptionTitle": "Delete Option",
