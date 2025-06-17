@@ -37,286 +37,6 @@ const findTagById = (tagId, tags) => {
   return tags.find(tag => tag.id === parseInt(tagId) || tag.id === tagId || tag.id.toString() === tagId);
 };
 
-// 状态选择器组件，与TagConfig.js中的renderSingleSelectCell完全一致
-const StatusSelector = ({ value, onChange, options, projectThemeColor }) => {
-    const t = useTranslations('CreateTask');
-    const [open, setOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [isCreating, setIsCreating] = useState(false);
-    const [newOption, setNewOption] = useState({ label: '', color: '#10b981' });
-    const [editingOption, setEditingOption] = useState(null);
-    
-    // 解析当前选择的值
-    const selectedOption = parseSingleSelectValue(value);
-    
-    // 过滤选项
-    const filteredOptions = options.filter(option => 
-        option.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    
-    // 处理选项选择
-    const handleSelect = (option) => {
-        if (onChange) {
-            onChange(option);
-        }
-        setOpen(false);
-        setSearchTerm('');
-    };
-    
-    // 创建新选项
-    const handleCreateOption = () => {
-        if (newOption.label.trim()) {
-            const optionToAdd = {
-                ...newOption,
-                value: newOption.value || newOption.label.toLowerCase().replace(/\s+/g, '_')
-            };
-            
-            // 自动添加到选中项
-            handleSelect(optionToAdd);
-            
-            setNewOption({ label: '', color: '#10b981' });
-            setIsCreating(false);
-        }
-    };
-    
-    // 编辑选项
-    const handleEditOption = () => {
-        if (editingOption) {
-            // 如果编辑的是当前选中选项，更新选中值
-            if (selectedOption && selectedOption.value === editingOption.value) {
-                onChange(editingOption);
-            }
-            
-            setEditingOption(null);
-        }
-    };
-    
-    // 删除选项
-    const handleDeleteOption = (option, e) => {
-        e.stopPropagation();
-        // 如果删除的是当前选中选项，清除选中值
-        if (selectedOption && selectedOption.value === option.value) {
-            onChange(null);
-        }
-    };
-    
-    // 开始编辑选项
-    const startEditOption = (option, e) => {
-        e.stopPropagation();
-        setEditingOption({...option});
-    };
-    
-    // 生成随机颜色
-    const generateRandomColor = () => {
-        // 创建一个随机字符串
-        const randomString = Math.random().toString(36).substring(2, 8);
-        // 使用helpers.js中的函数生成颜色，确保一致性
-        return generateColorFromLabel(randomString);
-    };
-    
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <div className="flex items-center gap-2 hover:bg-accent p-1 rounded-md transition-colors cursor-pointer">
-                    {selectedOption ? (
-                        <div className="flex items-center gap-2">
-                            <div 
-                                className="w-3 h-3 rounded-full flex-shrink-0" 
-                                style={{ backgroundColor: selectedOption.color || '#e5e5e5' }}
-                            ></div>
-                            <span className="text-sm truncate">{selectedOption.label}</span>
-                        </div>
-                    ) : (
-                        <span className="text-sm text-muted-foreground">{t('selectStatus')}</span>
-                    )}
-                </div>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-0" align="start">
-                <div className="p-2">
-                    {/* 搜索输入框 */}
-                    <div className="mb-2">
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder={t('searchOptions')}
-                            className="w-full p-2 border rounded text-sm"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                    </div>
-                    
-                    {/* 选项列表 */}
-                    <div className="max-h-40 overflow-y-auto">
-                        {filteredOptions.length > 0 ? (
-                            filteredOptions.map((option, index) => (
-                                <div 
-                                    key={index} 
-                                    className={`flex items-center justify-between p-2 hover:bg-accent/50 rounded-md cursor-pointer ${
-                                        selectedOption && selectedOption.value === option.value ? 'bg-accent' : ''
-                                    }`}
-                                    onClick={() => handleSelect(option)}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <div 
-                                            className="w-3 h-3 rounded-full" 
-                                            style={{ backgroundColor: option.color || '#e5e5e5' }}
-                                        ></div>
-                                        <span className="text-sm">{option.label}</span>
-                                    </div>
-                                    
-                                    {/* 选项编辑按钮 */}
-                                    <div className="flex items-center">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0"
-                                            onClick={(e) => startEditOption(option, e)}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                            </svg>
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                                            onClick={(e) => handleDeleteOption(option, e)}
-                                        >
-                                            <Trash size={16} />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-sm text-muted-foreground text-center py-2">
-                                {searchTerm ? t('noMatchingOptions') : t('noOptions')}
-                            </div>
-                        )}
-                    </div>
-                    
-                    {/* 添加新选项按钮 */}
-                    <div className="mt-2 border-t pt-2">
-                        {isCreating ? (
-                            <div className="space-y-2">
-                                <input
-                                    type="text"
-                                    value={newOption.label}
-                                    onChange={(e) => setNewOption({...newOption, label: e.target.value})}
-                                    placeholder={t('newOptionName')}
-                                    className="w-full p-2 border rounded text-sm"
-                                />
-                                <div className="flex items-center gap-2">
-                                    <div className="flex-1">
-                                        <input
-                                            type="color"
-                                            value={newOption.color}
-                                            onChange={(e) => setNewOption({...newOption, color: e.target.value})}
-                                            className="w-full h-8"
-                                        />
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setNewOption({...newOption, color: generateRandomColor()})}
-                                        className="h-8"
-                                    >
-                                        🎲
-                                    </Button>
-                                </div>
-                                <div className="flex justify-between">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            setIsCreating(false);
-                                            setNewOption({ label: '', color: '#10b981' });
-                                        }}
-                                    >
-                                        {t('cancel')}
-                                    </Button>
-                                    <Button
-                                        variant={projectThemeColor}
-                                        size="sm"
-                                        onClick={handleCreateOption}
-                                        disabled={!newOption.label.trim()}
-                                    >
-                                        {t('create')}
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full"
-                                onClick={() => setIsCreating(true)}
-                            >
-                                <Plus size={16} className="mr-1" />
-                                {t('addOption')}
-                            </Button>
-                        )}
-                    </div>
-                    
-                    {/* 编辑选项界面 */}
-                    {editingOption && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingOption(null)}>
-                            <div className="bg-background p-4 rounded-lg shadow-lg w-72" onClick={(e) => e.stopPropagation()}>
-                                <h3 className="text-lg font-medium mb-4">{t('editOption')}</h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">{t('optionName')}</label>
-                                        <input
-                                            type="text"
-                                            value={editingOption.label}
-                                            onChange={(e) => setEditingOption({...editingOption, label: e.target.value})}
-                                            className="w-full p-2 border rounded"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">{t('optionColor')}</label>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="color"
-                                                value={editingOption.color}
-                                                onChange={(e) => setEditingOption({...editingOption, color: e.target.value})}
-                                                className="w-full h-8"
-                                            />
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setEditingOption({...editingOption, color: generateRandomColor()})}
-                                                className="h-8"
-                                            >
-                                                🎲
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between pt-2">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setEditingOption(null)}
-                                        >
-                                            {t('cancel')}
-                                        </Button>
-                                        <Button
-                                            variant={projectThemeColor}
-                                            onClick={handleEditOption}
-                                            disabled={!editingOption.label.trim()}
-                                        >
-                                            {t('save')}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </PopoverContent>
-        </Popover>
-    );
-};
-
 export default function BodyContent({ projectThemeColor }) {
     const dispatch = useDispatch();
     const t = useTranslations('CreateTask');
@@ -390,7 +110,6 @@ export default function BodyContent({ projectThemeColor }) {
     useEffect(() => {
       if (teamId) {
         // 强制每次组件加载时都请求最新数据
-        console.log('准备获取团队标签数据, teamId:', teamId);
         dispatch(getLabelByTeamId(teamId));
         requestCache.teamLabel = true;
         localRequestTracker.current.teamLabelFetched = true;
@@ -398,20 +117,14 @@ export default function BodyContent({ projectThemeColor }) {
     }, [dispatch, teamId]);
     
     // 当团队标签数据加载完成后处理状态选项
-    useEffect(() => {
-      console.log('团队标签数据状态变化:', teamLabelStatus, '数据:', teamLabel);
-      
+    useEffect(() => {      
       if (teamLabelStatus === 'succeeded') {
         // 从团队标签数据中提取SINGLE-SELECT选项
         const extractedOptions = extractSingleSelectOptions(teamLabel);
-        console.log('提取到的状态选项:', extractedOptions);
         
         // 如果有提取到选项，则使用提取的选项替换默认选项
         if (extractedOptions && extractedOptions.length > 0) {
-          console.log('设置新的状态选项');
           setStatusOptions(extractedOptions);
-        } else {
-          console.log('未提取到有效选项，使用默认选项');
         }
       }
     }, [teamLabel, teamLabelStatus]);
@@ -891,7 +604,9 @@ export default function BodyContent({ projectThemeColor }) {
             
             // 刷新工作流图
             if (refreshWorkflow) {
-                refreshWorkflow(updatedProcessedTasks);
+                setTimeout(() => {
+                    refreshWorkflow([...updatedProcessedTasks]);
+                }, 100); // 使用setTimeout确保状态更新已完成
             }
             
         } catch (error) {
@@ -975,11 +690,13 @@ export default function BodyContent({ projectThemeColor }) {
                     
                     <div className="flex flex-col">
                         <label className="font-medium mb-1">{t('status')}:</label>
-                        <StatusSelector 
-                            value={editingValues.status}
-                            onChange={(option) => handleInputChange('status', option)}
-                            options={statusOptions}
+                        <WorkflowLabelManager 
+                            teamId={teamId}
+                            selectedValue={editingValues.status}
+                            onSelect={(option) => handleInputChange('status', option)}
                             projectThemeColor={projectThemeColor}
+                            selectionMode={true}
+                            tasks={[]}
                         />
                     </div>
                     <div className="flex flex-col">
@@ -1231,14 +948,20 @@ export default function BodyContent({ projectThemeColor }) {
             
             // 更新本地任务列表
             const newProcessedTask = extractTaskInfo(updatedTask);
+            
+            // 使用函数形式的setState确保获取最新状态
             setAllTasks(prev => [...prev, updatedTask]);
-            setProcessedTasks(prev => [...prev, newProcessedTask]);
             
-            // 更新工作流数据
+            // 使用函数形式重新构建处理后的任务
             const updatedTasks = [...processedTasks, newProcessedTask];
-            updateWorkflowData(updatedTasks);
+            setProcessedTasks(updatedTasks);
             
-            // 刷新工作流图
+            // 强制重建工作流数据
+            // 注意：这里我们不使用updatedTasks，因为可能存在异步状态更新的问题
+            // 而是直接在这里构建完整的任务列表
+            await new Promise(resolve => setTimeout(resolve, 50)); // 小延迟以确保状态更新
+            
+            // 刷新工作流图 - 使用强制刷新模式
             if (refreshWorkflow) {
                 refreshWorkflow(updatedTasks);
             }
@@ -1302,12 +1025,14 @@ export default function BodyContent({ projectThemeColor }) {
                     
                     <div className="flex flex-col">
                         <label className="font-medium mb-1">{t('status')}:</label>
-                        <StatusSelector 
-                            value={newTaskValues.status}
-                            onChange={(option) => handleNewTaskInputChange('status', option)}
-                            options={statusOptions}
+                        <WorkflowLabelManager 
+                            teamId={teamId}
+                            selectedValue={newTaskValues.status}
+                            onSelect={(option) => handleNewTaskInputChange('status', option)}
                             projectThemeColor={projectThemeColor}
-                        />  
+                            selectionMode={true}
+                            tasks={[]}
+                        />
                     </div>
                     <div className="flex flex-col">
                         <label className="font-medium mb-1">{t('description')}:</label>
@@ -1435,7 +1160,9 @@ export default function BodyContent({ projectThemeColor }) {
                         
                         // 刷新工作流图
                         if (refreshWorkflow) {
-                            refreshWorkflow(updatedTasks);
+                            setTimeout(() => {
+                                refreshWorkflow([...updatedTasks]);
+                            }, 100); // 使用setTimeout确保状态更新已完成
                         }
                         
                         toast.success(t('taskDeleted'));
@@ -1490,7 +1217,7 @@ export default function BodyContent({ projectThemeColor }) {
 
             {/* 标签管理器组件 */}
             {showLabelManager && (
-                <div className="mb-6 border rounded-lg">
+                <div className="mb-6 overflow-hidden max-w-full">
                     <WorkflowLabelManager 
                         teamId={teamId}
                         tasks={allTasks}

@@ -64,7 +64,8 @@ function TaskListContent() {
     handleKeyDown,
     handleClickOutside,
     setEditingTask,
-    validationErrors
+    validationErrors,
+    handleDeleteTask
   } = HandleTask({ 
     teamId, 
     localTasks, 
@@ -85,7 +86,8 @@ function TaskListContent() {
     editingTask,
     editingTaskValues,
     isTaskLoading,
-    validationErrors
+    validationErrors,
+    handleDeleteTask
   );
   
   // 拖拽相关功能

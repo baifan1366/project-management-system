@@ -5,24 +5,19 @@ import React from 'react';
  */
 
 // 根据标签解析状态对象
-export function parseSingleSelectValue(value) {
-  console.log('parseSingleSelectValue 输入值:', value, '类型:', typeof value);
-  
+export function parseSingleSelectValue(value) {  
   if (!value) {
-    console.log('parseSingleSelectValue: 值为空，返回null');
     return null;
   }
   
   // 如果已经是对象形式，直接返回，确保保留原始颜色
   if (typeof value === 'object' && value !== null) {
-    console.log('parseSingleSelectValue: 值已经是对象，格式化后返回');
     const result = {
       label: value.label || '',
       value: value.value || value.label?.toLowerCase()?.replace(/\s+/g, '_') || '',
       // 优先使用对象中的颜色，没有时才生成
       color: value.color || generateColorFromLabel(value.label || '')
     };
-    console.log('对象格式化结果:', result);
     return result;
   }
   
@@ -35,14 +30,12 @@ export function parseSingleSelectValue(value) {
     if (value.includes('\\\"') || value.includes('\\"')) {
       // 替换转义的引号
       stringToParse = value.replace(/\\"/g, '"');
-      console.log('parseSingleSelectValue: 处理转义字符后:', stringToParse);
     }
     
     try {
       // 如果是有效的JSON字符串，解析它
       if (stringToParse.startsWith('{') || stringToParse.startsWith('[')) {
         const parsed = JSON.parse(stringToParse);
-        console.log('parseSingleSelectValue: JSON解析结果:', parsed);
         
         // 如果是对象，返回格式化的对象
         if (typeof parsed === 'object' && parsed !== null) {
@@ -52,7 +45,6 @@ export function parseSingleSelectValue(value) {
           const color = parsed.color || generateColorFromLabel(label || value);
           
           const result = { label, value, color };
-          console.log('parseSingleSelectValue: 格式化对象结果:', result);
           return result;
         }
       }
@@ -62,7 +54,6 @@ export function parseSingleSelectValue(value) {
     }
     
     // 如果不是有效的JSON或解析失败，创建基本对象
-    console.log('parseSingleSelectValue: 作为普通字符串处理');
     const label = value;
     const valueKey = value.toLowerCase().replace(/\s+/g, '_');
     return {
@@ -73,7 +64,6 @@ export function parseSingleSelectValue(value) {
   }
   
   // 如果是数字或其他类型，转为字符串并创建基本对象
-  console.log('parseSingleSelectValue: 作为其他类型处理');
   const stringValue = String(value);
   return {
     label: stringValue,

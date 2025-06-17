@@ -6,7 +6,7 @@
 import { FileText, File, Sheet, FileCode, X, User, Calendar, Fingerprint, Copy, CheckCheck, Trash, Plus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUserById } from '@/lib/redux/features/usersSlice';
 import { useTranslations } from 'next-intl';
@@ -510,6 +510,7 @@ export function renderPeopleCell(userIdStr, taskId, teamId, editable = true) {
       <div className="flex flex-col gap-2 w-full">
         <div className="flex items-center justify-between w-full">
           <PeopleDisplay userId={userIds[0]} />
+          <div className="flex items-center">
           {/* 始终允许删除负责人 */}
           {taskId && (
             <RemoveUserFromAssignee 
@@ -526,6 +527,7 @@ export function renderPeopleCell(userIdStr, taskId, teamId, editable = true) {
               onAdded={handleUserAdded} 
             />
           )}
+          </div>
         </div>
       </div>
     );
@@ -534,23 +536,11 @@ export function renderPeopleCell(userIdStr, taskId, teamId, editable = true) {
   // 显示多个用户
   return (
     <div className="flex flex-col gap-2 w-full">
+      <div className="flex items-center justify-between w-full">
       <MultipleUsers userIds={userIds} />
       
-      {/* 始终允许管理负责人 */}
-      {taskId && (
-        <div className="mt-1 space-y-1">
-          {userIds.map(userId => (
-            <div key={userId} className="flex items-center justify-between p-1 rounded-md hover:bg-accent/50">
-              <PeopleDisplay userId={userId} />
-              <RemoveUserFromAssignee 
-                taskId={taskId} 
-                userIdToRemove={userId} 
-                onRemoved={handleUserRemoved} 
-              />
-            </div>
-          ))}
-          
-          {teamId && (
+        {/* 始终显示添加按钮，即使有多个用户 */}
+        {taskId && teamId && (
             <AddUserToAssignee 
               teamId={teamId} 
               taskId={taskId} 
@@ -558,7 +548,6 @@ export function renderPeopleCell(userIdStr, taskId, teamId, editable = true) {
             />
           )}
         </div>
-      )}
     </div>
   );
 }
@@ -711,14 +700,63 @@ export function EditablePeopleCell({ value, taskId, teamId, editable = true }) {
  * @returns {JSX.Element} 人员显示组件
  */
 function PeopleDisplay({ userId }) {
+  const dispatch = useDispatch();
   const { users, isLoading } = useUserData(userId);
   const user = users[0]; // 单个用户ID只会有一个结果
+  
+  // 使用useMemo缓存渲染结果，避免不必要的重渲染
+  const userInfo = useMemo(() => {
+    if (!user) return {
+      name: '未知用户',
+      email: userId ? `ID: ${userId.substring(0, 8)}...` : '未知ID',
+      title: '',
+      department: '',
+      avatar: null,
+      initial: ''
+    };
+    
+    return {
+      name: user.name || '未知用户',
+      email: user.email || `ID: ${userId.substring(0, 8)}...`,
+      title: user.title || '',
+      department: user.department || '',
+      avatar: user.avatar_url || null,
+      initial: user.name?.[0] || ''
+    };
+  }, [user, userId]);
+  
+  // 预取用户详细信息
+  useEffect(() => {
+    // 检查缓存状态
+    if (!userId || 
+        (userInfoCache.has(userId) && 
+        Date.now() - userInfoCache.get(userId).timestamp < USER_CACHE_TIME)
+      ) {
+      return; // 缓存中有有效数据，不需要预取
+    }
+    
+    // 异步预取用户详情，不阻塞渲染
+    dispatch(fetchUserById(userId))
+      .unwrap()
+      .then(result => {
+        if (result) {
+          userInfoCache.set(userId, {
+            user: result,
+            timestamp: Date.now()
+          });
+        }
+      })
+      .catch(error => {
+        // 静默失败，不影响UI
+        console.log(`无法预取用户信息 (ID: ${userId}):`, error);
+      });
+  }, [userId, dispatch]);
   
   if (isLoading) {
     return (
       <div className="flex items-center gap-2">
-        <div className="h-6 w-6 rounded-full bg-muted animate-pulse"></div>
-        <div className="h-4 w-20 bg-muted animate-pulse rounded"></div>
+        <div className="h-7 w-7 rounded-full bg-muted/60 animate-pulse"></div>
+        <div className="h-4 w-20 bg-muted/60 animate-pulse rounded"></div>
       </div>
     );
   }
@@ -726,38 +764,46 @@ function PeopleDisplay({ userId }) {
   if (!user) {
     return (
       <div className="flex items-center gap-2">
-        <Avatar className="h-6 w-6">
-          <AvatarFallback>
+        <Avatar className="h-7 w-7">
+          <AvatarFallback className="bg-muted/60">
             <User size={14} />
           </AvatarFallback>
         </Avatar>
-        <span className="text-muted-foreground text-sm">ID: {userId ? userId.substring(0, 8) : '未知'}</span>
+        <span className="text-sm text-muted-foreground">ID: {userId ? userId.substring(0, 8) : '未知'}</span>
       </div>
     );
   }
   
   return (
     <Popover>
-      <PopoverTrigger className="flex items-center gap-2 hover:bg-accent p-1 rounded-md transition-colors">
-        <Avatar className="h-6 w-6">
-          <AvatarImage src={user.avatar_url} />
-          <AvatarFallback>{user.name?.[0] || <User size={14} />}</AvatarFallback>
+      <PopoverTrigger className="flex items-center gap-2 hover:bg-accent p-1 rounded-md transition-colors group">
+        <Avatar className="h-7 w-7 transition-transform group-hover:scale-105">
+          <AvatarImage src={userInfo.avatar} />
+          <AvatarFallback className="bg-primary/10 text-primary font-medium">{userInfo.initial || <User size={14} />}</AvatarFallback>
         </Avatar>
-        <span className="text-sm truncate">{user.name || user.email || userId.substring(0, 8)}</span>
+        <span className="text-sm font-medium group-hover:text-primary transition-colors truncate">{userInfo.name}</span>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
-        <div className="flex items-start gap-4 p-4">
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={user.avatar_url} />
-            <AvatarFallback>{user.name?.[0] || <User size={20} />}</AvatarFallback>
+        <div className="flex flex-col">
+          <div className="bg-primary/5 p-4 flex items-start gap-4 border-b">
+            <Avatar className="h-14 w-14">
+            <AvatarImage src={userInfo.avatar} />
+              <AvatarFallback className="bg-primary/10 text-primary font-medium text-lg">{userInfo.initial || <User size={24} />}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="font-medium">{user.name || '未知用户'}</span>
-            <span className="text-sm text-muted-foreground">{user.email || `ID: ${userId.substring(0, 8)}...`}</span>
-            {user.title && (
-              <span className="text-sm text-muted-foreground mt-1">{user.title}</span>
+              <span className="font-medium text-base">{userInfo.name}</span>
+            <span className="text-sm text-muted-foreground">{userInfo.email}</span>
+            {userInfo.title && (
+                <span className="text-xs text-muted-foreground mt-1 bg-muted px-2 py-0.5 rounded-full w-fit">{userInfo.title}</span>
             )}
           </div>
+          </div>
+          {userInfo.department && (
+            <div className="px-4 py-2 text-sm">
+              <span className="text-muted-foreground">部门: </span>
+              <span>{userInfo.department}</span>
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -772,57 +818,95 @@ function PeopleDisplay({ userId }) {
  */
 function MultipleUsers({ userIds }) {
   const t = useTranslations('Team');  
+  const dispatch = useDispatch();
   const { users, isLoading } = useUserData(userIds);
-  const displayCount = 2; // 显示的头像数量
+  const displayCount = 3; // 最多显示3个头像
+  
+  // 预取所有用户信息
+  useEffect(() => {
+    if (!userIds.length) return;
+    
+    // 使用批量预取函数获取用户信息
+    // 这不会阻塞组件渲染，但会确保缓存中有完整的用户数据
+    prefetchUsersInfo(userIds, dispatch).catch(error => {
+      console.log("预取多人员组件的用户信息失败:", error);
+    });
+  }, [JSON.stringify(userIds), dispatch]);
+  
+  // 优化显示逻辑，防止不必要的渲染
+  const userAvatars = useMemo(() => {
+    return users.slice(0, displayCount).map((user, idx) => (
+      <Avatar 
+        key={user?.id || idx} 
+        className={`h-7 w-7 border-2 border-background transition-all ${
+          idx > 0 ? "group-hover:-translate-x-1" : ""
+        }`}
+      >
+        <AvatarImage src={user?.avatar_url} />
+        <AvatarFallback className="bg-primary/10 text-primary font-medium">
+          {user?.name?.[0] || <User size={14} />}
+        </AvatarFallback>
+      </Avatar>
+    ));
+  }, [users]);
   
   return (
     <Popover>
-      <PopoverTrigger className="flex items-center gap-2 hover:bg-accent p-1 rounded-md transition-colors">
-        <div className="flex -space-x-2">
-          {/* 显示前N个用户头像 */}
-          {users.slice(0, displayCount).map((user, idx) => (
-            <Avatar key={user?.id || idx} className="h-6 w-6 border-2 border-background">
-              <AvatarImage src={user?.avatar_url} />
-              <AvatarFallback>
-                {user?.name?.[0] || <User size={14} />}
-              </AvatarFallback>
-            </Avatar>
-          ))}
+      <PopoverTrigger className="flex items-center gap-1 hover:bg-accent p-1 rounded-md transition-colors group">
+        <div className="flex items-center">
+          {/* 头像堆叠显示 */}
+          <div className="flex -space-x-3 mr-2">
+            {userAvatars}
+            
+            {/* 如果有更多用户，显示额外数量 */}
+            {userIds.length > displayCount && (
+              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background font-medium transition-transform group-hover:-translate-x-1">
+                +{userIds.length - displayCount}
+              </div>
+            )}
+            
+            {/* 如果还在加载中，显示加载指示器 */}
+            {isLoading && users.length === 0 && (
+              <div className="h-7 w-7 rounded-full bg-muted animate-pulse border-2 border-background"></div>
+            )}
+          </div>
           
-          {/* 如果有更多用户，显示额外数量 */}
-          {userIds.length > displayCount && (
-            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
-              +{userIds.length - displayCount}
-            </div>
-          )}
-          
-          {/* 如果还在加载中，显示加载指示器 */}
-          {isLoading && users.length === 0 && (
-            <div className="h-6 w-6 rounded-full bg-muted animate-pulse border-2 border-background"></div>
-          )}
+          {/* 用户数量文本 */}
+          <span className="text-sm font-medium">
+            {userIds.length > 1 ? 
+              `${userIds.length} ${t('users') || '用户'}` : 
+              (users[0]?.name || users[0]?.email || '用户')}
+          </span>
         </div>
-        <span className="text-sm truncate">
-          {users.length ? `${users[0]?.name || users[0]?.email || '用户'} ${users.length > 1 ? `+${users.length - 1}` : ''}` : 
-          isLoading ? '加载中...' : `${userIds.length} 用户`}
-        </span>
       </PopoverTrigger>
       
       <PopoverContent className="w-72 p-0" align="start" side="bottom">
         <div className="p-2">
-          <h4 className="text-sm font-medium mb-2 px-2">{t('assigned_users')}</h4>
+          <h4 className="text-sm font-medium mb-2 px-2 flex items-center">
+            <User size={14} className="mr-1.5 text-primary" />
+            {t('assigned_users') || '已分配用户'} 
+            <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+              {userIds.length}
+            </span>
+          </h4>
           <div className="max-h-60 overflow-y-auto">
             {isLoading && userIds.length > users.length ? (
               <div className="flex items-center justify-center py-2">
                 <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                <span className="ml-2 text-sm text-muted-foreground">{t('loading')}</span>
+                <span className="ml-2 text-sm text-muted-foreground">{t('loading') || '加载中'}</span>
               </div>
             ) : null}
             
             {users.map((user, idx) => (
-              <div key={user?.id || idx} className="flex items-center gap-3 p-2 hover:bg-accent/50 rounded-md">
+              <div 
+                key={user?.id || idx} 
+                className="flex items-center gap-3 p-2 hover:bg-accent/50 rounded-md transition-colors"
+              >
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user?.avatar_url} />
-                  <AvatarFallback>{user?.name?.[0] || <User size={14} />}</AvatarFallback>
+                  <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                    {user?.name?.[0] || <User size={14} />}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
                   <span className="font-medium text-sm">{user?.name || '未知用户'}</span>
@@ -835,10 +919,10 @@ function MultipleUsers({ userIds }) {
             {userIds.filter(id => !users.some(u => u?.id === id)).map(id => (
               <div key={id} className="flex items-center gap-3 p-2 hover:bg-accent/50 rounded-md">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback><User size={14} /></AvatarFallback>
+                  <AvatarFallback className="bg-muted/60"><User size={14} /></AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
-                  <span className="font-medium text-sm">{t('unknown_user')}</span>
+                  <span className="font-medium text-sm">{t('unknown_user') || '未知用户'}</span>
                   <span className="text-xs text-muted-foreground">ID: {id ? id.substring(0, 8) : '未知'}...</span>
                 </div>
               </div>
@@ -932,10 +1016,10 @@ function RemoveUserFromAssignee({ taskId, userIdToRemove, onRemoved }) {
       size="icon" 
       variant="ghost" 
       onClick={handleRemoveUser}
-      className="h-6 w-6 rounded-full hover:bg-destructive/10 hover:text-destructive"
+      className="h-7 w-7 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
       title="移除负责人"
     >
-      <Trash className="w-3 h-3" />
+      <Trash className="w-3.5 h-3.5" />
     </Button>
   );
 }
@@ -961,6 +1045,22 @@ function useDebounce(value, delay) {
 const teamMembersCache = new Map();
 const CACHE_TIME = 60000; // 缓存1分钟
 
+// 添加全局用户缓存
+const userInfoCache = new Map();
+const USER_CACHE_TIME = 300000; // 用户信息缓存5分钟
+
+/**
+ * 清理过期的用户缓存
+ */
+export function cleanExpiredUserCache() {
+  const now = Date.now();
+  for (const [id, data] of userInfoCache.entries()) {
+    if (now - data.timestamp >= USER_CACHE_TIME) {
+      userInfoCache.delete(id);
+    }
+  }
+}
+
 /**
  * 添加负责人组件
  * @param {Object} props - 组件参数
@@ -979,6 +1079,10 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastFetchedTeamId, setLastFetchedTeamId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [enrichedMembers, setEnrichedMembers] = useState([]);
+  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // 添加防抖搜索
   
   // 使用useEffect进行防抖获取
   useEffect(() => {
@@ -1055,6 +1159,43 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
     
   }, [teamId, taskId, dispatch]);
   
+  // 获取团队成员后，再获取每个成员的详细信息
+  useEffect(() => {
+    if (!teamMembers.length) return;
+    
+    const fetchDetailedUserInfo = async () => {
+      setLoadingUserDetails(true);
+      
+      try {
+        const enrichedData = await Promise.all(
+          teamMembers.map(async (member) => {
+            try {
+              // 获取用户详细信息
+              const userResult = await dispatch(fetchUserById(member.user_id)).unwrap();
+              return {
+                ...member,
+                name: userResult.name || member.name,
+                email: userResult.email || member.email,
+                avatar_url: userResult.avatar_url || member.avatar_url
+              };
+            } catch (error) {
+              console.error(`获取用户${member.user_id}详情失败:`, error);
+              return member; // 返回原始成员信息
+            }
+          })
+        );
+        
+        setEnrichedMembers(enrichedData);
+      } catch (error) {
+        console.error("获取用户详情失败:", error);
+      } finally {
+        setLoadingUserDetails(false);
+      }
+    };
+    
+    fetchDetailedUserInfo();
+  }, [teamMembers, dispatch]);
+  
   // 提取用户数据的辅助函数
   function extractUsers(response) {
     if (Array.isArray(response)) return response;
@@ -1118,56 +1259,172 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
     }
   };
 
+  // 处理移除负责人操作
+  const handleRemoveUserFromAssignee = async (userIdToRemove) => {
+    if (!userIdToRemove || !taskId) {
+      return;
+    }
+    
+    try {      
+      // 获取当前任务信息
+      const taskResult = await dispatch(fetchTaskById(taskId)).unwrap();
+      
+      // 获取当前负责人列表
+      const tagValues = taskResult.tag_values || {};
+      const currentAssignees = tagValues[assigneeTagId] || [];
+            
+      // 如果没有找到assignee标签值或者不是数组，则不执行操作
+      if (!Array.isArray(currentAssignees)) {
+        console.error('负责人数据格式错误', currentAssignees);
+        return;
+      }
+      
+      // 移除指定用户ID
+      const updatedAssignees = currentAssignees.filter(userId => userId !== userIdToRemove);
+      
+      // 获取当前所有 tag_values
+      const allTagValues = taskResult.tag_values || {};
+      
+      // 合并更新，保留所有其他字段
+      const updatedTagValues = {
+        ...allTagValues,
+        [assigneeTagId]: updatedAssignees
+      };
+      
+      // 更新任务
+      const updatedTask = await dispatch(updateTask({
+        taskId: taskId, 
+        taskData: {
+          tag_values: updatedTagValues
+        }
+      })).unwrap();
+      
+      // 更新本地状态
+      setAssignedMembers(updatedAssignees);
+      
+      // 更新未分配成员列表
+      const userToAdd = teamMembers.find(member => member.user_id === userIdToRemove);
+      if (userToAdd) {
+        setMembersNotYetAssigned(prev => [...prev, userToAdd]);
+      }
+      
+      // 如果提供了回调函数，则调用
+      if (typeof onAdded === 'function') {
+        onAdded(userIdToRemove);
+      }
+      
+    } catch (error) {
+      console.error('移除负责人失败:', error);
+      alert('移除失败: ' + (error.message || '服务器错误'));
+    }
+  };
+
+  // 过滤团队成员 - 使用防抖后的搜索词
+  const filteredTeamMembers = useMemo(() => {
+    return enrichedMembers.filter(member => {
+      const memberName = member.name?.toLowerCase() || '';
+      const memberEmail = member.email?.toLowerCase() || '';
+      // 添加默认值，防止debouncedSearchTerm为undefined
+      const search = (debouncedSearchTerm || '').toLowerCase();
+      return memberName.includes(search) || 
+             memberEmail.includes(search) || 
+             member.user_id.toLowerCase().includes(search);
+    });
+  }, [enrichedMembers, debouncedSearchTerm]);
+  
+  // 检查用户是否已被分配
+  const isUserAssigned = (userId) => {
+    return assignedMembers.includes(userId);
+  };
+
   return (
-    <div className="flex justify-center">
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex items-center gap-1 h-7 border border-dashed border-primary/50 hover:border-primary"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-64 p-2">
-          <h4 className="text-sm font-medium mb-2">{t('add_assignee') || '添加负责人'}</h4>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button 
+        variant="ghost" 
+        size="icon" 
+        className="h-7 w-7 rounded-full hover:bg-primary/10 hover:text-primary"
+        title={t('add_assignee') || '添加负责人'}
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-medium flex items-center">
+            <User size={14} className="mr-1.5 text-primary" /> 
+            {t('manage_assignees') || '管理负责人'}
+          </h4>
+        </div>
           
-          {isLoading ? (
-            <div className="flex items-center justify-center py-4">
-              <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-              <span className="ml-2 text-sm text-muted-foreground">{t('loading') || '加载中...'}</span>
-            </div>
-          ) : error ? (
-            <div className="text-center py-2 text-sm text-destructive">
-              {error}
-            </div>
-          ) : membersNotYetAssigned.length > 0 ? (
-            <div className="max-h-60 overflow-y-auto">
-              {membersNotYetAssigned.map(member => (
+        {/* 搜索框 */}
+        <div className="mb-2">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={t('searchMembers') || '搜索团队成员...'}
+            className="w-full p-2 border rounded text-sm"
+          />
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+            <span className="ml-2 text-sm text-muted-foreground">{t('loading') || '加载中...'}</span>
+          </div>
+        ) : error ? (
+          <div className="text-center py-2 text-sm text-destructive">
+            {error}
+          </div>
+        ) : filteredTeamMembers.length > 0 ? (
+          <div className="max-h-60 overflow-y-auto">
+            {filteredTeamMembers.map(member => {
+              const isAssigned = isUserAssigned(member.user_id);
+              return (
                 <div 
                   key={member.user_id} 
-                  className="flex items-center gap-2 p-2 hover:bg-accent/50 rounded-md cursor-pointer"
-                  onClick={() => handleAddUserToAssignee(member.user_id)}
+                  className={`flex items-center gap-2 p-2 hover:bg-accent/50 rounded-md cursor-pointer transition-colors ${
+                    isAssigned ? 'bg-primary/10' : ''
+                  }`}
+                  onClick={() => isAssigned 
+                    ? handleRemoveUserFromAssignee(member.user_id)
+                    : handleAddUserToAssignee(member.user_id)
+                  }
                 >
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-8 w-8 relative">
                     <AvatarImage src={member.avatar_url} />
-                    <AvatarFallback>{member.name?.[0] || <User size={14} />}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                      {member.name?.[0] || <User size={14} />}
+                    </AvatarFallback>
+                    {isAssigned && (
+                      <div className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full w-4 h-4 flex items-center justify-center">
+                        <CheckCheck size={12} />
+                      </div>
+                    )}
                   </Avatar>
                   <div className="flex flex-col">
-                    <span className="text-xs text-medium">{member.user_id}</span>
+                    <span className="text-sm font-medium">{member.name || member.user_id}</span>
+                    <span className="text-xs text-muted-foreground">{member.email || `ID: ${member.user_id.substring(0, 8)}...`}</span>
                   </div>
+                  {isAssigned ? (
+                    <CheckCheck size={16} className="ml-auto text-muted-foreground" />
+                  ) : (
+                    <Plus size={16} className="ml-auto text-muted-foreground" />
+                  )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-2 text-sm text-muted-foreground">
-              {t('no_available_members') || '没有可添加的团队成员'}
-            </div>
-          )}
-        </PopoverContent>
-      </Popover>
-    </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-5 text-sm text-muted-foreground flex flex-col items-center">
+            {searchTerm 
+              ? (t('no_matching_members') || '没有匹配的团队成员') 
+              : (t('no_available_members') || '没有团队成员')}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -1249,32 +1506,54 @@ export function AssigneeManager({ teamId, taskId }) {
           {/* 当前负责人列表 */}
           {assignees.length > 0 ? (
             <div className="space-y-1">
-              {assignees.map(userId => (
+              {assignees.length > 1 ? (
+                <div className="flex items-center justify-between p-1 rounded-md hover:bg-accent/50 group">
+                  <MultipleUsers userIds={assignees} />
+                  <AddUserToAssignee 
+                    teamId={teamId} 
+                    taskId={taskId} 
+                    onAdded={handleAddAssignee}
+                  />
+                </div>
+              ) : (
+                assignees.map(userId => (
                 <div key={userId} className="flex items-center justify-between p-1 rounded-md hover:bg-accent/50 group">
                   <PeopleDisplay userId={userId} />
+                    <div className="flex items-center gap-1">
                   <RemoveUserFromAssignee 
                     taskId={taskId} 
                     userIdToRemove={userId} 
                     onRemoved={handleRemoveAssignee}
                   />
+                      <AddUserToAssignee 
+                        teamId={teamId} 
+                        taskId={taskId} 
+                        onAdded={handleAddAssignee}
+                      />
                 </div>
-              ))}
+                  </div>
+                ))
+              )}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground py-1 flex items-center gap-2">
-              <User size={14} className="text-muted-foreground" />
-              {t('unassigned') || '未分配'}
+            <div className="flex items-center justify-between p-1 rounded-md hover:bg-accent/50">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-7 w-7">
+                  <AvatarFallback className="bg-muted/60">
+                    <User size={14} />
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm text-muted-foreground">{t('unassigned') || '未分配'}</span>
             </div>
-          )}
           
           {/* 添加负责人按钮 */}
-          <div className="mt-1">
             <AddUserToAssignee 
               teamId={teamId} 
               taskId={taskId} 
               onAdded={handleAddAssignee}
             />
           </div>
+          )}
         </>
       )}
     </div>
@@ -1393,6 +1672,42 @@ export function renderDateCell(dateValue, onChange) {
   const t = useTranslations('Team');
   const formattedDate = formatDateDisplay(dateValue);
   
+  // 获取今天的日期，格式为YYYY-MM-DD
+  const today = new Date().toISOString().split('T')[0];
+  
+  // 日期验证函数，确保不能选择今天之前的日期
+  const validateDate = (selectedDate) => {
+    if (!selectedDate) return true; // 允许清空日期
+    
+    const selected = new Date(selectedDate);
+    selected.setHours(0, 0, 0, 0); // 重置时间部分
+    
+    const current = new Date();
+    current.setHours(0, 0, 0, 0); // 重置时间部分
+    
+    return selected >= current; // 只有当选择的日期大于等于今天时返回true
+  };
+  
+  // 处理日期变更
+  const handleDateChange = (e) => {
+    const newDate = e.target.value;
+    
+    if (validateDate(newDate)) {
+      // 日期有效，调用onChange
+      if (onChange) {
+        onChange(newDate);
+      }
+    } else {
+      // 日期无效，显示警告
+      alert(t('dateInPastError') || '不能选择今天之前的日期');
+      
+      // 如果当前已有有效日期，保持不变；否则清空
+      if (onChange && !validateDate(dateValue)) {
+        onChange('');
+      }
+    }
+  };
+  
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -1406,11 +1721,8 @@ export function renderDateCell(dateValue, onChange) {
           <input 
             type="date" 
             value={dateValue ? new Date(dateValue).toISOString().split('T')[0] : ''} 
-            onChange={(e) => {
-              if (onChange) {
-                onChange(e.target.value);
-              }
-            }}
+            onChange={handleDateChange}
+            min={today} // 设置最小日期为今天
             className="p-2 border rounded"
           />
           {dateValue && (
@@ -3093,7 +3405,7 @@ export function validateTextInput(value, options = {}) {
   if (required && (!value || value.trim() === '')) {
     return {
       isValid: false,
-      message: '此字段不能为空'
+      message: 'This field is required.'
     };
   }
   
@@ -3160,4 +3472,121 @@ export function renderTextCell(value, onChange, options = {}) {
       )}
     </div>
   );
+}
+
+/**
+ * 用户缓存管理组件，用于定期清理过期缓存并提供预取功能
+ * 可以添加到应用的根组件中
+ */
+export function UserCacheManager({ prefetchUserIds = [] }) {
+  const dispatch = useDispatch();
+  
+  // 定期清理过期缓存
+  useEffect(() => {
+    const intervalId = setInterval(cleanExpiredUserCache, USER_CACHE_TIME);
+    return () => clearInterval(intervalId);
+  }, []);
+  
+  // 预取用户信息
+  useEffect(() => {
+    if (!prefetchUserIds.length) return;
+    
+    // 过滤出缓存中不存在或已过期的用户ID
+    const userIdsToFetch = prefetchUserIds.filter(id => 
+      !userInfoCache.has(id) || 
+      Date.now() - userInfoCache.get(id).timestamp >= USER_CACHE_TIME
+    );
+    
+    if (!userIdsToFetch.length) return;
+    
+    // 批量预取用户信息
+    const prefetchUsers = async () => {
+      try {
+        // 并发获取多个用户信息，但限制并发数为5
+        const batchSize = 5;
+        for (let i = 0; i < userIdsToFetch.length; i += batchSize) {
+          const batch = userIdsToFetch.slice(i, i + batchSize);
+          await Promise.all(batch.map(userId => 
+            dispatch(fetchUserById(userId))
+              .unwrap()
+              .then(result => {
+                if (result) {
+                  userInfoCache.set(userId, {
+                    user: result,
+                    timestamp: Date.now()
+                  });
+                }
+              })
+              .catch(error => {
+                console.log(`预取用户信息失败 (ID: ${userId}):`, error);
+              })
+          ));
+        }
+      } catch (error) {
+        console.error("批量预取用户信息失败:", error);
+      }
+    };
+    
+    prefetchUsers();
+  }, [prefetchUserIds, dispatch]);
+  
+  return null; // 这是一个纯功能性组件，不渲染任何UI
+}
+
+/**
+ * 预取指定用户ID数组的用户信息
+ * @param {Array} userIds - 用户ID数组
+ * @param {Function} dispatch - Redux dispatch函数
+ * @returns {Promise} - 完成预取的Promise
+ */
+export async function prefetchUsersInfo(userIds, dispatch) {
+  if (!Array.isArray(userIds) || !userIds.length || !dispatch) {
+    return Promise.resolve();
+  }
+  
+  try {
+    // 过滤出缓存中不存在或已过期的用户ID
+    const userIdsToFetch = userIds.filter(id => 
+      !userInfoCache.has(id) || 
+      Date.now() - userInfoCache.get(id).timestamp >= USER_CACHE_TIME
+    );
+    
+    if (!userIdsToFetch.length) {
+      return Promise.resolve();
+    }
+    
+    // 批量获取，但限制并发数
+    const batchSize = 5;
+    const batches = [];
+    
+    for (let i = 0; i < userIdsToFetch.length; i += batchSize) {
+      const batch = userIdsToFetch.slice(i, i + batchSize);
+      const batchPromise = Promise.all(
+        batch.map(userId => 
+          dispatch(fetchUserById(userId))
+            .unwrap()
+            .then(result => {
+              if (result) {
+                userInfoCache.set(userId, {
+                  user: result,
+                  timestamp: Date.now()
+                });
+              }
+              return result;
+            })
+            .catch(error => {
+              console.log(`批量获取用户信息失败 (ID: ${userId}):`, error);
+              return null;
+            })
+        )
+      );
+      
+      batches.push(batchPromise);
+    }
+    
+    return Promise.all(batches);
+  } catch (error) {
+    console.error("预取用户信息失败:", error);
+    return Promise.reject(error);
+  }
 }

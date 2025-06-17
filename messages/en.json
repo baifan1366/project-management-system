@@ -766,6 +766,11 @@
     "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
   },
   "CreateTask": {
+    "projectArchived": "Project Archived",
+    "projectNotPublic": "Project Not Public",
+    "ok": "OK",
+    "projectNotPublicDescription": "This project is not public. You can no longer create tasks in it.",
+    "projectArchivedDescription": "This project has been archived. You can no longer create tasks in it.",
     "taskDeleted": "Task deleted successfully",
     "taskNotFound": "Task not found",
     "deleteTaskFailed": "Failed to delete task",
@@ -1031,7 +1036,8 @@
     "unclassified": "Unclassified",
     "noStatusOptions": "No status options available",
     "noTasksOrGrouping": "No tasks or status groupings available",
-    "editTaskFailed": "Failed to edit task"
+    "editTaskFailed": "Failed to edit task",
+    "random": "Random"
   },
   "ChatDialog": {
     "privateMessages": "Private Messages",
@@ -2145,6 +2151,9 @@
     "orderedList": "Ordered List"
   },
   "confirmation": {
+    "teamNotFound": "Team Not Found",
+    "warning": "Warning",
+    "close": "Close",
     "confirm": "Confirm",
     "cancel": "Cancel",
     "confirmDeleteTask": "Confirm Delete Task",
@@ -2265,6 +2274,14 @@
     "durationRequired": "Duration is required."
   },
   "Team": {
+    "manage_assignees": "Manage Assignees",
+    "no_assignees": "No assignees",
+    "searchMembers": "Search Members",
+    "no_matching_members": "No matching members",
+    "dateInPastError": "Start date cannot be in the past",
+    "suggestedTags": "Suggested Tags",
+    "assigned": "Assigned",
+    "users": "Users",
     "add_assignee": "Add Assignee",
     "no_available_members": "No available members",
     "details": "Details",
