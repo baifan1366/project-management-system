@@ -12,6 +12,8 @@ import { FaEye, FaEyeSlash, FaQuestionCircle, FaCheck, FaTimes } from 'react-ico
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import useGetUser from '@/lib/hooks/useGetUser';
+import { useDispatch } from 'react-redux';
+import { updateUserData } from '@/lib/redux/features/usersSlice';
 
 // Import 2FA components
 import TOTPSetup from '@/components/2fa/TOTPSetup';
@@ -23,6 +25,7 @@ export default function SecurityPage() {
   const t = useTranslations('profile');
   const params = useParams();
   const locale = params.locale;
+  const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
@@ -54,11 +57,21 @@ export default function SecurityPage() {
   // Get current user using the useGetUser hook
   const { user, isLoading, mutate } = useGetUser();
   
-  // Use mutate as refreshUser function
+  // Use mutate as refreshUser function and update Redux store
   const refreshUser = () => {
     if (typeof mutate === 'function') {
-      return mutate();
+      mutate().then(() => {
+        // Update Redux store with new MFA status if user exists
+        if (user) {
+          dispatch(updateUserData({
+            is_mfa_enabled: user.is_mfa_enabled,
+            is_email_2fa_enabled: user.is_email_2fa_enabled
+          }));
+        }
+      });
+      return true;
     }
+    return false;
   };
 
   // Check requirements whenever password changes
@@ -431,7 +444,11 @@ export default function SecurityPage() {
                 // Force a delay and then refresh again to ensure UI updates
                 setTimeout(() => {
                   refreshUser();
-                  toast.success(t('common.success'));
+                  // Also explicitly update Redux store
+                  dispatch(updateUserData({
+                    is_mfa_enabled: true
+                  }));
+                  toast.success(t('success'));
                 }, 500);
               }}
               onCancel={() => setShowTotpSetup(false)}
@@ -476,7 +493,11 @@ export default function SecurityPage() {
                 // Force a delay and then refresh again to ensure UI updates
                 setTimeout(() => {
                   refreshUser();
-                  toast.success(t('common.success'));
+                  // Also explicitly update Redux store
+                  dispatch(updateUserData({
+                    is_email_2fa_enabled: true
+                  }));
+                  toast.success(t('success'));
                 }, 500);
               }}
               onCancel={() => setShowEmailSetup(false)}
@@ -498,7 +519,11 @@ export default function SecurityPage() {
             // Force a delay and then refresh again to ensure UI updates
             setTimeout(() => {
               refreshUser();
-              toast.success(t('common.success'));
+              // Also explicitly update Redux store
+              dispatch(updateUserData({
+                is_mfa_enabled: false
+              }));
+              toast.success(t('success'));
             }, 500);
           }}
         />
@@ -516,7 +541,11 @@ export default function SecurityPage() {
             // Force a delay and then refresh again to ensure UI updates
             setTimeout(() => {
               refreshUser();
-              toast.success(t('common.success'));
+              // Also explicitly update Redux store
+              dispatch(updateUserData({
+                is_email_2fa_enabled: false
+              }));
+              toast.success(t('success'));
             }, 500);
           }}
         />

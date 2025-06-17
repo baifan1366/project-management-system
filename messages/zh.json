@@ -2755,5 +2755,35 @@
     "userProfile": "用户资料",
     "notFound": "用户未找到",
     "accountSettings": "账户设置"
+  },
+  "auth": {
+    "title": "认证",
+    "login": {
+      "title": "登录",
+      "button": "登录",
+      "success": "成功",
+      "loading": "登录中...",
+      "twoFactorAuth": "两步验证",
+      "enterCode": "请输入验证码以继续",
+      "verificationMethod": "验证方式",
+      "authenticatorApp": "验证器应用",
+      "email": "电子邮件",
+      "enterTotpCode": "输入验证器应用中的6位数验证码",
+      "enterEmailCode": "输入发送到您邮箱的验证码",
+      "digitCode": "6位数验证码",
+      "verificationCode": "验证码",
+      "sending": "发送中...",
+      "resendIn": "重新发送倒计时",
+      "resendCode": "重新发送验证码",
+      "cancel": "取消",
+      "verifying": "验证中...",
+      "verify": "验证",
+      "codeSent": "验证码已发送到您的电子邮箱",
+      "totpCodeError": "请输入验证器应用中的有效6位数验证码",
+      "emailCodeError": "请输入从电子邮件收到的验证码",
+      "verificationSuccess": "验证成功",
+      "havingTrouble": "遇到问题？",
+      "contactSupport": "联系客服"
+    }
   }
 }

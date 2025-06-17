@@ -77,6 +77,7 @@ export default function VerifyTwoFactorPage() {
           onVerified={handleVerified}
           onCancel={handleCancel}
           locale={locale}
+          action="send_code"
         />
         
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
