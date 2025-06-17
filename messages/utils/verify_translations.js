@@ -20,12 +20,12 @@ try {
 
   findMissingKeys(en, zh);
 
-  console.log('===== VERIFICATION RESULTS =====');
+  
   if (missingKeys.length === 0) {
-    console.log('✓ SUCCESS: No missing keys found. All English keys are now present in the Chinese translation.');
+    
   } else {
-    console.log(`✗ ERROR: Found ${missingKeys.length} keys still missing:`);
-    missingKeys.forEach(key => console.log(`  - ${key}`));
+    
+    missingKeys.forEach(key => 
   }
 
   // Also check if there are any keys in zh.json that are not in en.json
@@ -46,18 +46,18 @@ try {
   findExtraKeys(zh, en);
 
   if (extraKeys.length > 0) {
-    console.log(`\n✗ WARNING: Found ${extraKeys.length} extra keys in zh.json that are not in en.json:`);
-    extraKeys.forEach(key => console.log(`  - ${key}`));
+    
+    extraKeys.forEach(key => 
   } else {
-    console.log('\n✓ SUCCESS: No extra keys found in zh.json.');
+    
   }
   
   if (missingKeys.length === 0 && extraKeys.length === 0) {
-    console.log('\n✅ PERFECT MATCH: The translation files are perfectly aligned.');
-    console.log('\nThe Chinese translation file has been successfully updated with all missing translations.');
+    
+    
   }
   
-  console.log('==============================');
+  
 } catch (error) {
-  console.log('Error during verification:', error);
+  
 } 

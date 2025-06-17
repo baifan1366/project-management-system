@@ -37,7 +37,6 @@
     "edit": "Edit",
     "loading": "Loading...",
     "error": "An error occurred",
-    "success": "successful",
     "create": "Create",
     "creating": "Creating...",
     "notifications": "Notifications",
@@ -2156,6 +2155,7 @@
     "orderedList": "Ordered List"
   },
   "confirmation": {
+    "save":"Save",
     "teamNotFound": "Team Not Found",
     "warning": "Warning",
     "close": "Close",
@@ -2280,6 +2280,17 @@
     "userNameMax": "Name must be less than 50 characters."
   },
   "Team": {
+    "deleteOptionTitle": "Delete Option",
+    "deleteOptionWarning": "Are you sure you want to delete this option?",
+    "loadLabelsFailed": "Failed to load labels",
+    "manageOptions": "Manage Options",
+    "noStatusOptions": "No status options",
+    "optionNameRequired": "Option name is required",
+    "createOptionFailed": "Failed to create status option",
+    "updateOptionFailed": "Failed to update status option",
+    "confirmDeleteOption": "Confirm Delete Option",
+    "deleteOptionFailed": "Failed to delete status option",
+    "enterOptionName": "Enter option name",
     "manage_assignees": "Manage Assignees",
     "no_assignees": "No assignees",
     "searchMembers": "Search Members",

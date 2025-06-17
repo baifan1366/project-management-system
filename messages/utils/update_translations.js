@@ -20,18 +20,18 @@ try {
   
   // Create backup of original file
   fs.copyFileSync(zhPath, zhBackupPath);
-  console.log(`✓ Backup created: ${zhBackupPath}`);
+  
   
   // Replace original file with updated file
   fs.copyFileSync(zhUpdatedPath, zhPath);
-  console.log(`✓ Original zh.json replaced with updated translations.`);
+  
   
   // Delete the updated file
   fs.unlinkSync(zhUpdatedPath);
-  console.log(`✓ Temporary zh_updated.json file deleted.`);
   
-  console.log('\n✅ Update completed successfully!');
-  console.log(`If you need to restore the original file, you can find it at: ${zhBackupPath}`);
+  
+  
+  
 } catch (error) {
   console.error('Error updating translations:', error);
 } 

@@ -10,7 +10,7 @@ export async function GET() {
     const allCookies = cookieStore.getAll();
     
     // Log cookies to server console
-    console.log('Server cookies:', {
+    
       authToken: authToken ? {
         name: authToken.name,
         value: `${authToken.value.substring(0, 10)}...`, // Safely log part of token

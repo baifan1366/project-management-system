@@ -680,7 +680,7 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
           if (sectionData && sectionData.task_ids) {
             // 检查任务是否仍在部门中
             if (sectionData.task_ids.includes(Number(taskId))) {
-              console.log('任务仍存在于数据库，恢复本地状态');
+              
               // 如果任务仍在数据库中，恢复本地状态
               const { data: taskData } = await supabase
                 .from('task')

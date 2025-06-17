@@ -15,10 +15,10 @@ export function ConfirmExample() {
       confirmText: t('confirm'),
       cancelText: t('cancel'),
       onConfirm: () => {
-        console.log("用户确认了操作");
+        
       },
       onCancel: () => {
-        console.log("用户取消了操作");
+        
       }
     });
   };
@@ -31,7 +31,7 @@ export function ConfirmExample() {
       confirmText: t('delete'),
       cancelText: t('cancel'),
       onConfirm: () => {
-        console.log("用户确认了删除");
+        
       }
     });
   };
@@ -44,7 +44,7 @@ export function ConfirmExample() {
       confirmText: t('continue'),
       cancelText: t('cancel'),
       onConfirm: () => {
-        console.log("用户确认了警告");
+        
       }
     });
   };
@@ -57,10 +57,10 @@ export function ConfirmExample() {
       confirmText: t('continue'),
       cancelText: t('finish'),
       onConfirm: () => {
-        console.log("用户选择继续");
+        
       },
       onCancel: () => {
-        console.log("用户选择完成");
+        
       }
     });
   };
@@ -73,10 +73,10 @@ export function ConfirmExample() {
       confirmText: t('save'),
       cancelText: t('discard'),
       onConfirm: () => {
-        console.log("用户选择保存");
+        
       },
       onCancel: () => {
-        console.log("用户选择不保存");
+        
       }
     });
   };

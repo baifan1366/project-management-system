@@ -543,26 +543,26 @@ export default function LandingPage() {
   // 渲染 promo banner
   const renderPromoBanner = () => {
     const promoBannerSection = sections.find(section => section.name === 'promo_banner');
-    console.log('Found promo banner section:', promoBannerSection); // 调试日志
+    
 
     if (!promoBannerSection || !promoBannerSection.landing_page_content || promoBannerSection.landing_page_content.length === 0) {
-      console.log('No promo banner content found'); // 调试日志
+      
       return null;
     }
 
     const bannerContent = promoBannerSection.landing_page_content[0];
     if (!bannerContent) {
-      console.log('No banner content found'); // 调试日志
+      
       return null;
     }
 
     try {
       const bannerSettings = JSON.parse(bannerContent.content);
-      console.log('Banner settings:', bannerSettings); // 调试日志
+      
       
       // 移除 isEnabled 检查，只检查是否有 promo code
       if (!bannerSettings.selectedPromoCode) {
-        console.log('No promo code selected'); // 调试日志
+        
         return null;
       }
 
