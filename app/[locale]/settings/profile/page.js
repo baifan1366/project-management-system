@@ -25,6 +25,7 @@ export default function ProfilePage() {
     email: ''
   });
   const [phoneError, setPhoneError] = useState('');
+  const [nameError, setNameError] = useState('');
   const [providerData, setProviderData] = useState({
     googleConnected: false,
     githubConnected: false,
@@ -79,6 +80,19 @@ export default function ProfilePage() {
     const digitsOnly = phone.replace(/\D/g, '');
     if (digitsOnly.length < 7) {
       return { valid: false, message: t('phoneMinDigits') || 'Phone number must have at least 7 digits' };
+    }
+    
+    return { valid: true, message: '' };
+  };
+
+  // Name validation function
+  const validateName = (name) => {
+    if (!name) {
+      return { valid: false, message: t('nameRequired') };
+    }
+    
+    if (name.length > 50) {
+      return { valid: false, message: t('userNameMax') };
     }
     
     return { valid: true, message: '' };
@@ -155,9 +169,12 @@ export default function ProfilePage() {
       [name]: value
     }));
     
-    // Clear phone error when typing
+    // Clear errors when typing
     if (name === 'phone') {
       setPhoneError('');
+    }
+    if (name === 'name') {
+      setNameError('');
     }
   };
 
@@ -173,13 +190,30 @@ export default function ProfilePage() {
     }
   };
 
+  // Validate name on blur
+  const handleNameBlur = () => {
+    const { valid, message } = validateName(formData.name);
+    if (!valid) {
+      setNameError(message);
+    } else {
+      setNameError('');
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     
     // Validate phone before saving
-    const { valid, message } = validatePhone(formData.phone);
-    if (!valid) {
-      setPhoneError(message);
+    const phoneValidation = validatePhone(formData.phone);
+    if (!phoneValidation.valid) {
+      setPhoneError(phoneValidation.message);
+      return;
+    }
+    
+    // Validate name before saving
+    const nameValidation = validateName(formData.name);
+    if (!nameValidation.valid) {
+      setNameError(nameValidation.message);
       return;
     }
     
@@ -447,8 +481,13 @@ export default function ProfilePage() {
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
+                    onBlur={handleNameBlur}
                     placeholder={t('name')}
+                    className={nameError ? 'border-red-500 focus:ring-red-500' : ''}
                   />
+                  {nameError && (
+                    <p className="text-sm text-red-500 mt-1">{nameError}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">{t('email')}</Label>
@@ -481,7 +520,7 @@ export default function ProfilePage() {
           </div>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSaveProfile} disabled={loading || !!phoneError}>
+          <Button onClick={handleSaveProfile} disabled={loading || !!phoneError || !!nameError}>
             {loading ? t('saving') : t('saveChanges')}
           </Button>
         </CardFooter>

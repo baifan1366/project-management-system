@@ -41,7 +41,6 @@
     "creating": "Creating...",
     "notifications": "Notifications",
     "profile": "Profile",
-    "success": "Success",
     "warning": "Warning",
     "confirm": "Confirm",
     "confirmDelete": "Confirm Delete",
@@ -100,6 +99,7 @@
     "settings": "Settings",
     "signOut": "Sign out",
     "profile": "Profile",
+    "success": "Success",
     "name": "Name",
     "bio": "Bio",
     "avatar": "Avatar",
@@ -112,6 +112,10 @@
     "passwordChanged": "Password has been changed successfully",
     "timezone": "Timezone",
     "timeFormat": "Time Format",
+    "phoneInvalid": "Invalid phone number",
+    "phoneMinDigits": "Phone number must be at least 8 digits",
+    "nameRequired": "Name is required",
+    "userNameMax": "Name must be less than 50 characters",
     "password": {
       "requirementsTitle": "Password Requirements:",
       "minLength": "At least 8 characters",
@@ -179,9 +183,12 @@
     "twoFactorAuthDesc": "Add an extra layer of security to your account",
     "authenticatorApp": "Authenticator App",
     "authenticatorAppDesc": "Use an authenticator app to get verification codes",
+    "emailAuthentication": "Email Authentication",
+    "emailAuthenticationDesc": "Receive verification codes via email",
     "smsAuthentication": "SMS Authentication",
     "smsAuthenticationDesc": "Receive verification codes via SMS",
     "setup": "Set Up",
+    "disable": "Disable",
     "avatarUpdated": "Avatar updated successfully",
     "authorizations": "Authorizations",
     "authorizationsDesc": "Manage third-party service authorizations",
@@ -595,7 +602,9 @@
     "deleteConfirmationMessage": "Are you sure you want to delete this task? This action cannot be undone.",
     "noDueDate": "No due date",
     "noStartDate": "No start date",
-    "startDate": "Start Date"
+    "startDate": "Start Date",
+    "taskCreated":"Task has been created successfully",
+    "cannotSelectPastDate":"Cannot select past date"
   },
   "notifications": {
     "title": "Notifications",
@@ -760,6 +769,11 @@
     "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
   },
   "CreateTask": {
+    "projectArchived": "Project Archived",
+    "projectNotPublic": "Project Not Public",
+    "ok": "OK",
+    "projectNotPublicDescription": "This project is not public. You can no longer create tasks in it.",
+    "projectArchivedDescription": "This project has been archived. You can no longer create tasks in it.",
     "taskDeleted": "Task deleted successfully",
     "taskNotFound": "Task not found",
     "deleteTaskFailed": "Failed to delete task",
@@ -1025,7 +1039,8 @@
     "unclassified": "Unclassified",
     "noStatusOptions": "No status options available",
     "noTasksOrGrouping": "No tasks or status groupings available",
-    "editTaskFailed": "Failed to edit task"
+    "editTaskFailed": "Failed to edit task",
+    "random": "Random"
   },
   "ChatDialog": {
     "privateMessages": "Private Messages",
@@ -1576,7 +1591,8 @@
     "externalUserConfirmTitle": "Add External User",
     "externalUserConfirmDescription": "{name} is not a member of any of your teams. Are you sure you want to invite this external user?",
     "userCheckFailed": "Failed to check user details",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "schedule": "Schedule"
   },
   "CreateTag": {
     "createTag": "Create New Field",
@@ -1766,27 +1782,46 @@
     "tipDetailsForProject": "You can say \"Add 5 high priority tasks: homepage design, user login feature, database design...\" or \"Invite team@example.com to join the team\""
   },
   "auth": {
+    "title": "Authentication",
     "login": {
-      "title": "Sign in",
+      "title": "Login",
       "subtitle": "Welcome back!",
-      "button": "Sign in",
-      "loading": "Signing in...",
+
+      "password": "Password",
       "forgotPassword": "Forgot password?",
       "noAccount": "Don't have an account?",
       "signup": "Sign up",
-      "emailVerification": {
-        "title": "Check your email",
-        "description": "We've sent a verification link to",
-        "spam": "Didn't receive the email? Check your spam folder or",
-        "resend": "click here to resend",
-        "resending": "sending...",
-        "loading": "Verifying your email..."
-      }
+
+      "button": "Log in",
+      "success": "successful",
+      "loading": "Logging in...",
+      "twoFactorAuth": "Two-Factor Authentication",
+      "enterCode": "Please enter the verification code to continue",
+      "verificationMethod": "Verification Method",
+      "authenticatorApp": "Authenticator App",
+      "email": "Email",
+      "enterTotpCode": "Enter the 6-digit code from your authenticator app",
+      "enterEmailCode": "Enter the verification code sent to your email",
+      "digitCode": "6-digit code",
+      "verificationCode": "Verification code",
+      "sending": "Sending...",
+      "resendIn": "Resend in",
+      "resendCode": "Resend code",
+      "cancel": "Cancel",
+      "verifying": "Verifying...",
+      "verify": "Verify",
+      "codeSent": "Verification code sent to your email",
+      "totpCodeError": "Please enter a valid 6-digit code from your authenticator app",
+      "emailCodeError": "Please enter the verification code from your email",
+      "verificationSuccess": "Verification successful",
+      "havingTrouble": "Having trouble?",
+      "contactSupport": "Contact support."
     },
     "emailVerification": {
       "title": "Email Verification",
       "loading": "Verifying your email...",
-      "redirecting": "Redirecting you to login page..."
+      "redirecting": "Redirecting you to login page...",
+      "backToLogin": "Back to login"
     },
     "signup": {
       "title": "Sign up",
@@ -2120,6 +2155,10 @@
     "orderedList": "Ordered List"
   },
   "confirmation": {
+    "save":"Save",
+    "teamNotFound": "Team Not Found",
+    "warning": "Warning",
+    "close": "Close",
     "confirm": "Confirm",
     "cancel": "Cancel",
     "confirmDeleteTask": "Confirm Delete Task",
@@ -2237,9 +2276,29 @@
     "taskNameMin": "Task Name must be at least 2 characters.",
     "taskNameMax": "Task Name cannot exceed 100 characters.",
     "startDateRequired": "Start Date is required.",
-    "durationRequired": "Duration is required."
+    "durationRequired": "Duration is required.",
+    "userNameMax": "Name must be less than 50 characters."
   },
   "Team": {
+    "deleteOptionTitle": "Delete Option",
+    "deleteOptionWarning": "Are you sure you want to delete this option?",
+    "loadLabelsFailed": "Failed to load labels",
+    "manageOptions": "Manage Options",
+    "noStatusOptions": "No status options",
+    "optionNameRequired": "Option name is required",
+    "createOptionFailed": "Failed to create status option",
+    "updateOptionFailed": "Failed to update status option",
+    "confirmDeleteOption": "Confirm Delete Option",
+    "deleteOptionFailed": "Failed to delete status option",
+    "enterOptionName": "Enter option name",
+    "manage_assignees": "Manage Assignees",
+    "no_assignees": "No assignees",
+    "searchMembers": "Search Members",
+    "no_matching_members": "No matching members",
+    "dateInPastError": "Start date cannot be in the past",
+    "suggestedTags": "Suggested Tags",
+    "assigned": "Assigned",
+    "users": "Users",
     "add_assignee": "Add Assignee",
     "no_available_members": "No available members",
     "details": "Details",

@@ -34,10 +34,33 @@ export const WorkflowTools = () => {
 
   // 当workflowData更新时，更新节点和边
   useEffect(() => {
-    if (workflowData && workflowData.nodes && workflowData.nodes.length > 0) {
-      setNodes(workflowData.nodes);
-      setEdges(workflowData.edges || []);
+    // 即使没有节点，也要清空当前状态
+    if (!workflowData || !workflowData.nodes) {
+      setNodes([]);
+      setEdges([]);
+      return;
     }
+    
+    // 更新节点和边
+    setNodes([...workflowData.nodes]);
+    setEdges([...(workflowData.edges || [])]);
+    
+    // 强制触发ReactFlow实例重绘
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+      
+      // 再次检查确保节点被正确渲染
+      if (workflowData.nodes.length > 0) {
+        const flowInstance = document.querySelector('.react-flow');
+        if (flowInstance) {
+          // 尝试触发ReactFlow的内部fitView功能
+          const event = new CustomEvent('react-flow-force-update');
+          flowInstance.dispatchEvent(event);
+        }
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [workflowData]);
 
   const onNodesChange = useCallback(
@@ -83,17 +106,18 @@ export const WorkflowTools = () => {
   // 定义proOptions以移除水印
   const proOptions = { hideAttribution: true };
 
-  if (nodes.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">{t('loading')}</p>
-      </div>
-    );
-  }
+  // if (nodes.length === 0) {
+  //   return (
+  //     <div className="flex items-center justify-center h-full">
+  //       <p className="text-red-500">{t('loading')}</p>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div style={{ width: '100%', height: '600px' }}>
       <ReactFlow
+        key={`flow-${workflowData.nodes?.length || 0}-${Date.now()}`}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

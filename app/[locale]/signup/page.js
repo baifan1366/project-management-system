@@ -33,6 +33,7 @@ export default function SignupPage() {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
+  const [nameError, setNameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -90,15 +91,26 @@ export default function SignupPage() {
     return { valid: true, message: '' };
   };
 
+  // Name validation function
+  const validateName = (name) => {
+    if (name.length > 50) {
+      return { valid: false, message: t('validationRules.userNameMax') };
+    }
+    return { valid: true, message: '' };
+  };
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
     
-    // Clear password error when user types
+    // Clear errors when user types
     if (e.target.name === 'password') {
       setPasswordError('');
+    }
+    if (e.target.name === 'name') {
+      setNameError('');
     }
   };
 
@@ -126,10 +138,30 @@ export default function SignupPage() {
     }
   };
 
+  // Validate name on blur
+  const handleNameBlur = () => {
+    if (formData.name) {
+      const { valid, message } = validateName(formData.name);
+      if (!valid) {
+        setNameError(message);
+      } else {
+        setNameError('');
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setPasswordError('');
+    setNameError('');
+    
+    // Validate name length
+    const nameValidation = validateName(formData.name);
+    if (!nameValidation.valid) {
+      setNameError(nameValidation.message);
+      return;
+    }
     
     // Validate password format
     const { valid, message } = validatePassword(formData.password);
@@ -301,9 +333,13 @@ export default function SignupPage() {
                 placeholder="Full Name"
                 value={formData.name}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                onBlur={handleNameBlur}
+                className={`w-full px-4 py-3 rounded-lg border ${nameError ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400`}
                 required
               />
+              {nameError && (
+                <p className="text-sm text-red-500 mt-1">{nameError}</p>
+              )}
             </div>
 
             <div>

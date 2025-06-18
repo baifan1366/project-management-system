@@ -8,54 +8,22 @@ import { parseSingleSelectValue } from './helpers';
 export function extractSingleSelectOptions(labelData) {
   // 确保labelData存在且不为空对象
   if (!labelData || typeof labelData !== 'object' || Object.keys(labelData).length === 0) {
-    console.log('extractSingleSelectOptions: labelData为空或无效', labelData);
     return [];
   }
 
   try {
-    // 记录原始数据
-    console.log('extractSingleSelectOptions: 原始数据', labelData);
+    // 扁平化标签对象，消除嵌套结构
+    const flattenedLabel = flattenLabelObject(labelData);
     
-    // 处理键名可能的大小写和连字符变体
-    let singleSelectData = null;
-    const possibleKeys = ['SINGLE-SELECT', 'SINGLE_SELECT', 'single-select', 'single_select', 'SINGLE_SELECT', 'Single-Select'];
-    
-    // 尝试所有可能的键名
-    for (const key of possibleKeys) {
-      if (labelData[key] && (Array.isArray(labelData[key]) || typeof labelData[key] === 'object')) {
-        singleSelectData = labelData[key];
-        console.log(`找到SINGLE-SELECT数据，使用键名: ${key}`, singleSelectData);
-        break;
-      }
-    }
-    
-    // 如果没有找到，检查label对象内是否有嵌套的SINGLE-SELECT
-    if (!singleSelectData && labelData.label) {
-      for (const key of possibleKeys) {
-        if (labelData.label[key] && (Array.isArray(labelData.label[key]) || typeof labelData.label[key] === 'object')) {
-          singleSelectData = labelData.label[key];
-          console.log(`在label对象内找到SINGLE-SELECT数据，使用键名: ${key}`, singleSelectData);
-          break;
-        }
-      }
-    }
-    
-    // 如果仍然没有找到，尝试检查所有键
-    if (!singleSelectData) {
-      console.log('没有找到SINGLE-SELECT数据，可用键名:', Object.keys(labelData));
-      // 默认使用空数组
-      singleSelectData = [];
-    }
+    // 获取SINGLE-SELECT数组
+    let singleSelectData = flattenedLabel["SINGLE-SELECT"] || [];
     
     // 确保singleSelectData是数组
     if (!Array.isArray(singleSelectData)) {
-      console.log('singleSelectData不是数组，转换为数组:', singleSelectData);
-      // 如果是对象，尝试转换为数组
-      singleSelectData = Object.values(singleSelectData);
+      singleSelectData = [singleSelectData];
     }
     
     if (singleSelectData.length === 0) {
-      console.log('singleSelectData为空数组');
       return [];
     }
     
@@ -63,11 +31,9 @@ export function extractSingleSelectOptions(labelData) {
     const result = singleSelectData.map(option => {
       // 使用已有的parseSingleSelectValue函数解析每个选项
       const parsed = parseSingleSelectValue(option);
-      console.log('解析选项:', option, '结果:', parsed);
       return parsed;
     }).filter(option => option); // 过滤掉无效选项
     
-    console.log('最终提取的选项:', result);
     return result;
   } catch (error) {
     console.error('解析SINGLE-SELECT选项时出错:', error);
@@ -224,6 +190,34 @@ export function integrateLabelsWithTasks(teamLabelData, tasks, statusTagId) {
 }
 
 /**
+ * 提取实际的标签数据，解决多层嵌套问题
+ * @param {Object} label - 可能嵌套的标签对象
+ * @returns {Object} - 提取出的实际标签对象
+ */
+function extractActualLabel(label) {
+  if (!label || typeof label !== 'object') {
+    return label;
+  }
+  
+  let actualLabel = label;
+  let tempLabel = label;
+  let depth = 0;
+  const MAX_DEPTH = 20; // 防止无限循环
+  
+  // 遍历可能的嵌套层级，找到包含SINGLE-SELECT的对象
+  while (tempLabel && typeof tempLabel === 'object' && tempLabel.label && depth < MAX_DEPTH) {
+    if (tempLabel['SINGLE-SELECT']) {
+      actualLabel = tempLabel;
+      break;
+    }
+    tempLabel = tempLabel.label;
+    depth++;
+  }
+  
+  return actualLabel;
+}
+
+/**
  * 创建新的状态选项
  * @param {Object} label - 现有的标签对象
  * @param {Object} newOption - 新的选项对象 {label:string, color:string}
@@ -237,41 +231,25 @@ export function createStatusOption(label, newOption) {
   }
 
   try {
-    // 确保label是对象
-    let labelData = label || {};
     
-    // 如果标签数据为空，初始化结构
-    if (Object.keys(labelData).length === 0) {
-      labelData = {
-        'SINGLE-SELECT': []
-      };
-    }
+    // 首先扁平化标签对象，消除嵌套结构
+    const flattenedLabel = flattenLabelObject(label);
     
-    // 确保有SINGLE-SELECT键
-    if (!labelData['SINGLE-SELECT']) {
-      labelData['SINGLE-SELECT'] = [];
-    }
-    
-    // 准备新选项数据 - 确保包含value
+    // 格式化新选项
     const option = {
-      label: newOption.label,
+      label: newOption.label.trim(),
       value: newOption.value || newOption.label.toLowerCase().replace(/\s+/g, '_'),
       color: newOption.color
     };
     
-    // 将选项对象转为JSON字符串（与现有格式保持一致）
+    // 将选项对象转为JSON字符串
     const optionJson = JSON.stringify(option);
     
-    // 确保SINGLE-SELECT是数组
-    if (!Array.isArray(labelData['SINGLE-SELECT'])) {
-      labelData['SINGLE-SELECT'] = [];
-    }
-    
-    // 添加到SINGLE-SELECT数组
-    labelData['SINGLE-SELECT'].push(optionJson);
-    
-    console.log('成功添加新状态选项:', option);
-    return labelData;
+    // 添加新选项
+    const result = { ...flattenedLabel };
+    result["SINGLE-SELECT"].push(optionJson);
+        
+    return result;
   } catch (error) {
     console.error('创建状态选项发生错误:', error);
     throw error;
@@ -292,42 +270,37 @@ export function updateStatusOption(label, updatedOption) {
   }
 
   try {
-    // 确保SINGLE-SELECT是数组
-    if (!label['SINGLE-SELECT'] || !Array.isArray(label['SINGLE-SELECT'])) {
-      throw new Error('标签数据结构不正确: 缺少SINGLE-SELECT数组');
-    }
     
-    // 从SINGLE-SELECT数组中找到匹配的选项
-    const updatedOptions = label['SINGLE-SELECT'].map(optionStr => {
+    // 首先扁平化标签对象，消除嵌套结构
+    const flattenedLabel = flattenLabelObject(label);
+    
+    // 创建结果对象
+    const result = { ...flattenedLabel };
+    
+    // 从SINGLE-SELECT数组中找到匹配的选项并更新
+    result["SINGLE-SELECT"] = result["SINGLE-SELECT"].map(optionStr => {
       try {
         let option = typeof optionStr === 'string' ? JSON.parse(optionStr) : optionStr;
         
         // 如果找到匹配的选项，更新它
         if (option.value === updatedOption.value) {
+          // 创建更新后的选项
           option = {
             ...option,
             label: updatedOption.label || option.label,
             color: updatedOption.color || option.color
           };
-          console.log('找到并更新选项:', option);
         }
         
         // 将对象转回JSON字符串
         return typeof optionStr === 'string' ? JSON.stringify(option) : option;
       } catch (e) {
-        console.error('解析选项时出错:', e, optionStr);
-        return optionStr;
+        console.error('处理选项时出错:', e);
+        return optionStr; // 如果解析错误，保留原始选项
       }
     });
     
-    // 更新标签对象
-    const updatedLabel = {
-      ...label,
-      'SINGLE-SELECT': updatedOptions
-    };
-    
-    console.log('成功更新状态选项:', updatedLabel);
-    return updatedLabel;
+    return result;
   } catch (error) {
     console.error('更新状态选项发生错误:', error);
     throw error;
@@ -348,32 +321,75 @@ export function deleteStatusOption(label, optionValue) {
   }
 
   try {
-    // 确保SINGLE-SELECT是数组
-    if (!label['SINGLE-SELECT'] || !Array.isArray(label['SINGLE-SELECT'])) {
-      throw new Error('标签数据结构不正确: 缺少SINGLE-SELECT数组');
-    }
+    
+    // 首先扁平化标签对象，消除嵌套结构
+    const flattenedLabel = flattenLabelObject(label);
+    
+    // 创建结果对象
+    const result = { ...flattenedLabel };
+    
+    // 记录删除前的选项数量
+    const originalCount = result["SINGLE-SELECT"].length;
     
     // 从SINGLE-SELECT数组中过滤掉匹配的选项
-    const filteredOptions = label['SINGLE-SELECT'].filter(optionStr => {
+    result["SINGLE-SELECT"] = result["SINGLE-SELECT"].filter(optionStr => {
       try {
         let option = typeof optionStr === 'string' ? JSON.parse(optionStr) : optionStr;
-        return option.value !== optionValue;
+        const shouldKeep = option.value !== optionValue;
+        return shouldKeep;
       } catch (e) {
-        console.error('解析选项时出错:', e, optionStr);
+        console.error('处理选项时出错:', e);
         return true; // 如果解析错误，保留选项
       }
     });
     
-    // 更新标签对象
-    const updatedLabel = {
-      ...label,
-      'SINGLE-SELECT': filteredOptions
-    };
-    
-    console.log('成功删除状态选项:', optionValue);
-    return updatedLabel;
+    return result;
   } catch (error) {
     console.error('删除状态选项发生错误:', error);
     throw error;
   }
+}
+
+/**
+ * 扁平化标签对象，消除嵌套的label结构
+ * @param {Object} originalLabel - 可能包含嵌套label结构的原始标签对象
+ * @returns {Object} - 扁平化后的标签对象
+ */
+function flattenLabelObject(originalLabel) {
+  if (!originalLabel || typeof originalLabel !== 'object') {
+    return { "TAGS": [""], "MULTI-SELECT": [""], "SINGLE-SELECT": [] };
+  }
+
+  // 初始化结果对象
+  let result = {
+    "TAGS": [""],
+    "MULTI-SELECT": [""],
+    "SINGLE-SELECT": []
+  };
+  
+  // 递归处理嵌套的label对象
+  function extractNestedData(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    
+    // 处理直接属性
+    if (obj["TAGS"]) result["TAGS"] = Array.isArray(obj["TAGS"]) ? [...obj["TAGS"]] : [""];
+    if (obj["MULTI-SELECT"]) result["MULTI-SELECT"] = Array.isArray(obj["MULTI-SELECT"]) ? [...obj["MULTI-SELECT"]] : [""];
+    
+    // 合并SINGLE-SELECT数组
+    if (obj["SINGLE-SELECT"] && Array.isArray(obj["SINGLE-SELECT"])) {
+      result["SINGLE-SELECT"] = [...result["SINGLE-SELECT"], ...obj["SINGLE-SELECT"]];
+    } else if (obj["SINGLE-SELECT"]) {
+      result["SINGLE-SELECT"].push(obj["SINGLE-SELECT"]);
+    }
+    
+    // 递归处理嵌套的label
+    if (obj.label && typeof obj.label === 'object') {
+      extractNestedData(obj.label);
+    }
+  }
+  
+  // 从原始对象开始处理
+  extractNestedData(originalLabel);
+  
+  return result;
 } 

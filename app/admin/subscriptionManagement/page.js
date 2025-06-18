@@ -8,7 +8,7 @@ import { clsx } from 'clsx';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns'; // 用于格式化时间
+import { formatDistanceToNow } from 'date-fns';
 
 export default function AdminSubscriptions() {
   const router = useRouter();
@@ -482,7 +482,7 @@ export default function AdminSubscriptions() {
       setIsPaymentLoading(true);
       setPaymentError(null);
 
-      // 构建查询，第一步从payment表查询并连接user表获取用户信息
+
       let query = supabase
         .from('payment')
         .select(`
@@ -491,30 +491,30 @@ export default function AdminSubscriptions() {
         `)
         .order('created_at', { ascending: false });
       
-      // 添加状态过滤条件
+
       if (paymentStatusFilter !== 'all') {
         query = query.eq('status', paymentStatusFilter);
       }
       
-      // 添加搜索过滤条件
+
       if (paymentSearchQuery) {
         query = query.or(`user.email.ilike.%${paymentSearchQuery}%,transaction_id.ilike.%${paymentSearchQuery}%`);
       }
       
-      // 添加分页
+
       const from = (currentPaymentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
       
-      // 获取总数进行分页处理
+
       const { count } = await supabase
         .from('payment')
         .select('*', { count: 'exact', head: true });
       
-      // 设置总数和总页数
+
       setTotalPayments(count || 0);
       setTotalPages(Math.ceil((count || 0) / itemsPerPage));
       
-      // 执行分页查询  
+
       query = query.range(from, to);
       
       const { data, error } = await query;
@@ -523,7 +523,7 @@ export default function AdminSubscriptions() {
         console.error('Error fetching payment history:', error);
         setPaymentError('An error occurred while fetching payment history.');
       } else {
-        // 处理并格式化数据，添加用户名和邮箱
+
         const formattedPayments = data.map(payment => ({
           ...payment,
           userName: payment.user?.name || 'Unknown',
@@ -541,7 +541,7 @@ export default function AdminSubscriptions() {
     }
   };
 
-  // 添加useEffect来在组件加载时和过滤/分页参数变化时获取数据
+
   useEffect(() => {
     if (activeTab === 'paymentHistory') {
       fetchPaymentHistory();
@@ -555,7 +555,7 @@ export default function AdminSubscriptions() {
       const loadingToast = toast.loading('Preparing payment history export...');
       setIsPaymentLoading(true);
       
-      // Get all payment records, not paginated
+
       const { data, error } = await supabase
         .from('payment')
         .select(`
@@ -817,7 +817,6 @@ export default function AdminSubscriptions() {
     }
   };
 
-  // 获取订阅分布数据
   const fetchSubscriptionDistribution = async () => {
     try {
       // Get all subscription plans first
@@ -896,10 +895,8 @@ export default function AdminSubscriptions() {
     }
   };
 
-  // 获取订阅统计数据
   const fetchSubscriptionStats = async () => {
     try {
-      // 获取活跃订阅数量
       const { data: activeSubscriptions, error: activeError } = await supabase
         .from('user_subscription_plan')
         .select('id, plan:subscription_plan(billing_interval)')
@@ -907,7 +904,6 @@ export default function AdminSubscriptions() {
 
       if (activeError) throw activeError;
 
-      // 获取支付总额
       const { data: payments, error: paymentsError } = await supabase
         .from('payment')
         .select('amount')
@@ -915,7 +911,6 @@ export default function AdminSubscriptions() {
 
       if (paymentsError) throw paymentsError;
 
-      // 计算统计数据
       const stats = {
         totalActive: activeSubscriptions.length,
         totalRevenue: payments.reduce((sum, payment) => sum + payment.amount, 0),
@@ -930,7 +925,6 @@ export default function AdminSubscriptions() {
     }
   };
 
-  // 获取最近活动
   const fetchRecentActivity = async () => {
     try {
       const { data, error } = await supabase
@@ -962,7 +956,6 @@ export default function AdminSubscriptions() {
     }
   };
 
-  // 更新所有统计数据
   const updateSubscriptionAnalytics = async () => {
     const [distributionData, stats, activity] = await Promise.all([
       fetchSubscriptionDistribution(),
@@ -978,10 +971,9 @@ export default function AdminSubscriptions() {
     });
   };
 
-  // 在组件加载和数据更新时获取统计数据
   useEffect(() => {
     updateSubscriptionAnalytics();
-  }, [userSubscriptions]); // 当订阅列表更新时重新获取统计数据
+  }, [userSubscriptions]);
 
   if (loading) {
     return (

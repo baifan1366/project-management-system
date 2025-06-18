@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { useChat } from './ChatContext';
 import { supabase } from '@/lib/supabase';
 import ChatDialog from '@/components/chat/ChatDialog';
@@ -10,8 +10,8 @@ import useGetUser from '@/lib/hooks/useGetUser';
 const ChatDialogContext = createContext();
 
 export function ChatDialogProvider({ children }) {
-  const [openDialogs, setOpenDialogs] = useState(new Map());
-  const { messages, sendMessage, currentSession, setCurrentSession } = useChat();
+  const [openDialogs, setOpenDialogs] = useState([]);
+  const { currentSession } = useChat();
   const { user:currentUser } = useGetUser();
   const pathname = usePathname();
   const [isMobileView, setIsMobileView] = useState(false);
@@ -70,23 +70,44 @@ export function ChatDialogProvider({ children }) {
 
             // 打开或更新对话框
             setOpenDialogs(prev => {
-              const newMap = new Map(prev);
-              // 如果对话框已经打开，就不要重新打开
-              if (!newMap.has(payload.new.session_id) || !newMap.get(payload.new.session_id).isOpen) {
-                newMap.set(payload.new.session_id, {
-                  isOpen: true,
-                  sessionId: payload.new.session_id,
-                  user: {
-                    name: senderData.name,
-                    avatar_url: senderData.avatar_url || senderData.name.charAt(0),
-                    online: true
-                  },
-                  sessionName: sessionData.name,
-                  isMinimized: false,
-                  position: newMap.size // 设置新对话框的position
-                });
+              // 检查对话框是否已经打开
+              const existingIndex = prev.findIndex(d => d.sessionId === payload.new.session_id);
+              
+              if (existingIndex !== -1) {
+                // 如果对话框已存在但不是打开状态，设为打开
+                if (!prev[existingIndex].isOpen) {
+                  const updated = [...prev];
+                  updated[existingIndex] = {
+                    ...updated[existingIndex],
+                    isOpen: true,
+                    isMinimized: false
+                  };
+                  return updated;
+                }
+                // 如果已经是打开状态，不做更改
+                return prev;
               }
-              return newMap;
+              
+              // 如果是新对话框，添加到数组末尾
+              const newDialog = {
+                sessionId: payload.new.session_id,
+                user: {
+                  name: senderData.name,
+                  avatar_url: senderData.avatar_url || senderData.name.charAt(0),
+                  online: true
+                },
+                sessionName: sessionData.name,
+                isOpen: true,
+                isMinimized: false
+              };
+              
+              // 在移动设备上，关闭其他所有对话框
+              if (isMobileView) {
+                return [newDialog];
+              }
+              
+              // 在桌面设备上，添加到现有对话框列表
+              return [...prev, newDialog];
             });
           }
         } catch (error) {
@@ -98,128 +119,123 @@ export function ChatDialogProvider({ children }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser, currentSession, pathname]);
+  }, [currentUser, currentSession, pathname, isMobileView]);
 
   // 当切换到某个会话时，关闭对应的弹出对话框
   useEffect(() => {
     if (currentSession) {
       setOpenDialogs(prev => {
-        const newMap = new Map(prev);
-        if (newMap.has(currentSession.id)) {
-          newMap.get(currentSession.id).isOpen = false;
-        }
-        return newMap;
+        const updatedDialogs = prev.map(dialog => {
+          if (dialog.sessionId === currentSession.id) {
+            return { ...dialog, isOpen: false };
+          }
+          return dialog;
+        });
+        return updatedDialogs;
       });
     }
   }, [currentSession]);
-
-  // 重新计算位置，确保没有空缺
-  const recalculatePositions = useCallback(() => {
-    let position = 0;
-    const activeDialogs = Array.from(openDialogs.entries())
-      .filter(([_, dialog]) => dialog.isOpen)
-      .sort((a, b) => (a[1].position || 0) - (b[1].position || 0));
-
-    const updatedDialogs = new Map(openDialogs);
-    
-    activeDialogs.forEach(([sessionId, dialog]) => {
-      updatedDialogs.set(sessionId, {
-        ...dialog,
-        position: position++
-      });
-    });
-    
-    return updatedDialogs;
-  }, [openDialogs]);
 
   const openDialog = (sessionId, user, sessionName) => {
     // 如果是当前会话，不打开对话框
     if (sessionId === currentSession?.id) return;
 
     setOpenDialogs(prev => {
-      const newMap = new Map(prev);
-      const existingDialog = newMap.get(sessionId);
+      // 查找是否已经存在这个对话框
+      const existingIndex = prev.findIndex(d => d.sessionId === sessionId);
       
-      // 在移动设备上，限制同时打开的对话框数量为1个
-      if (isMobileView) {
-        // 关闭所有其他对话框，只保留当前打开的
-        newMap.forEach((dialog, id) => {
-          if (id !== sessionId && dialog.isOpen) {
-            dialog.isOpen = false;
-          }
-        });
-      }
+      // 生成新的对话框列表
+      let newDialogs = [...prev];
       
-      if (existingDialog) {
+      if (existingIndex !== -1) {
         // 更新已存在的对话框
-        newMap.set(sessionId, {
-          ...existingDialog,
+        newDialogs[existingIndex] = {
+          ...newDialogs[existingIndex],
           isOpen: true,
           isMinimized: false
-        });
+        };
       } else {
-        // 创建新的对话框，位置为当前打开对话框数量
-        const openCount = Array.from(newMap.values()).filter(d => d.isOpen).length;
-        newMap.set(sessionId, {
-          isOpen: true,
+        // 添加新的对话框
+        const newDialog = {
           sessionId,
           user,
           sessionName,
-          isMinimized: false,
-          position: openCount // 设置新对话框的位置
+          isOpen: true,
+          isMinimized: false
+        };
+        newDialogs = [...newDialogs, newDialog];
+      }
+      
+      // 在移动设备上，仅保留当前打开的对话框
+      if (isMobileView) {
+        newDialogs = newDialogs.map(dialog => {
+          if (dialog.sessionId !== sessionId) {
+            return { ...dialog, isOpen: false };
+          }
+          return dialog;
         });
       }
       
-      // 重新计算所有打开对话框的位置
-      return recalculatePositions();
+      return newDialogs;
     });
   };
 
   const closeDialog = (sessionId) => {
     setOpenDialogs(prev => {
-      const newMap = new Map(prev);
-      if (newMap.has(sessionId)) {
-        newMap.get(sessionId).isOpen = false;
+      const updatedDialogs = prev.map(dialog => {
+        if (dialog.sessionId === sessionId) {
+          return { ...dialog, isOpen: false };
+        }
+        return dialog;
+      });
+      
+      // 过滤出仍然打开的对话框
+      const stillOpen = updatedDialogs.filter(d => d.isOpen);
+      
+      // 如果没有打开的对话框，直接返回更新后的数组
+      if (stillOpen.length === 0) {
+        return updatedDialogs;
       }
       
-      // 重新计算所有打开对话框的位置
-      return recalculatePositions();
+      // 如果已删除所有对话框或只有一个，不需要特别处理
+      return updatedDialogs;
     });
   };
 
   const minimizeDialog = (sessionId) => {
     setOpenDialogs(prev => {
-      const newMap = new Map(prev);
-      if (newMap.has(sessionId)) {
-        const dialog = newMap.get(sessionId);
-        newMap.set(sessionId, {
-          ...dialog,
-          isMinimized: !dialog.isMinimized
-        });
-      }
-      return newMap;
+      return prev.map(dialog => {
+        if (dialog.sessionId === sessionId) {
+          return { ...dialog, isMinimized: !dialog.isMinimized };
+        }
+        return dialog;
+      });
     });
   };
+
+  // 获取打开的对话框列表，并计算它们的位置
+  const visibleDialogs = openDialogs.filter(dialog => dialog.isOpen).map((dialog, index) => ({
+    ...dialog,
+    position: index
+  }));
 
   return (
     <ChatDialogContext.Provider value={{ openDialog, closeDialog, minimizeDialog }}>
       {children}
       {/* 渲染所有打开的对话框 */}
-      {Array.from(openDialogs.entries())
-        .filter(([_, dialog]) => dialog.isOpen)
-        .map(([sessionId, dialog]) => (
-          <ChatDialog
-            key={sessionId}
-            isOpen={true}
-            sessionId={sessionId}
-            user={dialog.user}
-            sessionName={dialog.sessionName}
-            isMinimized={dialog.isMinimized}
-            position={dialog.position || 0}
-            onClose={() => closeDialog(sessionId)}
-            onMinimize={() => minimizeDialog(sessionId)}
-          />
-        ))}
+      {visibleDialogs.map((dialog, index) => (
+        <ChatDialog
+          key={dialog.sessionId}
+          isOpen={true}
+          sessionId={dialog.sessionId}
+          user={dialog.user}
+          sessionName={dialog.sessionName}
+          isMinimized={dialog.isMinimized}
+          position={index} // 使用数组索引作为位置，保证连续
+          onClose={() => closeDialog(dialog.sessionId)}
+          onMinimize={() => minimizeDialog(dialog.sessionId)}
+        />
+      ))}
     </ChatDialogContext.Provider>
   );
 }

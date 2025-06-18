@@ -172,6 +172,9 @@ export default function SettingsLayout({ children }) {
   const handleTabChange = (tab) => {
     if (tab === currentTab) return;
     
+    // 关闭所有现有的toast
+    toast.dismiss();
+    
     // 设置加载状态
     setIsLoading(true);
     setPreviousTab(currentTab);
@@ -202,8 +205,10 @@ export default function SettingsLayout({ children }) {
     };
     
     if (tabNames[currentTab]) {
-      // 显示正在加载提示
-      toast.info(t('loading') + ` ${tabNames[currentTab]}`);
+      // 显示正在加载提示，4秒后自动消失
+      toast.info(t('loading') + ` ${tabNames[currentTab]}`, {
+        duration: 4000, // 4秒后自动消失
+      });
     }
   }, [currentTab, t]);
 

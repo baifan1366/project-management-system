@@ -2,21 +2,34 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
+import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Shield, Phone } from 'lucide-react';
+import { Shield, Mail } from 'lucide-react';
 import { FaEye, FaEyeSlash, FaQuestionCircle, FaCheck, FaTimes } from 'react-icons/fa';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import useGetUser from '@/lib/hooks/useGetUser';
+import { useDispatch } from 'react-redux';
+import { updateUserData } from '@/lib/redux/features/usersSlice';
+
+// Import 2FA components
+import TOTPSetup from '@/components/2fa/TOTPSetup';
+import EmailSetup from '@/components/2fa/EmailSetup';
+import DisableTOTPModal from '@/components/2fa/DisableTOTPModal';
+import DisableEmailModal from '@/components/2fa/DisableEmailModal';
 
 export default function SecurityPage() {
   const t = useTranslations('profile');
+  const params = useParams();
+  const locale = params.locale;
+  const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  const [samePasswordError, setSamePasswordError] = useState('');
   const [showPassword, setShowPassword] = useState({
     currentPassword: false,
     newPassword: false,
@@ -35,8 +48,31 @@ export default function SecurityPage() {
     special: false,
   });
   
+  // State for 2FA options
+  const [showTotpSetup, setShowTotpSetup] = useState(false);
+  const [showEmailSetup, setShowEmailSetup] = useState(false);
+  const [showDisableTotpModal, setShowDisableTotpModal] = useState(false);
+  const [showDisableEmailModal, setShowDisableEmailModal] = useState(false);
+  
   // Get current user using the useGetUser hook
-  const { user, isLoading } = useGetUser();
+  const { user, isLoading, mutate } = useGetUser();
+  
+  // Use mutate as refreshUser function and update Redux store
+  const refreshUser = () => {
+    if (typeof mutate === 'function') {
+      mutate().then(() => {
+        // Update Redux store with new MFA status if user exists
+        if (user) {
+          dispatch(updateUserData({
+            is_mfa_enabled: user.is_mfa_enabled,
+            is_email_2fa_enabled: user.is_email_2fa_enabled
+          }));
+        }
+      });
+      return true;
+    }
+    return false;
+  };
 
   // Check requirements whenever password changes
   useEffect(() => {
@@ -82,6 +118,18 @@ export default function SecurityPage() {
     return { valid: true, message: '' };
   };
 
+  // Check if new password is same as current password
+  const checkSamePassword = () => {
+    if (passwords.newPassword && passwords.currentPassword && 
+        passwords.newPassword === passwords.currentPassword) {
+      setSamePasswordError(t('samePasswordError') || 'New password cannot be the same as current password');
+      return true;
+    } else {
+      setSamePasswordError('');
+      return false;
+    }
+  };
+
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
     setPasswords(prev => ({
@@ -92,8 +140,21 @@ export default function SecurityPage() {
     // Clear error when typing
     if (name === 'newPassword') {
       setPasswordError('');
+      // Check if same as current password when both fields have values
+      if (passwords.currentPassword) {
+        setTimeout(() => {
+          checkSamePassword();
+        }, 0);
+      }
     } else if (name === 'confirmPassword') {
       setConfirmPasswordError('');
+    } else if (name === 'currentPassword') {
+      // Check if same as new password when both fields have values
+      if (passwords.newPassword) {
+        setTimeout(() => {
+          checkSamePassword();
+        }, 0);
+      }
     }
   };
 
@@ -112,6 +173,8 @@ export default function SecurityPage() {
         setPasswordError(message);
       } else {
         setPasswordError('');
+        // Check if same as current password
+        checkSamePassword();
       }
     }
   };
@@ -129,6 +192,7 @@ export default function SecurityPage() {
     // Clear errors first
     setPasswordError('');
     setConfirmPasswordError('');
+    setSamePasswordError('');
     
     // Validate new password format
     if (passwords.newPassword) {
@@ -141,6 +205,11 @@ export default function SecurityPage() {
     
     if (passwords.newPassword !== passwords.confirmPassword) {
       setConfirmPasswordError(t('passwordMismatch'));
+      return;
+    }
+    
+    // Check if new password is same as current password
+    if (checkSamePassword()) {
       return;
     }
     
@@ -229,6 +298,10 @@ export default function SecurityPage() {
               </div>
               {passwordError && (
                 <p className="text-sm text-red-500 mt-1">{passwordError}</p>
+              )}
+              
+              {samePasswordError && (
+                <p className="text-sm text-red-500 mt-1">{samePasswordError}</p>
               )}
               
               {/* Dynamic password requirements */}
@@ -322,7 +395,7 @@ export default function SecurityPage() {
         <CardFooter>
           <Button 
             onClick={handleChangePassword} 
-            disabled={loading || isLoading || !!passwordError || !!confirmPasswordError || !passwords.currentPassword || !passwords.newPassword || !passwords.confirmPassword}
+            disabled={loading || isLoading || !!passwordError || !!confirmPasswordError || !!samePasswordError || !passwords.currentPassword || !passwords.newPassword || !passwords.confirmPassword}
           >
             {loading ? t('saving') : t('saveChanges')}
           </Button>
@@ -335,33 +408,148 @@ export default function SecurityPage() {
           <CardDescription>{t('twoFactorAuthDesc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Shield className="w-6 h-6 text-primary" />
-              <div>
-                <p className="font-medium">{t('authenticatorApp')}</p>
-                <p className="text-sm text-muted-foreground">{t('authenticatorAppDesc')}</p>
+          {/* TOTP Authenticator */}
+          {!showTotpSetup ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Shield className="w-6 h-6 text-primary" />
+                <div>
+                  <p className="font-medium">{t('authenticatorApp')}</p>
+                  <p className="text-sm text-muted-foreground">{t('authenticatorAppDesc')}</p>
+                </div>
               </div>
+              {user && user.is_mfa_enabled ? (
+                <Button 
+                  variant="destructive"
+                  onClick={() => setShowDisableTotpModal(true)}
+                >
+                  {t('disable')}
+                </Button>
+              ) : (
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowTotpSetup(true)}
+                >
+                  {t('setup')}
+                </Button>
+              )}
             </div>
-            <Button variant="outline">
-              {t('setup')}
-            </Button>
-          </div>
+          ) : (
+            <TOTPSetup 
+              userId={user?.id} 
+              onSetupComplete={() => {
+                setShowTotpSetup(false);
+                // Update the user data to reflect the change
+                refreshUser();
+                // Force a delay and then refresh again to ensure UI updates
+                setTimeout(() => {
+                  refreshUser();
+                  // Also explicitly update Redux store
+                  dispatch(updateUserData({
+                    is_mfa_enabled: true
+                  }));
+                  toast.success(t('success'));
+                }, 500);
+              }}
+              onCancel={() => setShowTotpSetup(false)}
+              locale={locale}
+            />
+          )}
           
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Phone className="w-6 h-6 text-primary" />
-              <div>
-                <p className="font-medium">{t('smsAuthentication')}</p>
-                <p className="text-sm text-muted-foreground">{t('smsAuthenticationDesc')}</p>
+          {/* Email Authentication */}
+          {!showEmailSetup ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Mail className="w-6 h-6 text-primary" />
+                <div>
+                  <p className="font-medium">{t('emailAuthentication')}</p>
+                  <p className="text-sm text-muted-foreground">{t('emailAuthenticationDesc')}</p>
+                </div>
               </div>
+              {user && user.is_email_2fa_enabled ? (
+                <Button 
+                  variant="destructive"
+                  onClick={() => setShowDisableEmailModal(true)}
+                >
+                  {t('disable')}
+                </Button>
+              ) : (
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowEmailSetup(true)}
+                >
+                  {t('setup')}
+                </Button>
+              )}
             </div>
-            <Button variant="outline">
-              {t('setup')}
-            </Button>
-          </div>
+          ) : (
+            <EmailSetup 
+              userId={user?.id} 
+              userEmail={user?.email}
+              onSetupComplete={() => {
+                setShowEmailSetup(false);
+                // Update the user data to reflect the change
+                refreshUser();
+                // Force a delay and then refresh again to ensure UI updates
+                setTimeout(() => {
+                  refreshUser();
+                  // Also explicitly update Redux store
+                  dispatch(updateUserData({
+                    is_email_2fa_enabled: true
+                  }));
+                  toast.success(t('success'));
+                }, 500);
+              }}
+              onCancel={() => setShowEmailSetup(false)}
+              locale={locale}
+            />
+          )}
         </CardContent>
       </Card>
+      
+      {/* Disable TOTP 2FA Modal */}
+      {showDisableTotpModal && (
+        <DisableTOTPModal
+          userId={user?.id}
+          onClose={() => setShowDisableTotpModal(false)}
+          onDisabled={() => {
+            setShowDisableTotpModal(false);
+            // Update the user data to reflect the change
+            refreshUser();
+            // Force a delay and then refresh again to ensure UI updates
+            setTimeout(() => {
+              refreshUser();
+              // Also explicitly update Redux store
+              dispatch(updateUserData({
+                is_mfa_enabled: false
+              }));
+              toast.success(t('success'));
+            }, 500);
+          }}
+        />
+      )}
+      
+      {/* Disable Email 2FA Modal */}
+      {showDisableEmailModal && (
+        <DisableEmailModal
+          userId={user?.id}
+          onClose={() => setShowDisableEmailModal(false)}
+          onDisabled={() => {
+            setShowDisableEmailModal(false);
+            // Update the user data to reflect the change
+            refreshUser();
+            // Force a delay and then refresh again to ensure UI updates
+            setTimeout(() => {
+              refreshUser();
+              // Also explicitly update Redux store
+              dispatch(updateUserData({
+                is_email_2fa_enabled: false
+              }));
+              toast.success(t('success'));
+            }, 500);
+          }}
+        />
+      )}
     </div>
   );
 } 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useDispatch, useSelector } from 'react-redux';
-import { createTask, updateTask } from '@/lib/redux/features/taskSlice';
+import { createTask, updateTask, deleteTask } from '@/lib/redux/features/taskSlice';
 import { updateTaskIds } from '@/lib/redux/features/sectionSlice';
 import { useTranslations } from 'next-intl';
 import { useTableContext } from './TableProvider';
@@ -24,7 +24,7 @@ function ValidationError({ message }) {
   );
 }
 
-export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInputRef }) {
+export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInputRef, loadAllSectionTasks }) {
   const dispatch = useDispatch();
   const t = useTranslations('CreateTask');
   const { user } = useGetUser();
@@ -458,7 +458,7 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
           
           if (!value || (typeof value === 'string' && value.trim() === '')) {
             preValidationFailed = true;
-            errors[tagId] = '此字段不能为空';
+            errors[tagId] = 'This field is required';
           }
         }
       }
@@ -610,6 +610,101 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
     );
   };
 
+  // ===== 删除任务相关功能 =====
+  
+  /**
+   * 删除任务
+   * @param {string} taskId - 要删除的任务ID
+   * @param {string} sectionId - 任务所属的部门ID
+   */
+  const handleDeleteTask = async (taskId, sectionId) => {
+    
+    try {
+      setIsLoading(true);
+      
+      // 处理临时任务(正在添加但未保存)的情况
+      if (isAddingTask && taskId.toString().startsWith('temp-')) {
+        setLocalTasks(prevTasks => ({
+          ...prevTasks,
+          [sectionId]: (prevTasks[sectionId] || []).filter(task => task.id !== taskId)
+        }));
+        
+        setEditingTask(null);
+        setEditingTaskValues({});
+        setIsAddingTask(false);
+        return;
+      }
+      
+      // 获取当前任务
+      const taskToDelete = localTasks[sectionId]?.find(task => task.id === taskId);
+      if (!taskToDelete) {
+        console.error('找不到要删除的任务:', taskId);
+        return;
+      }
+      
+      // 从本地任务列表中移除任务
+      setLocalTasks(prevTasks => ({
+        ...prevTasks,
+        [sectionId]: (prevTasks[sectionId] || []).filter(task => task.id !== taskId)
+      }));
+      
+      // 清除编辑状态（如果正在编辑这个任务）
+      if (editingTask === taskId) {
+        setEditingTask(null);
+        setEditingTaskValues({});
+        setIsAddingTask(false);
+      }
+      
+      // 调用Redux Action删除任务，传递所有必要参数
+      // API内部会处理更新部门任务ID的逻辑
+      const deleteResult = await dispatch(deleteTask({
+        taskId,
+        sectionId,
+        teamId,
+        userId: user?.id || null,
+        oldValues: taskToDelete || null
+      })).unwrap();
+      
+    } catch (error) {
+      console.error('任务删除过程发生错误:', error);
+      
+      // 删除失败，恢复本地任务列表状态
+      if (taskId && sectionId) {
+        try {
+          const { data: sectionData } = await supabase
+            .from('section')
+            .select('task_ids')
+            .eq('id', sectionId)
+            .single();
+            
+          if (sectionData && sectionData.task_ids) {
+            // 检查任务是否仍在部门中
+            if (sectionData.task_ids.includes(Number(taskId))) {
+              
+              // 如果任务仍在数据库中，恢复本地状态
+              const { data: taskData } = await supabase
+                .from('task')
+                .select('*')
+                .eq('id', taskId)
+                .single();
+                
+              if (taskData) {
+                setLocalTasks(prevTasks => ({
+                  ...prevTasks,
+                  [sectionId]: [...(prevTasks[sectionId] || []), taskData]
+                }));
+              }
+            }
+          }
+        } catch (recoveryError) {
+          console.error('恢复本地任务状态失败:', recoveryError);
+        }
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // 返回所有任务操作相关的函数和状态
   return {
     // 状态
@@ -631,6 +726,7 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
     handleTaskEditComplete,
     handleKeyDown,
     handleClickOutside,
+    handleDeleteTask,
     
     // UI组件
     renderAddTaskButton,

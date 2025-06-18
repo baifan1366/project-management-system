@@ -17,7 +17,10 @@ export default function RootLayout({ children }) {
       >
           <RouteGuard>
             {children}
-            <Toaster position="top-right" />
+            <Toaster 
+              position="top-right" 
+              duration={4000}
+            />
           </RouteGuard>
       </body>
     </html>

@@ -66,10 +66,12 @@ import {
   isTextType,
   isTextColumn,
   renderTextCell,
-  validateTextInput
+  validateTextInput,
+  EnhancedSingleSelect,
+  SingleSelectManager
 } from './TagConfig';
 
-export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading, validationErrors) {
+export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading, validationErrors, handleDeleteTask) {
   const t = useTranslations('CreateTask');
   const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
@@ -620,7 +622,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                     <div
                       ref={taskProvided.innerRef}
                       {...taskProvided.draggableProps}
-                      className={`border-b border-border h-10 ${
+                      className={`border-b border-border h-10 relative ${
                         snapshot.isDragging ? 'shadow-lg bg-accent/30' : ''
                       } ${hoveredTaskRow === task.id ? 'bg-accent/20' : ''} ${
                         isEditing || isCurrentTaskBeingAdded ? 'bg-accent/10' : ''
@@ -741,16 +743,20 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                       } else if (isIdColumn(tag) || (tagObj && isIdType(tagObj))) {
                                         return renderIdCell(currentValue);
                                       } else if (isSingleSelectColumn(tag) || (tagObj && isSingleSelectType(tagObj))) {
-                                        return renderSingleSelectCell(
-                                          currentValue, 
-                                          getTaskOptions(task.id, tagId), 
-                                          (option) => {
-                                            const newValue = JSON.stringify(option);
-                                            handleTaskValueChange(task.id, tagId, newValue);
-                                          },
-                                          (newOption) => handleCreateOption(task.id, tagId, newOption),
-                                          (editedOption) => handleEditOption(task.id, tagId, editedOption),
-                                          (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
+                                        return (
+                                          <EnhancedSingleSelect
+                                            value={currentValue}
+                                            options={getTaskOptions(task.id, tagId)}
+                                            onChange={(option) => {
+                                              const newValue = JSON.stringify(option);
+                                              handleTaskValueChange(task.id, tagId, newValue);
+                                            }}
+                                            onCreateOption={(newOption) => handleCreateOption(task.id, tagId, newOption)}
+                                            onEditOption={(editedOption) => handleEditOption(task.id, tagId, editedOption)}
+                                            onDeleteOption={(optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)}
+                                            teamId={teamId}
+                                            tagId={tagId}
+                                          />
                                         );
                                       } else if (isMultiSelectColumn(tag) || (tagObj && isMultiSelectType(tagObj))) {
                                         return renderMultiSelectCell(
@@ -930,10 +936,10 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                       } else if (isSingleSelectColumn(tag) || (tagObj && isSingleSelectType(tagObj))) {
                                         return (
                                           <div onClick={(e) => e.stopPropagation()}>
-                                            {renderSingleSelectCell(
-                                              currentValue, 
-                                              getTaskOptions(task.id, tagId), 
-                                              (option) => {
+                                            <EnhancedSingleSelect
+                                              value={currentValue}
+                                              options={getTaskOptions(task.id, tagId)}
+                                              onChange={(option) => {
                                                 // 激活编辑模式并设置新值
                                                 if (!isEditing) {
                                                   setEditingTask(task.id);
@@ -964,11 +970,13 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                                   const newValue = JSON.stringify(option);
                                                   handleTaskValueChange(task.id, tagId, newValue);
                                                 }
-                                              },
-                                              (newOption) => handleCreateOption(task.id, tagId, newOption),
-                                              (editedOption) => handleEditOption(task.id, tagId, editedOption),
-                                              (optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)
-                                            )}
+                                              }}
+                                              onCreateOption={(newOption) => handleCreateOption(task.id, tagId, newOption)}
+                                              onEditOption={(editedOption) => handleEditOption(task.id, tagId, editedOption)}
+                                              onDeleteOption={(optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)}
+                                              teamId={teamId}
+                                              tagId={tagId}
+                                            />
                                           </div>
                                         );
                                       } else if (isMultiSelectColumn(tag) || (tagObj && isMultiSelectType(tagObj))) {
@@ -1202,6 +1210,32 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                               </Button>
                             </div>
                           )}
+
+                          {/* 非编辑状态下的操作按钮 - 在鼠标悬停时显示 */}
+                          {!isEditing && !isCurrentTaskBeingAdded && hoveredTaskRow === task.id && (
+                            <div className="flex items-center px-2 gap-1 absolute right-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 mt-1.5 text-muted-foreground hover:text-red-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  confirm({
+                                    title: tConfirm('confirmDeleteTask'),
+                                    description: `${tConfirm('task')} "${task.tag_values?.['1'] || ''}" ${tConfirm('willBeDeleted')}`,
+                                    variant: 'error',
+                                    onConfirm: () => {
+                                      handleDeleteTask(task.id, sectionId);
+                                    }
+                                  });
+                                }}
+                                disabled={externalIsLoading}
+                                title={t('delete')}
+                              >
+                                <Trash size={16} className="text-red-500 hover:text-red-600" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1219,7 +1253,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                 {externalIsLoading ? (
                   <Loader2 size={16} className="animate-spin text-muted-foreground" />
                 ) : (
-                  <Plus size={16} className="text-muted-foreground" />
+                  <Plus size={16} className="text-muted-foreground" />                    
                 )}
               </Button>
             </div>

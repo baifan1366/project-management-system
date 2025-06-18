@@ -444,7 +444,61 @@ export async function GET(request) {
     }
     
     try {
-      // Generate JWT for authentication
+      // Check if user has 2FA enabled
+      const { data: userData, error: userError } = await supabase
+        .from('user')
+        .select('is_mfa_enabled, is_email_2fa_enabled')
+        .eq('id', userId)
+        .single();
+        
+      if (userError) {
+        console.error('Error fetching user 2FA status:', userError);
+        throw new Error('Failed to check 2FA status');
+      }
+      
+      // If 2FA is enabled, redirect to 2FA verification
+      if (userData && (userData.is_mfa_enabled || userData.is_email_2fa_enabled)) {
+        let twoFactorTypes = [];
+        if (userData.is_mfa_enabled) {
+          twoFactorTypes.push('totp');
+        }
+        if (userData.is_email_2fa_enabled) {
+          twoFactorTypes.push('email');
+        }
+        
+        // If email 2FA is enabled, send verification code automatically
+        if (userData.is_email_2fa_enabled) {
+          try {
+            // Send email verification code
+            await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/users/${userId}/email-2fa`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include'
+            });
+          } catch (emailError) {
+            console.error('Error sending 2FA email:', emailError);
+            // Continue anyway as we'll handle this on the frontend
+          }
+        }
+        
+        // Store OAuth provider info in session for after 2FA
+        const cookieOperation = cookies();
+        await cookieOperation.set('oauth_provider', provider, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 10 * 60, // 10 minutes
+        });
+        
+        // Redirect to 2FA verification page
+        const locale = 'en'; // 默认使用英文locale
+        return NextResponse.redirect(new URL(`/${locale}/login/verify-2fa?userId=${userId}&twoFactorTypes=${twoFactorTypes.join(',')}&redirect=${encodeURIComponent(redirectUrl)}`, request.url));
+      }
+      
+      // No 2FA enabled, proceed with normal login
       const token = await generateTokenForUser(userId);
       
       // Set auth cookie - cookies() 需要改用独立的cookieOperation变量

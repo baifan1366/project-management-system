@@ -28,6 +28,13 @@ function ChatLayout({ children }) {
   const t = useTranslations('Chat');
   const { formatLastSeen } = useLastSeen(); // 使用上次在线时间钩子
   const { formatChatTime } = useChatTime(); // 使用聊天时间钩子
+  
+  // Utility function to truncate text
+  const truncateText = (text, maxLength) => {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
   const { 
     currentUser, 
     usersStatus 
@@ -531,6 +538,10 @@ function ChatLayout({ children }) {
                   ? session.participants[0]?.avatar_url 
                   : null;
                   
+                const lastMessageContent = session.matchedMessages && session.matchedMessages.length > 0
+                  ? session.matchedMessages[0].content 
+                  : session.lastMessage?.content;
+                  
                 return (
                   <div
                     key={`${session.id}-${new Date(session.created_at || 0).getTime()}`}
@@ -570,7 +581,7 @@ function ChatLayout({ children }) {
                         <div className="flex items-baseline justify-between">
                           <div className="flex items-center gap-1">
                             <h3 className="font-medium truncate text-sm">
-                              {sessionName}
+                              {truncateText(sessionName, 25)}
                             </h3>
                             {/* Display external badge for private chats */}
                             {(() => {
@@ -590,7 +601,7 @@ function ChatLayout({ children }) {
                           </button>
                         </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {session.lastMessage?.content || t('noRecentMessages')}
+                        {truncateText(session.lastMessage?.content || t('noRecentMessages'), 50)}
                       </p>
                     </div>
                   </div>
@@ -655,7 +666,7 @@ function ChatLayout({ children }) {
                           <div className="flex items-baseline justify-between">
                             <div className="flex items-center gap-1">
                               <h3 className="font-medium truncate text-sm">
-                                {sessionName}
+                                {truncateText(sessionName, 25)}
                               </h3>
                               {/* Display external badge for private chats */}
                               {(() => {
@@ -675,7 +686,7 @@ function ChatLayout({ children }) {
                             </button>
                           </div>
                           <p className="text-xs text-muted-foreground truncate">
-                            {session.lastMessage?.content || t('noRecentMessages')}
+                            {truncateText(session.lastMessage?.content || t('noRecentMessages'), 50)}
                           </p>
                         </div>
                       </div>
@@ -760,7 +771,7 @@ function ChatLayout({ children }) {
                                                 <div className="flex items-baseline justify-between">
                             <div className="flex items-center gap-1">
                               <h3 className={`font-medium truncate ${session.unreadCount > 0 && !mutedSessions[session.id] ? 'text-foreground font-semibold' : ''}`}>
-                                {sessionName}
+                                {truncateText(sessionName, 17)}
                               </h3>
                               {/* Display external badge for private chats */}
                               {(() => {
@@ -779,7 +790,7 @@ function ChatLayout({ children }) {
                       <div className="flex items-center justify-between mt-1">
                         <p className={`text-sm truncate ${session.unreadCount > 0 && !mutedSessions[session.id] ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
                           {lastMessageContent
-                              ? (session.lastMessage?.role === 'assistant' ? `🤖 ${lastMessageContent}` : lastMessageContent)
+                              ? (session.lastMessage?.role === 'assistant' ? `🤖 ${truncateText(lastMessageContent, 40)}` : truncateText(lastMessageContent, 40))
                               : t('noRecentMessages')}
                         </p>
                         {session.unreadCount > 0 && !mutedSessions[session.id] && currentSession?.id !== session.id && (
