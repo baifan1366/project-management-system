@@ -203,6 +203,7 @@ export default function MyTasksPage() {
           return {
             ...task,
             my_task_id: myTask.id,
+            task_id: task.id, // Ensure task_id is explicitly available for reference display
             status: myTask.status,
             priority: myTask.priority,
             title: myTask.title || getTaskTitle(task),
@@ -828,6 +829,12 @@ export default function MyTasksPage() {
                                       {getTaskProjectId(task) && (
                                         <div className="text-xs">
                                           #{getTaskProjectId(task)}
+                                        </div>
+                                      )}
+                                      {/* Show reference ID for assigned tasks (non-standalone) */}
+                                      {!task.is_standalone && task.task_id && (
+                                        <div className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                                          {t_tasks('reference') || 'Ref'}: {task.task_id}
                                         </div>
                                       )}
                                     </div>
