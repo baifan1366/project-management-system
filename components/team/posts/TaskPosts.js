@@ -28,6 +28,9 @@ import EmojiPicker from '@/components/chat/EmojiPicker';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { fetchCommentsByPostId, fetchCommentById, createComment } from '@/lib/redux/features/commentsSlice';
+import AttachFile from './AttachFile';
+import { File, FileText } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function TaskPosts({ projectId, teamId, teamCFId }) {
   const t = useTranslations('PostsView');
@@ -109,6 +112,8 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   const [postType, setPostType] = useState('post'); // 'post' or 'announcement'
   const [isFormValid, setIsFormValid] = useState(false);
   const [expandedPosts, setExpandedPosts] = useState({});
+  // 添加防抖定时器引用
+  const debounceTimers = useRef({});
   
   // 添加编辑帖子的状态
   const [editingPostId, setEditingPostId] = useState(null);
@@ -134,6 +139,27 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   const [commentLoading, setCommentLoading] = useState(false);
   // 添加评论计数状态
   const [commentCounts, setCommentCounts] = useState({});
+  
+  // 添加请求中状态跟踪
+  const [pendingCommentRequests, setPendingCommentRequests] = useState({});
+  
+  // 添加附件相关状态
+  const [showAttachFileDialog, setShowAttachFileDialog] = useState(false);
+  const [activeAttachPostId, setActiveAttachPostId] = useState(null);
+  const [postAttachments, setPostAttachments] = useState({});
+  
+  // 添加状态来跟踪新帖子的附件
+  const [newPostAttachments, setNewPostAttachments] = useState([]);
+  
+  // 添加状态来跟踪新帖子的临时附件（还未上传）
+  const [newPostTempFiles, setNewPostTempFiles] = useState([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  
+  // 添加状态来存储帖子的附件
+  const [editPostAttachments, setEditPostAttachments] = useState([]);
+  
+  // 添加状态来跟踪待删除的附件
+  const [pendingDeleteAttachments, setPendingDeleteAttachments] = useState([]);
   
   // Hook into data handlers
   const { 
@@ -327,6 +353,8 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     setPostType('post');
     setShowCreateDialog(false);
     setShowInlineEditor(false);
+    setNewPostAttachments([]); // 重置已上传附件
+    setNewPostTempFiles([]); // 重置临时文件
   };
 
   // Dialog关闭时重置表单
@@ -339,7 +367,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     }
   }, [showCreateDialog, showInlineEditor]);
 
-  // Handle post creation
+  // Handle post creation - 修改为先上传文件，再创建帖子
   const handleCreatePost = async () => {
     const trimmedTitle = newPostTitle.trim();
     
@@ -349,11 +377,27 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     }
     
     try {
+      setIsLoading(true);
+      
+      // 先上传附件
+      let attachments = [];
+      
+      if (newPostTempFiles.length > 0) {
+        toast.loading(t('uploadingFiles') || '正在上传文件...');
+        attachments = await uploadAllFiles();
+        toast.dismiss();
+      }
+      
+      // 合并之前可能已经上传的附件
+      const allAttachments = [...attachments, ...newPostAttachments];
+      
+      // 创建帖子
       const result = await CreatePost({
         title: trimmedTitle,
         description: showInlineEditor ? newPostContent : newPostDescription,
         type: postType,
-        teamId
+        teamId,
+        attachments: allAttachments
       });
       
       if (result) {
@@ -361,9 +405,13 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         setPosts(prev => [...prev, result]);
         // Reset form and close editor
         resetForm();
+        toast.success(t('postCreated') || '帖子已创建');
       }
     } catch (error) {
       console.error(t('createPostError'), error);
+      toast.error(t('createPostError') || '创建帖子失败');
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -531,10 +579,46 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   // 获取帖子评论数量
   const fetchPostCommentCount = async (postId) => {
     try {
+      // 如果已经有这个帖子的请求正在进行中，则跳过
+      if (pendingCommentRequests[postId]) {
+        return commentCounts[postId] || 0;
+      }
+      
+      // 标记该帖子的请求为进行中
+      setPendingCommentRequests(prev => ({
+        ...prev,
+        [postId]: true
+      }));
+      
+      // 如果已经有缓存的评论数据，直接使用它计算数量
+      if (commentsMap[postId]) {
+        const count = commentsMap[postId].length;
+        setCommentCounts(prev => ({
+          ...prev,
+          [postId]: count
+        }));
+        
+        // 清除请求进行中标记
+        setPendingCommentRequests(prev => ({
+          ...prev,
+          [postId]: false
+        }));
+        
+        return count;
+      }
+      
       // 通过帖子ID获取评论
       const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
       // 计算获取到的评论总数
       const count = comments ? comments.length : 0;
+      
+      // 更新评论缓存
+      if (comments && comments.length > 0) {
+        setCommentsMap(prev => ({
+          ...prev,
+          [postId]: comments
+        }));
+      }
       
       // 更新评论计数缓存
       setCommentCounts(prev => ({
@@ -542,29 +626,67 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
         [postId]: count
       }));
       
+      // 清除请求进行中标记
+      setPendingCommentRequests(prev => ({
+        ...prev,
+        [postId]: false
+      }));
+      
       return count;
     } catch (error) {
       console.error(`获取帖子(${postId})评论数量失败:`, error);
+      
+      // 清除请求进行中标记
+      setPendingCommentRequests(prev => ({
+        ...prev,
+        [postId]: false
+      }));
+      
       return 0;
     }
   };
   
-  // 获取帖子的评论数量
+  // 添加防抖函数用于评论请求
+  const debounceCommentRequest = (postId, callback, delay = 300) => {
+    // 如果已经有这个帖子的请求计时器，清除它
+    if (debounceTimers.current[postId]) {
+      clearTimeout(debounceTimers.current[postId]);
+    }
+    
+    // 设置新的计时器
+    debounceTimers.current[postId] = setTimeout(() => {
+      callback();
+      // 完成后清除计时器引用
+      delete debounceTimers.current[postId];
+    }, delay);
+  };
+  
+  // 获取帖子的评论数量（修改版本）
   const getPostCommentCount = (postId) => {
     // 如果已经有缓存的数量，直接返回
     if (commentCounts[postId] !== undefined) {
       return commentCounts[postId];
     }
     
-    // 如果还没有缓存的评论数量，触发异步获取
-    fetchPostCommentCount(postId).catch(err => {
-      console.error(`获取帖子(${postId})评论计数失败:`, err);
-    });
-    
-    // 在异步加载完成前，尝试从已有数据中获取计数
-    // 如果有评论数据，直接计算长度
+    // 如果已经有评论数据，直接计算长度
     if (commentsMap[postId]) {
-      return commentsMap[postId].length;
+      const count = commentsMap[postId].length;
+      // 更新缓存
+      setCommentCounts(prev => ({
+        ...prev,
+        [postId]: count
+      }));
+      return count;
+    }
+    
+    // 如果还没有缓存的评论数量且没有请求正在进行中，触发异步获取
+    if (!pendingCommentRequests[postId] && !debounceTimers.current[postId]) {
+      // 使用防抖避免在短时间内多次请求
+      debounceCommentRequest(postId, () => {
+        fetchPostCommentCount(postId).catch(err => {
+          console.error(`获取帖子(${postId})评论计数失败:`, err);
+        });
+      });
     }
     
     // 如果帖子对象有评论数组，使用它的长度
@@ -576,18 +698,33 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   useEffect(() => {
     if (!isLoading && posts.length > 0) {
       const fetchCounts = async () => {
-        // 只获取没有评论计数的帖子
+        // 创建一个已请求帖子的集合，避免重复请求
+        const requestedPosts = new Set();
+        
+        // 只获取没有评论计数且没有正在请求的帖子
         const postsWithoutCounts = posts.filter(post => 
           commentCounts[post.id] === undefined && 
-          (!post.comments || post.comments.length > 0)
+          !pendingCommentRequests[post.id] &&
+          !debounceTimers.current[post.id] &&
+          (!post.comments || post.comments.length > 0) &&
+          !requestedPosts.has(post.id)
         );
         
         if (postsWithoutCounts.length > 0) {          
           // 并发获取评论计数，但限制并发数以避免过多请求
-          const batchSize = 3;
+          const batchSize = 2; // 减少批量大小，降低并发请求数
           for (let i = 0; i < postsWithoutCounts.length; i += batchSize) {
             const batch = postsWithoutCounts.slice(i, i + batchSize);
+            
+            // 标记这些帖子为已请求
+            batch.forEach(post => requestedPosts.add(post.id));
+            
             await Promise.all(batch.map(post => fetchPostCommentCount(post.id)));
+            
+            // 添加延迟，进一步减少服务器压力
+            if (i + batchSize < postsWithoutCounts.length) {
+              await new Promise(resolve => setTimeout(resolve, 300));
+            }
           }
         }
       };
@@ -596,13 +733,34 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     }
   }, [isLoading, posts]);
   
+  // 添加清理定时器的useEffect
+  useEffect(() => {
+    // 组件卸载时清除所有防抖定时器
+    return () => {
+      Object.keys(debounceTimers.current).forEach(key => {
+        clearTimeout(debounceTimers.current[key]);
+      });
+    };
+  }, []);
+  
   // 切换评论展开/收起状态
   const toggleComments = async (postId) => {
     handlePotentialLeave(async () => {
+      // 如果评论已经在加载中，则不要重复请求
+      if (commentLoading && !commentsMap[postId]) {
+        return;
+      }
+      
       setCommentLoading(true);
       try {
         // 如果评论还未加载，则加载评论
-        if (!commentsMap[postId]) {
+        if (!commentsMap[postId] && !pendingCommentRequests[postId]) {
+          // 标记该帖子的请求为进行中
+          setPendingCommentRequests(prev => ({
+            ...prev,
+            [postId]: true
+          }));
+          
           const comments = await dispatch(fetchCommentsByPostId(postId)).unwrap();
           
           // 更新评论计数
@@ -629,6 +787,12 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
             ...prev,
             [postId]: comments || []
           }));
+          
+          // 清除请求进行中标记
+          setPendingCommentRequests(prev => ({
+            ...prev,
+            [postId]: false
+          }));
         }
         
         // 切换显示状态
@@ -644,6 +808,12 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
       } catch (error) {
         console.error("加载评论失败:", error);
         toast.error(t('loadCommentsError') || "加载评论失败");
+        
+        // 清除请求进行中标记
+        setPendingCommentRequests(prev => ({
+          ...prev,
+          [postId]: false
+        }));
       } finally {
         setCommentLoading(false);
       }
@@ -1030,6 +1200,9 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                 className="h-[150px] min-h-[150px] max-h-[250px] overflow-y-auto text-[#252423] dark:text-white border-[#E1DFDD] dark:border-[#3B3A39]"
               />
             </div>
+            
+            {/* 显示现有附件 */}
+            {renderAttachments(editPostAttachments)}
           </div>
         </div>
         
@@ -1045,6 +1218,11 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               variant="ghost"
               size="icon"
               className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAttachFile(post.id);
+              }}
             >
               <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
             </Button>
@@ -1143,10 +1321,19 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               variant="ghost"
               size="icon"
               className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+              onClick={() => handleAttachFile('new')}
             >
               <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
+              {newPostTempFiles.length > 0 && (
+                <span className="absolute top-0 right-0 h-4 w-4 rounded-full bg-primary text-[10px] flex items-center justify-center text-white">
+                  {newPostTempFiles.length}
+                </span>
+              )}
             </Button>
-
+            
+            {/* 显示已选择的文件预览 */}
+            {newPostTempFiles.length > 0 && renderSelectedFiles()}
+            
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -1207,10 +1394,10 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
               variant={themeColor}
               size="sm"
               onClick={handleCreatePost}
-              disabled={!isFormValid || isLoading}
+              disabled={!isFormValid || isLoading || isUploadingFiles}
               className="rounded-md min-w-[80px]"
             >
-              {isLoading ? 
+              {isLoading || isUploadingFiles ? 
                 t('posting')
               : 
                 t('post')
@@ -1248,7 +1435,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center">
-                        <CardTitle className="text-base font-semibold w-full truncate max-w-[200px] sm:max-w-[300px] md:max-w-[400px] lg:max-w-[600px] xl:max-w-[800px]">
+                        <CardTitle className="text-base font-semibold w-full truncate max-w-48">
                           {post.title || t('noTitle')}
                         </CardTitle>
                       </div>
@@ -1672,23 +1859,34 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
   
   // 开始编辑帖子
   const startEditingPost = (post) => {
-    handlePotentialLeave(() => {
+    handlePotentialLeave(async () => {
       setEditingPostId(post.id);
       setEditPostTitle(post.title || '');
       setEditPostDescription(post.description || '');
       setEditPostContent(post.description || '');
+      
+      // 获取并设置该帖子的附件
+      const attachments = await fetchPostAttachments(post.id);
+      setEditPostAttachments(attachments);
     });
   };
   
   // 取消编辑帖子
   const cancelEditingPost = () => {
+    // 如果有待删除的附件，恢复它们
+    if (pendingDeleteAttachments.length > 0) {
+      setEditPostAttachments(prev => [...prev, ...pendingDeleteAttachments]);
+      setPendingDeleteAttachments([]);
+    }
+    
     setEditingPostId(null);
     setEditPostTitle('');
     setEditPostDescription('');
     setEditPostContent('');
+    setEditPostAttachments([]); // 清空编辑状态的附件
   };
   
-  // 保存编辑的帖子
+  // 保存编辑的帖子 - 更新这部分以包含附件处理
   const saveEditedPost = async () => {
     const trimmedTitle = editPostTitle.trim();
     
@@ -1700,30 +1898,54 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     try {
       setIsLoading(true);
       
+      // 如果有待删除的附件，先执行删除操作
+      if (pendingDeleteAttachments.length > 0) {
+        for (const attachment of pendingDeleteAttachments) {
+          // 从attachment表中删除记录
+          const { error: deletedAttachmentError } = await supabase
+            .from('attachment')
+            .delete()
+            .eq('id', attachment.id);
+          
+          if (deletedAttachmentError) throw deletedAttachmentError;
+          
+          // TODO: 如果需要，这里还可以添加删除存储中的文件
+        }
+      }
+      
       // 准备更新的帖子数据
       const updateData = {
         id: editingPostId,
         title: trimmedTitle,
         description: editPostContent, // 始终使用富文本编辑器的内容
         type: postType,
-        team_id: teamId
+        team_id: teamId,
+        attachment_id: editPostAttachments.map(att => att.id) // 添加附件ID数组
       };
       
-      // 使用Redux action更新帖子
-      const resultAction = await dispatch(updatePost(updateData)).unwrap();
+      // 使用supabase直接更新帖子，包括附件
+      const { data: updatedPost, error } = await supabase
+        .from('team_post')
+        .update(updateData)
+        .eq('id', editingPostId)
+        .select()
+        .single();
       
-      if (resultAction) {
-        // 重置编辑状态
-        cancelEditingPost();
-        
-        // 直接用Redux刷新一次帖子列表，确保数据一致性
-        const updatedPosts = await dispatch(fetchPostsByTeamId(teamId)).unwrap();
-        
-        // 确保使用最新的数据更新本地状态
-        setPosts(updatedPosts);
-        
-        toast.success(t('postUpdated') || '帖子已更新');
-      }
+      if (error) throw error;
+      
+      // 重置编辑状态
+      cancelEditingPost();
+      
+      // 清空待删除附件列表
+      setPendingDeleteAttachments([]);
+      
+      // 直接用Redux刷新一次帖子列表，确保数据一致性
+      const updatedPosts = await dispatch(fetchPostsByTeamId(teamId)).unwrap();
+      
+      // 确保使用最新的数据更新本地状态
+      setPosts(updatedPosts);
+      
+      toast.success(t('postUpdated') || '帖子已更新');
     } catch (error) {
       console.error(t('updatePostError') || '更新帖子失败', error);
       toast.error(t('updatePostError') || '更新帖子失败');
@@ -1819,6 +2041,415 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     handlePotentialLeave(() => {
       setSearchQuery(newValue);
     });
+  };
+  
+  // 添加处理附件上传的函数
+  const handleAttachFile = (postId) => {
+    // 如果是新帖子，不要使用handlePotentialLeave，直接打开附件对话框
+    if (postId === 'new') {
+      setActiveAttachPostId('new');
+      setShowAttachFileDialog(true);
+      return;
+    }
+    
+    // 如果是编辑中的帖子，也直接打开附件对话框
+    if (postId === editingPostId) {
+      setActiveAttachPostId(postId);
+      setShowAttachFileDialog(true);
+      return;
+    }
+    
+    // 对于其他已有帖子，使用原来的逻辑
+    handlePotentialLeave(() => {
+      // 确保postId有效
+      if (postId) {
+        setActiveAttachPostId(postId);
+        setShowAttachFileDialog(true);
+      } else {
+        // 如果没有传入postId，使用当前活动的评论帖子ID
+        if (activeCommentPostId) {
+          setActiveAttachPostId(activeCommentPostId);
+          setShowAttachFileDialog(true);
+        } else {
+          toast.error(t('selectPostFirst') || '请先选择一个帖子');
+        }
+      }
+    });
+  };
+  
+  // 处理文件附加完成后的回调
+  const handleFileAttached = async (selectedFiles) => {
+    if (selectedFiles && selectedFiles.length > 0) {
+      if (activeAttachPostId === 'new') {
+        // 如果是添加到新帖子，仅保存文件对象，不立即上传
+        setNewPostTempFiles(prev => [...prev, ...selectedFiles]);
+        toast.success(t('fileSelected') || '文件已选择，将在发布时上传');
+      } else if (activeAttachPostId) {
+        // 如果是添加到正在编辑的帖子，判断是否是当前编辑的帖子
+        if (activeAttachPostId === editingPostId) {
+          try {
+            setIsUploadingFiles(true);
+            toast.loading(t('uploadingFiles') || '正在上传文件...');
+            
+            // 上传文件并获取附件记录
+            const uploadedAttachments = [];
+            for (const fileItem of selectedFiles) {
+              const attachmentData = await uploadFile(fileItem);
+              if (attachmentData) {
+                uploadedAttachments.push(attachmentData);
+              }
+            }
+            
+            if (uploadedAttachments.length > 0) {
+              // 添加到编辑中帖子的附件列表
+              setEditPostAttachments(prev => [...prev, ...uploadedAttachments]);
+              
+              // 更新帖子的attachment_id字段
+              const currentPostAttachmentIds = editPostAttachments.map(att => att.id);
+              const newAttachmentIds = [...currentPostAttachmentIds, ...uploadedAttachments.map(att => att.id)];
+              
+              const { data, error } = await supabase
+                .from('team_post')
+                .update({
+                  attachment_id: newAttachmentIds
+                })
+                .eq('id', editingPostId);
+              
+              if (error) throw error;
+              
+              toast.dismiss();
+              toast.success(t('fileAttached') || '文件已添加到帖子');
+            }
+          } catch (error) {
+            console.error("Error uploading files for editing post:", error);
+            toast.dismiss();
+            toast.error(t('uploadError') || '上传文件失败');
+          } finally {
+            setIsUploadingFiles(false);
+          }
+        } else {
+          // 现有帖子的处理方式不变，可以直接上传
+          setPostAttachments(prev => ({
+            ...prev,
+            [activeAttachPostId]: [
+              ...(prev[activeAttachPostId] || []),
+              ...selectedFiles
+            ]
+          }));
+          
+          toast.success(t('fileAttached') || '文件已附加到帖子');
+        }
+      }
+    }
+  };
+  
+  // 上传单个文件并返回附件信息
+  const uploadFile = async (fileItem) => {
+    try {
+      // 生成唯一的文件路径
+      const timestamp = new Date().getTime();
+      const fileName = fileItem.name;
+      const uniqueFileName = `${timestamp}_${fileName}`;
+      const filePath = `posts/temp/${timestamp}/${uniqueFileName}`;
+      
+      // 上传文件到Supabase存储
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, fileItem.file);
+      
+      if (storageError) throw storageError;
+      
+      // 获取公共URL
+      const { data: publicUrlData } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath);
+        
+      const publicUrl = publicUrlData.publicUrl;
+      
+      // 创建附件记录
+      const { data: attachmentData, error: attachmentError } = await supabase
+        .from('attachment')
+        .insert({
+          file_name: fileName,
+          file_url: publicUrl,
+          uploaded_by: user?.id,
+          file_type: fileItem.type,
+          size: fileItem.size,
+          file_path: filePath
+        })
+        .select()
+        .single();
+      
+      if (attachmentError) throw attachmentError;
+      
+      return {
+        id: attachmentData.id,
+        name: fileName,
+        url: publicUrl,
+        type: fileItem.type,
+        size: fileItem.size
+      };
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      throw error;
+    }
+  };
+  
+  // 上传所有文件
+  const uploadAllFiles = async () => {
+    if (!newPostTempFiles || newPostTempFiles.length === 0) {
+      return [];
+    }
+    
+    try {
+      setIsUploadingFiles(true);
+      
+      const uploadedAttachments = [];
+      // 逐个上传文件
+      for (const fileItem of newPostTempFiles) {
+        const attachmentData = await uploadFile(fileItem);
+        if (attachmentData) {
+          uploadedAttachments.push(attachmentData);
+        }
+      }
+      
+      // 清理预览URL
+      newPostTempFiles.forEach(file => {
+        if (file.preview) {
+          URL.revokeObjectURL(file.preview);
+        }
+      });
+      
+      return uploadedAttachments;
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      toast.error(t('uploadError') || '上传文件时出错');
+      return [];
+    } finally {
+      setIsUploadingFiles(false);
+    }
+  };
+  
+  // 添加显示已选择文件的函数
+  const renderSelectedFiles = () => {
+    if (newPostTempFiles.length === 0) return null;
+    
+    return (
+      <div className="mt-2 space-y-1">
+        <p className="text-xs text-[#605E5C] dark:text-[#C8C6C4]">
+          {t('selectedFiles') || '已选择的文件'}:
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {newPostTempFiles.map((file, index) => (
+            <div
+              key={index}
+              className="flex items-center bg-accent/50 dark:bg-accent/20 rounded-md px-2 py-1 text-xs"
+            >
+              {file.type.startsWith('image/') ? (
+                <img 
+                  src={file.preview} 
+                  alt={file.name}
+                  className="w-4 h-4 object-cover rounded mr-1"
+                />
+              ) : file.type.includes('pdf') ? (
+                <File className="w-3 h-3 text-red-500 mr-1" />
+              ) : file.type.includes('doc') ? (
+                <FileText className="w-3 h-3 text-blue-500 mr-1" />
+              ) : (
+                <File className="w-3 h-3 text-gray-500 mr-1" />
+              )}
+              <span className="truncate max-w-[100px]">{file.name}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 rounded-full ml-1 hover:bg-accent"
+                onClick={() => removeSelectedFile(index)}
+              >
+                <X className="h-2 w-2" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  
+  // 移除已选择但未上传的文件
+  const removeSelectedFile = (index) => {
+    setNewPostTempFiles(prev => {
+      const newFiles = [...prev];
+      
+      // 释放预览URL
+      if (newFiles[index]?.preview) {
+        URL.revokeObjectURL(newFiles[index].preview);
+      }
+      
+      newFiles.splice(index, 1);
+      return newFiles;
+    });
+  };
+  
+  // 获取帖子附件的函数
+  const fetchPostAttachments = async (postId) => {
+    try {
+      // 首先获取帖子详情，查看attachment_id字段
+      const { data: post, error: postError } = await supabase
+        .from('team_post')
+        .select('attachment_id')
+        .eq('id', postId)
+        .single();
+      
+      if (postError) throw postError;
+      
+      // 如果没有附件，直接返回空数组
+      if (!post.attachment_id || !Array.isArray(post.attachment_id) || post.attachment_id.length === 0) {
+        return [];
+      }
+      
+      // 获取附件详情
+      const { data: attachments, error: attachmentsError } = await supabase
+        .from('attachment')
+        .select('*')
+        .in('id', post.attachment_id);
+      
+      if (attachmentsError) throw attachmentsError;
+      
+      return attachments || [];
+    } catch (error) {
+      console.error("Error fetching post attachments:", error);
+      toast.error(t('errorFetchingAttachments') || '获取附件失败');
+      return [];
+    }
+  };
+  
+  // 添加渲染已上传附件的函数
+  const renderAttachments = (attachments) => {
+    if (!attachments || attachments.length === 0) return null;
+    
+    return (
+      <div className="mt-3 space-y-1">
+        <p className="text-xs text-[#605E5C] dark:text-[#C8C6C4]">
+          {t('attachedFiles') || '已附加的文件'}:
+        </p>
+        <div className="flex flex-wrap gap-2 mb-2">
+          {attachments.map((file, index) => (
+            <div
+              key={file.id}
+              className="flex items-center bg-accent/50 dark:bg-accent/20 rounded-md px-2 py-1 text-xs"
+            >
+              {file.file_type?.startsWith('image/') ? (
+                <img 
+                  src={file.file_url} 
+                  alt={file.file_name}
+                  className="w-4 h-4 object-cover rounded mr-1"
+                />
+              ) : file.file_type?.includes('pdf') ? (
+                <File className="w-3 h-3 text-red-500 mr-1" />
+              ) : file.file_type?.includes('doc') ? (
+                <FileText className="w-3 h-3 text-blue-500 mr-1" />
+              ) : (
+                <File className="w-3 h-3 text-gray-500 mr-1" />
+              )}
+              <a 
+                href={file.file_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="truncate max-w-[100px] hover:underline"
+              >
+                {file.file_name}
+              </a>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 rounded-full ml-1 hover:bg-accent"
+                onClick={() => removeAttachment(file.id, index)}
+              >
+                <X className="h-2 w-2" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        
+        {/* 显示待删除的附件 */}
+        {pendingDeleteAttachments.length > 0 && (
+          <div className="mt-2">
+            <p className="text-xs text-[#605E5C] dark:text-[#C8C6C4]">
+              {t('pendingDeleteFiles') || '待删除的文件'} ({pendingDeleteAttachments.length}):
+            </p>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {pendingDeleteAttachments.map((file, index) => (
+                <div
+                  key={file.id}
+                  className="flex items-center bg-red-100 dark:bg-red-900/20 rounded-md px-2 py-1 text-xs"
+                >
+                  {file.file_type?.startsWith('image/') ? (
+                    <img 
+                      src={file.file_url} 
+                      alt={file.file_name}
+                      className="w-4 h-4 object-cover rounded mr-1 opacity-50"
+                    />
+                  ) : file.file_type?.includes('pdf') ? (
+                    <File className="w-3 h-3 text-red-300 mr-1" />
+                  ) : file.file_type?.includes('doc') ? (
+                    <FileText className="w-3 h-3 text-blue-300 mr-1" />
+                  ) : (
+                    <File className="w-3 h-3 text-gray-300 mr-1" />
+                  )}
+                  <span className="truncate max-w-[100px] line-through text-gray-500">
+                    {file.file_name}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4 rounded-full ml-1 hover:bg-red-200 dark:hover:bg-red-800"
+                    onClick={() => restoreAttachment(index)}
+                    title={t('restoreFile') || '恢复文件'}
+                  >
+                    <ChevronUp className="h-2 w-2" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+  
+  // 移除附件的函数
+  const removeAttachment = async (attachmentId, index) => {
+    try {
+      // 从当前显示的附件列表中移除
+      const newAttachments = [...editPostAttachments];
+      const removedAttachment = newAttachments.splice(index, 1)[0];
+      setEditPostAttachments(newAttachments);
+      
+      // 添加到待删除列表，稍后在保存时处理
+      setPendingDeleteAttachments(prev => [...prev, removedAttachment]);
+      
+      toast.success(t('attachmentMarkedForRemoval') || '附件已标记为删除，将在保存时执行');
+    } catch (error) {
+      console.error("Error marking attachment for removal:", error);
+      toast.error(t('errorRemovingAttachment') || '移除附件失败');
+    }
+  };
+  
+  // 添加恢复已标记为删除的附件的函数
+  const restoreAttachment = (index) => {
+    try {
+      // 从待删除列表中移除
+      const newPendingDelete = [...pendingDeleteAttachments];
+      const restoredAttachment = newPendingDelete.splice(index, 1)[0];
+      setPendingDeleteAttachments(newPendingDelete);
+      
+      // 添加回附件列表
+      setEditPostAttachments(prev => [...prev, restoredAttachment]);
+      
+      toast.success(t('attachmentRestored') || '附件已恢复');
+    } catch (error) {
+      console.error("Error restoring attachment:", error);
+      toast.error(t('errorRestoringAttachment') || '恢复附件失败');
+    }
   };
   
   return (
@@ -1969,7 +2600,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                           className="h-[135px] min-h-[135px] max-h-[250px] overflow-y-auto border border-[#E1DFDD] text-[#252423] dark:border-[#3B3A39] dark:text-white"
                         />
                         <div className="mt-2 flex justify-between items-center">
-                          <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2">
                             
                             <EmojiPicker 
                               onEmojiSelect={(emojiData) => setNewPostDescription(prev => prev + emojiData.emoji)}
@@ -1981,11 +2612,19 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 rounded-full hover:bg-[#F5F5F5] dark:hover:bg-[#3B3A39]"
+                              onClick={() => handleAttachFile('new')}
                             >
                               <Paperclip className="h-4 w-4 text-[#252423] dark:text-white" />
                             </Button>
                           </div>
                         </div>
+                        
+                        {/* 显示已选择的文件预览 */}
+                        {newPostTempFiles.length > 0 && (
+                          <div className="mt-2">
+                            {renderSelectedFiles()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2129,6 +2768,18 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
           </div>
         )}
       </div>
+      
+      {/* 附加文件对话框 */}
+      <AttachFile
+        isOpen={showAttachFileDialog}
+        onClose={() => {
+          setShowAttachFileDialog(false);
+          // 不要关闭内联编辑器或主对话框
+        }}
+        postId={activeAttachPostId}
+        teamId={teamId}
+        onFileAttached={handleFileAttached}
+      />
     </div>
   );
 }

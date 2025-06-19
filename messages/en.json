@@ -2515,6 +2515,8 @@
     "noSections": "No sections found"
   },
   "File": {
+    "error": "Error",
+    "uploadAttachmentToPost": "Upload Attachment to Post",
     "newFolder": "New Folder",
     "uploadError": "Upload Error",
     "noTaskIdProvided": "No task ID was provided.",
@@ -2621,6 +2623,23 @@
     "closePreview": "Close Preview"
   },
   "PostsView": {
+    "uploadingFiles": "Uploading files...",
+    "selectPostFirst": "Please select a post first",
+    "fileSelected": "File selected",
+    "fileAttached": "File attached",
+    "uploadError": "Upload Error",
+    "restoreFile": "Restore File",
+    "errorRemovingFile": "Error removing file",
+    "attachmentRestored": "Attachment restored",
+    "errorRemovingAttachment": "Error removing attachment",
+    "errorRestoringAttachment": "Error restoring attachment",
+    "errorRestoringFile": "Error restoring file",
+    "errorFetchingAttachments": "Error fetching attachments",
+    "attachmentMarkedForRemoval": "Attachment marked for removal",
+    "pendingDeleteFiles": "Pending delete files",
+    "attachedFiles": "Attached Files",
+    "selectedFiles": "Selected Files",
+    "posting": "Posting...",
     "loadCommentsError": "Load Comments Error",
     "comments": "comments",
     "unknownUser": "Unknown User",
