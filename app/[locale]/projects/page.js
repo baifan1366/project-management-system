@@ -8,7 +8,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarIcon, EyeIcon, CheckCircleIcon, PlusCircleIcon, MessageSquareIcon, Plus, Archive, RefreshCcw, Filter } from "lucide-react";
+import { CalendarIcon, EyeIcon, CheckCircleIcon, PlusCircleIcon, Plus, Archive, RefreshCcw, Filter, UserRoundIcon, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getSubscriptionLimit } from '@/lib/subscriptionService';
@@ -27,6 +27,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import UserProfileDialog from '@/components/chat/UserProfileDialog';
 
 // 组件外部的辅助函数，避免重复创建
 function checkUserInProjectTeams(project, user, teams, userTeams) {
@@ -74,12 +80,15 @@ export default function ProjectsPage() {
   const teams = useSelector((state) => state.teams?.teams || [], shallowEqual);
   const teamUsers = useSelector((state) => state.teamUsers?.teamUsers || {}, shallowEqual);
   const userTeams = useSelector((state) => state.userTeams?.userTeams || [], shallowEqual);
+  const allUsers = useSelector((state) => state.users?.users || [], shallowEqual);
   
   const t = useTranslations('Projects');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const { user } = useGetUser();
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const { confirm } = useConfirm();
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
 
   // 使用useMemo计算过滤后的项目列表
   const formattedProjects = useMemo(() => {
@@ -127,6 +136,54 @@ export default function ProjectsPage() {
     }));
   }, [projects, showArchived, statusFilter, user, teams, userTeams]);
 
+  // 获取项目的团队成员
+  const getProjectTeamMembers = useCallback((projectId) => {
+    try {
+      // 获取项目的所有团队
+      const projectTeams = teams.filter(team => team.project_id === projectId);
+      if (!projectTeams.length) return [];
+      
+      // 获取这些团队的所有成员
+      const teamMembers = [];
+      projectTeams.forEach(team => {
+        const teamId = team.id;
+        const members = teamUsers[teamId] || [];
+        
+        members.forEach(member => {
+          if (member.user) {
+            // 查找完整的用户信息
+            const fullUserInfo = allUsers.find(u => u.id === member.user.id);
+            if (fullUserInfo) {
+              // 避免重复添加同一用户
+              if (!teamMembers.some(m => m.id === fullUserInfo.id)) {
+                teamMembers.push(fullUserInfo);
+              }
+            } else {
+              // 使用 teamUsers 中的基本用户信息
+              if (!teamMembers.some(m => m.id === member.user.id)) {
+                teamMembers.push(member.user);
+              }
+            }
+          }
+        });
+      });
+      
+      return teamMembers;
+    } catch (error) {
+      console.error('获取项目团队成员失败:', error);
+      return [];
+    }
+  }, [teams, teamUsers, allUsers]);
+
+  // 处理打开用户资料对话框
+  const handleOpenUserProfile = useCallback((user, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setSelectedUser(user);
+    setIsProfileDialogOpen(true);
+  }, []);
+
   // 使用useCallback记忆化事件处理程序
   const handleCardClick = useCallback((projectId) => {
     router.push(`/${locale}/projects/${projectId}`);
@@ -136,12 +193,6 @@ export default function ProjectsPage() {
     e.stopPropagation();
     router.push(`/${locale}/projects/${projectId}/tasks/create`);
   }, [router, locale]);
-
-  const handleTeamsChat = useCallback((e, projectId) => {
-    e.stopPropagation();
-    // 这里可以添加Teams集成的链接或功能
-    window.open(`https://teams.microsoft.com/l/chat/0/0?users=${projectId}`, '_blank');
-  }, []);
 
   const handleRestoreProject = useCallback((e, projectId) => {
     e.stopPropagation();
@@ -391,6 +442,64 @@ export default function ProjectsPage() {
                       </Tooltip>
                     ) : (
                       <>
+                        {/* Quick Chat Popover */}
+                        <Popover>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button 
+                                  variant="outline" 
+                                  size="icon" 
+                                  className="h-8 w-8 rounded-full bg-background/80 hover:bg-blue-600/10 hover:text-blue-600 border-none shadow-sm"
+                                >
+                                  <Users className="h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{t('quickChat') || 'Quick Chat'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <PopoverContent 
+                            className="w-64 p-0" 
+                            align="end"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="p-2">
+                              <h4 className="font-medium px-2 py-1.5 text-sm">{t('teamMembers') || 'Team Members'}</h4>
+                              <div className="max-h-60 overflow-y-auto">
+                                {getProjectTeamMembers(project.id).length > 0 ? (
+                                  getProjectTeamMembers(project.id).map(member => (
+                                    <div
+                                      key={member.id}
+                                      className="flex items-center gap-2 p-2 hover:bg-muted rounded-md cursor-pointer"
+                                      onClick={(e) => handleOpenUserProfile(member, e)}
+                                    >
+                                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                        {member.avatar_url ? (
+                                          <img 
+                                            src={member.avatar_url} 
+                                            alt={member.name || member.email}  
+                                            className="h-8 w-8 rounded-full object-cover"
+                                          />
+                                        ) : (
+                                          <UserRoundIcon className="h-4 w-4 text-primary" />
+                                        )}
+                                      </div>
+                                      <div className="flex-1 truncate">
+                                        <p className="text-sm font-medium">{member.name || member.email}</p>
+                                        {member.email && <p className="text-xs text-muted-foreground truncate">{member.email}</p>}
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-sm text-muted-foreground p-2">{t('noTeamMembers') || 'No team members found'}</p>
+                                )}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button 
@@ -406,22 +515,6 @@ export default function ProjectsPage() {
                             <p>{t('addTask')}</p>
                           </TooltipContent>
                         </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              size="icon" 
-                              className="h-8 w-8 rounded-full bg-background/80 hover:bg-[#4b53bc]/10 hover:text-[#4b53bc] border-none shadow-sm"
-                              onClick={(e) => handleTeamsChat(e, project.id)}
-                            >
-                              <MessageSquareIcon className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{t('openInTeams')}</p>
-                          </TooltipContent>
-                        </Tooltip>
                       </>
                     )}
                   </TooltipProvider>
@@ -432,6 +525,11 @@ export default function ProjectsPage() {
         </div>
       </ScrollArea>
       <CreateProjectDialog open={openCreateDialog} onOpenChange={setOpenCreateDialog} />
+      <UserProfileDialog 
+        open={isProfileDialogOpen} 
+        onOpenChange={setIsProfileDialogOpen} 
+        user={selectedUser} 
+      />
     </div>
   );
 }

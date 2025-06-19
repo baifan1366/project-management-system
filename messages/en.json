@@ -363,6 +363,9 @@
     "statusTitle": "Status",
     "archiveProjectConfirmTitle": "Archive Project",
     "archiveProjectConfirmDescription": "Are you sure you want to archive this project?",
+    "quickChat": "Quick Chat",
+    "teamMembers": "Team Members",
+    "noTeamMembers": "No team members found",
     "status": {
       "pending": "Pending",
       "in_progress": "In Progress",
