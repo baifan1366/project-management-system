@@ -31,6 +31,7 @@ import TaskAgile from '@/components/team/agile/TaskAgile';
 import TaskPosts from '@/components/team/posts/TaskPosts';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
+import { Skeleton } from "@/components/ui/skeleton";
 
 // 创建记忆化的选择器
 const selectTeams = state => state.teams.teams;
@@ -49,6 +50,94 @@ const selectTeamUsers = createSelector(
   state => state.teamUsers.teamUsers,
   (_, teamId) => teamId,
   (teamUsers, teamId) => teamUsers[teamId] || []
+);
+
+// Skeleton loaders for different field types
+const ListSkeleton = () => (
+  <div className="grid grid-cols-1 gap-4 mt-4">
+    {[1, 2, 3, 4, 5].map((i) => (
+      <div key={i} className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-4 rounded-full" />
+          <Skeleton className="h-5 w-2/3" />
+        </div>
+        <Skeleton className="h-16 w-full" />
+      </div>
+    ))}
+  </div>
+);
+
+const KanbanSkeleton = () => (
+  <div className="flex gap-4 overflow-x-auto">
+    {[1, 2, 3, 4].map((i) => (
+      <div key={i} className="flex-shrink-0 w-72">
+        <Skeleton className="h-8 w-full mb-2" />
+        <div className="space-y-2">
+          {[1, 2, 3].map((j) => (
+            <Skeleton key={j} className="h-24 w-full rounded" />
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const CalendarSkeleton = () => (
+  <div className="space-y-4">
+    <div className="flex justify-between items-center">
+      <Skeleton className="h-8 w-32" />
+      <div className="flex gap-2">
+        <Skeleton className="h-8 w-8 rounded-full" />
+        <Skeleton className="h-8 w-8 rounded-full" />
+      </div>
+    </div>
+    <div className="grid grid-cols-7 gap-1">
+      {[...Array(7)].map((_, i) => (
+        <Skeleton key={i} className="h-8 w-full" />
+      ))}
+    </div>
+    <div className="grid grid-cols-7 gap-1">
+      {[...Array(35)].map((_, i) => (
+        <Skeleton key={i} className="h-24 w-full rounded" />
+      ))}
+    </div>
+  </div>
+);
+
+const GanttSkeleton = () => (
+  <div className="space-y-4">
+    <div className="flex gap-2 overflow-x-auto">
+      {[...Array(10)].map((_, i) => (
+        <Skeleton key={i} className="h-8 w-24 flex-shrink-0" />
+      ))}
+    </div>
+    <div className="space-y-2">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <Skeleton className="h-8 w-48 flex-shrink-0" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Add another skeleton component
+const TaskTabSkeleton = () => (
+  <div className="flex space-x-1 pb-4 overflow-x-auto">
+    {[1, 2, 3, 4, 5].map((i) => (
+      <Skeleton key={i} className="h-9 w-24 rounded-md" />
+    ))}
+  </div>
+);
+
+// Add a skeleton for team users
+const TeamUsersSkeleton = () => (
+  <div className="flex -space-x-2 overflow-hidden">
+    {[1, 2, 3, 4].map((i) => (
+      <Skeleton key={i} className="inline-block h-8 w-8 rounded-full border-2 border-background" />
+    ))}
+  </div>
 );
 
 const TeamCustomFieldPage = () => {
@@ -249,7 +338,7 @@ const TeamCustomFieldPage = () => {
     };
   }, [dispatch, projectId, teamId, teamCFId, dataLoaded, project]);
 
-  // 单独的useEffect加载团队成员数据
+  // Update the useEffect for loading team users data to show loading state
   useEffect(() => {
     let isMounted = true;
     
@@ -257,12 +346,22 @@ const TeamCustomFieldPage = () => {
       if (!teamId || teamUsersLoaded || !dataLoaded) return;
       
       try {
+        // Set a local loading state for team users
+        if (isMounted) {
+          setIsLoading(true);
+        }
+        
         await dispatch(fetchTeamUsers(teamId)).unwrap();
+        
         if (isMounted) {
           setTeamUsersLoaded(true);
+          setIsLoading(false);
         }
       } catch (error) {
         console.error('Error loading team users:', error);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
     
@@ -273,7 +372,7 @@ const TeamCustomFieldPage = () => {
     };
   }, [dispatch, teamId, teamUsersLoaded, dataLoaded]);
 
-  // 单独的useEffect加载自定义字段数据
+  // Update the useEffect for loading custom field data to show proper loading state
   useEffect(() => {
     let isMounted = true;
     
@@ -281,20 +380,25 @@ const TeamCustomFieldPage = () => {
       if (!teamId || !teamCFId || teamCFLoaded || !dataLoaded) return;
       
       try {
+        // Show loading state
+        if (isMounted) {
+          setIsLoading(true);
+        }
+        
         const result = await dispatch(fetchTeamCustomFieldById({
           teamId,
           teamCFId
         })).unwrap();
         
-        // 检查自定义字段是否存在
+        // Check if custom field exists
         if (!result || !result.id) {
           console.error('自定义字段不存在或已被删除:', teamCFId);
           
-          // 如果字段不存在，获取团队的所有字段
+          // If field doesn't exist, get all team fields
           const allFields = await dispatch(fetchTeamCustomField(teamId)).unwrap();
           
           if (Array.isArray(allFields) && allFields.length > 0) {
-            // 存在其他字段，重定向到第一个字段
+            // Other fields exist, redirect to first field
             const sortedFields = [...allFields].sort((a, b) => 
               (a.order_index || 0) - (b.order_index || 0)
             );
@@ -303,7 +407,7 @@ const TeamCustomFieldPage = () => {
             router.replace(`/projects/${projectId}/${teamId}/${firstFieldId}`);
             return;
           } else {
-            // 不存在任何字段，返回项目页面
+            // No fields exist, return to project page
             router.replace(`/projects/${projectId}`);
             return;
           }
@@ -312,17 +416,18 @@ const TeamCustomFieldPage = () => {
         if (isMounted) {
           setTeamCFLoaded(true);
           setRefreshKey(prev => prev + 1);
+          setIsLoading(false);
         }
       } catch (error) {
         console.error('Error loading team custom field:', error);
         
-        // 错误处理 - 如果是因为字段不存在导致的错误
+        // Error handling - if error is due to field not existing
         try {
-          // 尝试获取团队的所有字段
+          // Try to get all team fields
           const allFields = await dispatch(fetchTeamCustomField(teamId)).unwrap();
           
           if (Array.isArray(allFields) && allFields.length > 0) {
-            // 存在其他字段，重定向到第一个字段
+            // Other fields exist, redirect to first field
             const sortedFields = [...allFields].sort((a, b) => 
               (a.order_index || 0) - (b.order_index || 0)
             );
@@ -330,13 +435,17 @@ const TeamCustomFieldPage = () => {
             
             router.replace(`/projects/${projectId}/${teamId}/${firstFieldId}`);
           } else {
-            // 不存在任何字段，返回项目页面
+            // No fields exist, return to project page
             router.replace(`/projects/${projectId}`);
           }
         } catch (redirectError) {
           console.error('重定向处理失败:', redirectError);
-          // 最后的处理方式 - 回到项目页面
+          // Last resort - go back to project page
           router.replace(`/projects/${projectId}`);
+        } finally {
+          if (isMounted) {
+            setIsLoading(false);
+          }
         }
       }
     };
@@ -386,7 +495,43 @@ const TeamCustomFieldPage = () => {
   // 使用 useMemo 缓存自定义字段内容渲染结果
   const customFieldContent = useMemo(() => {
     if (cfStatus === 'loading') {
-      return <div></div>;
+      // Return different skeleton loaders based on the current view or last known field type
+      // If we don't know the type yet, use a default skeleton
+      if (currentItem?.custom_field?.type) {
+        switch (currentItem.custom_field.type) {
+          case 'LIST':
+            return <ListSkeleton />;
+          case 'KANBAN':
+            return <KanbanSkeleton />;
+          case 'CALENDAR':
+            return <CalendarSkeleton />;
+          case 'GANTT':
+            return <GanttSkeleton />;
+          default:
+            return (
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ))}
+              </div>
+            );
+        }
+      } else {
+        // Default skeleton when we don't know the field type
+        return (
+          <div className="grid grid-cols-1 gap-4 mt-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ))}
+          </div>
+        );
+      }
     }
 
     if (cfStatus === 'failed') {
@@ -409,46 +554,85 @@ const TeamCustomFieldPage = () => {
 
     const fieldType = currentItem.custom_field?.type;
     if (fieldType === 'LIST') {
-      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'GANTT') {
-      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'KANBAN') {
-      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'FILES') {
-      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'WORKFLOW') {
-      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'OVERVIEW') {
-      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'TIMELINE') {
-      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'CALENDAR') {
-      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'NOTE') {
-      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'AGILE') {
-      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     if (fieldType === 'POSTS') {
-      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} filters={filters} groupBy={groupBy} />;
     }
     return <div>暂不支持的字段类型: {fieldType}</div>;
-  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey, teamCFLoaded, fieldNotFoundText, fieldMayBeDeletedText]);
+  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey, teamCFLoaded, fieldNotFoundText, fieldMayBeDeletedText, filters, groupBy]);
 
   // 处理加载状态
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Loading...</div>
+      <div className="w-full h-full flex flex-col">
+        <div className="max-w-full border-0 bg-background text-foreground flex flex-col flex-grow">
+          <div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 gap-2">
+              <div className="flex flex-wrap items-center gap-1 max-w-full">
+                <Skeleton className="h-8 w-[180px] sm:w-[220px]" />
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-8 w-24" />
+              </div>
+              <div className="flex items-center self-end sm:self-auto gap-2 mt-1 sm:mt-0">
+                <Skeleton className="h-8 w-8 rounded-full" />
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <TaskTabSkeleton />
+            </div>
+          </div>
+          <div className="w-full p-0">
+            <div className="w-full border-b py-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-9 w-32" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-9 w-20" />
+                <Skeleton className="h-9 w-20" />
+                <Skeleton className="h-9 w-20" />
+              </div>
+            </div>
+          </div>
+          <div className="overflow-y-auto flex-grow h-0 mb-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0">
+            <div className="grid grid-cols-1 gap-4 mt-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-6 w-3/4" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -799,10 +983,6 @@ const TeamCustomFieldPage = () => {
               <Button variant="ghost" size="sm">
                 <Filter className="h-4 w-4 mr-1" />
                 <span className="hidden md:inline">{t('filter')}</span>
-              </Button>
-              <Button variant="ghost" size="sm">
-                <SortAsc className="h-4 w-4 mr-1" />
-                <span className="hidden md:inline">{t('sort')}</span>
               </Button>
               <Button variant="ghost" size="sm">
                 <Grid className="h-4 w-4 mr-1" />
