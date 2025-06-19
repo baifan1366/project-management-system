@@ -1608,6 +1608,11 @@
     "schedule": "Schedule"
   },
   "CreateTag": {
+    "tagDeleted": "Tag deleted",
+    "tagDeleteFailed": "Failed to delete tag",
+    "tagDeleteFailedDescription": "Failed to delete tag \"{tag}\"",
+    "deleteTag": "Delete Tag",
+    "tagDeletedDescription": "Successfully deleted tag \"{tag}\"",
     "createTag": "Create New Field",
     "createTagDescription": "You may create your own field.",
     "tagName": "Field title",
