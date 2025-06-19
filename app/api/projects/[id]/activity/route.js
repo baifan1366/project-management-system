@@ -29,6 +29,29 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Failed to fetch teams' }, { status: 500 });
     }
     
+    const { data: projectActivities, error: projectActivitiesError } = await supabase
+      .from('action_log')
+      .select(`
+        id,
+        user_id,
+        action_type,
+        entity_type,
+        entity_id,
+        old_values,
+        new_values,
+        created_at,
+        user:user_id (name, avatar_url)
+      `)
+      .in('entity_id', id)
+      .eq('entity_type', 'projects')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    
+    if (projectActivitiesError) {
+      console.error('Error fetching activities:', projectActivitiesError);
+      return NextResponse.json({ error: 'Failed to fetch activities' }, { status: 500 });
+    }
+
     // 如果没有找到团队，返回空数组
     if (!teams || teams.length === 0) {
       return NextResponse.json({ activities: [] });
@@ -52,7 +75,7 @@ export async function GET(request, { params }) {
         user:user_id (name, avatar_url)
       `)
       .in('entity_id', teamIds)
-      .eq('entity_type', 'team')
+      .eq('entity_type', 'teams')
       .order('created_at', { ascending: false })
       .limit(20);
     
@@ -61,8 +84,19 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Failed to fetch activities' }, { status: 500 });
     }
     
+    //fetch team user inv by using team id
+    const { data: teamUserInv, error: teamUserInvError } = await supabase
+      .from('user_team_invitation')
+      .select('id')
+      .in('team_id', teamIds)
+
+    if (teamUserInvError) {
+      console.error('Error fetching team user inv:', teamUserInvError);
+      return NextResponse.json({ error: 'Failed to fetch team user inv' }, { status: 500 });
+    }
+
     // 获取任务活动记录
-    const { data: taskActivities, error: taskActivitiesError } = await supabase
+    const { data: teamUsersActivities, error: teamUsersActivitiesError } = await supabase
       .from('action_log')
       .select(`
         id,
@@ -75,18 +109,18 @@ export async function GET(request, { params }) {
         created_at,
         user:user_id (name, avatar_url)
       `)
-      .eq('entity_type', 'task')
-      .in('entity_id', teamIds.map(id => id.toString()))
+      .eq('entity_type', 'teamUserInv')
+      .in('entity_id', teamUserInv.map(inv => inv.id))
       .order('created_at', { ascending: false })
       .limit(20);
     
-    if (taskActivitiesError) {
-      console.error('Error fetching task activities:', taskActivitiesError);
-      return NextResponse.json({ error: 'Failed to fetch task activities' }, { status: 500 });
+    if (teamUsersActivitiesError) {
+      console.error('Error fetching team users activities:', teamUsersActivitiesError);
+      return NextResponse.json({ error: 'Failed to fetch team users activities' }, { status: 500 });
     }
     
     // 合并团队和任务活动记录
-    const allActivities = [...activities, ...taskActivities]
+    const allActivities = [...projectActivities, ...teamUsersActivities]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 20);
     
