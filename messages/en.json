@@ -336,6 +336,9 @@
     }
   },
   "Projects": {
+    "clearSearch": "Clear Search",
+    "noTeamsFound": "No teams found",
+    "foundTeamsCount": "{count} teams found",
     "projectNotPublic": "Project not public",
     "ok": "OK",
     "createdAt": "Created On",

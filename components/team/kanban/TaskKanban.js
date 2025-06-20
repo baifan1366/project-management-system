@@ -74,7 +74,7 @@ const batchUserLoader = {
     
     this.queue.add(userId);
     pendingRequests.add(userId);
-    console.log(`batchUserLoader: 添加用户ID到队列 ${userId}, 队列大小: ${this.queue.size}`);
+    
     
     if (!this.timer) {
       this.timer = setTimeout(() => this.processBatch(dispatch), this.batchDelay);
@@ -84,14 +84,14 @@ const batchUserLoader = {
   processBatch(dispatch) {
     const batch = Array.from(this.queue).slice(0, this.maxBatchSize);
     if (batch.length > 0) {
-      console.log(`批量加载用户数据: ${batch.length}个用户`, batch);
+      
       
       // 如果有批量API可以在这里调用批量加载API，这里模拟单个加载
       batch.forEach(userId => {
-        console.log(`发起fetchUserById请求: ${userId}`);
+        
         dispatch(fetchUserById(userId))
           .then(result => {
-            console.log(`fetchUserById成功: ${userId}`, result);
+            
           })
           .catch(error => {
             console.error(`fetchUserById失败: ${userId}`, error);
@@ -749,7 +749,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     const cachedUser = userData || useSelector(state => selectUserById(state, userId));
     
     // 添加调试日志
-    console.log(`UserAvatar: userId=${userId}, cachedUser=`, cachedUser);
+    
     
     const [isLoading, setIsLoading] = useState(!cachedUser);
     
@@ -763,25 +763,25 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
       
       // 如果已经有完整数据，不需要加载
       if (cachedUser && cachedUser.avatar_url) {
-        console.log(`UserAvatar: ${userId} 已有头像URL:`, cachedUser.avatar_url);
+        
         setIsLoading(false);
         return;
       }
       
       // 如果正在请求中，不重复请求
       if (pendingRequests.has(userId)) {
-        console.log(`UserAvatar: ${userId} 正在请求中...`);
+        
         return;
       }
       
       // 节流控制，避免短时间内重复请求
       if (!throttleControl.canRequest(userId)) {
-        console.log(`UserAvatar: ${userId} 请求被节流控制阻止`);
+        
         return;
       }
       
       // 将请求添加到批处理队列
-      console.log(`UserAvatar: 开始请求用户数据 ${userId}`);
+      
       setIsLoading(true);
       batchUserLoader.add(userId, dispatch);
       throttleControl.startThrottle(userId);
@@ -800,7 +800,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     // 安全地检查是否有有效的头像URL - 更严格的检查
     const hasValidAvatar = Boolean(cachedUser && typeof cachedUser === 'object' && 'avatar_url' in cachedUser && cachedUser.avatar_url && cachedUser.avatar_url.length > 0);
     
-    console.log(`UserAvatar: ${userId} hasValidAvatar=${hasValidAvatar}, avatar_url=`, cachedUser?.avatar_url);
+    
     
     // 处理点击头像显示用户详情
     const handleAvatarClick = (e) => {
@@ -860,7 +860,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     
     // 在组件挂载时输出一次日志
     useEffect(() => {
-      console.log('AddAssignee组件初始化, teamMembers:', teamMembers);
+      
     }, []);
     
     // 加载团队成员
@@ -869,20 +869,20 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
         // 只有当弹窗打开时才请求数据
         if (!teamId || !open) return;
         
-        console.log('AddAssignee: 准备加载团队成员, teamId:', teamId, 'status:', teamUsersStatus);
+        
         
         // 如果团队成员正在加载中或已经成功加载，则不重复请求
         if (teamUsersStatus === 'loading' || (teamMembers.length > 0 && teamUsersStatus === 'succeeded')) {
-          console.log('AddAssignee: 跳过加载团队成员, 原因:', 
+          
             teamUsersStatus === 'loading' ? '正在加载中' : '已成功加载');
           return;
         }
         
         setIsLoading(true);
         try {
-          console.log('AddAssignee: 发起fetchTeamUsers请求');
+          
           const result = await dispatch(fetchTeamUsers(teamId)).unwrap();
-          console.log('AddAssignee: fetchTeamUsers成功', result);
+          
           setRequestSent(true);
         } catch (error) {
           console.error('获取团队成员失败:', error);
@@ -1016,7 +1016,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     
     return (
       <Popover open={open} onOpenChange={(newOpen) => {
-        console.log('AddAssignee: 弹窗状态变化', open, '->', newOpen);
+        
         setOpen(newOpen);
       }}>
         <PopoverTrigger asChild>
@@ -1047,7 +1047,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                 const userAvatar = userData.avatar_url;
                 
                 // 添加调试日志
-                console.log(`AddAssignee: 成员 ${userId}, userName=${userName}, avatar=`, userAvatar);
+                
                 
                 // 更严格的头像检查
                 const hasAvatar = Boolean(userAvatar && typeof userAvatar === 'string' && userAvatar.length > 0);
