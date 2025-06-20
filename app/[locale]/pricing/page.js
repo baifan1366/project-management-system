@@ -151,7 +151,12 @@ export default function PricingPage() {
 
         const { isLoggedIn, plan } = userData;
 
-        if (isLoggedIn && plan) {
+        if (
+          isLoggedIn &&
+          plan &&
+          plan.status &&
+          plan.status.toUpperCase() === 'ACTIVE'
+        ) {
           setCurrentUserPlan(plan);
           setCtaText('Current Plan');
         } else {
