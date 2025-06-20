@@ -11,7 +11,11 @@ import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from '@/lib/supabase';
 import { useUserStatus } from '@/contexts/UserStatusContext';
-import { RefreshCw, Download, Receipt } from 'lucide-react';
+import { RefreshCw, Download, Receipt, ArrowUpCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchPlans, selectAllPlans } from '@/lib/redux/features/planSlice';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -270,117 +274,301 @@ export const PaymentHistory = () => {
 
 export const UpgradeOptions = () => {
   const t = useTranslations('profile');
+  const router = useRouter();
+  const dispatch = useDispatch();
+  const { user, isAuthenticated } = useGetUser();
+  const [loading, setLoading] = useState(true);
+  const [upgrading, setUpgrading] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState(null);
+  const [selectedInterval, setSelectedInterval] = useState('monthly');
+  const plans = useSelector(selectAllPlans);
+  const [availablePlans, setAvailablePlans] = useState([]);
   
-  // Mock upgrade plans
-  const plans = [
-    { 
-      id: 'pro', 
-      name: 'Pro', 
-      price: '$9.99/month',
-      features: [
-        '15 Projects',
-        '10 Team Members',
-        '10GB Storage',
-        'Priority Support'
-      ],
-      isCurrent: false,
-      recommended: true
-    },
-    { 
-      id: 'pro-ultimate', 
-      name: 'Pro Ultimate', 
-      price: '$19.99/month',
-      features: [
-        'Unlimited Projects',
-        'Unlimited Team Members',
-        '100GB Storage',
-        '24/7 Support',
-        'API Access'
-      ],
-      isCurrent: false,
-      recommended: false
+  // Fetch all plans when component mounts
+  useEffect(() => {
+    async function loadPlans() {
+      setLoading(true);
+      try {
+        await dispatch(fetchPlans()).unwrap();
+        await fetchCurrentPlan();
+      } catch (error) {
+        toast.error('Failed to load plans', {
+          description: error.message || 'Please try again later'
+        });
+      } finally {
+        setLoading(false);
+      }
     }
-  ];
+    
+    loadPlans();
+  }, [dispatch]);
+  
+  // Fetch current user's plan
+  const fetchCurrentPlan = async () => {
+    try {
+      if (!user?.id) return;
+      
+      // Query for active subscription plan only
+      const { data, error } = await supabase
+        .from('user_subscription_plan')
+        .select(`
+          id, 
+          plan_id,
+          subscription_plan (
+            id,
+            name,
+            type,
+            price,
+            billing_interval,
+            features
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'ACTIVE')
+        .order('created_at', { ascending: false })
+        .limit(1);
+        
+      if (error) throw error;
+      
+      // Get the first item if available
+      const activePlan = data && data.length > 0 ? data[0] : null;
+      setCurrentPlan(activePlan);
+      
+      // Set initial interval based on current plan
+      if (activePlan?.subscription_plan?.billing_interval) {
+        setSelectedInterval(activePlan.subscription_plan.billing_interval.toLowerCase());
+      }
+    } catch (error) {
+      console.error('Error fetching current plan:', error);
+    }
+  };
+  
+  // Update available plans whenever the plans state or selected interval changes
+  useEffect(() => {
+    if (plans && plans[selectedInterval]) {
+      // Filter plans to only show upgrades from current plan
+      const currentPlanType = currentPlan?.subscription_plan?.type || 'FREE';
+      const planTypes = ['FREE', 'PRO', 'ENTERPRISE']; // Order matters for comparison
+      
+      // Get the index of the current plan in the hierarchy
+      const currentIndex = planTypes.indexOf(currentPlanType);
+      
+      // Filter plans to only show those that are higher than the current plan
+      const upgradePlans = plans[selectedInterval].filter(plan => {
+        const planIndex = planTypes.indexOf(plan.type);
+        return planIndex > currentIndex;
+      });
+      
+      setAvailablePlans(upgradePlans);
+    }
+  }, [plans, selectedInterval, currentPlan]);
   
   const contactSales = () => {
-    toast.loading(t('contactingSupport'));
-    
-    // 模拟API调用
-    setTimeout(() => {
-      toast.success(t('supportRequestSent'));
-    }, 1500);
+    router.push('/contactUs?type=ENTERPRISE');
   };
   
-  const handleUpgrade = (planId) => {
-    toast.loading(t('subscription.upgrading'));
+  const handleUpgrade = async (planId) => {
+    if (!user?.id) {
+      toast.error('Authentication required', {
+        description: 'Please login to upgrade your plan'
+      });
+      return;
+    }
     
-    // 模拟API调用
-    setTimeout(() => {
-      toast.success(t('subscription.upgradePending'));
-    }, 1500);
+    setUpgrading(true);
+    try {
+      // First get default payment method if available
+      let paymentMethodId = null;
+      
+      const { data: userDetails, error: detailsError } = await supabase
+        .from('user')
+        .select('default_payment_method_id')
+        .eq('id', user.id)
+        .single();
+          
+      if (!detailsError && userDetails?.default_payment_method_id) {
+        paymentMethodId = userDetails.default_payment_method_id;
+      }
+      
+      // Attempt to use the subscription upgrade API first
+      const response = await fetch('/api/subscription/upgrade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          newPlanId: planId,
+          paymentMethodId: paymentMethodId
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start upgrade process');
+      }
+      
+      // If we have a checkout URL, redirect to it
+      if (data.url) {
+        toast.success('Redirecting to checkout', {
+          description: 'You will be redirected to complete your upgrade.'
+        });
+        
+        // Short delay before redirect
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 500);
+        
+        return;
+      }
+      
+      // Fallback to standard payment page
+      router.push(`/payment?plan_id=${planId}`);
+    } catch (error) {
+      console.error('Upgrade error:', error);
+      toast.error('Failed to start upgrade process', {
+        description: error.message || 'Please try again later'
+      });
+    } finally {
+      setUpgrading(false);
+    }
   };
+  
+  // Format price with billing interval
+  const formatPrice = (price, billingInterval) => {
+    if (billingInterval === 'YEARLY') {
+      return `US$${price.toFixed(2)}/mo`;
+    } else {
+      return `US$${price.toFixed(2)}/mo`;
+    }
+  };
+  
+  // Format the billing cycle for display
+  const formatBillingCycle = (billingInterval) => {
+    if (billingInterval === 'YEARLY') {
+      return 'billed annually';
+    } else {
+      return 'billed monthly';
+    }
+  };
+  
+  if (loading) {
+    return (
+      <div className="p-6 border rounded-md">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="p-6 border rounded-md space-y-6">
       <div>
-      <h3 className="text-lg font-medium">{t('subscription.upgradeOptions.title')}</h3>
-        <p className="text-sm text-gray-500">{t('subscription.tabs.upgradeOptions')}</p>
+        <h3 className="text-lg font-medium">{t('subscription.upgradeOptions.title')}</h3>
+        <p className="text-sm text-gray-500">{t('subscription.upgradeOptions.description')}</p>
       </div>
       
-      <div className="grid md:grid-cols-2 gap-4">
-        {plans.map((plan) => (
-          <div 
-            key={plan.id} 
-            className={`border rounded-lg p-5 ${
-              plan.recommended ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-200'
+      {/* Billing interval toggle */}
+      <div className="flex justify-center mb-8">
+        <div className="inline-flex rounded-md shadow-sm bg-muted p-1">
+          <button
+            className={`px-4 py-2 text-sm rounded-md transition-all ${
+              selectedInterval === 'monthly' 
+                ? 'bg-white shadow text-primary' 
+                : 'hover:bg-muted/80'
             }`}
+            onClick={() => setSelectedInterval('monthly')}
           >
-            {plan.recommended && (
-              <div className="inline-block px-2 py-1 text-xs font-semibold bg-indigo-100 text-indigo-800 rounded-full mb-2">
-                Recommended
+            Monthly
+          </button>
+          <button
+            className={`px-4 py-2 text-sm rounded-md transition-all ${
+              selectedInterval === 'yearly' 
+                ? 'bg-white shadow text-primary' 
+                : 'hover:bg-muted/80'
+            }`}
+            onClick={() => setSelectedInterval('yearly')}
+          >
+            Annual <span className="text-xs text-emerald-600">Save 20%</span>
+          </button>
+        </div>
+      </div>
+      
+      {availablePlans.length > 0 ? (
+        <div className="grid md:grid-cols-2 gap-6">
+          {availablePlans.map((plan) => (
+            <div 
+              key={plan.id} 
+              className={`border rounded-lg p-6 relative ${
+                plan.type === 'ENTERPRISE' 
+                  ? 'border-indigo-500 ring-1 ring-indigo-500' 
+                  : 'border-gray-200'
+              }`}
+            >
+              {plan.type === 'ENTERPRISE' && (
+                <div className="absolute top-2 right-2 bg-indigo-100 text-indigo-800 text-xs font-semibold py-1 px-2 rounded-full">
+                  Best Value
+                </div>
+              )}
+              
+              <h4 className="text-xl font-bold">{plan.name}</h4>
+              <div className="mt-2">
+                <span className="text-3xl font-semibold">{formatPrice(plan.price, plan.billing_interval)}</span>
+                <span className="text-sm text-muted-foreground ml-1">
+                  {formatBillingCycle(plan.billing_interval)}
+                </span>
               </div>
-            )}
-            
-            <h4 className="text-xl font-bold">{plan.name}</h4>
-            <p className="text-2xl font-semibold mt-1">{plan.price}</p>
-            
-            <ul className="mt-4 space-y-2">
-              {plan.features.map((feature, idx) => (
-                <li key={idx} className="flex items-start">
-                  <svg className="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-            
-            <div className="mt-6">
-              {plan.isCurrent ? (
-                <Button disabled className="w-full">
-                  {t('subscription.upgradeOptions.currentPlan')}
-                </Button>
-              ) : (
+              
+              <ul className="mt-6 space-y-3">
+                {(plan.features ? Object.values(plan.features) : []).map((feature, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              
+              <div className="mt-8">
                 <Button 
                   variant="default" 
                   className="w-full" 
                   onClick={() => handleUpgrade(plan.id)}
+                  disabled={upgrading}
                 >
-                  {t('subscription.upgradeOptions.upgradeNow')}
+                  {upgrading ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowUpCircle className="mr-2 h-4 w-4" />
+                      {t('subscription.upgradeOptions.upgradeNow')}
+                    </>
+                  )}
                 </Button>
-              )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-8 border rounded-md bg-muted/20">
+          <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-500" />
+          <h4 className="text-xl font-medium">You're on the highest plan</h4>
+          <p className="text-muted-foreground mt-2">You're already enjoying all available features.</p>
+        </div>
+      )}
       
-      <div className="text-center pt-4 border-t">
-        <p className="text-sm text-gray-500 mb-2">
-          Need a custom plan for your enterprise?
+      <div className="text-center pt-6 border-t mt-8">
+        <p className="text-sm text-gray-500 mb-3">
+          Need a custom solution for your large team?
         </p>
-      <Button variant="outline" onClick={contactSales}>
-        {t('subscription.upgradeOptions.contactSales')}
-      </Button>
+        <Button variant="outline" onClick={contactSales}>
+          <ExternalLink className="mr-2 h-4 w-4" />
+          {t('subscription.upgradeOptions.contactSales')}
+        </Button>
       </div>
     </div>
   );

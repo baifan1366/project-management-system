@@ -321,7 +321,8 @@
         "compare": "Compare Plans",
         "contactSales": "Contact Sales",
         "upgradeNow": "Upgrade Now",
-        "currentPlan": "Current Plan"
+        "currentPlan": "Current Plan",
+        "description": "Upgrade to a paid plan to unlock all features and continue using your subscription without interruption."
       },
       "limits": {
         "back": "Back",
