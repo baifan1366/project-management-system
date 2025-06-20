@@ -858,23 +858,14 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     const [isLoading, setIsLoading] = useState(false);
     const [requestSent, setRequestSent] = useState(false);
     
-    // 在组件挂载时输出一次日志
-    useEffect(() => {
-      
-    }, []);
-    
     // 加载团队成员
     useEffect(() => {
       const loadTeamMembers = async () => {
         // 只有当弹窗打开时才请求数据
         if (!teamId || !open) return;
         
-        
-        
         // 如果团队成员正在加载中或已经成功加载，则不重复请求
-        if (teamUsersStatus === 'loading' || (teamMembers.length > 0 && teamUsersStatus === 'succeeded')) {
-          
-            teamUsersStatus === 'loading' ? '正在加载中' : '已成功加载');
+        if (teamUsersStatus === 'loading' || (teamMembers.length > 0 && teamUsersStatus === 'succeeded')) {          
           return;
         }
         
