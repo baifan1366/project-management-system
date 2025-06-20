@@ -60,6 +60,7 @@ export default function ProjectSidebar({ projectId }) {
   const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
   const [projectCreatedBy, setProjectCreatedBy] = useState(null);
   const [canCreateTeam, setCanCreateTeam] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 项目名称下拉菜单
   useEffect(() => {
@@ -155,6 +156,15 @@ export default function ProjectSidebar({ projectId }) {
       };
     }).sort((a, b) => a.order_index - b.order_index);
   }, [userTeams, customFields, teamFirstCFIds, userTeams.length]);
+
+  // 根据搜索查询过滤团队
+  const filteredMenuItems = useMemo(() => {
+    if (!searchQuery.trim()) return menuItems;
+    
+    return menuItems.filter(item => 
+      item.label.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [menuItems, searchQuery]);
 
   // 处理拖拽结束
   const handleDragEnd = useCallback(async (result) => {
@@ -291,6 +301,11 @@ export default function ProjectSidebar({ projectId }) {
     setDropdownOpen(false);
   };
 
+  // 处理搜索输入
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
   return (
     <TooltipProvider>
       <div className="w-64 h-screen bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r border-border">
@@ -363,6 +378,8 @@ export default function ProjectSidebar({ projectId }) {
               <Search size={16} className="absolute left-2 top-2 text-muted-foreground" />
               <input
                 type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
                 placeholder={t('searchPlaceholder')}
                 className="w-full pl-8 pr-3 py-1.5 bg-muted text-foreground placeholder-muted-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
               />
@@ -389,7 +406,7 @@ export default function ProjectSidebar({ projectId }) {
                     {...provided.droppableProps}
                     ref={provided.innerRef}
                   >
-                    {menuItems.map((item, index) => {
+                    {filteredMenuItems.map((item, index) => {
                       // 修改检查逻辑：检查路径名是否包含团队ID部分
                       const isActive = pathname.includes(`/projects/${projectId}/${item.id}/`);
                       return (
