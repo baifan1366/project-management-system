@@ -677,7 +677,7 @@ CREATE TABLE "landing_page_section" (
 CREATE TABLE "landing_page_content" (
   "id" SERIAL PRIMARY KEY,
   "section_id" INT NOT NULL REFERENCES "landing_page_section"("id") ON DELETE CASCADE,
-  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('h1', 'h2', 'span', 'video', 'image', 'solution_card')),
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('h1', 'h2', 'span', 'video', 'image', 'solution_card', 'promo_banner')),
   "content" TEXT NOT NULL, -- text content or media URL
   "sort_order" INT NOT NULL DEFAULT 0
 );

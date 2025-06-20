@@ -22,6 +22,7 @@ import { getSectionByTeamId, getSectionById } from '@/lib/redux/features/section
 import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
 import ProjectStatsCard from '@/components/ProjectStatsCard';
 import TeamMemberCount from '@/components/TeamMemberCount';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Home({ params }) {
   const projectParams = use(params);
@@ -321,11 +322,8 @@ export default function Home({ params }) {
   // 如果权限检查未完成，显示加载状态
   if (!permissionChecked) {
     return (
-      <div className="container px-4 py-6 flex justify-center items-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>{t('loading')}</p>
-        </div>
+      <div className="container px-4 py-6">
+        <PageSkeleton />
       </div>
     );
   }
@@ -371,11 +369,8 @@ export default function Home({ params }) {
   // 如果项目不存在或加载失败，显示加载状态并重定向
   if (projectsStatus === 'succeeded' && !project) {
     return (
-      <div className="container px-4 py-6 flex justify-center items-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>{t('redirecting')}</p>
-        </div>
+      <div className="container px-4 py-6">
+        <PageSkeleton />
       </div>
     );
   }
@@ -407,22 +402,26 @@ export default function Home({ params }) {
           icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />} 
           title={t('teams')}
           value={teamsLoading ? "..." : teamsCount.toString()} 
+          isLoading={teamsLoading}
         />
         <StatsCard 
           icon={<Star className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />} 
           title={t('starredTeams')} 
           value={teamsLoading ? "..." : starredTeams.toString()} 
+          isLoading={teamsLoading}
         />
         <StatsCard 
           icon={<ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />} 
           title={t('totalTasks')} 
           value={loading ? "..." : taskCount.total.toString()} 
+          isLoading={loading}
         />
         <ProjectStatsCard
           icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />}
           title={t('projectMembers')}
           teams={teams}
           isTeamMembersCard={true}
+          isLoading={teamsLoading}
         />
       </div>
 
@@ -503,15 +502,103 @@ export default function Home({ params }) {
   );
 }
 
+// 整页骨架屏
+function PageSkeleton() {
+  return (
+    <div>
+      {/* 标题骨架屏 */}
+      <div className="flex items-center justify-between mb-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-10 w-20" />
+      </div>
+      
+      {/* 统计卡片骨架屏 */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="overflow-hidden">
+            <CardContent className="p-3 sm:p-4 sm:pt-6">
+              <div className="flex items-center justify-between">
+                <div className="w-full">
+                  <Skeleton className="h-4 w-20 mb-2" />
+                  <Skeleton className="h-6 w-12" />
+                </div>
+                <Skeleton className="h-8 w-8 rounded-full" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      
+      {/* 主要内容区骨架屏 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <div className="px-6 pt-6">
+              <Skeleton className="h-8 w-full max-w-[300px] mb-4" />
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <TeamSkeletonCard key={i} />
+                ))}
+              </div>
+            </div>
+          </Card>
+        </div>
+        
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-32" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 团队卡片骨架屏
+function TeamSkeletonCard() {
+  return (
+    <div className="border rounded-lg overflow-hidden shadow-sm">
+      <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center gap-2 w-full">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-16 rounded-full" />
+        </div>
+        <Skeleton className="h-5 w-5 rounded-full" />
+      </div>
+      <div className="p-4 bg-accent/5">
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i}>
+              <Skeleton className="h-3 w-16 mb-2" />
+              <Skeleton className="h-5 w-8" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // 统计卡片组件
-function StatsCard({ icon, title, value }) {
+function StatsCard({ icon, title, value, isLoading }) {
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-3 sm:p-4 sm:pt-6">
         <div className="flex items-center justify-between">
           <div className="mr-2">
             <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
-            <p className="text-lg sm:text-2xl font-bold">{value}</p>
+            {isLoading ? (
+              <Skeleton className="h-6 w-12" />
+            ) : (
+              <p className="text-lg sm:text-2xl font-bold">{value}</p>
+            )}
           </div>
           <div className="p-1.5 sm:p-2 bg-background rounded-full flex-shrink-0">{icon}</div>
         </div>
@@ -541,11 +628,6 @@ function TeamsContent({ teams, loading, onToggleStar }) {
         return { color: 'bg-blue-100 text-blue-800', label: t('pending') };
     }
   };
-
-  // 处理团队点击
-  const handleTeamClick = (teamId) => {
-    router.push(`/teams/${teamId}`);
-  };
   
   // 格式化日期
   const formatDate = (dateString) => {
@@ -559,8 +641,10 @@ function TeamsContent({ teams, loading, onToggleStar }) {
   return (
     <CardContent className="px-3 pt-0 sm:px-6 overflow-auto max-h-[470px]">
       {loading ? (
-        <div className="flex justify-center items-center h-40">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+        <div className="space-y-3 sm:space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <TeamSkeletonCard key={i} />
+          ))}
         </div>
       ) : teams.length === 0 ? (
         <div className="text-center py-6 text-muted-foreground">
@@ -589,8 +673,7 @@ function TeamsContent({ teams, loading, onToggleStar }) {
                   )}
                 </div>
                 <div 
-                  className="p-3 sm:p-4 bg-accent/5 cursor-pointer" 
-                  onClick={() => handleTeamClick(team.id)}
+                  className="p-3 sm:p-4 bg-accent/5"
                 >
                   <div className="grid grid-cols-3 gap-4">
                     <div>
