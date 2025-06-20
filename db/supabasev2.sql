@@ -273,7 +273,7 @@ CREATE TABLE "attachment" (
   "id" SERIAL PRIMARY KEY,
   "file_url" VARCHAR(255) NOT NULL,
   "file_name" VARCHAR(255) NOT NULL,
-  "task_id" INT NOT NULL REFERENCES "task"("id") ON DELETE CASCADE,
+  "task_id" INT NULL REFERENCES "task"("id") ON DELETE CASCADE,
   "uploaded_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -677,7 +677,7 @@ CREATE TABLE "landing_page_section" (
 CREATE TABLE "landing_page_content" (
   "id" SERIAL PRIMARY KEY,
   "section_id" INT NOT NULL REFERENCES "landing_page_section"("id") ON DELETE CASCADE,
-  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('h1', 'h2', 'span', 'video', 'image', 'solution_card')),
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('h1', 'h2', 'span', 'video', 'image', 'solution_card', 'promo_banner')),
   "content" TEXT NOT NULL, -- text content or media URL
   "sort_order" INT NOT NULL DEFAULT 0
 );

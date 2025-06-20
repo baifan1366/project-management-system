@@ -18,6 +18,7 @@ import ManageProject from '@/components/ManageProject';
 import ProjectSettings from '@/components/ProjectSettings';
 import { api } from '@/lib/api';
 import { useConfirm } from '@/hooks/use-confirm';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // 获取团队自定义字段
 const selectTeamCustomFields = state => state?.teams?.teamCustomFields ?? [];
@@ -46,6 +47,10 @@ export default function ProjectSidebar({ projectId }) {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   
+  // Loading states
+  const [isProjectLoading, setIsProjectLoading] = useState(true);
+  const [isTeamsLoading, setIsTeamsLoading] = useState(true);
+  
   const customFields = useSelector(selectTeamCustomFields);
   const teamFirstCFIds = useSelector(selectTeamFirstCFIds);
   const userTeams = useSelector(state => state.teams.userTeams); 
@@ -60,6 +65,7 @@ export default function ProjectSidebar({ projectId }) {
   const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
   const [projectCreatedBy, setProjectCreatedBy] = useState(null);
   const [canCreateTeam, setCanCreateTeam] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 项目名称下拉菜单
   useEffect(() => {
@@ -78,6 +84,8 @@ export default function ProjectSidebar({ projectId }) {
   const fetchTeams = useCallback(async () => {
     try {
       if (!user) return;
+      
+      setIsTeamsLoading(true);
 
       // 使用Redux action获取用户团队
       const teams = await dispatch(fetchUserTeams({ userId: user.id, projectId })).unwrap();
@@ -93,15 +101,24 @@ export default function ProjectSidebar({ projectId }) {
       }
     } catch (error) {
       console.error('获取用户团队失败:', error);
+    } finally {
+      setIsTeamsLoading(false);
     }
   }, [user]);
 
   const getProjectData = useCallback(async () => {
-    if (projectId) {
-      const project = await dispatch(fetchProjectById(projectId)).unwrap();
-      setThemeColor(project?.theme_color || '#64748b');
-      setProjectName(project?.project_name || 'Project');
-      setProjectCreatedBy(project?.created_by || null);
+    try {
+      setIsProjectLoading(true);
+      if (projectId) {
+        const project = await dispatch(fetchProjectById(projectId)).unwrap();
+        setThemeColor(project?.theme_color || '#64748b');
+        setProjectName(project?.project_name || 'Project');
+        setProjectCreatedBy(project?.created_by || null);
+      }
+    } catch (error) {
+      console.error('获取项目数据失败:', error);
+    } finally {
+      setIsProjectLoading(false);
     }
   }, [projectId, dispatch]);
 
@@ -155,6 +172,15 @@ export default function ProjectSidebar({ projectId }) {
       };
     }).sort((a, b) => a.order_index - b.order_index);
   }, [userTeams, customFields, teamFirstCFIds, userTeams.length]);
+
+  // 根据搜索查询过滤团队
+  const filteredMenuItems = useMemo(() => {
+    if (!searchQuery.trim()) return menuItems;
+    
+    return menuItems.filter(item => 
+      item.label.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [menuItems, searchQuery]);
 
   // 处理拖拽结束
   const handleDragEnd = useCallback(async (result) => {
@@ -291,32 +317,76 @@ export default function ProjectSidebar({ projectId }) {
     setDropdownOpen(false);
   };
 
+  // 处理搜索输入
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+  // Skeleton loaders for different parts of the UI
+  const ProjectHeaderSkeleton = () => (
+    <div className="flex items-center justify-between w-full px-4 py-2.5">
+      <div className="flex items-center gap-2">
+        <Skeleton className="w-6 h-6 rounded-md" />
+        <Skeleton className="h-4 w-[130px]" />
+      </div>
+      <Skeleton className="h-4 w-4" />
+    </div>
+  );
+
+  const SearchBarSkeleton = () => (
+    <div className="px-4 py-2">
+      <Skeleton className="h-9 w-full rounded-md" />
+    </div>
+  );
+
+  const HomeItemSkeleton = () => (
+    <div className="flex items-center px-4 py-2">
+      <Skeleton className="h-4 w-4" />
+      <Skeleton className="ml-2 h-4 w-16" />
+    </div>
+  );
+
+  const TeamItemSkeleton = () => (
+    <div className="flex items-center px-4 py-1.5">
+      <div className="flex items-center w-full justify-between">
+        <div className="flex items-center gap-2">
+          <Skeleton className="w-4 h-4 rounded-md" />
+          <Skeleton className="h-4 w-[130px]" />
+        </div>
+        <Skeleton className="h-4 w-4" />
+      </div>
+    </div>
+  );
+
   return (
     <TooltipProvider>
       <div className="w-64 h-screen bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r border-border">
         <div className="flex flex-col">
           {/* 项目名称下拉菜单 */}
           <div className="relative" ref={dropdownRef}>
-            <button 
-              onClick={() => canCreateTeam && setDropdownOpen(!isDropdownOpen)} 
-              className={cn(
-                "flex items-center justify-between w-full px-4 py-2.5 text-foreground transition-colors",
-                canCreateTeam ? "hover:bg-accent/50 cursor-pointer" : "cursor-default"
-              )}
-            >
-              <div className="flex items-center gap-2 flex-wrap">
-                <div 
-                  className={cn(
-                    "w-6 h-6 rounded-md flex items-center justify-center text-sm font-medium",
-                    getColorClass(themeColor)
-                  )}
-                >
-                  {getProjectInitial(projectName)}
+            {isProjectLoading ? (
+              <ProjectHeaderSkeleton />
+            ) : (
+              <button 
+                onClick={() => canCreateTeam && setDropdownOpen(!isDropdownOpen)} 
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2.5 text-foreground transition-colors",
+                  canCreateTeam ? "hover:bg-accent/50 cursor-pointer" : "cursor-default"
+                )}
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div 
+                    className={cn(
+                      "w-6 h-6 rounded-md flex items-center justify-center text-sm font-medium",
+                      getColorClass(themeColor)
+                    )}
+                  >
+                    {getProjectInitial(projectName)}
+                  </div>
+                  <span className="text-sm font-medium break-all overflow-wrap w-[130px] text-left">{projectName}</span>
                 </div>
-                <span className="text-sm font-medium break-all overflow-wrap w-[130px] text-left">{projectName}</span>
-              </div>
-              {canCreateTeam && <ChevronDown className="h-4 w-4"/>}           
-            </button>
+                {canCreateTeam && <ChevronDown className="h-4 w-4"/>}           
+              </button>
+            )}
             <div className={cn(
               "absolute left-0 right-0 mt-1 py-1 bg-popover border border-border rounded-md shadow-lg z-10",
               isDropdownOpen ? 'block' : 'hidden'
@@ -358,104 +428,123 @@ export default function ProjectSidebar({ projectId }) {
           </div>
 
           {/* 搜索框 */}
-          <div className="px-4 py-2">
-            <div className="relative">
-              <Search size={16} className="absolute left-2 top-2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder={t('searchPlaceholder')}
-                className="w-full pl-8 pr-3 py-1.5 bg-muted text-foreground placeholder-muted-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
-              />
+          {isProjectLoading ? (
+            <SearchBarSkeleton />
+          ) : (
+            <div className="px-4 py-2">
+              <div className="relative">
+                <Search size={16} className="absolute left-2 top-2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  placeholder={t('searchPlaceholder')}
+                  className="w-full pl-8 pr-3 py-1.5 bg-muted text-foreground placeholder-muted-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 导航链接 */}
           <nav className="mt-2">
-            <Link
-              href={`/projects/${projectId}`}
-              className={cn(
-                "flex items-center px-4 py-2 text-foreground hover:bg-accent/50 transition-colors",
-                pathname === `/projects/${projectId}` && "bg-accent text-accent-foreground"
-              )}
-            >
-              <Home size={16} className="text-muted-foreground" />
-              <span className="ml-2 text-sm">{t('home')}</span>
-            </Link>
-            
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="teams">
-                {(provided) => (
-                  <div
-                    {...provided.droppableProps}
-                    ref={provided.innerRef}
-                  >
-                    {menuItems.map((item, index) => {
-                      // 修改检查逻辑：检查路径名是否包含团队ID部分
-                      const isActive = pathname.includes(`/projects/${projectId}/${item.id}/`);
-                      return (
-                        <Draggable key={item.id} draggableId={String(item.id)} index={index}>
-                          {(provided) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                            >
-                              <Link
-                                href={item.href}
-                                className={cn(
-                                  "flex items-center px-4 py-1.5 text-foreground group",
-                                  isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
-                                  "transition-colors"
-                                )}
-                              >
-                                <div className="flex items-center w-full justify-between flex-wrap">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div 
-                                      className={cn(
-                                        "w-4 h-4 rounded-md flex items-center justify-center text-xs font-medium transition-all",
-                                        getColorClass(themeColor),
-                                        "ring-offset-background",
-                                        isActive
-                                          ? ""
-                                          : ""
-                                      )}
-                                    >
-                                      {getProjectInitial(item.label)}
-                                    </div>
-                                    <span className="text-sm break-all w-[130px]">{item.label}</span>
-                                  </div>
-                                  <div className="flex items-center">
-                                    {(() => {
-                                      switch (item.access) {
-                                        case 'invite_only':
-                                          return renderTooltip(Lock, t('inviteOnlyTooltip'));
-                                        case 'can_edit':
-                                          return renderTooltip(Pencil, t('canEditTooltip'));
-                                        case 'can_check':
-                                          return renderTooltip(Eye, t('canCheckTooltip'));
-                                        case 'can_view':
-                                          return renderTooltip(Eye, t('canViewTooltip'));
-                                        default:
-                                          return renderTooltip(Lock, t('inviteOnlyTooltip'));
-                                      }
-                                    })()}
-                                  </div>
-                                </div>
-                              </Link>
-                            </div>
-                          )}
-                        </Draggable>
-                      );
-                    })}
-                    {provided.placeholder}
-                  </div>
+            {isProjectLoading ? (
+              <HomeItemSkeleton />
+            ) : (
+              <Link
+                href={`/projects/${projectId}`}
+                className={cn(
+                  "flex items-center px-4 py-2 text-foreground hover:bg-accent/50 transition-colors",
+                  pathname === `/projects/${projectId}` && "bg-accent text-accent-foreground"
                 )}
-              </Droppable>
-            </DragDropContext>
+              >
+                <Home size={16} className="text-muted-foreground" />
+                <span className="ml-2 text-sm">{t('home')}</span>
+              </Link>
+            )}
+            
+            {isTeamsLoading ? (
+              // Show multiple skeleton items for teams
+              <>
+                <TeamItemSkeleton />
+                <TeamItemSkeleton />
+                <TeamItemSkeleton />
+              </>
+            ) : (
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId="teams">
+                  {(provided) => (
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                    >
+                      {menuItems.map((item, index) => {
+                        // 修改检查逻辑：检查路径名是否包含团队ID部分
+                        const isActive = pathname.includes(`/projects/${projectId}/${item.id}/`);
+                        return (
+                          <Draggable key={item.id} draggableId={String(item.id)} index={index}>
+                            {(provided) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                              >
+                                <Link
+                                  href={item.href}
+                                  className={cn(
+                                    "flex items-center px-4 py-1.5 text-foreground group",
+                                    isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+                                    "transition-colors"
+                                  )}
+                                >
+                                  <div className="flex items-center w-full justify-between flex-wrap">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div 
+                                        className={cn(
+                                          "w-4 h-4 rounded-md flex items-center justify-center text-xs font-medium transition-all",
+                                          getColorClass(themeColor),
+                                          "ring-offset-background",
+                                          isActive
+                                            ? ""
+                                            : ""
+                                        )}
+                                      >
+                                        {getProjectInitial(item.label)}
+                                      </div>
+                                      <span className="text-sm break-all w-[130px]">{item.label}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                      {(() => {
+                                        switch (item.access) {
+                                          case 'invite_only':
+                                            return renderTooltip(Lock, t('inviteOnlyTooltip'));
+                                          case 'can_edit':
+                                            return renderTooltip(Pencil, t('canEditTooltip'));
+                                          case 'can_check':
+                                            return renderTooltip(Eye, t('canCheckTooltip'));
+                                          case 'can_view':
+                                            return renderTooltip(Eye, t('canViewTooltip'));
+                                          default:
+                                            return renderTooltip(Lock, t('inviteOnlyTooltip'));
+                                        }
+                                      })()}
+                                    </div>
+                                  </div>
+                                </Link>
+                              </div>
+                            )}
+                          </Draggable>
+                        );
+                      })}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+            )}
           </nav>
 
-          {/* 创建团队按钮 - 仅当当前用户是项目创建者时显示 */}
-          {canCreateTeam && (
+          {/* 创建团队按钮 - 仅当当前用户是项目创建者时显示且不在加载状态 */}
+          {!isProjectLoading && canCreateTeam && (
             <button 
               onClick={() => {
                 setDialogOpen(true);

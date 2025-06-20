@@ -65,33 +65,28 @@ export default function ActivityLog() {
   
   // 获取活动图标
   const getActivityIcon = (actionType, entityType) => {
-    if (entityType === 'task') {
+    if (entityType === 'projects') {
       switch (actionType) {
-        case 'CREATE':
+        case 'createProject':
           return <FilePlus className="h-4 w-4 text-green-500" />;
-        case 'UPDATE':
-          return <Edit className="h-4 w-4 text-blue-500" />;
-        case 'DELETE':
-          return <Trash2 className="h-4 w-4 text-red-500" />;
-        case 'COMPLETE':
-          return <CheckCircle className="h-4 w-4 text-green-500" />;
-        case 'COMMENT':
-          return <MessageSquare className="h-4 w-4 text-purple-500" />;
         default:
           return <FileText className="h-4 w-4 text-gray-500" />;
       }
-    } else if (entityType === 'team') {
+    } else if (entityType === 'teams') {
       switch (actionType) {
-        case 'CREATE':
+        case 'createteam':
           return <Plus className="h-4 w-4 text-green-500" />;
-        case 'UPDATE':
+        case 'updateTeam':
           return <Edit className="h-4 w-4 text-blue-500" />;
-        case 'DELETE':
-          return <Trash2 className="h-4 w-4 text-red-500" />;
-        case 'JOIN':
-          return <User className="h-4 w-4 text-blue-500" />;
-        case 'LEAVE':
-          return <XCircle className="h-4 w-4 text-red-500" />;
+        default:
+          return <FileText className="h-4 w-4 text-gray-500" />;
+      }
+    } else if (entityType === 'teamUserInv') {
+      switch (actionType) {
+        case 'create':
+          return <Plus className="h-4 w-4 text-green-500" />;
+        case 'updateStatus':
+          return <Edit className="h-4 w-4 text-blue-500" />;
         default:
           return <FileText className="h-4 w-4 text-gray-500" />;
       }
@@ -104,33 +99,28 @@ export default function ActivityLog() {
   const getActivityDescription = (activity) => {
     const { action_type, entity_type, new_values } = activity;
     
-    if (entity_type === 'task') {
+    if (entity_type === 'projects') {
       switch (action_type) {
-        case 'CREATE':
-          return `${tLog('createdTask')} ${new_values?.title || ''}`;
-        case 'UPDATE':
-          return `${tLog('updatedTask')} ${new_values?.title || ''}`;
-        case 'DELETE':
-          return `${tLog('deletedTask')} ${new_values?.title || ''}`;
-        case 'COMPLETE':
-          return `${tLog('completedTask')} ${new_values?.title || ''}`;
-        case 'COMMENT':
-          return `${tLog('addedComment')} ${new_values?.title || ''}`;
-        case 'ASSIGN':
-          return `${tLog('assignedTask')} ${new_values?.title || ''}`;
+        case 'createProject':
+          return `${tLog('project')} ${new_values?.project_name || ''} ${tLog('hasBeenCreated')}`;
         default:
           return `${action_type?.toLowerCase()} ${entity_type?.toLowerCase()}`;
       }
-    } else if (entity_type === 'team') {
+    } else if (entity_type === 'teams') {
       switch (action_type) {
-        case 'CREATE':
-          return `${tLog('createdTeam')} ${new_values?.name || ''}`;
-        case 'UPDATE':
-          return `${tLog('updatedTeam')} ${new_values?.name || ''}`;
-        case 'JOIN':
-          return `${tLog('joinedTeam')} ${new_values?.name || ''}`;
-        case 'LEAVE':
-          return `${tLog('leftTeam')} ${new_values?.name || ''}`;
+        case 'createTeam':
+          return `${tLog('team')} ${new_values?.name || ''} ${tLog('hasBeenCreated')}`;
+        case 'updateTeam':
+          return `${tLog('team')} ${new_values?.name || ''} ${tLog('detailsHasBeenUpdated')}`;
+        default:
+          return `${action_type?.toLowerCase()} ${entity_type?.toLowerCase()}`;
+      }
+    } else if (entity_type === 'teamUserInv') {
+      switch (action_type) {
+        case 'create':
+          return `${tLog('teamInvitationSentTo')} ${new_values?.user_email || ''}.`;
+        case 'updateStatus':
+          return `${tLog('teamInvitationFor')} ${new_values?.user_email || ''} ${tLog('hasBeenUpdated')}`;
         default:
           return `${action_type?.toLowerCase()} ${entity_type?.toLowerCase()}`;
       }
@@ -169,7 +159,7 @@ export default function ActivityLog() {
   };
   
   return (
-    <Card className="h-full">
+    <Card className="max-h-[550px] overflow-y-auto">
       <CardHeader>
         <CardTitle>{t('recentActivity')}</CardTitle>
       </CardHeader>

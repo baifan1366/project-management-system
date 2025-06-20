@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { fetchCurrentUser } from '@/lib/redux/features/usersSlice';
 import { createSelector } from '@reduxjs/toolkit';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // 从Redux获取原始状态
 const getUsersSubscription = state => state.users?.subscription;
@@ -294,6 +295,19 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
     );
   };
 
+  // 渲染骨架加载效果
+  const renderSkeletons = () => {
+    return Array(6).fill(0).map((_, index) => (
+      <div key={`skeleton-${index}`} className="flex items-start gap-3 p-3 border rounded-md">
+        <Skeleton className="flex-shrink-0 w-8 h-8 rounded" />
+        <div className="w-full">
+          <Skeleton className="h-5 w-24 mb-2" />
+          <Skeleton className="h-3 w-full max-w-[200px]" />
+        </div>
+      </div>
+    ));
+  };
+
   // 排序字段，将可用的放在前面
   const sortFields = (fields) => {
     if (!Array.isArray(fields)) return [];
@@ -334,7 +348,9 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
           </div>
           <div className="px-4 pb-4">
             <div className="grid grid-cols-3 gap-4">
-              {Array.isArray(availableFields) && availableFields.length > 0 ? (
+              {customFieldStatus === 'loading' ? (
+                renderSkeletons()
+              ) : Array.isArray(availableFields) && availableFields.length > 0 ? (
                 sortFields(availableFields).map(renderFieldItem)
               ) : (
                 <div className="text-center text-muted-foreground col-span-3 items-center justify-center">
