@@ -135,13 +135,39 @@ export default function Team() {
     router.push(`/${locale}/projects`);
   };
 
-  // 如果权限检查未完成，显示加载状态
+  // 如果权限检查未完成，显示骨架屏加载UI
   if (isLoading) {
     return (
-      <div className="container px-4 py-6 flex justify-center items-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>{t('loading')}</p>
+      <div className="container px-4 py-6">
+        {/* Skeleton header */}
+        <div className="flex items-center mb-6">
+          <div className="h-12 w-12 rounded-full bg-gray-200 animate-pulse mr-4"></div>
+          <div>
+            <div className="h-5 w-48 bg-gray-200 animate-pulse mb-2 rounded"></div>
+            <div className="h-4 w-32 bg-gray-200 animate-pulse rounded"></div>
+          </div>
+        </div>
+        
+        {/* Skeleton tabs/navigation */}
+        <div className="flex border-b mb-6">
+          {[1, 2, 3, 4].map((item) => (
+            <div key={item} className="h-10 w-24 bg-gray-200 animate-pulse mr-4 rounded"></div>
+          ))}
+        </div>
+        
+        {/* Skeleton content */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {[1, 2, 3, 4, 5, 6].map((item) => (
+            <div key={item} className="border rounded-lg p-4">
+              <div className="h-5 w-3/4 bg-gray-200 animate-pulse mb-4 rounded"></div>
+              <div className="h-4 w-full bg-gray-200 animate-pulse mb-2 rounded"></div>
+              <div className="h-4 w-5/6 bg-gray-200 animate-pulse mb-4 rounded"></div>
+              <div className="flex items-center">
+                <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse mr-2"></div>
+                <div className="h-4 w-24 bg-gray-200 animate-pulse rounded"></div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
