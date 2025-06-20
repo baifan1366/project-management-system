@@ -268,10 +268,10 @@ export function useLoadTag() {
                       <ContextMenuContent>
                         <ContextMenuItem 
                           onClick={() => handleDeleteTag(index)}
-                          className="flex items-center gap-2 text-red-500 hover:text-red-600"
+                          className="flex items-center gap-2"
                         >
-                          <Trash2 className="w-4 h-4" />
-                          <span>{t('deleteTag') || '删除标签'}</span>
+                          <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
+                          <span className="text-red-500 hover:text-red-600">{t('deleteTag') || '删除标签'}</span>
                         </ContextMenuItem>
                       </ContextMenuContent>
                     </ContextMenu>
