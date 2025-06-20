@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 // GET /api/projects/:id/team - Get teams for a specific project where the user is a member
 export async function GET(request, { params }) {
   try {
-    const projectId = params.id
+    const projectId = await params.id
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
 

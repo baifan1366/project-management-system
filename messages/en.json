@@ -364,6 +364,9 @@
     "statusTitle": "Status",
     "archiveProjectConfirmTitle": "Archive Project",
     "archiveProjectConfirmDescription": "Are you sure you want to archive this project?",
+    "quickChat": "Quick Chat",
+    "teamMembers": "Team Members",
+    "noTeamMembers": "No team members found",
     "status": {
       "pending": "Pending",
       "in_progress": "In Progress",
@@ -1605,6 +1608,11 @@
     "schedule": "Schedule"
   },
   "CreateTag": {
+    "tagDeleted": "Tag deleted",
+    "tagDeleteFailed": "Failed to delete tag",
+    "tagDeleteFailedDescription": "Failed to delete tag \"{tag}\"",
+    "deleteTag": "Delete Tag",
+    "tagDeletedDescription": "Successfully deleted tag \"{tag}\"",
     "createTag": "Create New Field",
     "createTagDescription": "You may create your own field.",
     "tagName": "Field title",
@@ -2515,6 +2523,8 @@
     "noSections": "No sections found"
   },
   "File": {
+    "error": "Error",
+    "uploadAttachmentToPost": "Upload Attachment to Post",
     "newFolder": "New Folder",
     "uploadError": "Upload Error",
     "noTaskIdProvided": "No task ID was provided.",
@@ -2621,6 +2631,23 @@
     "closePreview": "Close Preview"
   },
   "PostsView": {
+    "uploadingFiles": "Uploading files...",
+    "selectPostFirst": "Please select a post first",
+    "fileSelected": "File selected",
+    "fileAttached": "File attached",
+    "uploadError": "Upload Error",
+    "restoreFile": "Restore File",
+    "errorRemovingFile": "Error removing file",
+    "attachmentRestored": "Attachment restored",
+    "errorRemovingAttachment": "Error removing attachment",
+    "errorRestoringAttachment": "Error restoring attachment",
+    "errorRestoringFile": "Error restoring file",
+    "errorFetchingAttachments": "Error fetching attachments",
+    "attachmentMarkedForRemoval": "Attachment marked for removal",
+    "pendingDeleteFiles": "Pending delete files",
+    "attachedFiles": "Attached Files",
+    "selectedFiles": "Selected Files",
+    "posting": "Posting...",
     "loadCommentsError": "Load Comments Error",
     "comments": "comments",
     "unknownUser": "Unknown User",

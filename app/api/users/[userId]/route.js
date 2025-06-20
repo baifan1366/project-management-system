@@ -9,7 +9,9 @@ import { supabase } from '@/lib/supabase';
  */
 export async function GET(request, { params }) {
   try {
-    const { userId } = params;
+    // 确保params已经解析完成
+    const resolvedParams = await Promise.resolve(params);
+    const { userId } = resolvedParams;
     
     if (!userId) {
       return NextResponse.json({ 

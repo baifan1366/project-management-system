@@ -24,7 +24,25 @@ import { createSelector } from '@reduxjs/toolkit';
 
 // 创建全局用户缓存
 const userCache = {};
-const pendingRequests = {};
+// 创建全局请求跟踪器
+const pendingRequests = new Set();
+// 创建请求节流控制器
+const throttleControl = {
+  timeouts: {},
+  throttleTime: 2000, // 同一用户ID的请求间隔2秒
+  
+  canRequest(userId) {
+    return !this.timeouts[userId];
+  },
+  
+  startThrottle(userId) {
+    if (!userId) return;
+    this.timeouts[userId] = true;
+    setTimeout(() => {
+      delete this.timeouts[userId];
+    }, this.throttleTime);
+  }
+};
 
 // 创建记忆化选择器
 const selectUserById = createSelector(
@@ -49,13 +67,14 @@ const batchUserLoader = {
   queue: new Set(),
   timer: null,
   maxBatchSize: 10,
-  batchDelay: 200, // 毫秒
+  batchDelay: 300, // 毫秒
   
   add(userId, dispatch) {
-    if (!userId || pendingRequests[userId]) return;
+    if (!userId || pendingRequests.has(userId)) return;
     
     this.queue.add(userId);
-    pendingRequests[userId] = true;
+    pendingRequests.add(userId);
+    console.log(`batchUserLoader: 添加用户ID到队列 ${userId}, 队列大小: ${this.queue.size}`);
     
     if (!this.timer) {
       this.timer = setTimeout(() => this.processBatch(dispatch), this.batchDelay);
@@ -65,10 +84,21 @@ const batchUserLoader = {
   processBatch(dispatch) {
     const batch = Array.from(this.queue).slice(0, this.maxBatchSize);
     if (batch.length > 0) {
+      console.log(`批量加载用户数据: ${batch.length}个用户`, batch);
       
       // 如果有批量API可以在这里调用批量加载API，这里模拟单个加载
       batch.forEach(userId => {
-        dispatch(fetchUserById(userId));
+        console.log(`发起fetchUserById请求: ${userId}`);
+        dispatch(fetchUserById(userId))
+          .then(result => {
+            console.log(`fetchUserById成功: ${userId}`, result);
+          })
+          .catch(error => {
+            console.error(`fetchUserById失败: ${userId}`, error);
+          })
+          .finally(() => {
+            pendingRequests.delete(userId);
+          });
       });
       
       // 清空已处理的
@@ -711,58 +741,51 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     };
   }, [editingColumnId, editingTaskId, newTaskId, isAddingSection, editingTitle, editingTaskContent, newTaskContent, newSectionTitle]);
 
-  // 显示单个用户头像和名称的组件
-  const UserAvatar = React.memo(({ userId, size = "sm" }) => {
+  // 用户头像组件优化
+  const UserAvatar = React.memo(({ userId, userData = null, size = "sm" }) => {
     const dispatch = useDispatch();
     
-    // 使用记忆化选择器获取用户数据
-    const cachedUser = useSelector(state => selectUserById(state, userId));
+    // 先从props中获取userData，如果没有再从Redux获取
+    const cachedUser = userData || useSelector(state => selectUserById(state, userId));
     
-    const [user, setUser] = useState(cachedUser);
+    // 添加调试日志
+    console.log(`UserAvatar: userId=${userId}, cachedUser=`, cachedUser);
+    
     const [isLoading, setIsLoading] = useState(!cachedUser);
-    const [hasError, setHasError] = useState(false);
     
-    // 使用userIdRef跟踪用户ID变化
-    const userIdRef = useRef(userId);
-    
+    // 确保用户数据已经加载
     useEffect(() => {
-      // 如果已经有缓存的用户数据，直接使用
-      if (cachedUser) {
-        setUser(cachedUser);
-        setIsLoading(false);
-        return;
-      }
-      
       // 确保userId有效
       if (!userId) {
-        console.warn('UserAvatar: 无效的userId');
         setIsLoading(false);
-        setHasError(true);
         return;
       }
       
-      // 防止重复请求和无效请求
-      if (hasError || pendingRequests[userId]) return;
-            
-      // 轻量化处理，使用批量加载器而不是直接触发API请求
-      batchUserLoader.add(userId, dispatch);
-      
-      // 设置加载状态
-      setIsLoading(true);
-      
-      // 更新跟踪的用户ID
-      if (userIdRef.current !== userId) {
-        userIdRef.current = userId;
-      }
-    }, [userId, dispatch, cachedUser, hasError]);
-    
-    // 当缓存用户变化时更新组件状态
-    useEffect(() => {
-      if (cachedUser) {
-        setUser(cachedUser);
+      // 如果已经有完整数据，不需要加载
+      if (cachedUser && cachedUser.avatar_url) {
+        console.log(`UserAvatar: ${userId} 已有头像URL:`, cachedUser.avatar_url);
         setIsLoading(false);
+        return;
       }
-    }, [cachedUser]);
+      
+      // 如果正在请求中，不重复请求
+      if (pendingRequests.has(userId)) {
+        console.log(`UserAvatar: ${userId} 正在请求中...`);
+        return;
+      }
+      
+      // 节流控制，避免短时间内重复请求
+      if (!throttleControl.canRequest(userId)) {
+        console.log(`UserAvatar: ${userId} 请求被节流控制阻止`);
+        return;
+      }
+      
+      // 将请求添加到批处理队列
+      console.log(`UserAvatar: 开始请求用户数据 ${userId}`);
+      setIsLoading(true);
+      batchUserLoader.add(userId, dispatch);
+      throttleControl.startThrottle(userId);
+    }, [userId, cachedUser, dispatch]);
     
     const sizeClasses = {
       sm: "h-6 w-6",
@@ -771,45 +794,47 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     };
     
     const avatarClass = sizeClasses[size] || sizeClasses.sm;
-    const displayName = user?.name || userId || '?';
+    const displayName = cachedUser?.name || userId || '?';
     const displayInitial = displayName?.[0] || '?';
     
     // 安全地检查是否有有效的头像URL - 更严格的检查
-    const hasValidAvatar = Boolean(user && typeof user === 'object' && 'avatar_url' in user && user.avatar_url);
+    const hasValidAvatar = Boolean(cachedUser && typeof cachedUser === 'object' && 'avatar_url' in cachedUser && cachedUser.avatar_url && cachedUser.avatar_url.length > 0);
     
-    if (isLoading) {
-      return (
-        <Avatar className={`${avatarClass} bg-muted`}>
-          <AvatarFallback><User size={14} /></AvatarFallback>
-        </Avatar>
-      );
-    }
+    console.log(`UserAvatar: ${userId} hasValidAvatar=${hasValidAvatar}, avatar_url=`, cachedUser?.avatar_url);
+    
+    // 处理点击头像显示用户详情
+    const handleAvatarClick = (e) => {
+      e.stopPropagation();
+      // 这里可以添加显示用户详情的逻辑
+    };
     
     return (
-      <Tooltip>
-        <TooltipTrigger>
-          <Avatar className={avatarClass}>
-            {hasValidAvatar ? (
-              <AvatarImage 
-                src={user.avatar_url} 
-                alt={displayName} 
-                onError={(e) => {
-                  console.warn(`头像加载失败: ${userId}`, e);
-                  // 标记元素已经出错，避免继续显示损坏的图像
-                  e.target.style.display = 'none';
-                }}
-              />
-            ) : (
-              <AvatarFallback>
-                {displayInitial?.toUpperCase() || <User size={14} />}
-              </AvatarFallback>
-            )}
-          </Avatar>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{displayName}</p>
-        </TooltipContent>
-      </Tooltip>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Avatar className={`${avatarClass} cursor-pointer hover:ring-2 hover:ring-primary`} onClick={handleAvatarClick}>
+              {hasValidAvatar ? (
+                <AvatarImage 
+                  src={cachedUser.avatar_url} 
+                  alt={displayName} 
+                  onError={(e) => {
+                    console.warn(`头像加载失败: ${userId}`, e);
+                    // 标记元素已经出错，避免继续显示损坏的图像
+                    e.target.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <AvatarFallback>
+                  <User size={14} />
+                </AvatarFallback>
+              )}
+            </Avatar>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{displayName}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   });
 
@@ -833,20 +858,31 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     const [isLoading, setIsLoading] = useState(false);
     const [requestSent, setRequestSent] = useState(false);
     
+    // 在组件挂载时输出一次日志
+    useEffect(() => {
+      console.log('AddAssignee组件初始化, teamMembers:', teamMembers);
+    }, []);
+    
     // 加载团队成员
     useEffect(() => {
       const loadTeamMembers = async () => {
         // 只有当弹窗打开时才请求数据
         if (!teamId || !open) return;
         
+        console.log('AddAssignee: 准备加载团队成员, teamId:', teamId, 'status:', teamUsersStatus);
+        
         // 如果团队成员正在加载中或已经成功加载，则不重复请求
         if (teamUsersStatus === 'loading' || (teamMembers.length > 0 && teamUsersStatus === 'succeeded')) {
+          console.log('AddAssignee: 跳过加载团队成员, 原因:', 
+            teamUsersStatus === 'loading' ? '正在加载中' : '已成功加载');
           return;
         }
         
         setIsLoading(true);
         try {
-          await dispatch(fetchTeamUsers(teamId)).unwrap();
+          console.log('AddAssignee: 发起fetchTeamUsers请求');
+          const result = await dispatch(fetchTeamUsers(teamId)).unwrap();
+          console.log('AddAssignee: fetchTeamUsers成功', result);
           setRequestSent(true);
         } catch (error) {
           console.error('获取团队成员失败:', error);
@@ -979,7 +1015,10 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     }, [open, taskId, dispatch, assigneeTagId]);
     
     return (
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={(newOpen) => {
+        console.log('AddAssignee: 弹窗状态变化', open, '->', newOpen);
+        setOpen(newOpen);
+      }}>
         <PopoverTrigger asChild>
           <button 
             className="p-1 rounded-full hover:bg-gray-200 hover:dark:bg-gray-700"
@@ -1006,6 +1045,10 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                 const userId = member.user_id || member.id;
                 const userName = userData.name || userId;
                 const userAvatar = userData.avatar_url;
+                
+                // 添加调试日志
+                console.log(`AddAssignee: 成员 ${userId}, userName=${userName}, avatar=`, userAvatar);
+                
                 // 更严格的头像检查
                 const hasAvatar = Boolean(userAvatar && typeof userAvatar === 'string' && userAvatar.length > 0);
                 const userInitial = userName?.[0]?.toUpperCase() || 'U';
@@ -1017,22 +1060,31 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                     onClick={() => !isAssigned && handleAddAssignee(userId)}
                   >
                     <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        {hasAvatar ? (
-                          <AvatarImage 
-                            src={userAvatar} 
-                            alt={userName}
-                            onError={(e) => {
-                              console.warn(`头像加载失败: ${userId}`, e);
-                              // 标记元素已经出错，避免继续显示损坏的图像
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                        ) : null}
-                        <AvatarFallback>
-                          {userInitial}
-                        </AvatarFallback>
-                      </Avatar>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Avatar className="h-6 w-6">
+                              {hasAvatar ? (
+                                <AvatarImage 
+                                  src={userAvatar} 
+                                  alt={userName}
+                                  onError={(e) => {
+                                    console.warn(`头像加载失败: ${userId}`, e);
+                                    // 标记元素已经出错，避免继续显示损坏的图像
+                                    e.target.style.display = 'none';
+                                  }}
+                                />
+                              ) : null}
+                              <AvatarFallback>
+                                {userInitial}
+                              </AvatarFallback>
+                            </Avatar>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{userName}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <span className="text-sm">{userName}</span>
                     </div>
                     
@@ -1131,12 +1183,39 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
   const MultipleAssignees = ({ assignees, taskId }) => {
     const t = useTranslations('CreateTask');
     const [open, setOpen] = useState(false);
+    const dispatch = useDispatch();
+    
+    // 为每个用户ID添加到批处理队列而不是立即调用API
+    useEffect(() => {
+      if (assignees && assignees.length > 0) {
+        // 仅当第一次渲染或assignees变化时添加到批处理队列
+        assignees.forEach(userId => {
+          if (userId) {
+            batchUserLoader.add(userId, dispatch);
+          }
+        });
+      }
+    }, [assignees, dispatch]);
+    
+    // 仅在弹出框打开时获取详细数据
+    useEffect(() => {
+      if (open && assignees && assignees.length > 0) {
+        // 仅当弹窗打开时才请求更多用户详情
+        assignees.forEach(userId => {
+          if (userId && !pendingRequests.has(userId)) {
+            const user = useSelector(state => selectUserById(state, userId));
+            if (!user || !user.avatar_url) {
+              batchUserLoader.add(userId, dispatch);
+            }
+          }
+        });
+      }
+    }, [open, assignees, dispatch]);
     
     // 如果没有assignees，返回添加按钮
     if (!assignees || assignees.length === 0) {
       return (
         <div className="flex items-center">
-          {/* <span className="text-xs text-gray-500 mr-1">{t('unassigned')}</span> */}
           <AddAssignee taskId={taskId} />
         </div>
       );
@@ -1154,38 +1233,43 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
     
     // 如果有多个assignee，显示数字和弹出菜单
     return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => e.stopPropagation()}>
-            <div className="flex -space-x-1">
-              {assignees.slice(0, 2).map((userId) => (
-                <UserAvatar key={userId} userId={userId} />
-              ))}
-              {assignees.length > 2 && (
-                <Avatar className="h-6 w-6 bg-gray-200 dark:bg-gray-700">
+      <div className="flex items-center gap-1">
+        <div className="flex -space-x-1">
+          {assignees.slice(0, 2).map((userId) => (
+            <UserAvatar key={userId} userId={userId} />
+          ))}
+          {assignees.length > 2 && (
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Avatar className="h-6 w-6 bg-gray-200 dark:bg-gray-700 cursor-pointer" onClick={(e) => e.stopPropagation()}>
                   <AvatarFallback>+{assignees.length - 2}</AvatarFallback>
                 </Avatar>
-              )}
-            </div>
-          </div>
-        </PopoverTrigger>
-        <PopoverContent className="w-60 p-2">
-          <h4 className="text-sm font-medium mb-2">{t('assignees')}</h4>
-          <div className="space-y-2">
-            {assignees.map((userId) => (
-              <div key={userId} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UserAvatar userId={userId} />
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-2">
+                <h4 className="text-sm font-medium mb-2">{t('assignees')}</h4>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {assignees.map((userId) => {
+                    // 使用记忆化选择器获取用户数据
+                    const user = useSelector(state => selectUserById(state, userId));
+                    const userName = user?.name || userId;
+                    
+                    return (
+                      <div key={userId} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <UserAvatar userId={userId} userData={user} />
+                          <span className="text-sm">{userName}</span>
+                        </div>
+                        <RemoveAssignee taskId={taskId} userId={userId} />
+                      </div>
+                    );
+                  })}
                 </div>
-                <RemoveAssignee taskId={taskId} userId={userId} />
-              </div>
-            ))}
-            <div className="pt-2 border-t mt-2">
-              <AddAssignee taskId={taskId} />
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+        <AddAssignee taskId={taskId} />
+      </div>
     );
   };
 
@@ -1391,7 +1475,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                           {/* 底部栏 */}
                                           <div className="flex justify-between items-center mt-2">
                                             <div className="flex items-center">
-                                              {/* <User size={14} className="text-gray-500 mr-1" /> */}
                                               {/* 显示assignee信息 */}
                                               {task.assignee ? (
                                                 task.assignee.assignees ? (
@@ -1408,7 +1491,6 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                                 )
                                               ) : (
                                                 <div className="flex items-center">
-                                                  {/* <span className="text-xs text-gray-500 mr-1">{t('unassigned')}</span> */}
                                                   <AddAssignee taskId={task.id} />
                                                 </div>
                                               )}
