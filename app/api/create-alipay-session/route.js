@@ -67,6 +67,7 @@ export async function POST(req) {
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/en/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/en/payment`,
       customer_email: email,
+      locale: 'en', // Set language to English
       metadata: {
         planName: planName,
         quantity: quantity.toString(),

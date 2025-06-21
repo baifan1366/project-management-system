@@ -229,6 +229,12 @@ export default function PaymentSuccess() {
   // Check if payment has been processed
   const checkPaymentProcessed = async (paymentIntentId) => {
     try {
+      // Make sure paymentIntentId is a string
+      if (!paymentIntentId || typeof paymentIntentId !== 'string') {
+        console.error('Invalid paymentIntentId format:', paymentIntentId);
+        return false;
+      }
+      
       const { data, error } = await supabase
         .from('payment')
         .select('is_processed, stripe_payment_id')
@@ -246,6 +252,12 @@ export default function PaymentSuccess() {
   // Update payment processed status
   const updatePaymentProcessed = async (paymentIntentId) => {
     try {
+      // Make sure paymentIntentId is a string
+      if (!paymentIntentId || typeof paymentIntentId !== 'string') {
+        console.error('Invalid paymentIntentId format:', paymentIntentId);
+        return false;
+      }
+      
       const { error } = await supabase
         .from('payment')
         .update({ 
@@ -387,8 +399,14 @@ export default function PaymentSuccess() {
         }
         
         // 如果直接有支付意图ID（信用卡支付通常会返回支付意图ID）
-        if (paymentIntent) {
+        if (paymentIntent && typeof paymentIntent === 'string') {
           await processPaymentWithIntent(paymentIntent);
+          return;
+        } else if (paymentIntent) {
+          console.error('Payment intent is not a string:', paymentIntent);
+          toast.error('Payment verification failed', {
+            description: 'Invalid payment ID format'
+          });
           return;
         }
         
@@ -415,6 +433,15 @@ export default function PaymentSuccess() {
     // Process payment with session ID
     const processPaymentWithSession = async (sessionId) => {
       try {
+        // Ensure sessionId is a string
+        if (!sessionId || typeof sessionId !== 'string') {
+          console.error('Invalid sessionId format:', sessionId);
+          toast.error('Payment verification failed', {
+            description: 'Invalid session ID format'
+          });
+          return;
+        }
+        
         // Fetch session details from Stripe
         const sessionResult = await dispatch(fetchSessionDetails(sessionId)).unwrap();
         
@@ -427,7 +454,7 @@ export default function PaymentSuccess() {
         }
         
         // 如果有支付意图ID，检查是否已处理
-        if (sessionResult.payment_intent) {
+        if (sessionResult.payment_intent && typeof sessionResult.payment_intent === 'string') {
           // Check if payment is already processed
           const isProcessed = await checkPaymentProcessed(sessionResult.payment_intent);
           if (isProcessed) {
@@ -437,6 +464,11 @@ export default function PaymentSuccess() {
           
           // 如果有支付意图ID，尝试处理支付
           await processPaymentWithIntent(sessionResult.payment_intent);
+        } else if (sessionResult.payment_intent) {
+          console.error('Payment intent is not a string:', sessionResult.payment_intent);
+          toast.error('Payment verification failed', {
+            description: 'Invalid payment ID format'
+          });
         }
         
         // Update metadata from session if available
@@ -498,7 +530,7 @@ export default function PaymentSuccess() {
             });
             
             // 更新支付处理状态
-            if (paymentRecord && sessionResult.payment_intent) {
+            if (paymentRecord && sessionResult.payment_intent && typeof sessionResult.payment_intent === 'string') {
               await updatePaymentProcessed(sessionResult.payment_intent);
             }
             
@@ -524,6 +556,15 @@ export default function PaymentSuccess() {
 
     // Process payment with payment intent
     const processPaymentWithIntent = async (paymentIntentId) => {
+      // Ensure paymentIntentId is a string
+      if (!paymentIntentId || typeof paymentIntentId !== 'string') {
+        console.error('Invalid paymentIntentId format:', paymentIntentId);
+        toast.error('Payment verification failed', {
+          description: 'Invalid payment ID format'
+        });
+        return;
+      }
+      
       // Check if payment is already processed
       const isProcessed = await checkPaymentProcessed(paymentIntentId);
       if (isProcessed) {

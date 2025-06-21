@@ -331,7 +331,8 @@
         "compare": "Compare Plans",
         "contactSales": "Contact Sales",
         "upgradeNow": "Upgrade Now",
-        "currentPlan": "Current Plan"
+        "currentPlan": "Current Plan",
+        "description": "Upgrade to a paid plan to unlock all features and continue using your subscription without interruption."
       },
       "limits": {
         "back": "Back",
@@ -360,6 +361,14 @@
     "willBeUnarchived": "will be unarchived",
     "deleteTeamConfirmTitle": "Delete Team",
     "willBeDeletedPermanently": "will be deleted permanently",
+    "owner": "Owner",
+    "you": "You",
+    "role": {
+      "owner": "Owner",
+      "can_edit": "Editor",
+      "can_check": "Checker", 
+      "can_view": "Viewer"
+    },
     "projectSettings": "Project Settings",
     "archivedTeams": "Archived Teams",
     "deleteProject": "Delete Project",
@@ -379,6 +388,14 @@
     "quickChat": "Quick Chat",
     "teamMembers": "Team Members",
     "noTeamMembers": "No team members found",
+    "owner": "Owner",
+    "you": "You",
+    "role": {
+      "owner": "Owner",
+      "can_edit": "Editor",
+      "can_check": "Checker",
+      "can_view": "Viewer"
+    },
     "status": {
       "pending": "Pending",
       "in_progress": "In Progress",
@@ -490,7 +507,6 @@
     "selectTeam": "Select Team",
     "teams": "Teams",
     "unnamed": "Unnamed",
-    "role": "Role",
     "selectTeamPlaceholder": "Select a team",
     "selectRole": "Select Role",
     "invite": "Invite",
