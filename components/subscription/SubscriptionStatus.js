@@ -119,7 +119,7 @@ export default function SubscriptionStatus() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(amount / 100); // Assuming amount is in cents
+    }).format(amount); // Amount is already in dollars, not cents
   };
 
   // Check if the plan is a free plan
