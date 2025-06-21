@@ -36,6 +36,8 @@ import { supabase } from '@/lib/supabase';
 import { getSubscriptionLimit, getSubscriptionUsage, DELTA_MAP } from '@/lib/subscriptionService';
 import useGetUser from '@/lib/hooks/useGetUser';
 import { createProjectValidationSchema, projectFormTransforms } from '@/components/validation/projectSchema';
+import { trackSubscriptionUsage } from '@/lib/subscriptionService';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
 export default function CreateProjectDialog({ open, onOpenChange }) {
   const t = useTranslations('CreateProject');
@@ -136,14 +138,11 @@ export default function CreateProjectDialog({ open, onOpenChange }) {
       // 再次检查用户是否可以创建项目
       const limitCheck = await getSubscriptionLimit(user.id, 'create_project');
       if (!limitCheck.allowed) {
-        toast({
-          title: '超出订阅限制',
-          description: limitCheck.reason || '您已达到项目创建上限，请升级您的订阅计划',
-          variant: "destructive",
-        });
-        console.error('订阅限制检查失败:', limitCheck);
+        dispatch(limitExceeded({
+          actionType: 'create_project',
+          limitInfo: limitCheck
+        }));
         onOpenChange(false);
-        router.push('/settings/subscription');
         return;
       }
 
@@ -162,25 +161,12 @@ export default function CreateProjectDialog({ open, onOpenChange }) {
       }));
 
       if (createProject.fulfilled.match(resultAction)) {
-        // 获取用户的订阅使用情况
-        const usageData = await getSubscriptionUsage(user.id);
-        
-        if (!usageData) {
-          console.error('Failed to fetch subscription usage data');
-        } else {
-          // 使用 DELTA_MAP 更新用户的项目使用计数
-          const deltaValue = DELTA_MAP['create_project'] || 1;
-          const currentProjects = usageData.usageData.workspaces.current || 0;
-          
-          const { error: updateError } = await supabase
-            .from('user_subscription_plan')
-            .update({ current_projects: currentProjects + deltaValue })
-            .eq('user_id', user.id);
-          
-          if (updateError) {
-            console.error('Failed to update subscription usage:', updateError);
-          }
-        }
+        // Use the subscription service to increment current_projects for the active plan only
+        await trackSubscriptionUsage({
+          userId: user.id,
+          actionType: 'createProject',
+          entityType: 'projects'
+        });
 
         toast({
           title: t('createSuccess'),
