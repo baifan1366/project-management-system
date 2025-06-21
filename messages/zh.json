@@ -321,6 +321,15 @@
         "currentUsage": "当前使用量: {current} / {limit}",
         "upgradeSubscription": "升级订阅",
         "operationLimited": "操作受限",
+        "createProjectLimited": "已达到项目创建上限",
+        "inviteMemberLimited": "已达到成员邀请上限",
+        "createTeamLimited": "已达到团队创建上限",
+        "aiChatLimited": "已达到AI聊天次数限制",
+        "operationLimited": "操作受限",
+        "subscriptionLimit": "订阅限制",
+        "currentUsage": "当前用量: {current}/{limit}",
+        "upgradeSubscription": "升级订阅",
+        "operationLimited": "操作受限",
         "createProjectLimited": "项目创建受限",
         "inviteMemberLimited": "成员邀请受限",
         "createTeamLimited": "团队创建受限"
@@ -2222,7 +2231,10 @@
     "me": "我",
     "mustHaveOwner": "必须有所有者",
     "ownerDescription": "团队所有者。可以管理团队成员和访问设置。",
-    "checkerDescription": "可以标记和评论任务。不能创建任务和项目。"
+    "checkerDescription": "可以标记和评论任务。不能创建任务和项目。",
+    "random": "随机",
+    "addStatus": "添加状态",
+    "teamIsFullError": "该团队已满。团队所有者需要升级他们的计划以添加更多成员。"
   },
   "Notion": {
     "knowledgeBase": "知识库",

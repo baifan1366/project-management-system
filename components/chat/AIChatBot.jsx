@@ -13,6 +13,9 @@ import useGetUser from '@/lib/hooks/useGetUser';
 import { toast } from 'sonner';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import ChatSearch from '@/components/chat/ChatSearch';
+import { getSubscriptionLimit, trackSubscriptionUsage } from '@/lib/subscriptionService';
+import { useDispatch } from 'react-redux';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
 // 移除原SVG组件，改用Image组件
 const PenguinIcon = () => (
@@ -40,6 +43,7 @@ export default function AIChatBot() {
   const chatContainerRef = useRef(null);
   const { hourFormat, adjustTimeByOffset } = useUserTimezone();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const dispatch = useDispatch();
 
   // 自动滚动到底部
   useEffect(() => {
@@ -153,8 +157,18 @@ export default function AIChatBot() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!input.trim()) return;
+    if (!input.trim() || !currentUser) return;
     
+    // 检查订阅限制
+    const limitCheck = await getSubscriptionLimit(currentUser.id, 'ai_chat');
+    if (!limitCheck.allowed) {
+      dispatch(limitExceeded({
+        actionType: 'ai_chat',
+        limitInfo: limitCheck,
+      }));
+      return;
+    }
+
     // 验证字数限制
     if (input.trim().length > 1000) {
       toast.error(t('errors.messageTooLong') || '消息过长（最多1000个字符）');
@@ -233,6 +247,14 @@ export default function AIChatBot() {
       
       await saveAIChatMessage({...userMessage, session_id: currentSessionId});
       await saveAIChatMessage(aiMessage);
+
+      // 追踪订阅用量
+      await trackSubscriptionUsage({
+        userId: currentUser.id,
+        actionType: 'ai_chat',
+        entityType: 'aiChat',
+        deltaValue: 1,
+      });
     } catch (error) {
       console.error(t('aiResponseError'), error);
       // 添加错误消息

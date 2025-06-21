@@ -13,6 +13,9 @@ import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { handleInvitationAccepted } from '@/components/team/TeamGuard';
+import { getSubscriptionLimit, trackSubscriptionUsage } from '@/lib/subscriptionService';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
+import { AlertTriangle } from 'lucide-react';
 
 export default function TeamInvitation() {
   const t = useTranslations('TeamInvitation');
@@ -133,7 +136,21 @@ export default function TeamInvitation() {
         throw new Error(t('invalidInvitation'));
       }
 
-      // 1. 再次验证邀请状态
+      // 1. Get the subscription owner's ID
+      const ownerId = invitationInfo.created_by;
+      if (!ownerId) {
+        throw new Error('Subscription owner not found on invitation.');
+      }
+
+      // 2. Check the owner's subscription limit
+      const limitCheck = await getSubscriptionLimit(ownerId, 'invite_member');
+      if (!limitCheck.allowed) {
+        // Here, you might want to inform the user that the team is full.
+        // For simplicity, we'll throw an error. A better UX could guide them.
+        throw new Error(t('teamIsFullError') || 'This team is full. The owner needs to upgrade their plan.');
+      }
+
+      // 3. Re-validate invitation status (existing logic)
       const { data: currentInvitation, error: invitationError } = await supabase
         .from('user_team_invitation')
         .select('*')
@@ -149,7 +166,7 @@ export default function TeamInvitation() {
         throw new Error(t('invitationNoLongerValid'));
       }
 
-      // 2. 验证用户不是已经是团队成员
+      // 4. Verify user is not already a member (existing logic)
       const { data: existingMembers, error: memberCheckError } = await supabase
         .from('user_team')
         .select('*')
@@ -162,7 +179,7 @@ export default function TeamInvitation() {
         throw new Error(t('alreadyTeamMember'));
       }
 
-      // 3. 获取团队信息以获取 project_id
+      // 5. Get team info (existing logic)
       const { data: teamData, error: teamError } = await supabase
         .from('team')
         .select('project_id')
@@ -173,7 +190,7 @@ export default function TeamInvitation() {
         throw new Error(t('teamNotFound'));
       }
 
-      // 4. 直接使用Supabase创建团队用户关系
+      // 6. Add user to the team (existing logic)
       const { error: userTeamError } = await supabase
         .from('user_team')
         .insert({
@@ -188,7 +205,14 @@ export default function TeamInvitation() {
         throw new Error(userTeamError.message || t('acceptInvitationFailed'));
       }
 
-      // 5. 更新邀请状态为已接受
+      // 7. Increment the subscription count for the owner
+      await trackSubscriptionUsage({
+        userId: ownerId,
+        actionType: 'invite_member',
+        entityType: 'teamMembers'
+      });
+
+      // 8. Update invitation status to ACCEPTED (existing logic)
       const { error: updateError } = await supabase
         .from('user_team_invitation')
         .update({ status: 'ACCEPTED' })
@@ -196,10 +220,12 @@ export default function TeamInvitation() {
 
       if (updateError) {
         console.error("Invitation update error:", updateError);
+        // Note: At this point the user is in the team, but the invite status failed to update.
+        // This might need a cleanup mechanism, but for now we'll throw.
         throw new Error(updateError.message || t('acceptInvitationFailed'));
       }
 
-      // 6. 重定向到项目页面
+      // 9. Redirect to the project page (existing logic)
       window.location.href = `/${params.locale}/projects/${teamData.project_id}`;
     } catch (error) {
       console.error("Accept invitation error:", error);
@@ -219,10 +245,11 @@ export default function TeamInvitation() {
 
   if (error) {
     return (
-      <Card className="max-w-[600px] mx-auto mt-8">
-        <CardContent className="pt-6">
-          <div className="text-center text-red-500">
-            <p>{error}</p>
+      <Card className="max-w-[600px] mx-auto mt-8 border-red-500/50">
+        <CardContent className="pt-8">
+          <div className="text-center text-red-500 flex flex-col items-center space-y-4">
+            <AlertTriangle className="w-16 h-16 text-red-500" />
+            <p className="text-lg font-semibold">{error}</p>
             <Button
               onClick={() => router.push(`/${params.locale}`)}
               className="mt-4"

@@ -43,7 +43,6 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
     }
   }
   
-  // 组件挂载或对话框打开时获取团队数据
   useEffect(() => {
     fetchProjectTeams()
   }, [projectId, isOpen])
@@ -97,9 +96,26 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
       onConfirm: async () => {
         setIsLoading(true)
         try {
-          // 实现删除项目的功能
+          // 1. Delete all teams under the project and decrement current_teams for each
+          if (user && user.id) {
+            const teams = await api.teams.listByProject(projectId);
+            if (Array.isArray(teams)) {
+              for (const team of teams) {
+                await api.teams.delete(team.id);
+                await trackSubscriptionUsage({
+                  userId: user.id,
+                  actionType: 'create_team',
+                  entityType: 'teams',
+                  deltaValue: -1
+                });
+              }
+            }
+          }
+
+          // 2. Delete the project itself
           await api.projects.delete(projectId)
           
+          // 3. Decrement current_projects
           if (user && user.id) {
             await trackSubscriptionUsage({
               userId: user.id,
@@ -117,9 +133,6 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
         } catch (error) {
           console.error('删除项目失败:', error)
         } finally {
-          console.log('Updating subscription usage:', {
-            userId, operation, metricToUpdate, currentValue, deltaValue, newValue
-          });
           setIsLoading(false)
         }
       }

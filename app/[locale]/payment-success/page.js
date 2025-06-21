@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 import ProcessedPaymentModal from '@/components/payment/paymentProcessed';
 import PaymentSuccessModal from '@/components/payment/paymentSuccees';
+import { fetchSubscription } from '@/lib/redux/features/subscriptionSlice';
 
 export default function PaymentSuccess() {
   const router = useRouter();
@@ -214,6 +215,9 @@ export default function PaymentSuccess() {
           .insert(newData);
       
       if (result.error) throw result.error;
+      
+      // After successfully updating the subscription in the DB, refresh Redux state
+      await dispatch(fetchSubscription(userId));
       
       return true;
     } catch (error) {
