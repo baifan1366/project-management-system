@@ -199,7 +199,7 @@ export function useLoadTag() {
   // 编辑标签（暂时只是占位）
   const handleEditTag = (index) => {
     const tagName = sortedTagInfo[index];
-    console.log(`编辑标签: ${tagName}`);
+    
     // 这里可以打开标签编辑对话框
     // ...
   };

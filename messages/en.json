@@ -349,6 +349,9 @@
     }
   },
   "Projects": {
+    "clearSearch": "Clear Search",
+    "noTeamsFound": "No teams found",
+    "foundTeamsCount": "{count} teams found",
     "projectNotPublic": "Project not public",
     "ok": "OK",
     "createdAt": "Created On",
@@ -810,6 +813,7 @@
     "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
   },
   "CreateTask": {
+    "failedToLoadUsers": "Failed to load users",
     "projectArchived": "Project Archived",
     "projectNotPublic": "Project Not Public",
     "ok": "OK",
@@ -2661,6 +2665,7 @@
     "closePreview": "Close Preview"
   },
   "PostsView": {
+    "postTitleRequired": "Post title is required",
     "uploadingFiles": "Uploading files...",
     "selectPostFirst": "Please select a post first",
     "fileSelected": "File selected",
