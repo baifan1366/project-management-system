@@ -349,6 +349,14 @@
     "willBeUnarchived": "will be unarchived",
     "deleteTeamConfirmTitle": "Delete Team",
     "willBeDeletedPermanently": "will be deleted permanently",
+    "owner": "Owner",
+    "you": "You",
+    "role": {
+      "owner": "Owner",
+      "can_edit": "Editor",
+      "can_check": "Checker", 
+      "can_view": "Viewer"
+    },
     "projectSettings": "Project Settings",
     "archivedTeams": "Archived Teams",
     "deleteProject": "Delete Project",
@@ -368,6 +376,14 @@
     "quickChat": "Quick Chat",
     "teamMembers": "Team Members",
     "noTeamMembers": "No team members found",
+    "owner": "Owner",
+    "you": "You",
+    "role": {
+      "owner": "Owner",
+      "can_edit": "Editor",
+      "can_check": "Checker",
+      "can_view": "Viewer"
+    },
     "status": {
       "pending": "Pending",
       "in_progress": "In Progress",
@@ -479,7 +495,6 @@
     "selectTeam": "Select Team",
     "teams": "Teams",
     "unnamed": "Unnamed",
-    "role": "Role",
     "selectTeamPlaceholder": "Select a team",
     "selectRole": "Select Role",
     "invite": "Invite",
