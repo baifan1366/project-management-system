@@ -26,7 +26,7 @@ export default function PaymentPage() {
   const params = useParams();
   const locale = params.locale || 'en';
   const [loading, setLoading] = useState(true);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
   
   // 使用 useGetUser hook 获取用户信息
   const { user, isAuthenticated } = useGetUser();
@@ -158,10 +158,10 @@ export default function PaymentPage() {
         const orderId = uuidv4();
 
         // Calculate the final total (with discount applied)
-        const finalAmount = calculateFinalTotal();
+        const finalAmountValue = calculateFinalTotal();
         
         // Store the final total in Redux
-        dispatch(setFinalTotal(finalAmount));
+        dispatch(setFinalTotal(finalAmountValue));
 
         // 设置支付元数据
         const paymentMetadata = {
@@ -169,7 +169,7 @@ export default function PaymentPage() {
           userId: user.id,
           orderId,
           planName: planDetails?.name,
-          amount: finalAmount, // Use finalAmount here
+          amount: finalAmountValue, // Use finalAmount here
           promoCode: appliedPromoCode,
           discount: discount,
           quantity: 1,
@@ -180,7 +180,7 @@ export default function PaymentPage() {
 
         // 创建支付意向 - Make sure to use finalAmount
         const result = await dispatch(createPaymentIntent({
-          amount: finalAmount, // Use finalAmount here
+          amount: finalAmountValue, // Use finalAmount here
           userId: user.id,
           planId: planId,
           metadata: {
@@ -192,7 +192,7 @@ export default function PaymentPage() {
             discount: discount,
             payment_method: 'card',
             quantity: 1,
-            finalAmount: finalAmount // Add finalAmount to metadata
+            finalAmount: finalAmountValue // Add finalAmount to metadata
           }
         })).unwrap();
 
@@ -309,7 +309,7 @@ export default function PaymentPage() {
   };
 
   const handlePaymentMethodSelect = (method) => {
-    setSelectedPaymentMethod(method);
+    setSelectedPaymentMethod('card');
   };
 
   const handleAlipayPayment = async () => {
@@ -433,9 +433,9 @@ export default function PaymentPage() {
 
   // 格式化价格
   const formatPrice = (price) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('ms-MY', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'MYR',
       minimumFractionDigits: 2
     }).format(price);
   };
@@ -593,23 +593,33 @@ export default function PaymentPage() {
 
   // Update the button click handler to use the appropriate payment function
   const handlePaymentButtonClick = async () => {
+    // Reset any previous messages
+    setPromoMessage('');
 
-    if (selectedPaymentMethod === 'card' && handleCardPayment) {
-      // Use the Stripe card payment handler provided by CheckoutForm
+    // Ensure clientSecret is available
+    if (!clientSecret) {
+      toast.error('Payment session not ready. Please wait or refresh the page.');
+      return;
+    }
+
+    if (selectedPaymentMethod === 'card') {
+      setIsProcessing(true);
       await handleCardPayment();
-    } else if (selectedPaymentMethod === 'alipay') {
-      // Use the Alipay payment handler
-      await handleAlipayPayment();
+      setIsProcessing(false);
     } else {
-      console.error('No valid payment method selected or handler available');
+      toast.error('Please select a payment method.');
     }
   };
 
   // 添加一个格式化价格和计费周期的函数
   const formatPlanPriceAndInterval = (plan) => {
-    if (!plan) return 'US$0.00';
+    if (!plan) return 'RM0.00';
 
-    const formattedPrice = `US$${plan.price.toFixed(2)}`;
+    const formattedPrice = new Intl.NumberFormat('ms-MY', {
+      style: 'currency',
+      currency: 'MYR',
+      minimumFractionDigits: 2,
+    }).format(plan.price);
 
     // 如果没有计费周期（比如免费计划）
     if (!plan.billing_interval) {
@@ -626,6 +636,11 @@ export default function PaymentPage() {
         return formattedPrice;
     }
   };
+
+  // 确保在组件加载时，默认选择"Card"
+  useEffect(() => {
+    setSelectedPaymentMethod('card');
+  }, []);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -666,13 +681,13 @@ export default function PaymentPage() {
                   {planDetails ? `Subscribe to ${planDetails.name}` : 'Subscribe to Team Sync'}
                 </h1>
                 <div className="text-4xl font-bold mb-2">
-                  {planDetails ? formatPlanPriceAndInterval(planDetails) : '$0.00'}
+                  {planDetails ? formatPlanPriceAndInterval(planDetails) : 'RM0.00'}
                   <span className="text-sm">
                     {getBillingText()}
                   </span>
                 </div>
                 <div className="text-gray-400">
-                  {planDetails ? formatPlanPriceAndInterval(planDetails) : 'US$10.00 per month, billed annually'}
+                  {planDetails ? formatPlanPriceAndInterval(planDetails) : 'RM10.00 per month, billed annually'}
                 </div>
               </div>
 
@@ -680,7 +695,7 @@ export default function PaymentPage() {
               <div className="space-y-6">
                 <div className="flex justify-between">
                   <span>{planDetails ? planDetails.name : 'Team Sync'}</span>
-                  <span>{planDetails ? formatPlanPriceAndInterval(planDetails) : '$0.00'}</span>
+                  <span>{planDetails ? formatPlanPriceAndInterval(planDetails) : 'RM0.00'}</span>
                 </div>
 
                 <div className="text-sm text-gray-400">
@@ -864,47 +879,6 @@ export default function PaymentPage() {
                               <p className="mt-2 text-gray-600">Loading payment form...</p>
                             </div>
                           )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Alipay Option */}
-                    <div className="border rounded-lg overflow-hidden">
-                      <label className="flex items-center justify-between w-full p-4 cursor-pointer hover:bg-gray-50">
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            name="payment-method"
-                            value="alipay"
-                            checked={selectedPaymentMethod === 'alipay'}
-                            onChange={(e) => handlePaymentMethodSelect(e.target.value)}
-                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                          />
-                          <div className="ml-3 flex items-center">
-                            <span className="font-medium text-gray-900 mr-2">Alipay 支付宝</span>
-                            <Image src="/alipay.png" alt="Alipay" width={64} height={20} className="object-contain" />
-                          </div>
-                        </div>
-                      </label>
-
-                      {selectedPaymentMethod === 'alipay' && (
-                        <div className="p-4 border-t">
-                          <div className="mb-4 text-sm text-gray-600">
-                            <p>Payment will be processed in Chinese Yuan (CNY).</p>
-                            <p>Approximate amount: ¥{(calculateFinalTotal() * 7.2).toFixed(2)} CNY</p>
-                            <p className="text-xs text-gray-500 mt-1">Exchange rate: 1 USD ≈ 7.2 CNY</p>
-                          </div>
-                          <button
-                            onClick={handleAlipayPayment}
-                            disabled={isProcessing}
-                            className={`w-full py-2 px-4 rounded-lg ${
-                              isProcessing 
-                                ? 'bg-gray-400 cursor-not-allowed' 
-                                : 'bg-[#1677FF] hover:bg-[#0E66E7]'
-                            } text-white`}
-                          >
-                            {isProcessing ? 'Processing...' : 'Pay with Alipay'}
-                          </button>
                         </div>
                       )}
                     </div>

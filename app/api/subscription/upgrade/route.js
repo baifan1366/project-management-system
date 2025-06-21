@@ -165,7 +165,7 @@ export async function POST(request) {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'myr',
             product_data: {
               name: `Upgrade to ${newPlan.name}`,
               description: `${prorationDetails ? 'Prorated upgrade' : 'Immediate upgrade'} from ${currentSubscription?.subscription_plan?.name || 'current plan'} to ${newPlan.name}`

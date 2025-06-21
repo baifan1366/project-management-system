@@ -437,10 +437,16 @@ export const UpgradeOptions = () => {
   
   // Format price with billing interval
   const formatPrice = (price, billingInterval) => {
+    const options = {
+      style: 'currency',
+      currency: 'MYR',
+      minimumFractionDigits: 2,
+    };
+
     if (billingInterval === 'YEARLY') {
-      return `US$${price.toFixed(2)}/mo`;
+      return new Intl.NumberFormat('ms-MY', options).format(price) + '/mo';
     } else {
-      return `US$${price.toFixed(2)}/mo`;
+      return new Intl.NumberFormat('ms-MY', options).format(price) + '/mo';
     }
   };
   

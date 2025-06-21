@@ -33,8 +33,11 @@ export default function PaymentSuccess() {
   } = useSelector(state => state.payment);
 
   // Format amount helper
-  const formatAmount = (amount) => {
-    return `$${(amount / 100).toFixed(2)}`;
+  const formatAmount = (amount, currency = 'MYR') => {
+    return new Intl.NumberFormat('ms-MY', {
+      style: 'currency',
+      currency: currency,
+    }).format((amount || 0) / 100);
   };
 
   // Copy to clipboard helper
@@ -88,7 +91,8 @@ export default function PaymentSuccess() {
             planName: orderDetails.planName,
             amount: orderDetails.amount,
             orderId: orderDetails.orderId,
-            userId: orderDetails.userId
+            userId: orderDetails.userId,
+            currency: 'MYR'
           }
         }),
       });

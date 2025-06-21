@@ -370,9 +370,12 @@ export default function AdminSubscriptions() {
   
   // Format currency for display
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
+    if (amount === null || amount === undefined) {
+      return 'N/A';
+    }
+    return new Intl.NumberFormat('ms-MY', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'MYR',
     }).format(amount);
   };
   
@@ -1083,6 +1086,7 @@ export default function AdminSubscriptions() {
   
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+      
       
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
@@ -1865,7 +1869,7 @@ export default function AdminSubscriptions() {
                     <div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Total Revenue</p>
                       <p className="text-2xl font-semibold text-gray-800 dark:text-white">
-                        ${subscriptionStats.stats.totalRevenue.toLocaleString()}
+                        RM {subscriptionStats.stats.totalRevenue.toLocaleString()}
                       </p>
                     </div>
                     <div>
@@ -1985,7 +1989,7 @@ export default function AdminSubscriptions() {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white">
-                                  ${parseFloat(payment.amount).toFixed(2)} {payment.currency}
+                                  {parseFloat(payment.amount).toFixed(2)} {payment.currency}
                                 </div>
                                 {payment.discount_amount > 0 && (
                                   <div className="text-xs text-green-600 dark:text-green-400 flex flex-col">
