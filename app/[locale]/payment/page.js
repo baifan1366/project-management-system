@@ -301,7 +301,8 @@ export default function PaymentPage() {
     if (paymentStatus === 'processing') return 'Processing...';
     
     switch(selectedPaymentMethod) {
-      case 'card' || 'alipay':
+      case 'card':
+      case 'alipay':
         return 'Pay Now';
       default:
         return 'Select Payment Method';
@@ -309,7 +310,7 @@ export default function PaymentPage() {
   };
 
   const handlePaymentMethodSelect = (method) => {
-    setSelectedPaymentMethod('card');
+    setSelectedPaymentMethod(method);
   };
 
   const handleAlipayPayment = async () => {
@@ -334,6 +335,7 @@ export default function PaymentPage() {
     });
     
     try {
+      const orderId = uuidv4(); // Generate a unique order ID for Alipay
       
       const response = await fetch('/api/create-alipay-session', {
         method: 'POST',
@@ -341,6 +343,7 @@ export default function PaymentPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          orderId, // Pass the order ID to the backend
           planName: planDetails.name,
           price: planDetails.price,
           quantity: 1,
@@ -596,16 +599,18 @@ export default function PaymentPage() {
     // Reset any previous messages
     setPromoMessage('');
 
-    // Ensure clientSecret is available
-    if (!clientSecret) {
-      toast.error('Payment session not ready. Please wait or refresh the page.');
-      return;
-    }
-
     if (selectedPaymentMethod === 'card') {
+      // Ensure clientSecret is available for card payments
+      if (!clientSecret) {
+        toast.error('Payment session not ready. Please wait or refresh the page.');
+        return;
+      }
+
       setIsProcessing(true);
       await handleCardPayment();
       setIsProcessing(false);
+    } else if (selectedPaymentMethod === 'alipay') {
+      await handleAlipayPayment();
     } else {
       toast.error('Please select a payment method.');
     }
@@ -881,6 +886,26 @@ export default function PaymentPage() {
                           )}
                         </div>
                       )}
+                    </div>
+
+                    {/* Alipay Option */}
+                    <div className="border rounded-lg overflow-hidden">
+                      <label className="flex items-center justify-between w-full p-4 cursor-pointer hover:bg-gray-50">
+                        <div className="flex items-center">
+                          <input
+                            type="radio"
+                            name="payment-method"
+                            value="alipay"
+                            checked={selectedPaymentMethod === 'alipay'}
+                            onChange={(e) => handlePaymentMethodSelect(e.target.value)}
+                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                          />
+                          <div className="ml-3 flex items-center">
+                            <span className="font-medium text-gray-900 mr-2">Alipay</span>
+                            <Image src="/alipay.png" alt="Alipay" width={32} height={32} className="object-contain" />
+                          </div>
+                        </div>
+                      </label>
                     </div>
                   </div>
 
