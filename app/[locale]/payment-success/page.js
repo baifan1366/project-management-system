@@ -109,10 +109,35 @@ export default function PaymentSuccess() {
   // Update user subscription
   const updateUserSubscription = async (userId, planId) => {
     try {
-      // Get current date for start_date
-      const startDate = new Date().toISOString();
+      // Deactivate any existing active subscriptions for the user (case-insensitive)
+      const { data: activeSubscriptions, error: findError } = await supabase
+        .from('user_subscription_plan')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'ACTIVE');
+
+      if (findError) {
+        console.error('Error finding active subscriptions to deactivate:', findError);
+        throw findError;
+      }
+
+      if (activeSubscriptions && activeSubscriptions.length > 0) {
+        const idsToDeactivate = activeSubscriptions.map(sub => sub.id);
+        const { error: updateError } = await supabase
+          .from('user_subscription_plan')
+          .update({ 
+            status: 'INACTIVE',
+            updated_at: new Date().toISOString() 
+          })
+          .in('id', idsToDeactivate);
+        
+        if (updateError) {
+          console.error('Error deactivating old subscriptions:', updateError);
+          throw updateError;
+        }
+      }
       
-      // Get plan details
+      // Get the details of the new plan
       const { data: planData, error: planError } = await supabase
         .from('subscription_plan')
         .select('billing_interval, type')
@@ -135,34 +160,6 @@ export default function PaymentSuccess() {
         } else {
           // For NULL or undefined billing_interval, keep end date as null
           endDate = null;
-        }
-      }
-      
-      // First, find all active subscription plans for this user (both paid and free)
-      const { data: activeSubscriptions, error: activeSubError } = await supabase
-        .from('user_subscription_plan')
-        .select('id, plan_id, status')
-        .eq('user_id', userId)
-        .or('status.eq.ACTIVE,status.eq.active')
-        .order('created_at', { ascending: false });
-      
-      if (activeSubError) throw activeSubError;
-      
-      const now = new Date().toISOString();
-      
-      // Deactivate ALL active subscription plans
-      if (activeSubscriptions && activeSubscriptions.length > 0) {
-        
-        for (const subscription of activeSubscriptions) {
-          // Deactivate each active subscription plan
-          await supabase
-            .from('user_subscription_plan')
-            .update({
-              status: 'DEACTIVATED',
-              updated_at: now
-            })
-            .eq('id', subscription.id);
-            
         }
       }
       
@@ -206,12 +203,12 @@ export default function PaymentSuccess() {
           user_id: userId,
           plan_id: planId,
           status: 'ACTIVE',
-          start_date: startDate,
+          start_date: new Date().toISOString(),
           end_date: endDate,  // Can be null
         auto_renew: planData.type !== 'FREE', // Enable auto-renew for paid plans by default
         ...currentUsage, // Spread the current usage values
-          created_at: now,
-          updated_at: now
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
         
       const result = await supabase
@@ -397,10 +394,10 @@ export default function PaymentSuccess() {
         await updatePaymentProcessed(finalPaymentIntentId);
         dispatch(fetchPaymentStatus.fulfilled(paymentRecord, 'payment/fetchPaymentStatus', finalPaymentIntentId));
 
-        if (paymentRecord.metadata?.userId) {
-          const email = await fetchUserEmail(paymentRecord.metadata.userId);
+        if (paymentRecord.user_id) {
+          const email = await fetchUserEmail(paymentRecord.user_id);
           if (paymentRecord.metadata?.planId) {
-            await updateUserSubscription(paymentRecord.metadata.userId, paymentRecord.metadata.planId);
+            await updateUserSubscription(paymentRecord.user_id, paymentRecord.metadata.planId);
           }
           if (email) {
             await sendEmail(email, {
