@@ -42,6 +42,7 @@ import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import { fetchAgileRoleById, fetchAgileMembers } from '@/lib/redux/features/agileSlice';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { toast } from 'sonner';
 
 const SprintPlanning = ({ 
   teamId, 
@@ -60,7 +61,15 @@ const SprintPlanning = ({
     const team = useSelector(state => state.teams.teams.find(t => t.id.toString() === teamId?.toString()));
     const {user} = useGetUser();
     const isTeamCreator = user?.id && team?.created_by && user.id.toString() === team.created_by.toString();
-    
+    const project = useSelector(state => 
+      state.projects.projects.find(p => String(p.id) === String(projectId))
+    );
+    const [themeColor, setThemeColor] = useState('');
+    useEffect(() => {
+      if (project?.theme_color) {
+        setThemeColor(project.theme_color);
+      }
+    }, [project]);
   // 辅助函数 - 解析日期
   const parseDateSafely = (dateString) => {
     if (!dateString) return null;
@@ -163,7 +172,7 @@ const SprintPlanning = ({
     if (currentSprint.status === 'PENDING') {
       return (
         <Button 
-          variant="outline" //themeColor 
+          variant={themeColor} //themeColor 
           onClick={() => onCompleteSprint(currentSprint.id)}
         >
           <CheckCircle2 className="w-4 h-4 mr-2" />
@@ -175,7 +184,7 @@ const SprintPlanning = ({
     if (currentSprint.status === 'PLANNING') {
       return (
         <Button 
-          variant="default" 
+          variant={themeColor} 
           size="sm" 
           className="mr-2"
           onClick={() => onStartSprint(currentSprint.id)}
@@ -368,7 +377,7 @@ const SprintPlanning = ({
   };
 
   // 处理创建新冲刺
-  const handleCreateNewSprint = () => {
+  const handleCreateNewSprint = async () => {
     // 验证表单
     const errors = {};
     
@@ -432,7 +441,14 @@ const SprintPlanning = ({
     
     
     try {
-      const createdSprint = onCreateSprint(sprintData);
+      // 显示加载状态，使用唯一ID便于后续引用
+      const loadingToastId = toast.loading(t('creatingNewSprint'));
+      
+      // 等待创建冲刺的处理
+      const createdSprint = await onCreateSprint(sprintData);
+      
+      // 清除加载状态
+      toast.dismiss(loadingToastId);
       
       if (createdSprint) {
         setCreateDialogOpen(false);
@@ -440,15 +456,32 @@ const SprintPlanning = ({
         resetForm();
         
         // 显示成功消息
+        toast.success(t('createSprintSuccess'));
         
-        // 短暂延迟后刷新页面
-        setTimeout(() => {
-          window.location.reload();
-        }, 800);
+        // 通知父组件 TaskAgile 更新数据
+        if (typeof onUpdateMembers === 'function') {
+          onUpdateMembers();
+          
+          // 如果创建的冲刺有返回ID，则设置为当前选中的冲刺
+          if (createdSprint.id) {
+            // 立即选择新创建的冲刺并设置其类型为 PLANNING
+            setSelectedType('PLANNING');
+            setSelectedSprint({
+              ...createdSprint,
+              status: 'PLANNING' // 确保状态被强制设置为 PLANNING
+            });
+          }
+        }
+      } else {
+        // 创建失败但没有抛出异常的情况
+        toast.error(t('createSprintError'));
       }
     } catch (error) {
       console.error('创建冲刺失败:', error);
-      // 可以在这里添加错误处理，如显示错误消息
+      // 确保清除加载状态
+      toast.dismiss();
+      // 显示错误消息
+      toast.error(t('createSprintError'));
     }
   };
 
@@ -765,7 +798,7 @@ const SprintPlanning = ({
           >
             {t('cancel')}
           </Button>
-          <Button onClick={handleCreateNewSprint}>
+          <Button onClick={handleCreateNewSprint} variant={themeColor}>
             {t('create')}
           </Button>
         </DialogFooter>
@@ -938,7 +971,7 @@ const SprintPlanning = ({
         <div className="flex space-x-2">
           {selectedType === 'PLANNING' && !selectedSprint && isTeamCreator && (
             <Button 
-              variant="outline" 
+              variant={themeColor} 
               onClick={() => setCreateDialogOpen(true)}
             >
               <Plus className="w-4 h-4 mr-1" />
@@ -948,7 +981,7 @@ const SprintPlanning = ({
           {selectedSprint && (selectedSprint.status === 'PLANNING') && isTeamCreator && (
             <>
               <Button 
-                variant="outline" 
+                variant={themeColor} 
                 onClick={() => onStartSprint(selectedSprint.id)}
               >
                 <PlayCircle className="w-4 h-4 mr-1" />

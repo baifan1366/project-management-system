@@ -5,7 +5,22 @@ import { supabase } from '@/lib/supabase';
 export async function POST(request) {
   try {
     // 获取请求数据
-    const data = await request.json();
+    let data;
+    try {
+      data = await request.json();
+      
+    } catch (parseError) {
+      console.error('【API错误】解析请求JSON失败:', parseError);
+      return NextResponse.json({ 
+        error: '无效的请求格式，请确保发送正确的JSON数据' 
+      }, { status: 400 });
+    }
+    
+    // 验证数据是否存在
+    if (!data) {
+      console.error('【API错误】请求体为空');
+      return NextResponse.json({ error: '请求体不能为空' }, { status: 400 });
+    }
         
     // 验证数据
     if (!data.team_id) {
