@@ -25,9 +25,7 @@ import TaskOverview from '@/components/team/overview/TaskOverview';
 import TaskTimeline from '@/components/team/timeline/TaskTimeline';
 import TaskNotion from '@/components/team/notion/TaskNotion';
 import TaskCalendar from '@/components/team/calendar/TaskCalendar';
-//agile
 import TaskAgile from '@/components/team/agile/TaskAgile';
-//posts
 import TaskPosts from '@/components/team/posts/TaskPosts';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
@@ -125,9 +123,7 @@ const GanttSkeleton = () => (
 // Add another skeleton component
 const TaskTabSkeleton = () => (
   <div className="flex space-x-1 pb-4 overflow-x-auto">
-    {[1, 2, 3, 4, 5].map((i) => (
-      <Skeleton key={i} className="h-9 w-24 rounded-md" />
-    ))}
+    <Skeleton className="h-9 w-full rounded-md" />
   </div>
 );
 
@@ -616,7 +612,6 @@ const TeamCustomFieldPage = () => {
                 <Skeleton className="h-9 w-32" />
               </div>
               <div className="flex items-center gap-2">
-                <Skeleton className="h-9 w-20" />
                 <Skeleton className="h-9 w-20" />
                 <Skeleton className="h-9 w-20" />
               </div>

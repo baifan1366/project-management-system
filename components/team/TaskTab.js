@@ -71,6 +71,15 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
   const params = useParams();
   const { confirm } = useConfirm();
   const { user } = useGetUser();
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
+  const [themeColor, setThemeColor] = useState('');
+  useEffect(() => {
+    if (project?.theme_color) {
+      setThemeColor(project.theme_color);
+    }
+  }, [project]);
 
   // 从 URL 参数中获取当前的 teamCFId
   const currentTeamCFId = params?.teamCFId;
@@ -724,6 +733,7 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
             validateName={validateName}
             t={t}
             setIsOpen={setIsEditDialogOpen}
+            themeColor={themeColor}
           />
         </DialogContent>
       </Dialog>
@@ -732,7 +742,7 @@ export default function TaskTab({ onViewChange, teamId, projectId, handleRefresh
 }
 
 // 添加编辑视图名称表单组件
-function EditViewNameForm({ currentField, customFieldValues, onSave, validateName, t, setIsOpen }) {
+function EditViewNameForm({ currentField, customFieldValues, onSave, validateName, t, setIsOpen, themeColor }) {
   const [error, setError] = useState('');
   const [charCount, setCharCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -830,7 +840,7 @@ function EditViewNameForm({ currentField, customFieldValues, onSave, validateNam
           <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
             {t('cancel')}
           </Button>
-          <Button type="submit" disabled={isSubmitting || charCount === 0 || charCount > MAX_LENGTH}>
+          <Button type="submit" variant={themeColor} disabled={isSubmitting || charCount === 0 || charCount > MAX_LENGTH}>
             {isSubmitting ? t('saving') + '...' : t('save')}
           </Button>
         </DialogFooter>

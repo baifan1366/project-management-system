@@ -54,6 +54,7 @@ import { updateRole, deleteRole } from '@/lib/redux/features/agileSlice';
 import RoleForm from './RoleForm';
 import { fetchAgileRoles } from '@/lib/redux/features/agileSlice';
 import { createRole } from '@/lib/redux/features/agileSlice';
+import { useMemo } from 'react';
 
 // 角色职责简述（保留，因为这些通常是固定的业务规则）
 const ROLE_RESPONSIBILITIES = {
@@ -95,7 +96,7 @@ const ROLE_RESPONSIBILITIES = {
   ]
 };
 
-const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], onUpdateMembers }) => {
+const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], onUpdateMembers, themeColor }) => {
   const t = useTranslations('Agile');
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
@@ -110,8 +111,21 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
   const [error, setError] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const {user} = useGetUser();
+  const { teams } = useSelector(state => state.teams);
+  const { users } = useSelector(state => state.users);
+
   const userId = user?.id;
-  
+  // 检查当前用户是否是团队创建者
+  const isTeamCreator = useMemo(() => {
+    if (!user) return false;
+    
+    // 在teams中查找对应的团队
+    const team = teams?.find(t => t.id === Number(teamId));
+    if (!team) return false;
+    
+    // 判断当前用户是否是团队创建者
+    return team.created_by === user.id;
+  }, [user, teams, teamId]);
   // 从Redux获取团队信息
   const team = useSelector(state => {
     // 根据Redux状态结构，找到对应teamId的团队
@@ -157,7 +171,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
     return `${name} (1)`;
   };
 
-  // 获取团队成员
+  // 修改获取团队成员
   useEffect(() => {
     if (teamId) {
       setLoading(true);
@@ -175,6 +189,102 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         });
     }
   }, [teamId, agileId]);
+
+  // 获取成员信息 - 修正版，同时支持id和user_id
+  const getMemberInfo = (userId) => {
+    if (!userId) return null;
+    
+    // 检查是否为多个ID（逗号分隔）
+    if (typeof userId === 'string' && userId.includes(',')) {
+      // 对于多个ID，获取每个用户的信息并组合
+      const userIds = userId.split(',').filter(id => id.trim());
+      const usersList = userIds.map(id => {
+        // 为每个ID获取用户信息 - 优先从users中查找
+        const userInfo = users?.find(u => 
+          (u.id && u.id.toString() === id.trim()) || 
+          (u.user_id && u.user_id.toString() === id.trim())
+        ) || 
+        userCache[id.trim()] || 
+        agileMembers?.find(member => 
+          (member.user_id && member.user_id.toString() === id.trim()) || 
+          (member.id && member.id.toString() === id.trim())
+        );
+        
+        return userInfo || { id: id.trim(), name: 'Loading...' };
+      });
+      
+      return {
+        id: userId,
+        users: usersList,
+        isMultiple: true,
+        count: usersList.length
+      };
+    }
+    
+    // 将userId转换为字符串以确保一致性
+    const idStr = userId.toString();
+    
+    // 检查是否已经在Redux store中有此用户 - 优先从users中查找
+    const userFromStore = users?.find(user => 
+      (user.id && user.id.toString() === idStr) || 
+      (user.user_id && user.user_id.toString() === idStr)
+    );
+    
+    if (userFromStore) {
+      return userFromStore;
+    }
+    
+    // 检查是否在本地缓存中
+    if (userCache[idStr]) {
+      return userCache[idStr];
+    }
+    
+    // 如果都没有，从agileMembers尝试获取
+    const memberInfo = agileMembers?.find(member => 
+      (member.user_id && member.user_id.toString() === idStr) || 
+      (member.id && member.id.toString() === idStr)
+    );
+    
+    if (memberInfo) {
+      return memberInfo;
+    }
+    
+    // 返回一个简单对象，不在渲染期间调用setState
+    return { id: idStr, name: 'Loading...' };
+  };
+  
+  // 单独的函数用于请求用户数据，避免在渲染时调用 - 修正版
+  const fetchMemberInfo = (userId) => {
+    if (!userId) return;
+    
+    // 确保userId是字符串类型
+    const id = userId.toString();
+    
+    // 如果ID包含逗号，说明是多个ID，这里应处理为单个ID
+    if (id.includes(',')) {
+      // 拆分ID并分别获取
+      const ids = id.split(',');
+      ids.forEach(singleId => {
+        if (singleId && singleId.trim()) {
+          // 递归调用但传入单个ID
+          fetchMemberInfo(singleId.trim());
+        }
+      });
+      return;
+    }
+    
+    // 如果用户既不在Redux也不在缓存中，则通过API获取
+    if (!users?.find(user => 
+        (user.id && user.id.toString() === id) || 
+        (user.user_id && user.user_id.toString() === id)
+      ) && !userCache[id]) {
+      try {
+        dispatch(fetchUserById(id));
+      } catch (err) {
+        console.error(`获取用户信息失败: ${id}`, err);
+      }
+    }
+  };
 
   // 获取角色信息
   const getRoleInfo = (roleId) => {
@@ -287,20 +397,20 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
     
     // 验证角色名称
     if (!newRoleName || newRoleName.trim() === '') {
-      validationErrors.name = t('roleNameRequired') || '请输入角色名称';
+      validationErrors.name = t('roleNameRequired');
     } else if (newRoleName.trim().length < 2) {
-      validationErrors.name = t('roleNameMinLength') || '角色名称最少需要2个字符';
+      validationErrors.name = t('roleNameMinLength');
     } else if (newRoleName.trim().length > 50) {
-      validationErrors.name = t('roleNameMaxLength') || '角色名称最多允许50个字符';
+      validationErrors.name = t('roleNameMaxLength');
     }
     
     // 验证角色描述
     if (!newRoleDescription || newRoleDescription.trim() === '') {
-      validationErrors.description = t('roleDescriptionRequired') || '请输入角色描述';
+      validationErrors.description = t('roleDescriptionRequired');
     } else if (newRoleDescription.trim().length < 10) {
-      validationErrors.description = t('roleDescriptionMinLength') || '角色描述最少需要10个字符';
+      validationErrors.description = t('roleDescriptionMinLength');
     } else if (newRoleDescription.trim().length > 100) {
-      validationErrors.description = t('roleDescriptionMaxLength') || '角色描述最多允许100个字符';
+      validationErrors.description = t('roleDescriptionMaxLength');
     }
     
     // 如果有验证错误，显示错误并中断提交
@@ -313,8 +423,8 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
     
     try {
       if (!userId) {
-        console.error('创建角色失败: 用户ID未找到');
-        throw new Error('无法获取当前用户ID');
+        console.error(t('createRoleFailedNoUserId'));
+        throw new Error(t('noUserIdFound'));
       }
       
       setLoading(true); // 开始加载状态
@@ -326,14 +436,10 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         created_by: userId
       };
             
-      const response = await dispatch(createRole(roleData));
-      
-      if (!response.ok) throw new Error('创建角色失败');
-      
-      const newRoleData = await response.json();
+      const response = await dispatch(createRole(roleData)).unwrap();
       
       // 获取API返回的新角色数据
-      const newRole = newRoleData.data || newRoleData;
+      const newRole = response;
       
       // 将新创建的角色直接添加到本地角色列表，不等待父组件更新
       // 创建一个新的角色列表副本，包含新角色
@@ -343,9 +449,6 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         const roleExists = updatedRoles.some(role => role.id === newRole.id);
         if (!roleExists) {
           updatedRoles.push(newRole);
-          // 更新页面上显示的角色列表
-          // 注意：这不会更改父组件传入的props，但会在本地显示新角色
-          window.agileRoles = updatedRoles; // 在调试控制台中可见
         }
       }
       
@@ -356,39 +459,14 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
       toast.success(t('roleCreatedSuccess'));
       
       // 调用父组件的更新函数来重新加载敏捷角色信息
-      try {
-        if (typeof onUpdateMembers === 'function') {
-          onUpdateMembers();
-        } else {
-          console.warn('onUpdateMembers 不是一个有效的函数');
-        }
-        
-        // 无论如何，都确保页面刷新
-        
-        // 使用两种方式尝试刷新，增加成功率
-        setTimeout(() => {
-          try {
-            // 方法1：直接刷新
-            window.location.reload();
-            
-            // 方法2：如果直接刷新失败，尝试替代方式
-            setTimeout(() => {
-              window.location.href = window.location.href;
-            }, 200);
-          } catch (refreshError) {
-            console.error('刷新页面出错:', refreshError);
-            alert('请手动刷新页面以查看新创建的角色');
-          }
-        }, 800); // 延长延迟，确保API操作完成
-      } catch (updateError) {
-        console.error('更新操作失败:', updateError);
-        // 即使更新失败也尝试刷新
-        window.location.reload();
+      if (typeof onUpdateMembers === 'function') {
+        onUpdateMembers();
       }
       
     } catch (error) {
-      console.error('创建角色失败:', error);
+      console.error(t('createRoleFailed'), error);
       toast.error(t('roleCreationError'));
+    } finally {
       setLoading(false);
     }
   };
@@ -538,18 +616,18 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         <TableBody>
           {membersToRender.map((member) => {
             if (!member) {
-              console.error('Invalid member object (null)');
+              console.error(t('invalidMemberNull'));
               return null; // 跳过无效成员
             }
             
             // 检测成员对象格式并适配
             const memberId = member.id || member.user_id;
-            const memberName = member.name || '未知用户';
+            const memberName = member.name || t('unknownUser');
             const memberEmail = member.email || `ID: ${memberId}`;
             const memberAvatar = member.avatar || member.avatar_url;
             
             if (!memberId) {
-              console.error('Invalid member object (no id):', member);
+              console.error(t('invalidMemberNoId'), member);
               return null; // 跳过无效成员
             }
             
@@ -610,10 +688,10 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
                   <Button 
                     variant="ghost" 
                     size="sm"
+                    disabled={!isTeamCreator}
                     onClick={() => openAssignRoleDialog(member)}
                   >
                     <Pen className="w-4 h-4 mr-1" />
-                    {t('assign')}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -685,7 +763,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
           <Button variant="outline" onClick={() => setCreateRoleDialogOpen(false)} disabled={loading}>
             {t('cancel')}
           </Button>
-          <Button onClick={createNewRole} disabled={loading}>
+          <Button onClick={createNewRole} disabled={loading} variant={themeColor}>
             {loading ? t('creating') || '创建中...' : t('create')}
           </Button>
         </DialogFooter>
@@ -788,7 +866,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
           <Button variant="outline" onClick={() => setDialogOpen(false)}>
             {t('cancel')}
           </Button>
-          <Button onClick={assignRole}>
+          <Button onClick={assignRole} variant={themeColor}>
             {t('assign')}
           </Button>
         </DialogFooter>
@@ -801,31 +879,32 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
         <Card className="p-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-base font-medium ml-2">{t('roleAssignment')}</h3>
-            
-            <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setIsRoleInfoExpanded(!isRoleInfoExpanded)}
-              >
-                <Info className="w-4 h-4 mr-1" />
-                {t('roleInfo')}
-                {isRoleInfoExpanded ? (
-                  <ChevronUp className="ml-1 w-4 h-4" />
-                ) : (
-                  <ChevronDown className="ml-1 w-4 h-4" />
-                )}
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setCreateRoleDialogOpen(true)}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                {t('createRole')}
-              </Button>
-            </div>
+            {isTeamCreator && (
+              <div className="flex items-center space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setIsRoleInfoExpanded(!isRoleInfoExpanded)}
+                >
+                  <Info className="w-4 h-4 mr-1" />
+                  {t('roleInfo')}
+                  {isRoleInfoExpanded ? (
+                    <ChevronUp className="ml-1 w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="ml-1 w-4 h-4" />
+                  )}
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCreateRoleDialogOpen(true)}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  {t('createRole')}
+                </Button>
+              </div>
+            )}
           </div>
           
           {isRoleInfoExpanded && (

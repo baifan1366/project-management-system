@@ -5,6 +5,7 @@ import { createPost, updatePost, deletePost, fetchPostById, togglePostPin, addRe
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
+import { supabase } from '@/lib/supabase';
 
 export default function HandlePost({ teamId }) {
   const dispatch = useDispatch();
@@ -13,26 +14,27 @@ export default function HandlePost({ teamId }) {
   const user = useSelector(state => state.users.currentUser);
 
   // 创建新帖子
-  const CreatePost = useCallback(async ({ title, description, type, teamId }) => {
+  const CreatePost = async ({ title, description, type = 'post', teamId, attachments = [] }) => {
     try {
-      if (!user?.id) {
-        toast.error('用户未认证');
+      if (!title) {
+        toast.error(t('postTitleRequired'));
         return null;
       }
       
-      const newPost = {
+      // 从附件中提取ID数组
+      const attachmentIds = attachments.map(attachment => attachment.id);
+      
+      const postData = {
         title,
         description,
+        type,
         team_id: teamId,
-        type: type, // 包含帖子类型
-        created_by: user.id,
-        created_at: new Date().toISOString(), // 添加创建时间
+        created_by: user?.id,
         is_pinned: false,
-        reactions: {},
-        attachment_id: [] // 使用新的attachment_id字段
+        attachment_id: attachmentIds.length > 0 ? attachmentIds : null
       };
       
-      const result = await dispatch(createPost(newPost)).unwrap();
+      const result = await dispatch(createPost(postData)).unwrap();
       
       if (result) {
         toast.success(t('postCreated'));
@@ -42,11 +44,11 @@ export default function HandlePost({ teamId }) {
         return null;
       }
     } catch (error) {
-      console.error('创建帖子错误:', error);
+      console.error('Error creating post:', error);
       toast.error(t('createPostError'));
       return null;
     }
-  }, [dispatch, user]);
+  };
 
   // 更新现有帖子
   const UpdatePost = useCallback(async ({ postId, title, description }) => {

@@ -9,7 +9,7 @@ import AgileTools from './AgileTools';
 import { fetchTeamAgile, fetchAgileRoles, fetchAgileMembers } from '@/lib/redux/features/agileSlice';
 import { useDispatch, useSelector } from 'react-redux';
 
-const TaskAgile = ({ teamId }) => {
+const TaskAgile = ({ projectId, teamId }) => {
   const t = useTranslations('Agile');
   const [currentSprint, setCurrentSprint] = useState(null);
   // 添加请求跟踪
@@ -93,33 +93,57 @@ const TaskAgile = ({ teamId }) => {
   // 创建新的冲刺
   const handleCreateSprint = async (sprintData) => {
     try {
+      // 验证数据
+      if (!teamId || !sprintData.name || !sprintData.created_by && !user?.id) {
+        console.error('【创建冲刺】必要数据缺失:', { teamId, name: sprintData.name, created_by: sprintData.created_by || user?.id });
+        toast.error(t('createSprintError'));
+        return null;
+      }
+
+      // 准备请求数据
+      const requestData = { 
+        team_id: teamId,
+        name: sprintData.name,
+        start_date: sprintData.startDate,
+        duration: parseInt(sprintData.duration),
+        goal: sprintData.goal,
+        status: 'PLANNING',
+        task_ids: [],
+        created_by: sprintData.created_by || user.id
+      };
+
+      
+      
       // 实际应用中，这里应该调用API保存到数据库
       const response = await fetch('/api/teams/agile/sprint', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          team_id: teamId,
-          name: sprintData.name,
-          start_date: sprintData.startDate,
-          duration: parseInt(sprintData.duration),
-          goal: sprintData.goal,
-          status: 'PLANNING',
-          task_ids: [],
-          created_by: sprintData.created_by || user.id
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
         console.error('【创建冲刺】请求失败, status:', response.status);
+        const errorText = await response.text();
+        console.error('【创建冲刺】错误详情:', errorText);
         throw new Error('创建冲刺失败');
       }
       
       const newSprint = await response.json();
       
       // 重新加载团队敏捷数据
-      dispatch(fetchTeamAgile(teamId))
+      await dispatch(fetchTeamAgile(teamId)).unwrap();
+      
+      // 如果有新创建的冲刺，将其设为当前冲刺
+      if (newSprint && newSprint.id) {
+        // 确保设置正确的状态
+        const sprintWithCorrectStatus = {
+          ...newSprint,
+          status: 'PLANNING'
+        };
+        setCurrentSprint(sprintWithCorrectStatus);
+      }
       
       toast.success(t('createSprintSuccess'));
       return newSprint;
@@ -193,7 +217,12 @@ const TaskAgile = ({ teamId }) => {
     if (sprintId) {
       // 重置缓存状态，强制重新获取
       membersFetchedRef.current[sprintId] = false;
-      dispatch(fetchAgileMembers(sprintId))
+      dispatch(fetchAgileMembers(sprintId));
+    }
+    
+    // 无论是否提供了sprintId，都重新获取团队敏捷数据
+    if (teamId) {
+      dispatch(fetchTeamAgile(teamId));
     }
   };
 
@@ -222,6 +251,7 @@ const TaskAgile = ({ teamId }) => {
       ) : (
         <SprintPlanning 
           teamId={teamId}
+          projectId={projectId}
           sprints={teamAgile || []}
           currentSprint={currentSprint}
           agileRoles={agileRoles || []}

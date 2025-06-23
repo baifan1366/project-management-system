@@ -9,7 +9,9 @@ import { supabase } from '@/lib/supabase';
  */
 export async function GET(request, { params }) {
   try {
-    const { userId } = params;
+    // 确保params已经解析完成
+    const resolvedParams = await Promise.resolve(params);
+    const { userId } = resolvedParams;
     
     if (!userId) {
       return NextResponse.json({ 
@@ -18,6 +20,55 @@ export async function GET(request, { params }) {
       }, { status: 400 });
     }
 
+    // 检查是否有多个ID (使用逗号分隔)
+    if (userId.includes(',')) {
+      const userIds = userId.split(',');
+      let results = [];
+      
+      for (const id of userIds) {
+        if (!id.trim()) continue; // 跳过空ID
+        
+        try {
+          // 为每个ID单独调用查询
+          const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+          
+          let query = supabase
+            .from('user')
+            .select('id, name, avatar_url, email');
+          
+          if (isValidUUID) {
+            query = query.eq('id', id.trim());
+          } else {
+            query = query.ilike('name', id.trim());
+          }
+          
+          const { data, error } = await query.single();
+          
+          if (!error && data) {
+            results.push(data);
+          }
+        } catch (error) {
+          console.error(`Error fetching user with ID ${id}:`, error);
+          // 继续处理其他ID，不中断流程
+        }
+      }
+      
+      // 如果没有找到任何用户，返回404
+      if (results.length === 0) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'No users found' 
+        }, { status: 404 });
+      }
+      
+      // 返回找到的所有用户
+      return NextResponse.json({ 
+        success: true, 
+        data: results 
+      });
+    }
+
+    // 单个ID的处理逻辑保持不变
     // Check if userId is a valid UUID
     const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
     

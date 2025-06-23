@@ -32,7 +32,7 @@ import { format, parseISO } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Plus, MoveUp, MoveDown, CheckCircle2, ChevronDown, ChevronUp, PlayCircle, ListStartIcon, Trash2 } from 'lucide-react';
+import { CalendarIcon, Plus, MoveUp, MoveDown, CheckCircle2, ChevronDown, ChevronUp, PlayCircle, ListStartIcon, Trash2, AlertCircle } from 'lucide-react';
 import BodyContent from './BodyContent';
 import SprintBoard from './SprintBoard';
 import RoleAssignment from './RoleAssignment';
@@ -42,6 +42,7 @@ import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import { fetchAgileRoleById, fetchAgileMembers } from '@/lib/redux/features/agileSlice';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { toast } from 'sonner';
 
 const SprintPlanning = ({ 
   teamId, 
@@ -60,7 +61,67 @@ const SprintPlanning = ({
     const team = useSelector(state => state.teams.teams.find(t => t.id.toString() === teamId?.toString()));
     const {user} = useGetUser();
     const isTeamCreator = user?.id && team?.created_by && user.id.toString() === team.created_by.toString();
+    const project = useSelector(state => 
+      state.projects.projects.find(p => String(p.id) === String(projectId))
+    );
+    const [themeColor, setThemeColor] = useState('');
+    useEffect(() => {
+      if (project?.theme_color) {
+        setThemeColor(project.theme_color);
+      }
+    }, [project]);
+  
+  // 检查Sprint是否已过期
+  const isSprintOverdue = (sprint) => {
+    if (!sprint) return false;
     
+    try {
+      // 尝试从多种可能的属性中获取结束日期
+      const endDateValue = sprint.endDate || sprint.end_date;
+      
+      // 如果没有结束日期，则尝试从开始日期和持续时间计算
+      if (!endDateValue) {
+        const startDate = sprint.startDate || sprint.start_date;
+        const duration = sprint.duration;
+        
+        if (startDate && duration) {
+          // 计算结束日期
+          return calculateEndDate(startDate, duration) < new Date();
+        }
+        return false;
+      }
+      
+      // 解析结束日期
+      let endDate;
+      if (typeof endDateValue === 'string') {
+        if (endDateValue.includes(' ')) {
+          endDate = new Date(endDateValue.split(' ')[0]);
+        } else if (endDateValue.includes('T')) {
+          endDate = new Date(endDateValue.split('T')[0]);
+        } else {
+          endDate = new Date(endDateValue);
+        }
+      } else if (endDateValue instanceof Date) {
+        endDate = new Date(endDateValue);
+      } else {
+        return false;
+      }
+      
+      // 检查日期是否有效
+      if (isNaN(endDate.getTime())) return false;
+      
+      // 获取当前日期（只保留年月日）
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+            
+      // 如果结束日期在今天之前，则已过期
+      return endDate < today;
+    } catch (e) {
+      console.error('检查Sprint过期时出错:', e, sprint);
+      return false;
+    }
+  };
+  
   // 辅助函数 - 解析日期
   const parseDateSafely = (dateString) => {
     if (!dateString) return null;
@@ -163,7 +224,7 @@ const SprintPlanning = ({
     if (currentSprint.status === 'PENDING') {
       return (
         <Button 
-          variant="outline" //themeColor 
+          variant={themeColor} //themeColor 
           onClick={() => onCompleteSprint(currentSprint.id)}
         >
           <CheckCircle2 className="w-4 h-4 mr-2" />
@@ -175,7 +236,7 @@ const SprintPlanning = ({
     if (currentSprint.status === 'PLANNING') {
       return (
         <Button 
-          variant="default" 
+          variant={themeColor} 
           size="sm" 
           className="mr-2"
           onClick={() => onStartSprint(currentSprint.id)}
@@ -357,18 +418,22 @@ const SprintPlanning = ({
         return null;
       }
       
-      const durationInDays = parseInt(duration) * 7; // 将周转换为天数
+      // 将周转换为天数
+      const durationInDays = parseInt(duration) * 7;
       
-      dateObj.setDate(dateObj.getDate() + durationInDays);
-      return dateObj;
+      // 复制日期对象以避免修改原始对象
+      const endDate = new Date(dateObj.getTime());
+      endDate.setDate(endDate.getDate() + durationInDays - 1); // 减1是因为开始日期算作第一天
+            
+      return endDate;
     } catch (e) {
-      console.error('计算结束日期时出错:', e);
+      console.error('计算结束日期时出错:', e, startDate, duration);
       return null;
     }
   };
 
   // 处理创建新冲刺
-  const handleCreateNewSprint = () => {
+  const handleCreateNewSprint = async () => {
     // 验证表单
     const errors = {};
     
@@ -432,7 +497,14 @@ const SprintPlanning = ({
     
     
     try {
-      const createdSprint = onCreateSprint(sprintData);
+      // 显示加载状态，使用唯一ID便于后续引用
+      const loadingToastId = toast.loading(t('creatingNewSprint'));
+      
+      // 等待创建冲刺的处理
+      const createdSprint = await onCreateSprint(sprintData);
+      
+      // 清除加载状态
+      toast.dismiss(loadingToastId);
       
       if (createdSprint) {
         setCreateDialogOpen(false);
@@ -440,15 +512,32 @@ const SprintPlanning = ({
         resetForm();
         
         // 显示成功消息
+        toast.success(t('createSprintSuccess'));
         
-        // 短暂延迟后刷新页面
-        setTimeout(() => {
-          window.location.reload();
-        }, 800);
+        // 通知父组件 TaskAgile 更新数据
+        if (typeof onUpdateMembers === 'function') {
+          onUpdateMembers();
+          
+          // 如果创建的冲刺有返回ID，则设置为当前选中的冲刺
+          if (createdSprint.id) {
+            // 立即选择新创建的冲刺并设置其类型为 PLANNING
+            setSelectedType('PLANNING');
+            setSelectedSprint({
+              ...createdSprint,
+              status: 'PLANNING' // 确保状态被强制设置为 PLANNING
+            });
+          }
+        }
+      } else {
+        // 创建失败但没有抛出异常的情况
+        toast.error(t('createSprintError'));
       }
     } catch (error) {
       console.error('创建冲刺失败:', error);
-      // 可以在这里添加错误处理，如显示错误消息
+      // 确保清除加载状态
+      toast.dismiss();
+      // 显示错误消息
+      toast.error(t('createSprintError'));
     }
   };
 
@@ -765,7 +854,7 @@ const SprintPlanning = ({
           >
             {t('cancel')}
           </Button>
-          <Button onClick={handleCreateNewSprint}>
+          <Button onClick={handleCreateNewSprint} variant={themeColor}>
             {t('create')}
           </Button>
         </DialogFooter>
@@ -836,18 +925,20 @@ const SprintPlanning = ({
     } else if (selectedType === 'PENDING' || selectedType === 'PLANNING') {
       return (
         <>
-          {isTeamCreator && (
-            <RoleAssignment 
-              teamId={teamId}
-              agileId={selectedSprint.id}
-              agileRoles={Array.isArray(agileRoles) ? agileRoles : []}
-              agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
-              onUpdateMembers={handleUpdateMembers}
-            />
-          )}
+          <RoleAssignment 
+            teamId={teamId}
+            agileId={selectedSprint.id}
+            agileRoles={Array.isArray(agileRoles) ? agileRoles : []}
+            agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
+            onUpdateMembers={handleUpdateMembers}
+            themeColor={themeColor}
+          />
+          
           <SprintBoard 
             sprint={selectedSprint} 
             tasks={sprintTasks}
+            teamId={teamId}
+            themeColor={themeColor}
             agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
           />
         </>
@@ -938,7 +1029,7 @@ const SprintPlanning = ({
         <div className="flex space-x-2">
           {selectedType === 'PLANNING' && !selectedSprint && isTeamCreator && (
             <Button 
-              variant="outline" 
+              variant={themeColor} 
               onClick={() => setCreateDialogOpen(true)}
             >
               <Plus className="w-4 h-4 mr-1" />
@@ -948,7 +1039,7 @@ const SprintPlanning = ({
           {selectedSprint && (selectedSprint.status === 'PLANNING') && isTeamCreator && (
             <>
               <Button 
-                variant="outline" 
+                variant={themeColor} 
                 onClick={() => onStartSprint(selectedSprint.id)}
               >
                 <PlayCircle className="w-4 h-4 mr-1" />
@@ -978,7 +1069,14 @@ const SprintPlanning = ({
             </div>
 
             {selectedSprint && (selectedSprint.status === 'PENDING') && (
-              <div>
+              <div className="flex items-center">
+                {isSprintOverdue(selectedSprint) && (
+                  <div className="flex items-center text-red-500 mr-3" title={t('sprintOverdue')}>
+                    <AlertCircle className="w-5 h-5 mr-1" />
+                    <span className="text-sm">{t('overdue')}</span>
+                  </div>
+                )}
+                {isTeamCreator && (
                 <Button 
                   variant="outline" //themeColor 
                   onClick={() => onCompleteSprint(selectedSprint.id)}
@@ -986,6 +1084,7 @@ const SprintPlanning = ({
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   {t('completeSprint')}
                 </Button>
+                )}
               </div>
             )}
                 
