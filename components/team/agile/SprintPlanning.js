@@ -32,7 +32,7 @@ import { format, parseISO } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Plus, MoveUp, MoveDown, CheckCircle2, ChevronDown, ChevronUp, PlayCircle, ListStartIcon, Trash2 } from 'lucide-react';
+import { CalendarIcon, Plus, MoveUp, MoveDown, CheckCircle2, ChevronDown, ChevronUp, PlayCircle, ListStartIcon, Trash2, AlertCircle } from 'lucide-react';
 import BodyContent from './BodyContent';
 import SprintBoard from './SprintBoard';
 import RoleAssignment from './RoleAssignment';
@@ -70,6 +70,58 @@ const SprintPlanning = ({
         setThemeColor(project.theme_color);
       }
     }, [project]);
+  
+  // 检查Sprint是否已过期
+  const isSprintOverdue = (sprint) => {
+    if (!sprint) return false;
+    
+    try {
+      // 尝试从多种可能的属性中获取结束日期
+      const endDateValue = sprint.endDate || sprint.end_date;
+      
+      // 如果没有结束日期，则尝试从开始日期和持续时间计算
+      if (!endDateValue) {
+        const startDate = sprint.startDate || sprint.start_date;
+        const duration = sprint.duration;
+        
+        if (startDate && duration) {
+          // 计算结束日期
+          return calculateEndDate(startDate, duration) < new Date();
+        }
+        return false;
+      }
+      
+      // 解析结束日期
+      let endDate;
+      if (typeof endDateValue === 'string') {
+        if (endDateValue.includes(' ')) {
+          endDate = new Date(endDateValue.split(' ')[0]);
+        } else if (endDateValue.includes('T')) {
+          endDate = new Date(endDateValue.split('T')[0]);
+        } else {
+          endDate = new Date(endDateValue);
+        }
+      } else if (endDateValue instanceof Date) {
+        endDate = new Date(endDateValue);
+      } else {
+        return false;
+      }
+      
+      // 检查日期是否有效
+      if (isNaN(endDate.getTime())) return false;
+      
+      // 获取当前日期（只保留年月日）
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+            
+      // 如果结束日期在今天之前，则已过期
+      return endDate < today;
+    } catch (e) {
+      console.error('检查Sprint过期时出错:', e, sprint);
+      return false;
+    }
+  };
+  
   // 辅助函数 - 解析日期
   const parseDateSafely = (dateString) => {
     if (!dateString) return null;
@@ -366,12 +418,16 @@ const SprintPlanning = ({
         return null;
       }
       
-      const durationInDays = parseInt(duration) * 7; // 将周转换为天数
+      // 将周转换为天数
+      const durationInDays = parseInt(duration) * 7;
       
-      dateObj.setDate(dateObj.getDate() + durationInDays);
-      return dateObj;
+      // 复制日期对象以避免修改原始对象
+      const endDate = new Date(dateObj.getTime());
+      endDate.setDate(endDate.getDate() + durationInDays - 1); // 减1是因为开始日期算作第一天
+            
+      return endDate;
     } catch (e) {
-      console.error('计算结束日期时出错:', e);
+      console.error('计算结束日期时出错:', e, startDate, duration);
       return null;
     }
   };
@@ -869,18 +925,20 @@ const SprintPlanning = ({
     } else if (selectedType === 'PENDING' || selectedType === 'PLANNING') {
       return (
         <>
-          {isTeamCreator && (
-            <RoleAssignment 
-              teamId={teamId}
-              agileId={selectedSprint.id}
-              agileRoles={Array.isArray(agileRoles) ? agileRoles : []}
-              agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
-              onUpdateMembers={handleUpdateMembers}
-            />
-          )}
+          <RoleAssignment 
+            teamId={teamId}
+            agileId={selectedSprint.id}
+            agileRoles={Array.isArray(agileRoles) ? agileRoles : []}
+            agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
+            onUpdateMembers={handleUpdateMembers}
+            themeColor={themeColor}
+          />
+          
           <SprintBoard 
             sprint={selectedSprint} 
             tasks={sprintTasks}
+            teamId={teamId}
+            themeColor={themeColor}
             agileMembers={Array.isArray(agileMembers) ? agileMembers : []}
           />
         </>
@@ -1011,7 +1069,14 @@ const SprintPlanning = ({
             </div>
 
             {selectedSprint && (selectedSprint.status === 'PENDING') && (
-              <div>
+              <div className="flex items-center">
+                {isSprintOverdue(selectedSprint) && (
+                  <div className="flex items-center text-red-500 mr-3" title={t('sprintOverdue')}>
+                    <AlertCircle className="w-5 h-5 mr-1" />
+                    <span className="text-sm">{t('overdue')}</span>
+                  </div>
+                )}
+                {isTeamCreator && (
                 <Button 
                   variant="outline" //themeColor 
                   onClick={() => onCompleteSprint(selectedSprint.id)}
@@ -1019,6 +1084,7 @@ const SprintPlanning = ({
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   {t('completeSprint')}
                 </Button>
+                )}
               </div>
             )}
                 

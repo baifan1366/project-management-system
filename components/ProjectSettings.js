@@ -117,9 +117,6 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
         } catch (error) {
           console.error('删除项目失败:', error)
         } finally {
-          
-            userId, operation, metricToUpdate, currentValue, deltaValue, newValue
-          });
           setIsLoading(false)
         }
       }
