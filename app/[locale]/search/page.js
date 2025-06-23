@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import SearchInput from '@/components/search/SearchInput';
 import SearchResults from '@/components/search/SearchResults';
 import RecentSearches from '@/components/search/RecentSearches';
@@ -12,14 +13,18 @@ import { useGetUser } from '@/lib/hooks/useGetUser';
 import UserProfileDialog from '@/components/chat/UserProfileDialog';
 import { useConfirm } from '@/hooks/use-confirm';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useChat } from '@/contexts/ChatContext';
 
 export default function SearchPage() {
   const t = useTranslations();
   const chatT = useTranslations('Chat');
+  const locale = useLocale();
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get('q') || '';
+  
   const { user: currentUser, isLoading: userLoading } = useGetUser();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
@@ -33,8 +38,13 @@ export default function SearchPage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
 
-  // Load recent searches
+  // Load recent searches and execute initial search
   useEffect(() => {
+    // Execute search if there's an initial query from URL
+    if (initialQuery) {
+      handleSearch(initialQuery);
+    }
+    
     async function loadRecentSearches() {
       setLoadingHistory(true);
       try {

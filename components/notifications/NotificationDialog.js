@@ -31,7 +31,7 @@ import { zhCN, enUS } from 'date-fns/locale';
 import { Check, Trash, Bell, BellOff, Calendar, User, MessageSquare, Video } from 'lucide-react';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import NotificationItem from '@/components/notifications/NotificationItem';
+import NotificationItem, { NotificationItemSkeleton } from '@/components/notifications/NotificationItem';
 
 export function NotificationDialog({ open, onOpenChange, headerHandlesSubscription = false }) {
   const t = useTranslations();
@@ -246,6 +246,7 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
   );
 }
 
+// Enhanced NotificationList with skeleton loading state
 function NotificationList({ 
   notifications, 
   loading, 
@@ -257,9 +258,11 @@ function NotificationList({
 }) {
   if (loading) {
     return (
-      <div className="py-10 text-center">
-        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-        <p className="text-muted-foreground">{t('common.loading')}</p>
+      <div className="space-y-4 py-2">
+        {/* Show multiple skeletons with varying layouts */}
+        {Array.from({ length: 5 }, (_, i) => (
+          <NotificationItemSkeleton key={i} />
+        ))}
       </div>
     );
   }

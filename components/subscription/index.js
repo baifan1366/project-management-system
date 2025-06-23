@@ -16,9 +16,177 @@ import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPlans, selectAllPlans } from '@/lib/redux/features/planSlice';
 import useGetUser from '@/lib/hooks/useGetUser';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+
+// Reusable skeleton component for usage stats
+const UsageStatsSkeleton = () => (
+  <div className="p-6 border rounded-md space-y-6 border-border dark:border-border/40 bg-card dark:bg-card/90">
+    <div className="flex justify-between items-center">
+      <div>
+        <Skeleton className="h-6 w-48 mb-2" />
+        <Skeleton className="h-4 w-64" />
+      </div>
+      <Skeleton className="h-9 w-24 rounded-md" />
+    </div>
+    
+    <div className="space-y-6 pt-4">
+      {/* Project Usage Skeleton */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <Skeleton className="h-2.5 w-full rounded-full" />
+      </div>
+      
+      {/* Team Usage Skeleton */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-28" />
+        </div>
+        <Skeleton className="h-2.5 w-full rounded-full" />
+      </div>
+      
+      {/* Members Usage Skeleton */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-36" />
+        </div>
+        <Skeleton className="h-2.5 w-full rounded-full" />
+      </div>
+      
+      {/* AI Chat Credits Skeleton */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <Skeleton className="h-2.5 w-full rounded-full" />
+      </div>
+      
+      {/* AI Task Credits Skeleton */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <Skeleton className="h-2.5 w-full rounded-full" />
+      </div>
+      
+      {/* AI Workflow Credits Skeleton */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <Skeleton className="h-2.5 w-full rounded-full" />
+      </div>
+      
+      {/* Storage Usage Skeleton */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-36" />
+        </div>
+        <Skeleton className="h-2.5 w-full rounded-full" />
+      </div>
+    </div>
+  </div>
+);
+
+// Reusable skeleton component for plan cards
+const PlanCardsSkeleton = () => (
+  <div className="p-6 border rounded-md space-y-6 border-border dark:border-border/40 bg-card dark:bg-card/90">
+    <div>
+      <Skeleton className="h-6 w-48 mb-2" />
+      <Skeleton className="h-4 w-64" />
+    </div>
+    
+    {/* Billing interval toggle skeleton */}
+    <div className="flex justify-center mb-8">
+      <Skeleton className="h-10 w-48 rounded-md" />
+    </div>
+    
+    {/* Plan cards skeleton */}
+    <div className="grid md:grid-cols-2 gap-6">
+      {[1, 2].map((i) => (
+        <div key={i} className="border rounded-lg p-6 space-y-4 border-border dark:border-border/40 bg-background dark:bg-background/60">
+          <Skeleton className="h-7 w-32 mb-2" />
+          <div>
+            <Skeleton className="h-8 w-24 inline-block" />
+            <Skeleton className="h-4 w-24 inline-block ml-2" />
+          </div>
+          
+          <div className="space-y-3 py-4">
+            <div className="flex items-start gap-2">
+              <Skeleton className="h-5 w-5 rounded-full flex-shrink-0" />
+              <Skeleton className="h-5 w-full" />
+            </div>
+            <div className="flex items-start gap-2">
+              <Skeleton className="h-5 w-5 rounded-full flex-shrink-0" />
+              <Skeleton className="h-5 w-3/4" />
+            </div>
+            <div className="flex items-start gap-2">
+              <Skeleton className="h-5 w-5 rounded-full flex-shrink-0" />
+              <Skeleton className="h-5 w-5/6" />
+            </div>
+          </div>
+          
+          <Skeleton className="h-10 w-full rounded-md mt-4" />
+        </div>
+      ))}
+    </div>
+    
+    <div className="text-center pt-6 border-t mt-8 border-border dark:border-border/40">
+      <Skeleton className="h-4 w-64 mx-auto mb-3" />
+      <Skeleton className="h-9 w-40 mx-auto rounded-md" />
+    </div>
+  </div>
+);
+
+// Reusable skeleton for payment history
+const PaymentHistorySkeleton = () => (
+  <div className="space-y-4">
+    <div className="flex justify-between items-center mb-4">
+      <div>
+        <Skeleton className="h-6 w-40 mb-2" />
+        <Skeleton className="h-4 w-60" />
+      </div>
+      <Skeleton className="h-9 w-24 rounded-md" />
+    </div>
+    
+    <div className="border rounded-md border-border dark:border-border/40 overflow-hidden">
+      <div className="p-4 border-b border-border dark:border-border/40 bg-muted/40 dark:bg-muted/20">
+        <div className="flex gap-4">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+      </div>
+      
+      <div className="divide-y divide-border dark:divide-border/40">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="flex items-center justify-between p-4">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-5 w-20" />
+            <div className="flex items-center space-x-1">
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="h-5 w-16" />
+            <Skeleton className="h-8 w-32 rounded-md" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
 // Export the SubscriptionCard component that uses our actual components
 export const SubscriptionCard = () => {
@@ -39,67 +207,223 @@ export const SubscriptionCard = () => {
   );
 };
 
-// 空组件
 export const UsageStats = () => {
   const t = useTranslations('profile');
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [usageData, setUsageData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { user } = useGetUser();
+  
+  const fetchUsageStats = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Get the user's active subscription plan
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('user_subscription_plan')
+        .select(`
+          id,
+          plan_id,
+          current_projects,
+          current_teams,
+          current_members,
+          current_ai_chat,
+          current_ai_task,
+          current_ai_workflow,
+          current_storage,
+          subscription_plan (
+            max_projects,
+            max_teams,
+            max_members,
+            max_ai_chat,
+            max_ai_task,
+            max_ai_workflow,
+            max_storage
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'ACTIVE')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (subscriptionError) {
+        throw subscriptionError;
+      }
+      
+      if (!subscriptionData) {
+        throw new Error('No active subscription found');
+      }
+      
+      // Calculate percentages and format the data
+      const stats = {
+        projects: {
+          current: subscriptionData.current_projects || 0,
+          limit: subscriptionData.subscription_plan.max_projects,
+          percentage: calculatePercentage(
+            subscriptionData.current_projects || 0,
+            subscriptionData.subscription_plan.max_projects
+          )
+        },
+        teams: {
+          current: subscriptionData.current_teams || 0,
+          limit: subscriptionData.subscription_plan.max_teams,
+          percentage: calculatePercentage(
+            subscriptionData.current_teams || 0,
+            subscriptionData.subscription_plan.max_teams
+          )
+        },
+        members: {
+          current: subscriptionData.current_members || 0,
+          limit: subscriptionData.subscription_plan.max_members,
+          percentage: calculatePercentage(
+            subscriptionData.current_members || 0,
+            subscriptionData.subscription_plan.max_members
+          )
+        },
+        aiChat: {
+          current: subscriptionData.current_ai_chat || 0,
+          limit: subscriptionData.subscription_plan.max_ai_chat,
+          percentage: calculatePercentage(
+            subscriptionData.current_ai_chat || 0,
+            subscriptionData.subscription_plan.max_ai_chat
+          )
+        },
+        aiTask: {
+          current: subscriptionData.current_ai_task || 0,
+          limit: subscriptionData.subscription_plan.max_ai_task,
+          percentage: calculatePercentage(
+            subscriptionData.current_ai_task || 0,
+            subscriptionData.subscription_plan.max_ai_task
+          )
+        },
+        aiWorkflow: {
+          current: subscriptionData.current_ai_workflow || 0,
+          limit: subscriptionData.subscription_plan.max_ai_workflow,
+          percentage: calculatePercentage(
+            subscriptionData.current_ai_workflow || 0,
+            subscriptionData.subscription_plan.max_ai_workflow
+          )
+        },
+        storage: {
+          current: subscriptionData.current_storage || 0,
+          limit: subscriptionData.subscription_plan.max_storage,
+          percentage: calculatePercentage(
+            subscriptionData.current_storage || 0,
+            subscriptionData.subscription_plan.max_storage
+          ),
+          unit: 'GB'
+        }
+      };
+      
+      setUsageData(stats);
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('Error fetching usage stats:', err);
+      setError(err.message);
+      toast.error(t('subscription.usageStats.fetchError'), {
+        description: err.message
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Calculate percentage helper function
+  const calculatePercentage = (current, limit) => {
+    if (!limit || limit === 0) return 0;
+    return Math.round((current / limit) * 100);
+  };
+  
+  // Fetch stats when component mounts or user changes
+  useEffect(() => {
+    if (user?.id) {
+      fetchUsageStats();
+    }
+  }, [user?.id]);
   
   const refreshStats = () => {
-    toast.loading(t('refreshingStats'));
-    
-    // 模拟API调用
-    setTimeout(() => {
-      setLastUpdated(new Date());
+    const toastId = toast.loading(t('refreshingStats'));
+    fetchUsageStats().then(() => {
+      toast.dismiss(toastId);
       toast.success(t('statsRefreshed'));
-    }, 1500);
+    }).catch((error) => {
+      toast.dismiss(toastId);
+      toast.error(t('subscription.usageStats.fetchError'), {
+        description: error.message
+      });
+    });
   };
   
-  // Mock data for usage statistics
-  const usageData = {
-    users: { current: 5, limit: 10, percentage: 50 },
-    projects: { current: 8, limit: 15, percentage: 53 },
-    teams: { current: 3, limit: 5, percentage: 60 },
-    storage: { current: 2.5, limit: 10, percentage: 25, unit: 'GB' },
-    aiCredits: { current: 500, limit: 1000, percentage: 50 }
-  };
-
   const formatLastUpdated = (date) => {
     return date.toLocaleString();
   };
   
+  if (isLoading) {
+    return <UsageStatsSkeleton />;
+  }
+  
+  if (error) {
+    return (
+      <div className="p-6 border rounded-md space-y-6 border-border dark:border-border/40 bg-card dark:bg-card/90">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-medium">{t('subscription.usageStats.title')}</h3>
+            <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+          </div>
+          <Button variant="outline" onClick={fetchUsageStats} size="sm">
+            {t('subscription.usageStats.retry')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  
   return (
-    <div className="p-6 border rounded-md space-y-6">
+    <div className="p-6 border rounded-md space-y-6 border-border dark:border-border/40 bg-card dark:bg-card/90">
       <div className="flex justify-between items-center">
         <div>
-      <h3 className="text-lg font-medium">{t('subscription.usageStats.title')}</h3>
-          <p className="text-sm text-gray-500">{t('subscription.usageStats.lastUpdated')}: {formatLastUpdated(lastUpdated)}</p>
+          <h3 className="text-lg font-medium">{t('subscription.usageStats.title')}</h3>
+          <p className="text-sm text-muted-foreground">{t('subscription.usageStats.lastUpdated')}: {formatLastUpdated(lastUpdated)}</p>
         </div>
         <Button variant="outline" onClick={refreshStats} size="sm">
+          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           {t('subscription.usageStats.refresh')}
-      </Button>
+        </Button>
       </div>
       
-      <div className="space-y-4">
-        {Object.entries(usageData).map(([key, data]) => (
-          <div key={key} className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium">{t(`subscription.usageStats.${key}`)}</span>
-              <span>
-                {data.current}{data.unit || ''} / {data.limit}{data.unit || ''} ({data.percentage}%)
-              </span>
+      {usageData && (
+        <div className="space-y-4">
+          {Object.entries(usageData).map(([key, data]) => (
+            <div key={key} className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">{t(`subscription.usageStats.${key}`)}</span>
+                <span>
+                  {data.current}{data.unit || ''} / {data.limit}{data.unit || ''} ({data.percentage}%)
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                <div 
+                  className={`h-2.5 rounded-full ${
+                    data.percentage > 80 
+                      ? 'bg-red-500 dark:bg-red-600' 
+                      : data.percentage > 60 
+                        ? 'bg-yellow-500 dark:bg-yellow-600' 
+                        : 'bg-green-500 dark:bg-emerald-600'
+                  }`} 
+                  style={{ width: `${data.percentage}%` }}
+                ></div>
+              </div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div 
-                className={`h-2.5 rounded-full ${
-                  data.percentage > 80 ? 'bg-red-500' : 
-                  data.percentage > 60 ? 'bg-yellow-500' : 'bg-green-500'
-                }`} 
-                style={{ width: `${data.percentage}%` }}
-              ></div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -115,6 +439,7 @@ export const PaymentHistory = () => {
   }, []);
   
   const fetchPaymentHistory = async () => {
+    const toastId = toast.loading(t('subscription.paymentHistory.loading'));
     try {
       setIsLoading(true);
       setError(null);
@@ -129,19 +454,26 @@ export const PaymentHistory = () => {
       }
       
       setPayments(data || []);
+      toast.dismiss(toastId);
+      toast.success(t('subscription.paymentHistory.loaded'));
     } catch (err) {
       console.error('Error fetching payment history:', err);
       setError(err.message);
+      toast.dismiss(toastId);
+      toast.error(t('subscription.paymentHistory.error'), {
+        description: err.message
+      });
     } finally {
       setIsLoading(false);
     }
   };
   
   const downloadInvoice = (id) => {
-    toast.loading(t('preparingInvoice'));
+    const toastId = toast.loading(t('preparingInvoice'));
     
     // In a real implementation, this would call an API to generate an invoice
     setTimeout(() => {
+      toast.dismiss(toastId);
       toast.success(t('invoiceReady'));
     }, 1500);
   };
@@ -160,13 +492,13 @@ export const PaymentHistory = () => {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'COMPLETED':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+        return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
       case 'PENDING':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
+        return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800';
       case 'FAILED':
-        return 'bg-rose-100 text-rose-800 border-rose-200';
+        return 'bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800';
       default:
-        return 'bg-slate-100 text-slate-800 border-slate-200';
+        return 'bg-slate-100 dark:bg-slate-800/60 text-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700';
     }
   };
   
@@ -190,13 +522,13 @@ export const PaymentHistory = () => {
       </div>
       
       {error && (
-        <div className="p-4 bg-destructive/10 text-destructive rounded-md">
+        <div className="p-4 bg-destructive/10 dark:bg-destructive/20 text-destructive dark:text-destructive/90 rounded-md">
           <p>{t('common.error')}: {error}</p>
           <Button 
             variant="link" 
             size="sm" 
             onClick={fetchPaymentHistory}
-            className="mt-2 text-destructive"
+            className="mt-2 text-destructive dark:text-destructive/90"
           >
             {t('common.retry')}
           </Button>
@@ -204,18 +536,13 @@ export const PaymentHistory = () => {
       )}
       
       {isLoading ? (
-        <div className="py-10 text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
-            <span className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">{t('subscription.paymentHistory.loadingPayments')}</p>
-        </div>
+        <PaymentHistorySkeleton />
       ) : payments.length > 0 ? (
-        <div className="border rounded-md">
+        <div className="border rounded-md border-border dark:border-border/40">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40">
+                <tr className="border-b bg-muted/40 dark:bg-muted/20">
                   <th className="px-4 py-3 text-left font-medium">{t('subscription.paymentHistory.date')}</th>
                   <th className="px-4 py-3 text-left font-medium">{t('subscription.paymentHistory.amount')}</th>
                   <th className="px-4 py-3 text-left font-medium">{t('subscription.paymentHistory.status')}</th>
@@ -223,9 +550,9 @@ export const PaymentHistory = () => {
                   <th className="px-4 py-3 text-left font-medium">{t('subscription.paymentHistory.invoice')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border dark:divide-border/40">
                 {payments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-muted/50">
+                  <tr key={payment.id} className="hover:bg-muted/50 dark:hover:bg-muted/10">
                     <td className="px-4 py-3 whitespace-nowrap">{formatDate(payment.created_at)}</td>
                     <td className="px-4 py-3">
                       <div>{formatCurrency(payment.amount, payment.currency)}</div>
@@ -249,7 +576,7 @@ export const PaymentHistory = () => {
                           variant="ghost" 
                           size="sm" 
                           onClick={() => downloadInvoice(payment.id)}
-                          className="text-primary hover:text-primary"
+                          className="text-primary hover:text-primary dark:text-primary/80 dark:hover:text-primary"
                         >
                           <Download className="h-4 w-4 mr-1" />
                           {t('subscription.paymentHistory.downloadInvoice')}
@@ -263,7 +590,7 @@ export const PaymentHistory = () => {
           </div>
         </div>
       ) : (
-        <div className="py-12 text-center text-muted-foreground border rounded-md">
+        <div className="py-12 text-center text-muted-foreground border rounded-md border-border dark:border-border/40 bg-card/50 dark:bg-card/20">
           <Receipt className="h-12 w-12 mx-auto mb-3 text-muted-foreground/60" />
           <p>{t('subscription.paymentHistory.noHistory')}</p>
         </div>
@@ -288,11 +615,14 @@ export const UpgradeOptions = () => {
   useEffect(() => {
     async function loadPlans() {
       setLoading(true);
+      const toastId = toast.loading(t('subscription.upgradeOptions.loading'));
       try {
         await dispatch(fetchPlans()).unwrap();
         await fetchCurrentPlan();
+        toast.dismiss(toastId);
       } catch (error) {
-        toast.error('Failed to load plans', {
+        toast.dismiss(toastId);
+        toast.error(t('subscription.upgradeOptions.loadError') || 'Failed to load plans', {
           description: error.message || 'Please try again later'
         });
       } finally {
@@ -369,13 +699,14 @@ export const UpgradeOptions = () => {
   
   const handleUpgrade = async (planId) => {
     if (!user?.id) {
-      toast.error('Authentication required', {
-        description: 'Please login to upgrade your plan'
+      toast.error(t('subscription.auth.required') || 'Authentication required', {
+        description: t('subscription.auth.loginRequired') || 'Please login to upgrade your plan'
       });
       return;
     }
     
     setUpgrading(true);
+    const toastId = toast.loading(t('subscription.upgradeOptions.processing') || 'Processing upgrade request');
     try {
       // First get default payment method if available
       let paymentMethodId = null;
@@ -409,10 +740,12 @@ export const UpgradeOptions = () => {
         throw new Error(data.error || 'Failed to start upgrade process');
       }
       
+      toast.dismiss(toastId);
+      
       // If we have a checkout URL, redirect to it
       if (data.url) {
-        toast.success('Redirecting to checkout', {
-          description: 'You will be redirected to complete your upgrade.'
+        toast.success(t('subscription.upgradeOptions.redirecting') || 'Redirecting to checkout', {
+          description: t('subscription.upgradeOptions.redirectDesc') || 'You will be redirected to complete your upgrade.'
         });
         
         // Short delay before redirect
@@ -427,8 +760,9 @@ export const UpgradeOptions = () => {
       router.push(`/payment?plan_id=${planId}`);
     } catch (error) {
       console.error('Upgrade error:', error);
-      toast.error('Failed to start upgrade process', {
-        description: error.message || 'Please try again later'
+      toast.dismiss(toastId);
+      toast.error(t('subscription.upgradeOptions.error') || 'Failed to start upgrade process', {
+        description: error.message || t('subscription.common.tryAgain') || 'Please try again later'
       });
     } finally {
       setUpgrading(false);
@@ -454,30 +788,24 @@ export const UpgradeOptions = () => {
   };
   
   if (loading) {
-    return (
-      <div className="p-6 border rounded-md">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    );
+    return <PlanCardsSkeleton />;
   }
   
   return (
-    <div className="p-6 border rounded-md space-y-6">
+    <div className="p-6 border rounded-md space-y-6 border-border dark:border-border/40 bg-card dark:bg-card/90">
       <div>
         <h3 className="text-lg font-medium">{t('subscription.upgradeOptions.title')}</h3>
-        <p className="text-sm text-gray-500">{t('subscription.upgradeOptions.description')}</p>
+        <p className="text-sm text-muted-foreground">{t('subscription.upgradeOptions.description')}</p>
       </div>
       
       {/* Billing interval toggle */}
       <div className="flex justify-center mb-8">
-        <div className="inline-flex rounded-md shadow-sm bg-muted p-1">
+        <div className="inline-flex rounded-md shadow-sm bg-muted/80 dark:bg-muted/20 p-1 border border-border/50 dark:border-border/20">
           <button
             className={`px-4 py-2 text-sm rounded-md transition-all ${
               selectedInterval === 'monthly' 
-                ? 'bg-white shadow text-primary' 
-                : 'hover:bg-muted/80'
+                ? 'bg-background dark:bg-gray-800 shadow-sm text-primary dark:text-primary/90' 
+                : 'hover:bg-muted/80 dark:hover:bg-muted/50'
             }`}
             onClick={() => setSelectedInterval('monthly')}
           >
@@ -486,12 +814,12 @@ export const UpgradeOptions = () => {
           <button
             className={`px-4 py-2 text-sm rounded-md transition-all ${
               selectedInterval === 'yearly' 
-                ? 'bg-white shadow text-primary' 
-                : 'hover:bg-muted/80'
+                ? 'bg-background dark:bg-gray-800 shadow-sm text-primary dark:text-primary/90' 
+                : 'hover:bg-muted/80 dark:hover:bg-muted/50'
             }`}
             onClick={() => setSelectedInterval('yearly')}
           >
-            Annual <span className="text-xs text-emerald-600">Save 20%</span>
+            Annual <span className="ml-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">Save 20%</span>
           </button>
         </div>
       </div>
@@ -503,12 +831,12 @@ export const UpgradeOptions = () => {
               key={plan.id} 
               className={`border rounded-lg p-6 relative ${
                 plan.type === 'ENTERPRISE' 
-                  ? 'border-indigo-500 ring-1 ring-indigo-500' 
-                  : 'border-gray-200'
+                  ? 'border-indigo-500 dark:border-indigo-500/70 ring-1 ring-indigo-500 dark:ring-indigo-500/70 bg-background dark:bg-background/60' 
+                  : 'border-border dark:border-border/40 bg-background dark:bg-background/60'
               }`}
             >
               {plan.type === 'ENTERPRISE' && (
-                <div className="absolute top-2 right-2 bg-indigo-100 text-indigo-800 text-xs font-semibold py-1 px-2 rounded-full">
+                <div className="absolute top-2 right-2 bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 text-xs font-semibold py-1 px-2 rounded-full">
                   Best Value
                 </div>
               )}
@@ -524,7 +852,7 @@ export const UpgradeOptions = () => {
               <ul className="mt-6 space-y-3">
                 {(plan.features ? Object.values(plan.features) : []).map((feature, idx) => (
                   <li key={idx} className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                    <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 flex-shrink-0" />
                     <span>{feature}</span>
                   </li>
                 ))}
@@ -554,15 +882,15 @@ export const UpgradeOptions = () => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-8 border rounded-md bg-muted/20">
-          <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-500" />
+        <div className="text-center py-8 border rounded-md bg-muted/20 dark:bg-muted/10 border-border dark:border-border/40">
+          <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-500 dark:text-green-400" />
           <h4 className="text-xl font-medium">You're on the highest plan</h4>
           <p className="text-muted-foreground mt-2">You're already enjoying all available features.</p>
         </div>
       )}
       
-      <div className="text-center pt-6 border-t mt-8">
-        <p className="text-sm text-gray-500 mb-3">
+      <div className="text-center pt-6 border-t mt-8 border-border dark:border-border/40">
+        <p className="text-sm text-muted-foreground mb-3">
           Need a custom solution for your large team?
         </p>
         <Button variant="outline" onClick={contactSales}>

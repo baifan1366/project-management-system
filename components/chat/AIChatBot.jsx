@@ -13,6 +13,7 @@ import useGetUser from '@/lib/hooks/useGetUser';
 import { toast } from 'sonner';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import ChatSearch from '@/components/chat/ChatSearch';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // 移除原SVG组件，改用Image组件
 const PenguinIcon = () => (
@@ -24,6 +25,53 @@ const PenguinIcon = () => (
       style={{ objectFit: 'cover' }}
       priority
     />
+  </div>
+);
+
+// AI Chat Skeleton Loading Component
+const AIChatSkeleton = () => (
+  <div className="flex flex-col space-y-6 animate-pulse">
+    {/* Initial greeting message skeleton */}
+    <div className="flex items-start gap-2 max-w-2xl">
+      <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-16 w-80 rounded-md" />
+        <Skeleton className="h-12 w-60 rounded-md" />
+      </div>
+    </div>
+
+    {/* User message skeleton */}
+    <div className="flex items-start gap-2 max-w-2xl ml-auto flex-row-reverse">
+      <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
+      <Skeleton className="h-12 w-64 rounded-md" />
+    </div>
+
+    {/* Assistant response skeleton */}
+    <div className="flex items-start gap-2 max-w-2xl">
+      <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-10 w-72 rounded-md" />
+        <Skeleton className="h-16 w-80 rounded-md" />
+        <Skeleton className="h-10 w-48 rounded-md" />
+      </div>
+    </div>
+
+    {/* User follow-up question skeleton */}
+    <div className="flex items-start gap-2 max-w-2xl ml-auto flex-row-reverse">
+      <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
+      <Skeleton className="h-8 w-40 rounded-md" />
+    </div>
+
+    {/* Loading indicator */}
+    <div className="flex items-start gap-2 max-w-2xl">
+      <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
+      <div className="flex items-center gap-2 mt-2">
+        <Skeleton className="h-4 w-4 rounded-full" />
+        <Skeleton className="h-4 w-24" />
+      </div>
+    </div>
   </div>
 );
 
@@ -395,97 +443,113 @@ export default function AIChatBot() {
       {/* 聊天内容区域 */}
       <div className="flex-1 overflow-hidden relative">
         <div className="absolute inset-0 overflow-y-auto p-4" ref={chatContainerRef}>
-          <div className="flex flex-col space-y-4 min-h-full">
-            {messages.length === 0 && !loading ? (
-              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-                <div className="relative text-blue-600 mb-2 w-16 h-16">
-                  <Image 
-                    src={PengyImage} 
-                    alt="Project Manager Penguin"
-                    width={64}
-                    height={64}
-                    style={{ objectFit: 'contain' }}
-                    className="rounded-lg"
-                    priority
-                  />
-                </div>
-                <p className="text-lg font-medium mb-2">{t('welcomeTitle')}</p>
-                <p className="text-sm">{t('welcomeMessage')}</p>
-              </div>
-            ) : (
-              <div className="flex flex-col space-y-4">
-                {messages.map((msg, index) => (
-                  <ChatMessage 
-                    key={index}
-                    message={msg}
-                    currentUser={currentUser}
-                    t={t}
-                    PenguinIcon={PenguinIcon}
-                    hourFormat={hourFormat}
-                    adjustTimeByOffset={adjustTimeByOffset}
-                  />
-                ))}
-                
-                {/* 将loading状态指示器移除，因为现在使用isStreaming标记在每条消息内部显示 */}
-                {loading && !messages.some(msg => msg.isStreaming) && (
-                  <div className="flex items-start gap-2 max-w-2xl">
-                    <div className="w-8 h-8 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center text-white font-medium flex-shrink-0">
-                      <PenguinIcon />
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />
-                      <span className="text-sm text-muted-foreground dark:text-gray-400">{t('thinking')}</span>
-                    </div>
+          {isInitialLoad ? (
+            // Show skeleton while initially loading
+            <AIChatSkeleton />
+          ) : (
+            <div className="flex flex-col space-y-4 min-h-full">
+              {messages.length === 0 && !loading ? (
+                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                  <div className="relative text-blue-600 mb-2 w-16 h-16">
+                    <Image 
+                      src={PengyImage} 
+                      alt="Project Manager Penguin"
+                      width={64}
+                      height={64}
+                      style={{ objectFit: 'contain' }}
+                      className="rounded-lg"
+                      priority
+                    />
                   </div>
-                )}
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+                  <p className="text-lg font-medium mb-2">{t('welcomeTitle')}</p>
+                  <p className="text-sm">{t('welcomeMessage')}</p>
+                </div>
+              ) : (
+                <div className="flex flex-col space-y-4">
+                  {messages.map((msg, index) => (
+                    <ChatMessage 
+                      key={index}
+                      message={msg}
+                      currentUser={currentUser}
+                      t={t}
+                      PenguinIcon={PenguinIcon}
+                      hourFormat={hourFormat}
+                      adjustTimeByOffset={adjustTimeByOffset}
+                    />
+                  ))}
+                  
+                  {/* 将loading状态指示器移除，因为现在使用isStreaming标记在每条消息内部显示 */}
+                  {loading && !messages.some(msg => msg.isStreaming) && (
+                    <div className="flex items-start gap-2 max-w-2xl">
+                      <div className="w-8 h-8 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center text-white font-medium flex-shrink-0">
+                        <PenguinIcon />
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />
+                        <span className="text-sm text-muted-foreground dark:text-gray-400">{t('thinking')}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
       </div>
 
       {/* 输入区域 */}
       <div className="p-4 border-t">
-        <form onSubmit={handleSubmit} className="flex items-end gap-2">
-          <div className="flex-1 bg-accent rounded-lg">
-            <div className="px-3 pb-2 pt-2 relative">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit(e);
-                  }
-                }}
-                placeholder={t('inputPlaceholder')}
-                className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm py-2 max-h-32"
-                rows={1}
-                disabled={loading}
-              />
-              
-              {/* 字符计数器已移至表单下方 */}
+        {isInitialLoad ? (
+          <div className="flex items-end gap-2 animate-pulse">
+            <div className="flex-1 bg-accent rounded-lg p-3">
+              <Skeleton className="h-8 w-full rounded-md" />
+            </div>
+            <div>
+              <Skeleton className="w-10 h-10 rounded-lg" />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button 
-              type="submit" 
-              className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-              disabled={!input.trim() || loading || input.length > 1000}
-              title={input.length > 1000 ? t('errors.messageTooLong') || '消息过长（最多1000个字符）' : t('send')}
-            >
-              {loading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Send className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex items-end gap-2">
+            <div className="flex-1 bg-accent rounded-lg">
+              <div className="px-3 pb-2 pt-2 relative">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
+                  placeholder={t('inputPlaceholder')}
+                  className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm py-2 max-h-32"
+                  rows={1}
+                  disabled={loading}
+                />
+                
+                {/* 字符计数器已移至表单下方 */}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                type="submit" 
+                className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                disabled={!input.trim() || loading || input.length > 1000}
+                title={input.length > 1000 ? t('errors.messageTooLong') || '消息过长（最多1000个字符）' : t('send')}
+              >
+                {loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          </form>
+        )}
         
         {/* 字符计数器 - 当接近限制时显示 */}
-        {input.length > 700 && (
+        {!isInitialLoad && input.length > 700 && (
           <div className={`text-xs text-right mt-1 mr-2 ${
             input.length > 1000 ? 'text-destructive font-medium' : 'text-muted-foreground'
           }`}>

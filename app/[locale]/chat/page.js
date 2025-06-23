@@ -57,10 +57,29 @@ const MessageSkeleton = ({ isOwnMessage = false }) => (
         <Skeleton className="h-4 w-20" />
         <Skeleton className="h-3 w-12" />
       </div>
+      
+      {/* Simulate a message with reply */}
+      {Math.random() > 0.7 && (
+        <div className={cn(
+          "mt-1 rounded-lg",
+          isOwnMessage ? "ml-auto" : ""
+        )}>
+          <Skeleton className="h-10 w-48 mb-1 rounded-md" />
+        </div>
+      )}
+      
       <Skeleton className={cn(
         "mt-1 rounded-lg h-16 w-60",
         isOwnMessage ? "ml-auto" : ""
       )} />
+      
+      {/* Simulate attachments */}
+      {Math.random() > 0.8 && (
+        <div className="mt-2">
+          <Skeleton className="h-3 w-32 mt-1" />
+          {Math.random() > 0.5 && <Skeleton className="h-24 w-40 mt-1 rounded-md" />}
+        </div>
+      )}
     </div>
   </div>
 );
@@ -69,10 +88,13 @@ const MessageSkeleton = ({ isOwnMessage = false }) => (
 const HeaderSkeleton = () => (
   <div className="flex items-center gap-3 animate-pulse">
     <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
-    <div>
-      <Skeleton className="h-5 w-32 mb-1" />
-      <Skeleton className="h-3 w-24 mb-1" />
+    <div className="space-y-1.5">
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-3 w-24" />
       <Skeleton className="h-2 w-16" />
+    </div>
+    <div className="ml-auto">
+      <Skeleton className="h-8 w-8 rounded-full" />
     </div>
   </div>
 );
@@ -1044,11 +1066,18 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session');
   
+  // Keep track of if we've already processed this session ID
+  const processedSessionRef = useRef(null);
+  
   useEffect(() => {
-    if (sessionId && sessions.length > 0) {
-      // Find the session in our loaded sessions
-      const sessionToOpen = sessions.find(s => s.id === sessionId);
+    // Only process if we have a sessionId, sessions are loaded, and we haven't processed this sessionId yet
+    if (sessionId && sessions.length > 0 && processedSessionRef.current !== sessionId) {
+      // Find the session in our loaded sessions - compare as strings to avoid type mismatches
+      const sessionToOpen = sessions.find(s => String(s.id) === String(sessionId));
       if (sessionToOpen) {
+        // Mark this sessionId as processed to prevent infinite loops
+        processedSessionRef.current = sessionId;
+        
         // Set the current session immediately, regardless of what's currently open
         setCurrentSession(sessionToOpen);
         
@@ -1823,13 +1852,26 @@ export default function ChatPage() {
         <>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 relative" ref={chatContainerRef}>
             {messagesLoading ? (
-              // Skeleton loading state with fewer items
-              Array(3).fill().map((_, index) => (
-                <MessageSkeleton 
-                  key={`message-skeleton-${index}`}
-                  isOwnMessage={index % 2 === 0}
-                />
-              ))
+              // Enhanced skeleton loading state
+              <div className="space-y-6">
+                {/* Date separator */}
+                <div className="flex items-center justify-center my-4 animate-pulse">
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              
+                {/* Different message types */}
+                <MessageSkeleton isOwnMessage={false} />
+                <MessageSkeleton isOwnMessage={true} />
+                <MessageSkeleton isOwnMessage={false} />
+                
+                {/* Another date separator */}
+                <div className="flex items-center justify-center my-4 animate-pulse">
+                  <Skeleton className="h-4 w-20" />
+                </div>
+                
+                <MessageSkeleton isOwnMessage={true} />
+                <MessageSkeleton isOwnMessage={false} />
+              </div>
             ) : shouldVirtualize ? (
               // For large message lists, only render visible messages plus some buffer
               <>
@@ -1848,100 +1890,122 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* 输入区域 */}
+          {/* 输入区域 - add skeleton for the input area when loading */}
           <div className="p-4 border-t">
-            <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-              <div className="flex-1 bg-accent rounded-lg">
-                {/* 回复消息提示栏 */}
-                {replyToMessage && (
+            {messagesLoading ? (
+              <div className="flex items-end gap-2 animate-pulse">
+                <div className="flex-1 bg-accent rounded-lg">
+                  {/* Reply bar skeleton */}
                   <div className="px-3 pt-2 flex items-center justify-between">
-                    <div className="flex items-center text-sm">
-                      <div className="w-1 h-4 bg-blue-500 rounded-full mr-2"></div>
-                      <span className="text-muted-foreground mr-2">{t('replyTo')}</span>
-                      <span className="font-medium truncate max-w-[150px]">{replyToMessage.user?.name}</span>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-1 rounded-full" />
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-20" />
                     </div>
-                    <button 
-                      type="button"
-                      onClick={handleCancelReply}
-                      className="text-muted-foreground hover:text-foreground p-1 rounded-full"
-                      title={t('cancelReply')}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
                   </div>
-                )}
-                <div className="px-3 p-1 relative">
-                  <textarea
-                    value={message}
-                    onChange={handleInputChange}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage(e);
-                      }
-                      // Handle mention suggestion navigation
-                      if (isMentionOpen) {
-                        if (['ArrowDown', 'ArrowUp', 'Escape', 'Tab', 'Enter'].includes(e.key)) {
-                          e.preventDefault();
-                          if (e.key === 'Escape') {
-                            setIsMentionOpen(false);
-                          }
-                        }
-                      }
-                    }}
-                    placeholder={t('inputPlaceholder')}
-                    className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm p-2 min-h-[40px] overflow-y-auto"
-                    rows={1}
-                    ref={textareaRef}
-                  />
                   
-                  {/* Character count removed from here and moved below */}
-                  
-                  {/* @提及选择器 */}
-                  <MentionSelector
-                    isOpen={isMentionOpen}
-                    searchText={mentionSearchText}
-                    onSelect={handleMentionSelect}
-                    onClose={() => setIsMentionOpen(false)}
-                    position={mentionPosition}
-                  />
+                  <div className="p-3">
+                    <Skeleton className="h-8 w-full rounded-md" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pb-2">
+                  <Skeleton className="w-8 h-8 rounded-full" />
+                  <Skeleton className="w-8 h-8 rounded-full" />
+                  <Skeleton className="w-10 h-10 rounded-full" />
                 </div>
               </div>
-              <div className="flex items-center gap-2 pb-2">
-                <FileUploader 
-                  onUploadComplete={handleFileUploadComplete}
-                  sessionId={currentSession.id}
-                  userId={currentUser?.id}
-                  buttonOnly={true}
-                  isPending={isPending}
-                  buttonClassName="p-1 hover:bg-accent/50 rounded"
-                  title={t('attachFile')}
-                >
-                  <Paperclip className="h-5 w-5 text-muted-foreground" />
-                </FileUploader>
-                <EmojiPicker
-                  onEmojiSelect={handleEmojiSelect}
-                  buttonClassName="p-2 hover:bg-accent rounded-lg"
-                  buttonTitle={t('emoji')}
-                  position="top"
-                  isPending={isPending}
-                />
-                <button 
-                  type="submit" 
-                  className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                  disabled={!message.trim() || isPending || message.length > 1000}
-                  title={message.length > 1000 ? t('errors.messageTooLong') || 'Message too long (max 1000 characters)' : t('send')}
-                >
-                  <Send className="h-5 w-5" />
-                </button>
-              </div>
-            </form>
+            ) : (
+              <form onSubmit={handleSendMessage} className="flex items-end gap-2">
+                <div className="flex-1 bg-accent rounded-lg">
+                  {/* 回复消息提示栏 */}
+                  {replyToMessage && (
+                    <div className="px-3 pt-2 flex items-center justify-between">
+                      <div className="flex items-center text-sm">
+                        <div className="w-1 h-4 bg-blue-500 rounded-full mr-2"></div>
+                        <span className="text-muted-foreground mr-2">{t('replyTo')}</span>
+                        <span className="font-medium truncate max-w-[150px]">{replyToMessage.user?.name}</span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={handleCancelReply}
+                        className="text-muted-foreground hover:text-foreground p-1 rounded-full"
+                        title={t('cancelReply')}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  <div className="px-3 p-1 relative">
+                    <textarea
+                      value={message}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage(e);
+                        }
+                        // Handle mention suggestion navigation
+                        if (isMentionOpen) {
+                          if (['ArrowDown', 'ArrowUp', 'Escape', 'Tab', 'Enter'].includes(e.key)) {
+                            e.preventDefault();
+                            if (e.key === 'Escape') {
+                              setIsMentionOpen(false);
+                            }
+                          }
+                        }
+                      }}
+                      placeholder={t('inputPlaceholder')}
+                      className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm p-2 min-h-[40px] overflow-y-auto"
+                      rows={1}
+                      ref={textareaRef}
+                    />
+                    
+                    {/* @提及选择器 */}
+                    <MentionSelector
+                      isOpen={isMentionOpen}
+                      searchText={mentionSearchText}
+                      onSelect={handleMentionSelect}
+                      onClose={() => setIsMentionOpen(false)}
+                      position={mentionPosition}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pb-2">
+                  <FileUploader 
+                    onUploadComplete={handleFileUploadComplete}
+                    sessionId={currentSession.id}
+                    userId={currentUser?.id}
+                    buttonOnly={true}
+                    isPending={isPending}
+                    buttonClassName="p-1 hover:bg-accent/50 rounded"
+                    title={t('attachFile')}
+                  >
+                    <Paperclip className="h-5 w-5 text-muted-foreground" />
+                  </FileUploader>
+                  <EmojiPicker
+                    onEmojiSelect={handleEmojiSelect}
+                    buttonClassName="p-2 hover:bg-accent rounded-lg"
+                    buttonTitle={t('emoji')}
+                    position="top"
+                    isPending={isPending}
+                  />
+                  <button 
+                    type="submit" 
+                    className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                    disabled={!message.trim() || isPending || message.length > 1000}
+                    title={message.length > 1000 ? t('errors.messageTooLong') || 'Message too long (max 1000 characters)' : t('send')}
+                  >
+                    <Send className="h-5 w-5" />
+                  </button>
+                </div>
+              </form>
+            )}
             
             {/* Show character count when approaching limit */}
-            {message.length > 700 && (
+            {!messagesLoading && message.length > 700 && (
               <div className={`text-xs text-right mt-1 mr-2 ${message.length > 1000 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
                 {message.length}/1000
               </div>

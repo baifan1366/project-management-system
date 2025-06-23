@@ -1,18 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { 
   Clock, Calendar, PlusCircle, Filter, SortAsc, 
-  Search, CheckCircle, Circle 
+  Search, CheckCircle, Circle, Info
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import useGetUser from '@/lib/hooks/useGetUser';
+import useTaskContext from '@/hooks/useTaskContext';
 import React from 'react';
 import { supabase } from '@/lib/supabase';
 import NewTaskDialog from '@/components/myTasks/NewTaskDialog';
@@ -45,6 +47,14 @@ export default function MyTasksPage() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskDetailsDialog, setShowTaskDetailsDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
+  const [hoveredTaskId, setHoveredTaskId] = useState(null);
+  
+  // Use our custom hook for task context
+  const { 
+    taskContextMap: taskContextData, 
+    isLoading: isLoadingContext, 
+    fetchTaskContext 
+  } = useTaskContext();
 
   // 根据字段名找到对应的数字键
   const getKeyForField = React.useCallback((fieldName, tagValues) => {
@@ -634,27 +644,242 @@ export default function MyTasksPage() {
     }
   };
 
+  // Render task reference
+  const renderTaskReference = (task) => {
+    if (!task.is_standalone && task.task_id) {
+      return (
+        <TooltipProvider>
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              <div 
+                className="text-xs bg-muted px-1.5 py-0.5 rounded flex items-center gap-1 cursor-help"
+                onMouseEnter={() => {
+                  setHoveredTaskId(task.task_id);
+                  fetchTaskContext(task.task_id);
+                }}
+              >
+                <Info className="h-3 w-3" />
+                {t_tasks('reference') || 'Ref'}: {task.task_id}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="p-3 max-w-sm">
+              {isLoadingContext[task.task_id] ? (
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-4 rounded-full" />
+                  <div className="text-xs">{t_tasks('loadingTaskDetails')}</div>
+                </div>
+              ) : taskContextData[task.task_id] ? (
+                <div className="space-y-2 text-xs">
+                  {/* Project & Team info */}
+                  <div>
+                    <div className="font-medium text-sm mb-1">
+                      {taskContextData[task.task_id].project?.project_name || t_tasks('unknownProject')}
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t_tasks('team')}:</span>
+                      <span className="font-medium">{taskContextData[task.task_id].team?.name || t_tasks('unknownTeam')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t_tasks('section')}:</span>
+                      <span>{taskContextData[task.task_id].section?.name || t_tasks('unknownSection')}</span>
+                    </div>
+                  </div>
+
+                  {/* Task status if available */}
+                  {taskContextData[task.task_id].task?.tag_values?.["12"] && (
+                    <div className="flex justify-between items-center border-t pt-1">
+                      <span className="text-muted-foreground">{t_tasks('status.label')}:</span>
+                      <Badge 
+                        variant={getStatusVariant(taskContextData[task.task_id].task.tag_values["12"])}
+                        className="text-[10px] h-5"
+                      >
+                        {taskContextData[task.task_id].task.tag_values["12"]}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Assignees with avatars */}
+                  {taskContextData[task.task_id].assignees?.length > 0 && (
+                    <div className="border-t pt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">{t_tasks('assignees')}:</span>
+                        <div className="flex -space-x-1">
+                          {taskContextData[task.task_id].assignees.slice(0, 3).map(assignee => (
+                            <div 
+                              key={assignee.id} 
+                              className="h-5 w-5 rounded-full border border-background overflow-hidden bg-muted flex items-center justify-center"
+                              title={assignee.name}
+                            >
+                              {assignee.avatar_url ? (
+                                <img 
+                                  src={assignee.avatar_url} 
+                                  alt={assignee.name} 
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <span className="text-[8px] font-medium">
+                                  {assignee.name.charAt(0).toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          {taskContextData[task.task_id].assignees.length > 3 && (
+                            <div className="h-5 w-5 rounded-full bg-muted border border-background flex items-center justify-center">
+                              <span className="text-[8px]">+{taskContextData[task.task_id].assignees.length - 3}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* Show assignee names on next line */}
+                      <div className="mt-1 text-[10px] text-muted-foreground">
+                        {taskContextData[task.task_id].assignees.map(a => a.name).join(', ')}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* View in original project link */}
+                  <div className="mt-2 border-t pt-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-full text-[10px]"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent triggering the task card click
+                        // Navigate to the task in its project
+                        if (taskContextData[task.task_id].project?.id && taskContextData[task.task_id].team?.id) {
+                          window.open(
+                            `/projects/${taskContextData[task.task_id].project.id}?teamId=${taskContextData[task.task_id].team.id}`, 
+                            '_blank'
+                          );
+                        }
+                      }}
+                    >
+                      {t_tasks('viewInProject')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground">
+                  {t_tasks('taskContextNotFound')}
+                </div>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    return null;
+  };
+
+  // Get status badge variant
+  const getStatusVariant = (status) => {
+    switch (status) {
+      case 'TODO':
+        return 'outline';
+      case 'IN_PROGRESS':
+        return 'secondary';
+      case 'IN_REVIEW':
+        return 'warning';
+      case 'DONE':
+        return 'success';
+      default:
+        return 'outline';
+    }
+  };
+
   // 渲染加载状态
   if (status === 'loading') {
     return (
       <div className="p-4 h-screen">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold">{t_tasks('title')}</h1>
-          <Skeleton className="h-9 w-32" />
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-10 w-32" />
+          </div>
         </div>
-        <div className="flex space-x-4 h-[calc(100vh-120px)]">
-          {[1, 2, 3, 4].map(index => (
-            <div key={index} className="flex-1 bg-background border rounded-md p-2 shadow min-w-[250px]">
-              <div className="p-2">
-                <Skeleton className="h-6 w-24 mb-4" />
-                <div className="space-y-3">
-                  {[1, 2, 3].map(item => (
-                    <Skeleton key={item} className="h-32 w-full rounded-md" />
-                  ))}
+        
+        <div className="flex gap-4 h-[calc(100vh-120px)]">
+          {/* Skeleton for left filter panel */}
+          <div className="w-64 bg-background border rounded-md p-4">
+            <Skeleton className="h-8 w-full mb-4" />
+            
+            {/* TYPE filter skeleton */}
+            <div className="mb-5">
+              <Skeleton className="h-4 w-24 mb-4" />
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4 rounded-full" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <Skeleton className="h-5 w-8 rounded-full" />
                 </div>
+              ))}
+            </div>
+            
+            {/* ASSIGNED TO filter skeleton */}
+            <div className="mb-5">
+              <Skeleton className="h-4 w-32 mb-4" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-4 rounded-full" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <Skeleton className="h-5 w-8 rounded-full" />
               </div>
             </div>
-          ))}
+            
+            {/* WORKSPACE & TEAMS filter skeleton */}
+            <div className="mb-5">
+              <Skeleton className="h-4 w-40 mb-4" />
+              {[1, 2, 3].map(i => (
+                <div key={i} className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4 rounded-full" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                  <Skeleton className="h-5 w-8 rounded-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Skeleton for kanban board */}
+          <div className="flex-1">
+            <Skeleton className="h-5 w-32 mb-3" />
+            <div className="flex space-x-4 overflow-x-auto pb-4 h-full">
+              {['todo', 'in_progress', 'in_review', 'done'].map((column, index) => (
+                <div key={column} className="flex-1 bg-background border rounded-md shadow min-w-[250px]">
+                  <div className="p-2 border-b bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-5 w-8 rounded-full" />
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    {Array.from({ length: index === 0 ? 4 : index === 1 ? 3 : index === 2 ? 2 : 1 }).map((_, i) => (
+                      <div key={i} className="p-3 mb-2 border rounded-md">
+                        <div className="mb-2 flex justify-between">
+                          <Skeleton className="h-5 w-32" />
+                          <Skeleton className="h-5 w-16 rounded-full" />
+                        </div>
+                        <Skeleton className="h-4 w-full mb-2" />
+                        <Skeleton className="h-4 w-3/4 mb-4" />
+                        <div className="flex items-center justify-between">
+                          <Skeleton className="h-4 w-20" />
+                          <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-16" />
+                            <Skeleton className="h-4 w-16" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -831,12 +1056,7 @@ export default function MyTasksPage() {
                                           #{getTaskProjectId(task)}
                                         </div>
                                       )}
-                                      {/* Show reference ID for assigned tasks (non-standalone) */}
-                                      {!task.is_standalone && task.task_id && (
-                                        <div className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                                          {t_tasks('reference') || 'Ref'}: {task.task_id}
-                                        </div>
-                                      )}
+                                      {renderTaskReference(task)}
                                     </div>
                                     <div className="flex items-center gap-3">
                                       {task.expected_start_time && (
