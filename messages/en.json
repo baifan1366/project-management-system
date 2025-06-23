@@ -80,7 +80,8 @@
       "successDesc": "Your action was completed successfully. Would you like to continue to the next step?",
       "question": "Question",
       "questionDesc": "Do you want to save your current changes?"
-    }
+    },
+    "tryAgain": "Please try again later"
   },
   "profile": {
     "title": "Settings",
@@ -293,17 +294,20 @@
       },
       "usageStats": {
         "title": "Usage Statistics",
-        "users": "Users",
+        "lastUpdated": "Last Updated",
+        "refresh": "Refresh",
+        "refreshingStats": "Refreshing usage statistics...",
+        "statsRefreshed": "Statistics refreshed successfully!",
+        "loading": "Loading usage statistics...",
+        "retry": "Try Again",
+        "fetchError": "Failed to fetch usage statistics",
         "projects": "Projects",
         "teams": "Teams",
-        "storage": "Storage",
-        "aiCredits": "AI Credits",
-        "current": "Current",
-        "limit": "Limit",
-        "usage": "Usage",
-        "percentage": "Percentage",
-        "refresh": "Refresh Stats",
-        "lastUpdated": "Last Updated"
+        "members": "Team Members",
+        "aiChat": "AI Chat Credits",
+        "aiTask": "AI Task Credits",
+        "aiWorkflow": "AI Workflow Credits",
+        "storage": "Storage"
       },
       "paymentHistory": {
         "title": "Payment History",
@@ -314,7 +318,12 @@
         "noHistory": "No payment history",
         "downloadInvoice": "Download Invoice",
         "paymentMethod": "Payment Method",
-        "loadingPayments": "Loading payment history..."
+        "loadingPayments": "Loading payment history...",
+        "loading": "Loading payment history...",
+        "loaded": "Payment history loaded",
+        "error": "Failed to load payment history",
+        "preparingInvoice": "Preparing invoice...",
+        "invoiceReady": "Invoice ready for download"
       },
       "upgradeOptions": {
         "title": "Upgrade Options",
@@ -322,7 +331,13 @@
         "contactSales": "Contact Sales",
         "upgradeNow": "Upgrade Now",
         "currentPlan": "Current Plan",
-        "description": "Upgrade to a paid plan to unlock all features and continue using your subscription without interruption."
+        "description": "Upgrade to a paid plan to unlock all features and continue using your subscription without interruption.",
+        "loading": "Loading plans...",
+        "loadError": "Failed to load plans",
+        "processing": "Processing upgrade request...",
+        "redirecting": "Redirecting to checkout",
+        "redirectDesc": "You will be redirected to complete your upgrade.",
+        "error": "Failed to start upgrade process"
       },
       "limits": {
         "back": "Back",
@@ -333,6 +348,10 @@
         "createProjectLimited": "Project Creation Limited",
         "inviteMemberLimited": "Member Invitation Limited",
         "createTeamLimited": "Team Creation Limited"
+      },
+      "auth": {
+        "required": "Authentication required",
+        "loginRequired": "Please login to upgrade your plan"
       }
     }
   },
@@ -352,6 +371,14 @@
     "willBeUnarchived": "will be unarchived",
     "deleteTeamConfirmTitle": "Delete Team",
     "willBeDeletedPermanently": "will be deleted permanently",
+    "owner": "Owner",
+    "you": "You",
+    "role": {
+      "owner": "Owner",
+      "can_edit": "Editor",
+      "can_check": "Checker", 
+      "can_view": "Viewer"
+    },
     "projectSettings": "Project Settings",
     "archivedTeams": "Archived Teams",
     "deleteProject": "Delete Project",
@@ -482,7 +509,6 @@
     "selectTeam": "Select Team",
     "teams": "Teams",
     "unnamed": "Unnamed",
-    "role": "Role",
     "selectTeamPlaceholder": "Select a team",
     "selectRole": "Select Role",
     "invite": "Invite",
@@ -546,11 +572,17 @@
     "title": "My Tasks",
     "searchPlaceholder": "Search tasks...",
     "results": "results",
-    "noTasks": "No tasks in this status",
-    "noTitle": "No title",
-    "invalidDate": "Invalid date",
+    "noTasks": "No tasks found",
+    "noStartDate": "No start date",
+    "noDueDate": "No due date",
+    "description": "Description",
+    "reference": "Ref",
     "errors": {
       "loadingFailed": "Failed to load tasks"
+    },
+    "dueDate": {
+      "label": "Due Date",
+      "createdBy": "Created by me"
     },
     "status": {
       "label": "Status",
@@ -568,18 +600,14 @@
     },
     "assignedTo": {
       "label": "ASSIGNED TO",
-      "unassigned": "Unassigned",
-      "me": "Me"
+      "me": "Me",
+      "unassigned": "Unassigned"
     },
     "workspaceTeams": {
       "label": "WORKSPACE & TEAMS",
-      "all": "All",
-      "shared": "Shared",
-      "workspace": "Workspace"
-    },
-    "dueDate": {
-      "label": "DUE DATE",
-      "createdBy": "Created by me"
+      "workspace": "Workspace",
+      "shared": "Shared Tasks",
+      "all": "All Tasks"
     },
     "newTask": {
       "title": "Create New Task",
@@ -599,7 +627,6 @@
     "editTaskDescription": "Edit task details",
     "taskTitle": "Task Title",
     "taskTitlePlaceholder": "Enter task title",
-    "description": "Description",
     "descriptionPlaceholder": "Enter task description",
     "priority": "Priority",
     "selectPriority": "Select priority",
@@ -613,15 +640,32 @@
     "titleRequired": "Title is required",
     "taskUpdated": "Task updated successfully",
     "updateTaskFailed": "Failed to update task",
+    "referenceTooltip": "View task reference details",
     "taskDeleted": "Task deleted successfully",
     "deleteTaskFailed": "Failed to delete task",
     "deleteConfirmationTitle": "Delete Task",
-    "deleteConfirmationMessage": "Are you sure you want to delete this task? This action cannot be undone.",
-    "noDueDate": "No due date",
-    "noStartDate": "No start date",
+    "deleteConfirmationMessage": "This action cannot be undone. The task will be permanently deleted.",
     "startDate": "Start Date",
     "taskCreated":"Task has been created successfully",
-    "cannotSelectPastDate":"Cannot select past date"
+    "cannotSelectPastDate":"Cannot select past date",
+    "team": "Team",
+    "section": "Section",
+    "unknownProject": "Unknown Project",
+    "unknownTeam": "Unknown Team",
+    "unknownSection": "Unknown Section",
+    "assignees": "Assignees",
+    "loadingTaskDetails": "Loading task details...",
+    "viewInProject": "View in Original Project",
+    "taskContextNotFound": "Task details not found",
+    "cannotDeleteReferencedTask": "Cannot delete a task that is referenced from a team project",
+    "noPermissionTeamTask": "You don't have permission to edit this team task",
+    "noPermissionTeamTaskDesc": "You are no longer a member of the team this task belongs to",
+    "noTitle": "No title",
+    "invalidDate": "Invalid date",
+    "cannotDeletePastDueTask": "Cannot delete a past due task",
+    "cannotEditPastDueTask": "Cannot edit a past due task",
+    "pastDueTaskDesc": "Tasks that are past their due date are locked for historical record keeping",
+    "pastDue": "Past due"
   },
   "notifications": {
     "title": "Notifications",
@@ -1758,14 +1802,6 @@
     "noResults": "No results found",
     "tryDifferent": "Try different keywords or check spelling",
     "resultsFound": "results found",
-    "types": {
-      "project": "Project",
-      "task": "Task",
-      "user": "User",
-      "team": "Team",
-      "calendar": "Calendar",
-      "message": "Message"
-    },
     "recentSearches": "Recent Searches",
     "clearAll": "Clear All",
     "createdAt": "Created on",
@@ -1773,9 +1809,12 @@
     "creator": "Creator",
     "status": "Status",
     "untitled": "Untitled",
+    "quickSearch": "Quick Search",
+    "viewAllResults": "View all results",
     "message": "Create projects and tasks using natural language.",
     "description": "Just describe your needs, and Pengy will automatically create projects and tasks for you",
     "examples": "Example prompts",
+    "shiftClickToQuickSearch": "Shift + Click for quick search",
     "suggestedSearches": {
       "suggestedSearches": "Suggested Searches",
       "projects": "Active projects",
@@ -1787,6 +1826,14 @@
       "marketingProject": "Create a product launch task list with market analysis, prototype design, and user testing high priority tasks",
       "weeklyTasks": "Create a project for next week's market activities, including 5 tasks: content creation, design production, placement review, traffic analysis, and effectiveness evaluation",
       "developmentProject": "Plan a three-month software development project with tasks related to requirements analysis, design, development, testing, and release phases"
+    },
+    "types": {
+      "project": "Project",
+      "task": "Task",
+      "user": "User",
+      "team": "Team",
+      "calendar": "Calendar",
+      "message": "Message"
     }
   },
   "pengy": {

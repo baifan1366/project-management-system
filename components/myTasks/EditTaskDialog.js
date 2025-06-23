@@ -9,17 +9,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, isBefore, startOfToday, parseISO, isSameDay } from 'date-fns';
-import { CalendarIcon, Clock } from 'lucide-react';
+import { format, isBefore, startOfToday, parseISO, isSameDay, endOfDay } from 'date-fns';
+import { CalendarIcon, Clock, ShieldAlert, ClockIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
+import useTeamMembership from '@/hooks/useTeamMembership';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
   const t = useTranslations('myTasks');
   const t_common = useTranslations('common');
   const { adjustTimeByOffset } = useUserTimezone();
+  const { user } = useGetUser();
+  
+  // Initialize the team membership hook
+  const { isMember: isTeamMember, isChecking: isMembershipChecking, checkTaskTeamMembership } = useTeamMembership();
   
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('');
@@ -35,6 +41,13 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
     timeError: ''
   });
   
+  // Check team membership when task changes
+  useEffect(() => {
+    if (task && task.task_id && user) {
+      checkTaskTeamMembership(user.id, task.task_id);
+    }
+  }, [task, user, checkTaskTeamMembership]);
+
   // 分离useEffect: 基本字段初始化
   useEffect(() => {
     if (task && isOpen) {
@@ -50,8 +63,6 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
     // 创建一个处理日期的函数，在useEffect内部调用
     const processTaskDates = () => {
       if (!task || !isOpen) return;
-      
-      
       
       // 处理截止日期
       if (task.expected_completion_date) {
@@ -111,12 +122,23 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
     return isBefore(date, startOfToday());
   };
 
+  // Check if task is past due
+  const isPastDue = task?.expected_completion_date ? 
+    isBefore(new Date(task.expected_completion_date), endOfDay(new Date())) : 
+    false;
+
   // Validate form data
   const validateForm = () => {
     const errors = {
       dateError: '',
       timeError: ''
     };
+    
+    // First check if user has permission if task has reference
+    if (task.task_id && !isTeamMember) {
+      toast.error(t('noPermissionTeamTask'));
+      return false;
+    }
     
     // Check for past dates
     if (startDate && isDateInPast(startDate) && !isSameDay(startDate, new Date())) {
@@ -197,6 +219,18 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Check if task is past due
+    if (isPastDue) {
+      toast.error(t('cannotEditPastDueTask'));
+      return;
+    }
+
+    // Check for team membership first
+    if (task.task_id && !isTeamMember) {
+      toast.error(t('noPermissionTeamTask'));
+      return;
+    }
+    
     if (!title.trim()) {
       toast.error(t('titleRequired'));
       return;
@@ -255,11 +289,6 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
       // The task should now have the correct ID format from the parent component
       const taskId = task.id;
       
-      
-      
-
-      
-      
       if (!taskId) {
         throw new Error(t('invalidTaskId'));
       }
@@ -293,6 +322,28 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
           </DialogDescription>
         </DialogHeader>
         
+        {/* Warning if task is past due */}
+        {isPastDue && (
+          <div className="bg-destructive/10 border border-destructive/30 text-destructive p-3 rounded-md mb-4 flex items-start gap-2">
+            <ClockIcon className="h-5 w-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">{t('cannotEditPastDueTask')}</p>
+              <p className="text-xs mt-1">{t('pastDueTaskDesc')}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Warning if user is not a team member */}
+        {task && task.task_id && !isTeamMember && !isMembershipChecking && (
+          <div className="bg-destructive/10 border border-destructive/30 text-destructive p-3 rounded-md mb-4 flex items-start gap-2">
+            <ShieldAlert className="h-5 w-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">{t('noPermissionTeamTask')}</p>
+              <p className="text-xs mt-1">{t('noPermissionTeamTaskDesc')}</p>
+            </div>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           {/* Task title */}
           <div className="space-y-2">
@@ -305,6 +356,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t('taskTitlePlaceholder')}
               required
+              disabled={task?.task_id && !isTeamMember || isPastDue}
             />
           </div>
           
@@ -319,6 +371,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t('descriptionPlaceholder')}
               rows={3}
+              disabled={task?.task_id && !isTeamMember || isPastDue}
             />
           </div>
           
@@ -328,7 +381,11 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
               <label htmlFor="status" className="text-sm font-medium">
                 {t('status.label')}
               </label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select 
+                value={status} 
+                onValueChange={setStatus}
+                disabled={task?.task_id && !isTeamMember}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder={t('selectStatus')} />
                 </SelectTrigger>
@@ -346,7 +403,11 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
               <label htmlFor="priority" className="text-sm font-medium">
                 {t('priority')}
               </label>
-              <Select value={priority} onValueChange={setPriority}>
+              <Select 
+                value={priority} 
+                onValueChange={setPriority} 
+                disabled={task?.task_id && !isTeamMember}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder={t('selectPriority')} />
                 </SelectTrigger>
@@ -376,6 +437,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
                       isDateInPast(startDate) && "text-destructive",
                       formErrors.dateError && "border-red-500"
                     )}
+                    disabled={task?.task_id && !isTeamMember}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {startDate ? format(startDate, 'PPP') : t('selectDate')}
@@ -400,6 +462,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
                   value={startTime}
                   onChange={handleTimeChange}
                   className={cn(formErrors.timeError && "border-red-500")}
+                  disabled={task?.task_id && !isTeamMember}
                 />
               </div>
             </div>
@@ -423,6 +486,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
                       !dueDate && "text-muted-foreground",
                       isDateInPast(dueDate) && "text-destructive"
                     )}
+                    disabled={task?.task_id && !isTeamMember}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dueDate ? format(dueDate, 'PPP') : t('selectDate')}
@@ -447,6 +511,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
                   value={dueTime}
                   onChange={handleTimeChange}
                   className={cn(formErrors.timeError && "border-red-500")}
+                  disabled={task?.task_id && !isTeamMember}
                 />
               </div>
             </div>
@@ -459,7 +524,10 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
             <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
               {t_common('cancel')}
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading || (task?.task_id && !isTeamMember) || isPastDue}
+            >
               {loading ? t_common('saving') : t_common('save')}
             </Button>
           </DialogFooter>

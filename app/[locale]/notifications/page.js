@@ -26,8 +26,9 @@ import {
   selectUnreadCount,
   selectNotificationsLoading
 } from '@/lib/redux/features/notificationSlice';
-import NotificationItem from '@/components/notifications/NotificationItem';
+import NotificationItem, { NotificationItemSkeleton } from '@/components/notifications/NotificationItem';
 import { useRouter } from 'next/navigation';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function NotificationsPage() {
   const t = useTranslations();
@@ -143,72 +144,96 @@ export default function NotificationsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium mb-2">{t('common.status')}</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      variant={activeTab === 'all' ? 'default' : 'outline'} 
-                      size="sm" 
-                      onClick={() => setActiveTab('all')}
-                      className="justify-start"
-                    >
-                      <Bell className="mr-2 h-4 w-4" />
-                      {t('common.all')}
-                    </Button>
-                    <Button 
-                      variant={activeTab === 'unread' ? 'default' : 'outline'} 
-                      size="sm" 
-                      onClick={() => setActiveTab('unread')}
-                      className="justify-start dark:text-white"
-                    >
-                      <Badge variant="outline" className="mr-2 dark:text-white">{unreadCount}</Badge>
-                      {t('common.unread')}
-                    </Button>
+              {loading ? (
+                // Skeleton for filters while loading
+                <div className="space-y-4 animate-pulse">
+                  <div>
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Skeleton className="h-8 w-full rounded-md" />
+                      <Skeleton className="h-8 w-full rounded-md" />
+                    </div>
                   </div>
+                  
+                  <div>
+                    <Skeleton className="h-4 w-16 mb-2" />
+                    <div className="space-y-1">
+                      <Skeleton className="h-8 w-full rounded-md" />
+                      <Skeleton className="h-8 w-full rounded-md" />
+                      <Skeleton className="h-8 w-full rounded-md" />
+                    </div>
+                  </div>
+                  
+                  <Skeleton className="h-8 w-full rounded-md mt-4" />
                 </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-2">{t('common.type')}</h3>
-                  <div className="space-y-1">
-                    <Button 
-                      variant={filterType === 'all' ? 'default' : 'outline'} 
-                      size="sm" 
-                      onClick={() => setFilterType('all')}
-                      className="w-full justify-start"
-                    >
-                      <Info className="mr-2 h-4 w-4" />
-                      {t('common.all')}
-                    </Button>
-                    
-                    {notificationTypes.map(type => (
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">{t('common.status')}</h3>
+                    <div className="grid grid-cols-2 gap-2">
                       <Button 
-                        key={type}
-                        variant={filterType === type ? 'default' : 'outline'} 
+                        variant={activeTab === 'all' ? 'default' : 'outline'} 
                         size="sm" 
-                        onClick={() => setFilterType(type)}
+                        onClick={() => setActiveTab('all')}
+                        className="justify-start"
+                      >
+                        <Bell className="mr-2 h-4 w-4" />
+                        {t('common.all')}
+                      </Button>
+                      <Button 
+                        variant={activeTab === 'unread' ? 'default' : 'outline'} 
+                        size="sm" 
+                        onClick={() => setActiveTab('unread')}
+                        className="justify-start dark:text-white"
+                      >
+                        <Badge variant="outline" className="mr-2 dark:text-white">{unreadCount}</Badge>
+                        {t('common.unread')}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">{t('common.type')}</h3>
+                    <div className="space-y-1">
+                      <Button 
+                        variant={filterType === 'all' ? 'default' : 'outline'} 
+                        size="sm" 
+                        onClick={() => setFilterType('all')}
                         className="w-full justify-start"
                       >
-                        {getTypeIcon(type)}
-                        <span className="ml-2 capitalize">
-                          {t(`notifications.types.${type}`, { fallback: type })}
-                        </span>
+                        <Info className="mr-2 h-4 w-4" />
+                        {t('common.all')}
                       </Button>
-                    ))}
+                      
+                      {notificationTypes.map(type => (
+                        <Button 
+                          key={type}
+                          variant={filterType === type ? 'default' : 'outline'} 
+                          size="sm" 
+                          onClick={() => setFilterType(type)}
+                          className="w-full justify-start"
+                        >
+                          {getTypeIcon(type)}
+                          <span className="ml-2 capitalize">
+                            {t(`notifications.types.${type}`, { fallback: type })}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {unreadCount > 0 && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleMarkAllAsRead}
-                    className="w-full"
-                  >
-                    {t('common.markAllAsRead')}
-                  </Button>
-                )}
-              </div>
+                  {unreadCount > 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleMarkAllAsRead}
+                      className="w-full"
+                    >
+                      {t('common.markAllAsRead')}
+                    </Button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -259,12 +284,15 @@ export default function NotificationsPage() {
   );
 }
 
+// Enhanced NotificationList with skeleton loading
 function NotificationList({ notifications, loading, onAction, t, formatDateToUserTimezone, formatToUserTimezone }) {
   if (loading) {
     return (
-      <div className="py-10 text-center">
-        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-        <p className="text-muted-foreground">{t('common.loading')}</p>
+      <div className="space-y-4 pr-2">
+        {/* Show multiple skeletons to simulate a list of notifications */}
+        {Array.from({ length: 8 }, (_, i) => (
+          <NotificationItemSkeleton key={i} />
+        ))}
       </div>
     );
   }

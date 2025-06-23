@@ -1,16 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { format, parseISO } from 'date-fns';
-import { Calendar as CalendarIcon, Trash2, Edit, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { format, parseISO, isBefore, endOfDay } from 'date-fns';
+import { Calendar as CalendarIcon, Trash2, Edit, AlertTriangle, CheckCircle2, InfoIcon, ClockIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUserTimezone } from '@/hooks/useUserTimezone';
+import useTeamMembership from '@/hooks/useTeamMembership';
+import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onDelete, onSuccess }) {
   const t = useTranslations('myTasks');
@@ -18,9 +21,26 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const { formatDateToUserTimezone } = useUserTimezone();
+  const { user } = useGetUser();
+  const { isMember: isTeamMember, checkTaskTeamMembership } = useTeamMembership();
   
   if (!task) return null;
 
+  // Check if task has a reference (is linked to a team task)
+  const hasReference = !!task.task_id;
+  
+  // Check if task is past due
+  const isPastDue = task.expected_completion_date ? 
+    isBefore(new Date(task.expected_completion_date), endOfDay(new Date())) : 
+    false;
+    
+  // Check team membership when task changes
+  useEffect(() => {
+    if (task && task.task_id && user) {
+      checkTaskTeamMembership(user.id, task.task_id);
+    }
+  }, [task, user, checkTaskTeamMembership]);
+  
   // Get task priority with styling
   const getPriorityVariant = (priority) => {
     switch (priority) {
@@ -93,12 +113,38 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
 
   // Show delete confirmation
   const showDeleteConfirmation = () => {
+    // Don't allow deletion if task has a reference
+    if (hasReference) {
+      toast.error(t('cannotDeleteReferencedTask'));
+      return;
+    }
+    
+    // Don't allow deletion if task is past due
+    if (isPastDue) {
+      toast.error(t('cannotDeletePastDueTask'));
+      return;
+    }
+    
     setConfirmDeleteOpen(true);
   };
 
   // Handle delete task
   const handleDeleteTask = async () => {
     try {
+      // Additional check to prevent deletion of referenced tasks
+      if (hasReference) {
+        toast.error(t('cannotDeleteReferencedTask'));
+        setConfirmDeleteOpen(false);
+        return;
+      }
+      
+      // Additional check to prevent deletion of past due tasks
+      if (isPastDue) {
+        toast.error(t('cannotDeletePastDueTask'));
+        setConfirmDeleteOpen(false);
+        return;
+      }
+      
       setIsDeleting(true);
       setConfirmDeleteOpen(false);
       
@@ -108,8 +154,6 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
       if (!taskId) {
         throw new Error('Invalid task ID');
       }
-      
-      
       
       const { error } = await supabase
         .from('mytasks')
@@ -131,6 +175,12 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
 
   // Handle edit task
   const handleEditTask = () => {
+    // Don't allow editing past due tasks
+    if (isPastDue) {
+      toast.error(t('cannotEditPastDueTask'));
+      return;
+    }
+    
     setIsOpen(false);
     if (onEdit) onEdit(task);
   };
@@ -141,7 +191,7 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl">{task.title || t('noTitle')}</DialogTitle>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               <Badge variant={getStatusVariant(task.status)}>
                 {task.status}
               </Badge>
@@ -151,6 +201,20 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
                   className={getPriorityVariant(task.priority) === 'yellow' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
                 >
                   {task.priority.toLowerCase()}
+                </Badge>
+              )}
+              {/* Show reference badge if it exists */}
+              {hasReference && (
+                <Badge variant="outline" className="gap-1">
+                  <InfoIcon className="h-3 w-3" /> 
+                  {t('reference')}: {task.task_id}
+                </Badge>
+              )}
+              {/* Show past due badge if applicable */}
+              {isPastDue && (
+                <Badge variant="destructive" className="gap-1">
+                  <ClockIcon className="h-3 w-3" /> 
+                  {t('pastDue')}
                 </Badge>
               )}
             </div>
@@ -168,10 +232,10 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
             
             {/* Due date */}
             <div className="flex items-start gap-3">
-              <CalendarIcon className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <CalendarIcon className={`h-5 w-5 ${isPastDue ? 'text-destructive' : 'text-muted-foreground'} flex-shrink-0 mt-0.5`} />
               <div>
                 <h4 className="font-medium text-sm">{t('dueDate.label')}</h4>
-                <p className="text-sm mt-1">{formatDueDate()}</p>
+                <p className={`text-sm mt-1 ${isPastDue ? 'text-destructive' : ''}`}>{formatDueDate()}</p>
               </div>
             </div>
             
@@ -197,28 +261,60 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
           </div>
           
           <DialogFooter className="flex gap-2">
-            {/* Delete button */}
-            <Button 
-              variant="destructive" 
-              size="sm"
-              onClick={showDeleteConfirmation}
-              disabled={isDeleting}
-              className="gap-1"
-            >
-              <Trash2 className="h-4 w-4" />
-              {isDeleting ? t_common('deleting') : t_common('delete')}
-            </Button>
+            {/* Delete button with tooltip if disabled */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={showDeleteConfirmation}
+                      disabled={isDeleting || hasReference || isPastDue}
+                      className="gap-1"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {isDeleting ? t_common('deleting') : t_common('delete')}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {hasReference && (
+                  <TooltipContent>
+                    <p>{t('cannotDeleteReferencedTask')}</p>
+                  </TooltipContent>
+                )}
+                {!hasReference && isPastDue && (
+                  <TooltipContent>
+                    <p>{t('cannotDeletePastDueTask')}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
             
-            {/* Edit button */}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleEditTask}
-              className="gap-1"
-            >
-              <Edit className="h-4 w-4" />
-              {t_common('edit')}
-            </Button>
+            {/* Edit button with tooltip if past due */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleEditTask}
+                      disabled={isPastDue}
+                      className="gap-1"
+                    >
+                      <Edit className="h-4 w-4" />
+                      {t_common('edit')}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isPastDue && (
+                  <TooltipContent>
+                    <p>{t('cannotEditPastDueTask')}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
             
             {/* Close button */}
             <Button 

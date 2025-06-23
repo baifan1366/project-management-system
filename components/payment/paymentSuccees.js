@@ -86,7 +86,7 @@ export default function PaymentSuccessModal({
           {/* Action Buttons */}
           <div className="mt-8 space-y-3">
             <Link 
-              href="/dashboard"
+              href="/projects"
               className="block w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 transition-colors text-center"
             >
               Go to Dashboard

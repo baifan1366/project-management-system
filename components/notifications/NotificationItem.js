@@ -11,6 +11,64 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Notification Item Skeleton Component
+export const NotificationItemSkeleton = () => {
+  // Randomly determine if we should show action buttons (like a meeting invitation)
+  const showActions = Math.random() > 0.6;
+  // Randomly determine if we should show a link
+  const showLink = Math.random() > 0.7;
+
+  return (
+    <Card className="border bg-card/50 shadow-sm transition-all">
+      <CardContent className="p-4">
+        <div className="flex gap-3">
+          {/* Icon placeholder */}
+          <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="w-full">
+                {/* Title placeholder */}
+                <Skeleton className="h-4 w-3/4 mb-2" />
+                {/* Content placeholder - multi-line */}
+                <Skeleton className="h-3 w-full mb-1.5" />
+                <Skeleton className="h-3 w-5/6" />
+              </div>
+              
+              {/* Action buttons */}
+              <div className="flex flex-shrink-0 gap-1">
+                <Skeleton className="h-7 w-7 rounded-md" />
+                <Skeleton className="h-7 w-7 rounded-md" />
+              </div>
+            </div>
+            
+            {/* Meeting action buttons (randomly shown) */}
+            {showActions && (
+              <div className="mt-2 flex space-x-2">
+                <Skeleton className="h-7 w-16 rounded-md" />
+                <Skeleton className="h-7 w-16 rounded-md" />
+              </div>
+            )}
+            
+            {/* Link placeholder (randomly shown) */}
+            {showLink && (
+              <div className="mt-2">
+                <Skeleton className="h-3 w-24 rounded-sm" />
+              </div>
+            )}
+            
+            {/* Timestamp placeholder */}
+            <div className="mt-2">
+              <Skeleton className="h-3 w-16 rounded-sm" />
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function NotificationItem({ notification, onAction, formatDateToUserTimezone, formatToUserTimezone }) {
   const t = useTranslations('notifications');
@@ -219,7 +277,13 @@ export default function NotificationItem({ notification, onAction, formatDateToU
       }
       
       if (onAction) onAction('accept', id);
-      toast.success(tNotif('meetingAccepted'));
+      
+      const toastId = toast.success(tNotif('meetingAccepted'));
+      
+      // Automatically dismiss the toast after 3 seconds
+      setTimeout(() => {
+        toast.dismiss(toastId);
+      }, 3000);
     } catch (error) {
       console.error('Failed to accept meeting invitation:', error);
       toast.error(t('actionFailed'));
@@ -258,10 +322,17 @@ export default function NotificationItem({ notification, onAction, formatDateToU
       
       // Notify parent component to update state
       if (onAction) onAction('decline', id);
-      toast.success(tCalendar('meetingDeclined'));
+      
+      const toastId = toast.success(tCalendar('meetingDeclined'));
+      
+      // Automatically dismiss the toast after 3 seconds
+      setTimeout(() => {
+        toast.dismiss(toastId);
+      }, 3000);
     } catch (error) {
       console.error('Failed to decline meeting:', error);
-      toast.error(t('actionFailed'));
+      const toastId = toast.error(t('actionFailed'));
+      setTimeout(() => toast.dismiss(toastId), 3000);
     } finally {
       setTimeout(() => setIsActioning(false), 500);
     }
