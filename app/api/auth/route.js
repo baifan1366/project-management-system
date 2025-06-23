@@ -388,7 +388,7 @@ async function handleSignup(data) {
         {
           user_id: userId,
           plan_id: 1, // Free plan ID
-          status: 'active',
+          status: 'ACTIVE',
           start_date: now.toISOString(),
           end_date: endDate // 如果 billing_interval 为 NULL，end_date 也为 NULL
         },

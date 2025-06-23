@@ -21,7 +21,7 @@ export async function POST(req) {
     // Parse request body
     const body = await req.json();
     
-    const { planName, price, quantity, email, userId, planId, promoCode, discount, finalAmount } = body;
+    const { orderId, planName, price, quantity, email, userId, planId, promoCode, discount, finalAmount } = body;
     
     // Validate required parameters
     if (!price || price <= 0) {
@@ -44,8 +44,8 @@ export async function POST(req) {
     
     // Convert USD to CNY (approximate exchange rate, in production you'd use a real-time rate)
     // As of 2024, roughly 1 USD = 7.2 CNY
-    const exchangeRate = 7.2;
-    const amountInCNY = Math.round(amountToCharge * exchangeRate * 100); // Convert to CNY cents
+    // const exchangeRate = 7.2;
+    // const amountInCNY = Math.round(amountToCharge * exchangeRate * 100); // Convert to CNY cents
         
     // Create Alipay session with CNY currency
     const session = await stripe.checkout.sessions.create({
@@ -53,12 +53,12 @@ export async function POST(req) {
       line_items: [
         {
           price_data: {
-            currency: 'cny', // Using CNY which is fully supported by Alipay
+            currency: 'myr', // Using CNY which is fully supported by Alipay
             product_data: {
               name: planName,
               description: `${planName} Subscription`,
             },
-            unit_amount: amountInCNY, // Amount in CNY cents
+            unit_amount: Math.round(amountToCharge * 100), // Amount in MYR cents
           },
           quantity: quantity,
         },
@@ -69,6 +69,7 @@ export async function POST(req) {
       customer_email: email,
       locale: 'en', // Set language to English
       metadata: {
+        orderId: orderId,
         planName: planName,
         quantity: quantity.toString(),
         userId: userId,
@@ -77,9 +78,9 @@ export async function POST(req) {
         promoCode: promoCode || '',
         discount: discount ? discount.toString() : '0',
         finalAmount: amountToCharge.toString(),
-        originalCurrency: 'usd',
-        convertedCurrency: 'cny',
-        exchangeRate: exchangeRate.toString()
+        originalCurrency: 'myr',
+        // convertedCurrency: 'cny',
+        // exchangeRate: exchangeRate.toString()
       },
     });
         

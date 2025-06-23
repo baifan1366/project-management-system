@@ -226,6 +226,18 @@ export default function PricingPage() {
     return { text: 'Unavailable', disabled: true };
   };
 
+  const formatCurrency = (price, interval) => {
+    const formattedPrice = new Intl.NumberFormat('ms-MY', {
+      style: 'currency',
+      currency: 'MYR',
+    }).format(price);
+
+    if (interval === 'yearly') {
+      return `${formattedPrice}/month`;
+    }
+    return `${formattedPrice}/month`;
+  };
+
   // 渲染骨架屏加载状态
   const renderSkeletonLoader = () => {
     return (
@@ -242,30 +254,68 @@ export default function PricingPage() {
           
           {/* 计划卡片骨架 */}
           <div className="grid md:grid-cols-3 gap-8">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="border rounded-lg p-6 shadow-lg relative">
-                {/* Plan Type 标签骨架 */}
-                <div className="absolute -top-3 right-6 w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
-                
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-4"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
-                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6"></div>
-                
-                {/* 功能列表骨架 */}
-                <div className="space-y-3 mb-8">
-                  {[1, 2, 3, 4].map((j) => (
-                    <div key={j} className="flex items-center">
-                      <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded-full mr-2"></div>
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-                    </div>
-                  ))}
+            {(selectedInterval === 'monthly' ? plans.monthly : plans.yearly).map((plan) => {
+              const ctaConfig = getPlanCtaConfig(plan, currentUserPlan);
+              return (
+                <div 
+                  key={plan.id} 
+                  className={clsx(
+                    "border rounded-lg p-6 shadow-lg relative transition-all duration-300",
+                    "hover:shadow-xl hover:scale-105",
+                    {
+                      'border-indigo-500 ring-2 ring-indigo-500': plan.type === 'ENTERPRISE',
+                      'bg-gray-50 dark:bg-gray-800': ctaConfig.disabled,
+                    }
+                  )}
+                >
+                  {/* Plan Type 标签 */}
+                  <div className={clsx(
+                    "absolute -top-3 right-6 text-xs font-semibold py-1 px-3 rounded-full uppercase",
+                    {
+                      'bg-indigo-100 text-indigo-800': plan.type === 'ENTERPRISE',
+                      'bg-gray-100 text-gray-800': plan.type !== 'ENTERPRISE',
+                    }
+                  )}>
+                    {plan.type}
+                  </div>
+                  
+                  <h2 className="text-2xl font-bold mb-4">{plan.name}</h2>
+                  <div className="text-4xl font-extrabold mb-4">
+                    {plan.price === 0 ? 'Free' : formatCurrency(plan.price, selectedInterval)}
+                  </div>
+                  
+                  <p className="text-sm text-gray-500 mb-6 h-10">
+                    {plan.description}
+                  </p>
+
+                  <ul className="space-y-3 mb-8">
+                    {plan.features && plan.features.features && 
+                      plan.features.features.map((feature, index) => (
+                        <li key={index} className="flex items-center">
+                          <span className="text-green-500 mr-2">✓</span>
+                          {feature}
+                        </li>
+                      ))
+                    }
+                  </ul>
+                  
+                  <button
+                    onClick={() => handlePlanSelection(plan)}
+                    className={clsx(
+                      'w-full py-2 px-4 rounded-lg font-medium mt-auto',
+                      'transform transition-all duration-200',
+                      plan.type === 'PRO'
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        : 'bg-gray-100 text-gray-900 hover:bg-gray-200',
+                      ctaConfig.disabled && 'opacity-50 cursor-not-allowed'
+                    )}
+                    disabled={ctaConfig.disabled}
+                  >
+                    {ctaConfig.text}
+                  </button>
                 </div>
-                
-                {/* 按钮骨架 */}
-                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-full mt-auto"></div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -370,7 +420,7 @@ export default function PricingPage() {
                   <h2 className="text-2xl font-bold mb-4">{plan.name}</h2>
                   <p className="text-gray-600 mb-4">{plan.description}</p>
                   <div className="text-4xl font-bold mb-6">
-                    ${plan.price}
+                    RM{plan.price}
                     <span className="text-lg text-gray-500">
                       {plan.billing_interval ? `/${selectedInterval === 'monthly' ? 'mo' : 'yr'}` : ''}
                     </span>

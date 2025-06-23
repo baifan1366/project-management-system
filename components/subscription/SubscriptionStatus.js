@@ -116,9 +116,9 @@ export default function SubscriptionStatus() {
 
   const formatCurrency = (amount) => {
     if (!amount && amount !== 0) return c('notAvailable');
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('ms-MY', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'MYR',
     }).format(amount); // Amount is already in dollars, not cents
   };
 

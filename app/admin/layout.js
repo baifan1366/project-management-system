@@ -25,12 +25,13 @@ function AdminLayoutInner({ children }) {
   // Determine active page from pathname
   const getActivePage = () => {
     const path = pathname.split('/').pop();
-    if (path.includes('dashboard')) return 'dashboard';
-    if (path.includes('userManagement')) return 'users';
-    if (path.includes('adminManagement')) return 'admins';
-    if (path.includes('subscriptionManagement')) return 'subscriptions';
-    if (path.includes('supportManagement')) return 'support';
-    if (path.includes('adminSettings')) return 'settings';
+    if (path === 'adminDashboard') return 'dashboard';
+    if (path === 'userManagement') return 'users';
+    if (path === 'adminManagement') return 'admins';
+    if (path === 'subscriptionManagement') return 'subscriptions';
+    if (path === 'supportManagement') return 'support';
+    if (path === 'adminSettings') return 'settings';
+    if (path === 'analytics') return 'analytics';
     return '';
   };
   

@@ -19,6 +19,8 @@ import ProjectSettings from '@/components/ProjectSettings';
 import { api } from '@/lib/api';
 import { useConfirm } from '@/hooks/use-confirm';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getSubscriptionLimit } from '@/lib/subscriptionService';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
 // 获取团队自定义字段
 const selectTeamCustomFields = state => state?.teams?.teamCustomFields ?? [];
@@ -605,7 +607,18 @@ export default function ProjectSidebar({ projectId }) {
           {/* 创建团队按钮 - 仅当当前用户是项目创建者时显示且不在加载状态 */}
           {!isProjectLoading && canCreateTeam && (
             <button 
-              onClick={() => {
+              onClick={async () => {
+                // Check team creation limit before opening dialog
+                if (user && user.id) {
+                  const limitCheck = await getSubscriptionLimit(user.id, 'create_team');
+                  if (!limitCheck.allowed) {
+                    dispatch(limitExceeded({
+                      actionType: 'create_team',
+                      limitInfo: limitCheck
+                    }));
+                    return;
+                  }
+                }
                 setDialogOpen(true);
               }} 
               className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors"

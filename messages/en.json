@@ -266,7 +266,17 @@
         "remindLater": "Remind Me Later",
         "viewPlans": "View Upgrade Options",
         "daysRemaining": "{days} days remaining",
-        "manageSubscription": "Manage Subscription"
+        "manageSubscription": "Manage Subscription",
+        "limits": {
+          "createProjectLimited": "Project Creation Limit Reached",
+          "inviteMemberLimited": "Member Invitation Limit Reached",
+          "createTeamLimited": "Team Creation Limit Reached",
+          "aiChatLimited": "AI Chat Limit Reached",
+          "operationLimited": "Operation Limited",
+          "subscriptionLimit": "Subscription Limit",
+          "currentUsage": "Current Usage: {current}/{limit}",
+          "upgradeSubscription": "Upgrade Subscription"
+        }
       },
       "payments": {
         "title": "Payment Methods",
@@ -351,7 +361,10 @@
       },
       "auth": {
         "required": "Authentication required",
-        "loginRequired": "Please login to upgrade your plan"
+        "loginRequired": "Please login to upgrade your plan",
+        "createTeamLimited": "Team Creation Limited",
+        "aiChatLimited": "AI Chat Limit Reached",
+        "operationLimited": "Operation Limited"
       }
     }
   },
@@ -1275,7 +1288,7 @@
       "unhideFailed": "Failed to unhide chat",
       "updateFailed": "Failed to update message",
       "emptyMessage": "Message cannot be empty",
-      "messageTooLong": "Message too long (max 1000 characters)",
+      "messageTooLong": "Message is too long (maximum 1000 characters)",
       "nameCannotBeEmpty": "Group name cannot be empty",
       "leaveFailed": "Failed to leave group",
       "ownerCannotLeave": "Group owner cannot leave the group. Transfer ownership first or delete the group.",
@@ -1352,7 +1365,8 @@
     "transferringOwnership": "Transferring ownership...",
     "ownershipTransferred": "Group ownership transferred successfully",
     "confirmTransferTitle": "Transfer Group Ownership",
-    "confirmTransferDescription": "Are you sure you want to transfer ownership of this group to {name}? This action cannot be undone."
+    "confirmTransferDescription": "Are you sure you want to transfer ownership of this group to {name}? This action cannot be undone.",
+    "aiChatLimited": "AI Chat Limit Reached"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
@@ -1405,7 +1419,8 @@
     "alreadyMember": "You are already a member of this team",
     "alreadyTeamMember": "You are already a team member",
     "invitationDeclined": "Invitation Declined",
-    "declining": "Declining..."
+    "declining": "Declining...",
+    "teamIsFullError": "This team is full. The team owner needs to upgrade their plan to add more members."
   },
   "CustomField": {
     "title": "Custom Fields",

@@ -28,6 +28,8 @@ export default function SubscriptionLimitModal() {
         return t('inviteMemberLimited');
       case 'create_team':
         return t('createTeamLimited');
+      case 'ai_chat':
+        return t('aiChatLimited');
       default:
         return t('operationLimited');
     }

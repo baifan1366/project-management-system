@@ -44,7 +44,8 @@ export async function POST(request) {
     // 创建支付意向
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amount * 100 * quantity,
-      currency: 'usd',
+      currency: 'myr',
+      payment_method_types: ['card'],
       metadata: {
         planId,
         userId,

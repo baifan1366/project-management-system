@@ -24,6 +24,8 @@ import { supabase } from '@/lib/supabase'
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { createTeamValidationSchema, teamFormTransforms } from '@/components/validation/teamSchema'
 import { TeamGuard } from '@/components/team/TeamGuard'
+import { getSubscriptionLimit, trackSubscriptionUsage } from '@/lib/subscriptionService';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
 export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const t = useTranslations('CreateTeam')
@@ -106,6 +108,17 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
     try {
       // 获取当前用户信息
       const userId = user?.id;
+      // 订阅限制检查
+      const limitCheck = await getSubscriptionLimit(userId, 'create_team');
+      if (!limitCheck.allowed) {
+        dispatch(limitExceeded({
+          actionType: 'create_team',
+          limitInfo: limitCheck
+        }));
+        setIsLoading(false);
+        setIsSubmitting(false);
+        return;
+      }
       // 创建团队
       const team = await dispatch(createTeam({
         name: teamFormTransforms.teamName(data.teamName),
@@ -124,6 +137,13 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
         role: 'OWNER',
         created_by: userId
       })).unwrap();
+      
+      // 订阅用量递增
+      await trackSubscriptionUsage({
+        userId: userId,
+        actionType: 'create_team',
+        entityType: 'teams'
+      });
       
       if (data.teamAccess === 'can_edit') {
         try {          
