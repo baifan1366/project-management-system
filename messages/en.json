@@ -1366,7 +1366,20 @@
     "ownershipTransferred": "Group ownership transferred successfully",
     "confirmTransferTitle": "Transfer Group Ownership",
     "confirmTransferDescription": "Are you sure you want to transfer ownership of this group to {name}? This action cannot be undone.",
-    "aiChatLimited": "AI Chat Limit Reached"
+    "aiChatLimited": "AI Chat Limit Reached",
+    "project": "Project",
+    "created": "Created",
+    "updated": "Updated",
+    "viewDetails": "View details",
+    "createdBy": "Created by",
+    "viewProfile": "View Profile",
+    "viewProject": "View Project",
+    "viewTask": "View Task",
+    "userDetails": "User Details",
+    "projectDetails": "Project Details",
+    "taskDetails": "Task Details",
+    "unknown": "Unknown",
+    "close": "Close"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
