@@ -6,10 +6,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, BarChart2, History, ArrowUpCircle } from 'lucide-react';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
+import { useUserStatus } from '@/contexts/UserStatusContext';
+import { useRouter, useSearchParams } from 'next/navigation';
 // Import subscription components
 import { SubscriptionCard, UsageStats, PaymentHistory, UpgradeOptions } from '@/components/subscription';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 
 // Initialize Stripe outside of component to avoid recreation on re-renders
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -51,11 +54,49 @@ const SubscriptionSkeleton = () => (
 export default function SubscriptionPage() {
   const t = useTranslations('profile');
   const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { checkSubscriptionStatus, currentUser } = useUserStatus();
+  const [refreshing, setRefreshing] = useState(false);
+  const [defaultTab, setDefaultTab] = useState('current-plan');
+
+  // Check for payment success param
+  useEffect(() => {
+    const payment_status = searchParams.get('payment_status');
+    
+    if (payment_status === 'success' || payment_status === 'completed') {
+      // Force refresh subscription data
+      if (currentUser?.id) {
+        setRefreshing(true);
+        
+        toast.success(t('subscription.paymentSuccess') || 'Payment processed successfully', {
+          description: t('subscription.updatingDetails') || 'Your subscription details are being updated'
+        });
+        
+        // Refresh subscription status
+        checkSubscriptionStatus(currentUser.id).then(() => {
+          setRefreshing(false);
+        });
+      }
+      
+      // Clean URL params
+      const newUrl = window.location.pathname;
+      router.replace(newUrl);
+      
+      // Set active tab to current plan
+      setDefaultTab('current-plan');
+    }
+  }, [searchParams, currentUser?.id, checkSubscriptionStatus, router, t]);
 
   // Ensure we're running in client context before rendering Stripe components
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    
+    // Refresh subscription status on every visit
+    if (currentUser?.id) {
+      checkSubscriptionStatus(currentUser.id);
+    }
+  }, [currentUser?.id, checkSubscriptionStatus]);
 
   return (
     <div className="space-y-6">
@@ -65,7 +106,7 @@ export default function SubscriptionPage() {
           <CardDescription>{t('subscription.description')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="current-plan" className="space-y-6">
+          <Tabs defaultValue={defaultTab} className="space-y-6">
             <TabsList className="bg-muted/60">
               <TabsTrigger value="current-plan" className="flex items-center gap-2 data-[state=active]:font-medium">
                 <CreditCard className="h-4 w-4" />
@@ -86,7 +127,7 @@ export default function SubscriptionPage() {
             </TabsList>
 
             <TabsContent value="current-plan" className="mt-6 space-y-0">
-              {isClient ? <SubscriptionCard /> : <SubscriptionSkeleton />}
+              {isClient && !refreshing ? <SubscriptionCard /> : <SubscriptionSkeleton />}
             </TabsContent>
 
             <TabsContent value="usage-stats">

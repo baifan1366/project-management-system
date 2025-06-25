@@ -20,7 +20,7 @@ import { fetchAgileRoles } from '@/lib/redux/features/agileSlice';
  * 敏捷角色表单组件
  * 用于创建和编辑敏捷角色
  */
-const RoleForm = ({ initialValues, onSubmit, loading, teamId, isOpen }) => {
+const RoleForm = ({ initialValues, onSubmit, loading, teamId, isOpen, themeColor }) => {
   const isEdit = !!initialValues?.id;
   const {user} = useGetUser();
   const userId = user?.id;
@@ -189,7 +189,7 @@ const RoleForm = ({ initialValues, onSubmit, loading, teamId, isOpen }) => {
         
         {/* 提交按钮 */}
         <div className="w-full flex justify-end">
-          <Button type="submit" disabled={loading} className="">
+          <Button type="submit" variant={themeColor} disabled={loading}>
             {isEdit ? t('updateRole') : t('createRole')}
           </Button>
         </div>

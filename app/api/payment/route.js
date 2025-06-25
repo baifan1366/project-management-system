@@ -1,6 +1,7 @@
 //payment intent
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe';
+import crypto from 'crypto';
 
 // 确保使用正确的环境变量名称
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY, {
@@ -49,7 +50,7 @@ export async function POST(request) {
       metadata: {
         planId,
         userId,
-        orderId: body.metadata?.orderId,
+        orderId: body.metadata?.orderId || crypto.randomUUID(),
         planName: planName || '',
         quantity: quantity.toString(),
         promoCode: promoCode || '',

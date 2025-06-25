@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import crypto from 'crypto';
 
 export async function POST(req) {
   try {
@@ -22,6 +23,9 @@ export async function POST(req) {
     const body = await req.json();
     
     const { orderId, planName, price, quantity, email, userId, planId, promoCode, discount, finalAmount } = body;
+    
+    // Generate an order ID if not provided
+    const paymentOrderId = orderId || crypto.randomUUID();
     
     // Validate required parameters
     if (!price || price <= 0) {
@@ -69,7 +73,7 @@ export async function POST(req) {
       customer_email: email,
       locale: 'en', // Set language to English
       metadata: {
-        orderId: orderId,
+        orderId: paymentOrderId,
         planName: planName,
         quantity: quantity.toString(),
         userId: userId,

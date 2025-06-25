@@ -60,7 +60,7 @@ function getItemLink(item, locale) {
     case 'calendar':
       return `/${locale}/calendar/${item.id}`;
     case 'message':
-      return `/${locale}/chat/${item.chat_id || item.session_id}`;
+      return `/${locale}/chat?session=${item.chat_id || item.session_id}`;
     default:
       return '#';
   }
@@ -81,6 +81,16 @@ function getDisplayName(item, t) {
       return item.chat_name || t('search.message');
     default:
       return item.title || item.name || item.project_name || t('search.untitled');
+  }
+}
+
+// 获取详细内容（用于描述或消息内容）
+function getDetailContent(item) {
+  switch (item.type) {
+    case 'message':
+      return item.content;
+    default:
+      return item.description;
   }
 }
 
@@ -188,9 +198,9 @@ export default function SearchResults({ results, loading, query, onUserClick }) 
                   </span>
                 </div>
                 
-                {item.description && (
+                {(item.type === 'message' || item.description) && (
                   <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-2">
-                    <HighlightText text={item.description} query={query} />
+                    <HighlightText text={getDetailContent(item)} query={query} />
                   </p>
                 )}
                 

@@ -280,11 +280,26 @@ export default function PaymentSuccess() {
     try {
       const isAlipay = sessionData && sessionData.payment_method_types.includes('alipay');
       const metadata = paymentData?.metadata || sessionData?.metadata || {};
-      const orderId = metadata?.orderId;
+      
+      // Try to find orderId in different potential locations
+      const orderId = metadata?.orderId || 
+                      paymentData?.metadata?.orderId || 
+                      sessionData?.metadata?.orderId ||
+                      metadata?.order_id || 
+                      paymentData?.metadata?.order_id || 
+                      sessionData?.metadata?.order_id || 
+                      // If no order ID found, generate a new UUID
+                      uuidv4();
 
-      if (!orderId) {
-        throw new Error('No order ID found in payment metadata');
-      }
+      // Log the found orderId for debugging purposes
+      console.log('Using order ID:', orderId, 'Source:', 
+        metadata?.orderId ? 'metadata.orderId' : 
+        paymentData?.metadata?.orderId ? 'paymentData.metadata.orderId' : 
+        sessionData?.metadata?.orderId ? 'sessionData.metadata.orderId' : 
+        metadata?.order_id ? 'metadata.order_id' : 
+        paymentData?.metadata?.order_id ? 'paymentData.metadata.order_id' : 
+        sessionData?.metadata?.order_id ? 'sessionData.metadata.order_id' : 
+        'newly generated UUID');
 
       const status = (paymentData?.status === 'succeeded' || sessionData?.payment_status === 'paid')
         ? 'COMPLETED'
@@ -327,6 +342,14 @@ export default function PaymentSuccess() {
     }
   };
 
+  // 获取当前语言
+  const locale = searchParams.get('locale') || 'en'; // 如果没有语言参数，默认使用英文
+  
+  // 修改跳转路径，包含语言
+  const getLocalizedPath = (path) => {
+    return `/${locale}${path}`;
+  };
+
   // Initial setup on component mount
   useEffect(() => {
     const initializePaymentSuccess = async () => {
@@ -344,6 +367,28 @@ export default function PaymentSuccess() {
             description: 'No payment identifier found.'
           });
         }
+        
+        // 检查是否为套餐升级付款，如果是则添加5秒后自动跳转
+        if (metadata?.upgradeType === 'immediate' || sessionDetails?.metadata?.upgradeType === 'immediate') {
+          // 显示倒计时提示
+          setShowProcessedModal(true);
+          
+          // 启动倒计时
+          const timer = setInterval(() => {
+            setCountdown(prev => {
+              if (prev <= 1) {
+                clearInterval(timer);
+                // 倒计时结束后跳转
+                router.push(getLocalizedPath('/settings/subscription'));
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+          
+          // 清理定时器
+          return () => clearInterval(timer);
+        }
       } catch (error) {
         console.error('Initialization error on payment success page:', error);
         // Error toast is handled in the processing functions
@@ -354,6 +399,13 @@ export default function PaymentSuccess() {
 
     initializePaymentSuccess();
   }, [searchParams]);
+
+  // 添加倒计时提示组件渲染逻辑
+  useEffect(() => {
+    if (showProcessedModal && countdown === 0) {
+      router.push(getLocalizedPath('/settings/subscription'));
+    }
+  }, [countdown, showProcessedModal, router]);
 
   // Process payment with session ID
   const processPaymentWithSession = async (sessionId) => {
@@ -568,20 +620,63 @@ export default function PaymentSuccess() {
   }
 
   return (
-    <>
-      {showProcessedModal ? (
-        <ProcessedPaymentModal countdown={countdown} />
+    <div className="max-w-md mx-auto mt-16 p-4">
+      {loading ? (
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verifying your payment...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center space-y-4">
+          <div className="bg-red-100 p-4 rounded-md text-red-700">
+            <h3 className="font-medium">Payment Error</h3>
+            <p className="mt-2 text-sm">{error}</p>
+          </div>
+          <Link href="/payment" className="mt-6 inline-block text-indigo-600 hover:text-indigo-800">
+            Return to Payment Page
+          </Link>
+        </div>
+      ) : showProcessedModal ? (
+        // 套餐升级成功倒计时页面
+        <div className="text-center space-y-4 bg-white p-6 rounded-lg shadow-md">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+            <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Plan Upgraded Successfully!</h2>
+          <p className="text-green-600 font-medium">
+            Your subscription has been updated to {metadata?.planName || sessionDetails?.metadata?.planName}
+          </p>
+          <div className="my-4 p-3 bg-blue-50 rounded-md">
+            <p>Redirecting to subscription page in <span className="font-bold">{countdown}</span> seconds...</p>
+          </div>
+          <div className="mt-4">
+            <button 
+              onClick={() => router.push('/settings/subscription')}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
+            >
+              Go to Subscription Page Now
+            </button>
+          </div>
+        </div>
       ) : (
-        <PaymentSuccessModal
-          metadata={metadata}
-          userEmail={userEmail}
-          formatAmount={formatAmount}
-          formatOrderId={formatOrderId}
-          isOrderIdExpanded={isOrderIdExpanded}
-          setIsOrderIdExpanded={setIsOrderIdExpanded}
-          copyToClipboard={copyToClipboard}
-        />
+        <>
+          {paymentDetails || metadata ? (
+            <PaymentSuccessModal 
+              metadata={metadata}
+              userEmail={userEmail}
+              formatAmount={formatAmount}
+              formatOrderId={formatOrderId}
+              isOrderIdExpanded={isOrderIdExpanded}
+              setIsOrderIdExpanded={setIsOrderIdExpanded}
+              copyToClipboard={copyToClipboard}
+            />
+          ) : (
+            <ProcessedPaymentModal />
+          )}
+        </>
       )}
-    </>
+    </div>
   );
 }

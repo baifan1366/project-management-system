@@ -219,7 +219,37 @@ export default function ProjectsPage() {
     }));
   }, [projects, showArchived, statusFilter, user, teams, teamUsers]);
 
-  // 获取项目的团队成员
+  // Use useEffect to check for and load missing team user data
+  useEffect(() => {
+    if (projects.length > 0 && teams.length > 0) {
+      // Get potentially visible projects (same logic as in formattedProjects)
+      const potentiallyVisibleProjects = projects.filter(project => {
+        const matchesArchiveState = showArchived ? project.archived : !project.archived;
+        const matchesStatusFilter = statusFilter === 'ALL' || project.status === statusFilter;
+        
+        // Basic visibility check
+        const visibility = project.visibility?.toLowerCase?.() || 'private';
+        const basicVisibilityAccess = 
+          visibility === 'public' || 
+          (visibility === 'private' && user && user.id === project.created_by);
+        
+        return matchesArchiveState && matchesStatusFilter && basicVisibilityAccess;
+      });
+      
+      // For each potentially visible project, make sure we have team user data
+      potentiallyVisibleProjects.forEach(project => {
+        const projectTeams = teams.filter(team => team && team.project_id === project.id);
+        
+        projectTeams.forEach(team => {
+          if (!teamUsers[team.id] || teamUsers[team.id].length === 0) {
+            dispatch(fetchTeamUsers(team.id));
+          }
+        });
+      });
+    }
+  }, [projects, teams, teamUsers, showArchived, statusFilter, user, dispatch]);
+
+  // 获取项目的团队成员 - MODIFIED: Make this a pure function without dispatches
   const getProjectTeamMembers = useCallback((projectId) => {
     try {
       if (!teams || !Array.isArray(teams)) {
@@ -236,13 +266,6 @@ export default function ProjectsPage() {
       const projectTeams = teams.filter(team => team && team.project_id === projectId);
       
       if (!projectTeams.length) return [];
-      
-      // Ensure we have team users data for all teams
-      projectTeams.forEach(team => {
-        if (!teamUsers[team.id] || teamUsers[team.id].length === 0) {
-          dispatch(fetchTeamUsers(team.id));
-        }
-      });
       
       // 获取这些团队的所有成员
       const teamMembers = [];
@@ -299,7 +322,7 @@ export default function ProjectsPage() {
       console.error('Getting project team members failed:', error);
       return [];
     }
-  }, [teams, teamUsers, allUsers, dispatch]);
+  }, [teams, teamUsers, allUsers]);
 
   // 处理打开用户资料对话框
   const handleOpenUserProfile = useCallback((user, e) => {

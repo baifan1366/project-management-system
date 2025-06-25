@@ -7,7 +7,8 @@ import { supabase } from '@/lib/supabase';
  */
 export async function GET(request, { params }) {
   try {
-    const { teamId } = params;
+    // 确保 params 是已解析的对象
+    const teamId = params?.teamId;
 
     if (!teamId) {
       return NextResponse.json(

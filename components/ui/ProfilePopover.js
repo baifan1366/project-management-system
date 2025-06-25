@@ -1,7 +1,7 @@
 import { PopoverContent } from '@/components/ui/popover';
 import { useTranslations } from 'next-intl';
 import { Button } from './button';
-import { ChevronRight, Settings, User, Zap, LogOut, Sparkles, Workflow } from 'lucide-react';
+import { ChevronRight, Settings, User, Zap, LogOut, Sparkles, Workflow, Bot } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import LanguageSwitcher from '../LanguageSwitcher';
 import { ThemeToggle } from './ThemeToggle';
@@ -31,12 +31,19 @@ export function ProfilePopover({ onClose }) {
     {
       icon: <Zap className="w-4 h-4" />,
       label: t('profile.upgrade'),
-      href: '/upgrade'
+      href: '/settings/subscription',
+      isUpgrade: true
     },
     {
       icon: <Settings className="w-4 h-4" />,
       label: t('profile.settings'),
       href: '/settings'
+    },
+        {
+      icon: <Bot className="w-4 h-4" />,
+      label: t('nav.chat') + ' AI',
+      href: '/chat?mode=ai',
+      isAIChat: true
     },
     {
       icon: <Sparkles className="w-4 h-4" />,
@@ -79,25 +86,23 @@ export function ProfilePopover({ onClose }) {
               <Button
                 key={index}
                 variant="ghost"
-                className="w-full justify-between px-4 py-2 h-auto font-normal"
+                className={`w-full justify-between px-4 py-2 h-auto font-normal ${
+                  item.isUpgrade ? 'text-yellow-600 hover:text-white hover:bg-yellow-600' : ''
+                }`}
                 onClick={() => router.push(item.href)}
               >
                 <div className="flex items-center gap-3">
                   {item.icon}
                   <span>{item.label}</span>
                 </div>
-                {/* <ChevronRight className="w-4 h-4" /> */}
               </Button>
             ))}
-
-            <LanguageSwitcher/>
-            <ThemeToggle/>
           </div>
 
           <div className="border-t py-2">
             <Button
               variant="ghost"
-              className="w-full justify-start px-4 py-2 h-auto font-normal text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="w-full justify-start px-4 py-2 h-auto font-normal text-red-600 hover:text-white hover:bg-red-600"
               onClick={handleSignOut}
             >
               <div className="flex items-center gap-3">
