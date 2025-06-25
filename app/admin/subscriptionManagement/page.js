@@ -41,13 +41,20 @@ export default function AdminSubscriptions() {
   const [isCodeSelected, setIsCodeSelected] = useState(null);
   const [isUserSubscriptionPlanSelected, setIsUserSubscriptionPlanSelected] = useState(null);
   const [codeName, setCodeName] = useState('');
+  const [codeNameError, setCodeNameError] = useState('');
   const [codeType, setCodeType] = useState('');
+  const [codeTypeError, setCodeTypeError] = useState('');
   const [codeValue, setCodeValue] = useState('');
+  const [codeValueError, setCodeValueError] = useState('');
   const [codeDescription, setCodeDescription] = useState('');
+  const [codeDescriptionError, setCodeDescriptionError] = useState('');
   const [codeIsActive, setCodeIsActive] = useState('true');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDateError, setStartDateError] = useState('');
   const [endDate, setEndDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]);
+  const [endDateError, setEndDateError] = useState('');
   const [maxUses, setMaxUses] = useState('100');
+  const [maxUsesError, setMaxUsesError] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
   const [isPaymentLoading, setIsPaymentLoading] = useState(true);
@@ -61,8 +68,9 @@ export default function AdminSubscriptions() {
   const permissions = useSelector((state) => state.admin.permissions);
   const [userSubscriptions, setUserSubscriptions] = useState([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('ALL');
+  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('ACTIVE');
   const [planTypeFilter, setPlanTypeFilter] = useState('all');
+  const [planNameFilter, setPlanNameFilter] = useState('all');
   const [isUserSubscriptionDetailsModalOpen, setIsUserSubscriptionDetailsModalOpen] = useState(false);
   const [selectedSubscriptionDetails, setSelectedSubscriptionDetails] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
@@ -86,6 +94,10 @@ export default function AdminSubscriptions() {
     },
     recentActivity: []
   });
+  
+  // Add these new state variables after the existing state variables (around line 70)
+  const [allPayments, setAllPayments] = useState([]);
+  const [filteredPayments, setFilteredPayments] = useState([]);
   
   // initialize the page
   useEffect(() => {
@@ -172,7 +184,7 @@ export default function AdminSubscriptions() {
       }
       
       if (planTypeFilter !== 'all') {
-        query = query.eq('plan.type', planTypeFilter);
+        query = query.eq('plan_id.type', planTypeFilter);
       }
         
       const { data, error } = await query;
@@ -220,6 +232,15 @@ export default function AdminSubscriptions() {
     setIsCodeSelected(code);
     setCurrentModalPage(1);
     
+    // Reset all error states when opening any modal
+    setCodeNameError('');
+    setCodeTypeError('');
+    setCodeValueError('');
+    setCodeDescriptionError('');
+    setStartDateError('');
+    setEndDateError('');
+    setMaxUsesError('');
+    
     if (type === 'edit' && plan) {
       setPlanName(plan.name || '');
       setPlanType(plan.type || '');
@@ -256,11 +277,26 @@ export default function AdminSubscriptions() {
       
       // Set the dates (format them for the date input)
       if (code.start_date) {
+        const codeStartDate = new Date(code.start_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // If editing an existing code, allow past dates if they were already set
         setStartDate(new Date(code.start_date).toISOString().split('T')[0]);
       }
       if (code.end_date) {
         setEndDate(new Date(code.end_date).toISOString().split('T')[0]);
       }
+    } else if (type === 'add' && activeTab === "promoCodes") {
+      // Reset promo code form values
+      setCodeName('');
+      setCodeType('');
+      setCodeValue('');
+      setCodeDescription('');
+      setCodeIsActive('true');
+      setStartDate(new Date().toISOString().split('T')[0]);
+      setEndDate(new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]);
+      setMaxUses('100');
     }
     
     setIsModalOpen(true);
@@ -445,11 +481,6 @@ export default function AdminSubscriptions() {
 
   const deletePromoCode = async () => {
     try {
-      if (deleteConfirmation !== isCodeToDelete.code) {
-        toast.error('Please type the promo code correctly to confirm deletion');
-        return;
-      }
-
       setProcessing(true);
       
       const { error } = await supabase
@@ -480,62 +511,42 @@ export default function AdminSubscriptions() {
     }
   };
 
+  // Replace the fetchPaymentHistory function
   const fetchPaymentHistory = async () => {
     try {
       setIsPaymentLoading(true);
       setPaymentError(null);
 
-
-      let query = supabase
+      // Fetch all payment records at once
+      const { data, error } = await supabase
         .from('payment')
         .select(`
           *,
           user:user_id (email, name)
         `)
         .order('created_at', { ascending: false });
-      
-
-      if (paymentStatusFilter !== 'all') {
-        query = query.eq('status', paymentStatusFilter);
-      }
-      
-
-      if (paymentSearchQuery) {
-        query = query.or(`user.email.ilike.%${paymentSearchQuery}%,transaction_id.ilike.%${paymentSearchQuery}%`);
-      }
-      
-
-      const from = (currentPaymentPage - 1) * itemsPerPage;
-      const to = from + itemsPerPage - 1;
-      
-
-      const { count } = await supabase
-        .from('payment')
-        .select('*', { count: 'exact', head: true });
-      
-
-      setTotalPayments(count || 0);
-      setTotalPages(Math.ceil((count || 0) / itemsPerPage));
-      
-
-      query = query.range(from, to);
-      
-      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching payment history:', error);
         setPaymentError('An error occurred while fetching payment history.');
-      } else {
-
-        const formattedPayments = data.map(payment => ({
-          ...payment,
-          userName: payment.user?.name || 'Unknown',
-          userEmail: payment.user?.email || 'No email'
-        }));
-        
-        
-        setPayments(formattedPayments);
+        return;
       }
+
+      const formattedPayments = data.map(payment => ({
+        ...payment,
+        userName: payment.user?.name || 'Unknown',
+        userEmail: payment.user?.email || 'No email'
+      }));
+      
+      setAllPayments(formattedPayments);
+      
+      // Apply initial filtering
+      filterPayments(formattedPayments, paymentStatusFilter, paymentSearchQuery);
+      
+      // Calculate total for pagination
+      setTotalPayments(formattedPayments.length);
+      setTotalPages(Math.ceil(formattedPayments.length / itemsPerPage));
+      
     } catch (error) {
       console.error('Error in fetchPaymentHistory:', error);
       setPaymentError('An error occurred while fetching payment history.');
@@ -544,37 +555,71 @@ export default function AdminSubscriptions() {
     }
   };
 
+  // Add a new function to filter payments on the frontend
+  const filterPayments = (payments = allPayments, statusFilter = paymentStatusFilter, searchQuery = paymentSearchQuery) => {
+    let filtered = [...payments];
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(payment => payment.status === statusFilter);
+    }
+    
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(payment => 
+        payment.userName?.toLowerCase().includes(query) ||
+        payment.userEmail?.toLowerCase().includes(query) ||
+        payment.transaction_id?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Update filtered payments
+    setFilteredPayments(filtered);
+    
+    // Update pagination
+    setTotalPayments(filtered.length);
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+    
+    // Reset to first page if current page is out of bounds
+    if (currentPaymentPage > Math.ceil(filtered.length / itemsPerPage)) {
+      setCurrentPaymentPage(1);
+    }
+  };
 
+  // Modify the useEffect for payment history filtering
   useEffect(() => {
     if (activeTab === 'paymentHistory') {
-      fetchPaymentHistory();
+      if (allPayments.length === 0) {
+        fetchPaymentHistory();
+      } else {
+        filterPayments(allPayments, paymentStatusFilter, paymentSearchQuery);
+      }
     }
-  }, [activeTab, paymentStatusFilter, paymentSearchQuery, currentPaymentPage]);
+  }, [activeTab, paymentStatusFilter, paymentSearchQuery]);
 
-  // Add toast for exporting csv
+  // Add a useEffect for pagination
+  useEffect(() => {
+    // This will update the visible payments when the page changes
+    if (activeTab === 'paymentHistory') {
+      // No need to fetch again, just update the pagination
+    }
+  }, [currentPaymentPage, activeTab]);
+
+  // Replace the exportPaymentsToCSV function
   const exportPaymentsToCSV = async () => {
     try {
       // Show loading toast
       const loadingToast = toast.loading('Preparing payment history export...');
       setIsPaymentLoading(true);
       
-
-      const { data, error } = await supabase
-        .from('payment')
-        .select(`
-          *,
-          user:user_id (email, name)
-        `)
-        .order('created_at', { ascending: false });
-        
-      if (error) {
-        throw error;
-      }
+      // Use the filtered payments instead of fetching from the database
+      const paymentsToExport = filteredPayments;
       
       // Format data
-      const formattedData = data.map(payment => ({
-        'User Name': payment.user?.name || 'Unknown',
-        'User Email': payment.user?.email || 'No email',
+      const formattedData = paymentsToExport.map(payment => ({
+        'User Name': payment.userName || 'Unknown',
+        'User Email': payment.userEmail || 'No email',
         'Amount': parseFloat(payment.amount).toFixed(2),
         'Currency': payment.currency,
         'Discount Amount': parseFloat(payment.discount_amount || 0).toFixed(2),
@@ -610,7 +655,7 @@ export default function AdminSubscriptions() {
       // Dismiss loading toast and show success toast
       toast.dismiss(loadingToast);
       toast.success(`Payment history exported to ${fileName}`, {
-        description: `${data.length} records exported successfully`
+        description: `${paymentsToExport.length} records exported successfully`
       });
       
     } catch (error) {
@@ -709,6 +754,89 @@ export default function AdminSubscriptions() {
         setLoading(false);
       } 
   }
+
+  // Validate promo code format
+  const validatePromoCode = (code) => {
+    // Check if code is at least 5 characters long
+    if (!code || code.length < 5) {
+      return "Promo code must be at least 5 characters long";
+    }
+    
+    // Check if code contains special characters or spaces
+    if (!/^[a-zA-Z0-9]+$/.test(code)) {
+      return "Promo code cannot contain spaces or special characters";
+    }
+    
+    return "";
+  };
+  
+  // Validate discount value
+  const validateDiscountValue = (value, type) => {
+    const numValue = parseFloat(value);
+    
+    if (isNaN(numValue) || numValue < 1) {
+      return "Discount value must be at least 1";
+    }
+    
+    if (type === 'PERCENTAGE' && numValue > 100) {
+      return "Percentage discount cannot exceed 100%";
+    }
+    
+    return "";
+  };
+  
+  // Validate description
+  const validateDescription = (desc) => {
+    if (!desc || desc.trim().length < 8) {
+      return "Description must be at least 8 characters long";
+    }
+    
+    return "";
+  };
+  
+  // Validate max uses
+  const validateMaxUses = (uses) => {
+    const numUses = parseInt(uses);
+    
+    if (isNaN(numUses) || numUses < 0) {
+      return "Max uses must be a non-negative number";
+    }
+    
+    return "";
+  };
+
+  // Validate start date
+  const validateStartDate = (start) => {
+    if (!start) {
+      return "Start date is required";
+    }
+    
+    const startDate = new Date(start);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to beginning of today
+    
+    if (startDate < today) {
+      return "Start date cannot be in the past";
+    }
+    
+    return "";
+  };
+
+  // Validate end date
+  const validateEndDate = (end, start) => {
+    if (!end) {
+      return "End date is required";
+    }
+    
+    const endDate = new Date(end);
+    const startDate = new Date(start);
+    
+    if (endDate < startDate) {
+      return "End date cannot be earlier than start date";
+    }
+    
+    return "";
+  };
 
   // Fix the addPromoCode function
   const addPromoCode = async (codeData) =>{
@@ -937,8 +1065,8 @@ export default function AdminSubscriptions() {
           created_at,
           amount,
           status,
-          user:user_id (name, email),
-          plan:metadata->planId (name, type)
+          user:user_id(name,email),
+          metadata->planId
         `)
         .order('created_at', { ascending: false })
         .limit(3);
@@ -949,7 +1077,7 @@ export default function AdminSubscriptions() {
         id: activity.id,
         type: activity.status === 'COMPLETED' ? 'payment' : 'cancellation',
         userName: activity.user?.name || activity.user?.email || 'Unknown User',
-        planName: activity.plan?.name || 'Unknown Plan',
+        planName: activity.metadata?.planId || 'Unknown Plan',
         amount: activity.amount,
         timestamp: activity.created_at
       }));
@@ -977,6 +1105,12 @@ export default function AdminSubscriptions() {
   useEffect(() => {
     updateSubscriptionAnalytics();
   }, [userSubscriptions]);
+
+  const filteredUserSubscriptions = userSubscriptions.filter(sub => {
+    const typeMatch = (planTypeFilter === 'all') || (sub.plan && sub.plan.type === planTypeFilter);
+    const nameMatch = (planNameFilter === 'all') || (sub.plan && sub.plan.name === planNameFilter);
+    return typeMatch && nameMatch;
+  });
 
   if (loading) {
     return (
@@ -1439,10 +1573,20 @@ export default function AdminSubscriptions() {
                     value={planTypeFilter}
                     onChange={(e) => setPlanTypeFilter(e.target.value)}
                   >
-                    <option value="all">All Plans</option>
+                    <option value="all">All Types</option>
                     <option value="FREE">Free</option>
                     <option value="PRO">Pro</option>
                     <option value="ENTERPRISE">Enterprise</option>
+                  </select>
+                  <select 
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                    value={planNameFilter}
+                    onChange={(e) => setPlanNameFilter(e.target.value)}
+                  >
+                    <option value="all">All Plans</option>
+                    {subscriptionPlans.map(plan => (
+                      <option key={plan.id} value={plan.name}>{plan.name}</option>
+                    ))}
                   </select>
                   <select 
                     className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
@@ -1458,7 +1602,7 @@ export default function AdminSubscriptions() {
               </div>
               
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                {userSubscriptions.length === 0 ? (
+                {filteredUserSubscriptions.length === 0 ? (
                   <div className="p-6 text-center">
                     <p className="text-gray-500 dark:text-gray-400">
                       {userSearchQuery || subscriptionStatusFilter !== 'all' || planTypeFilter !== 'all' 
@@ -1537,7 +1681,7 @@ export default function AdminSubscriptions() {
                         </tr>
                       </thead>
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {userSubscriptions.map((subscription) => {
+                        {filteredUserSubscriptions.map((subscription) => {
                           return (
                             <tr 
                               key={subscription.id} 
@@ -1873,13 +2017,13 @@ export default function AdminSubscriptions() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Monthly</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Monthly Billing</p>
                       <p className="text-2xl font-semibold text-gray-800 dark:text-white">
                         {subscriptionStats.stats.monthly}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Yearly</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Yearly Billing</p>
                       <p className="text-2xl font-semibold text-gray-800 dark:text-white">
                         {subscriptionStats.stats.yearly}
                       </p>
@@ -1942,7 +2086,7 @@ export default function AdminSubscriptions() {
                       Try Again
                     </button>
                   </div>
-                ) : payments.length === 0 ? (
+                ) : filteredPayments.length === 0 ? (
                   <div className="p-10 text-center">
                     <p className="text-gray-500 dark:text-gray-400">No payment records found.</p>
                   </div>
@@ -1973,56 +2117,58 @@ export default function AdminSubscriptions() {
                           </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                          {payments.map((payment) => (
-                            <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
-                                  <div>
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                      {payment.userName || 'Unknown'}
-                                    </div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                                      {payment.userEmail || 'No email'}
+                          {filteredPayments
+                            .slice((currentPaymentPage - 1) * itemsPerPage, currentPaymentPage * itemsPerPage)
+                            .map((payment) => (
+                              <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {payment.userName || 'Unknown'}
+                                      </div>
+                                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                                        {payment.userEmail || 'No email'}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900 dark:text-white">
-                                  {parseFloat(payment.amount).toFixed(2)} {payment.currency}
-                                </div>
-                                {payment.discount_amount > 0 && (
-                                  <div className="text-xs text-green-600 dark:text-green-400 flex flex-col">
-                                    <span>Discount: ${parseFloat(payment.discount_amount).toFixed(2)}</span> 
-                                    <span>Promo Code: {payment.applied_promo_code}</span> 
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 dark:text-white">
+                                    {parseFloat(payment.amount).toFixed(2)} {payment.currency}
                                   </div>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                  ${payment.status === 'COMPLETED' 
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' 
-                                    : payment.status === 'PENDING'
-                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
-                                    : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
-                                  }`}
-                                >
-                                  {payment.status}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                {new Date(payment.created_at).toLocaleString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                <span className="capitalize">{payment.payment_method}</span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                <div className="truncate max-w-xs" title={payment.transaction_id}>
-                                  {payment.transaction_id}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                                  {payment.discount_amount > 0 && (
+                                    <div className="text-xs text-green-600 dark:text-green-400 flex flex-col">
+                                      <span>Discount: ${parseFloat(payment.discount_amount).toFixed(2)}</span> 
+                                      <span>Promo Code: {payment.applied_promo_code}</span> 
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    ${payment.status === 'COMPLETED' 
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' 
+                                      : payment.status === 'PENDING'
+                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
+                                      : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+                                    }`}
+                                  >
+                                    {payment.status}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                  {new Date(payment.created_at).toLocaleString()}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                  <span className="capitalize">{payment.payment_method}</span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                  <div className="truncate max-w-xs" title={payment.transaction_id}>
+                                    {payment.transaction_id}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
                         </tbody>
                       </table>
                     </div>
@@ -2041,9 +2187,9 @@ export default function AdminSubscriptions() {
                         </button>
                         <button
                           onClick={() => setCurrentPaymentPage(currentPaymentPage + 1)}
-                          disabled={payments.length < itemsPerPage}
+                          disabled={filteredPayments.length < itemsPerPage}
                           className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                            payments.length < itemsPerPage
+                            filteredPayments.length < itemsPerPage
                               ? 'text-gray-400 bg-gray-100'
                               : 'text-gray-700 bg-white hover:bg-gray-50'
                           }`}
@@ -2054,7 +2200,7 @@ export default function AdminSubscriptions() {
                       <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm text-gray-700 dark:text-gray-400">
-                            Showing <span className="font-medium">{payments.length > 0 ? (currentPaymentPage - 1) * itemsPerPage + 1 : 0}</span> to{' '}
+                            Showing <span className="font-medium">{filteredPayments.length > 0 ? (currentPaymentPage - 1) * itemsPerPage + 1 : 0}</span> to{' '}
                             <span className="font-medium">{Math.min(currentPaymentPage * itemsPerPage, totalPayments)}</span> of{' '}
                             <span className="font-medium">{totalPayments}</span> results
                           </p>
@@ -2184,7 +2330,6 @@ export default function AdminSubscriptions() {
                       type='text'
                       id='add-name'
                       name='name'
-                      required
                       value={planName}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
@@ -2970,6 +3115,30 @@ export default function AdminSubscriptions() {
             
             <form onSubmit={(e) => {
               e.preventDefault();
+              
+              // Validate form fields
+              const codeError = validatePromoCode(codeName);
+              const typeError = !codeType ? "Please select a discount type" : "";
+              const valueError = validateDiscountValue(codeValue, codeType);
+              const descError = validateDescription(codeDescription);
+              const startError = validateStartDate(startDate);
+              const endError = validateEndDate(endDate, startDate);
+              const usesError = validateMaxUses(maxUses);
+              
+              // Update error states
+              setCodeNameError(codeError);
+              setCodeTypeError(typeError);
+              setCodeValueError(valueError);
+              setCodeDescriptionError(descError);
+              setStartDateError(startError);
+              setEndDateError(endError);
+              setMaxUsesError(usesError);
+              
+              // Check if there are any errors
+              if (codeError || typeError || valueError || descError || startError || endError || usesError) {
+                return;
+              }
+              
               const codeData = {
                 code: codeName,
                 discount_type: codeType,
@@ -2997,14 +3166,23 @@ export default function AdminSubscriptions() {
                     type='text'
                     id='add-code-name'
                     name='code'
-                    required
                     value={codeName}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${codeNameError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter promo code'
-                    onChange={(e) => setCodeName(e.target.value)}
+                    onChange={(e) => {
+                      setCodeName(e.target.value);
+                      if (codeNameError) {
+                        setCodeNameError(validatePromoCode(e.target.value));
+                      }
+                    }}
+                    onBlur={(e) => setCodeNameError(validatePromoCode(e.target.value))}
                   />
+                  {codeNameError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{codeNameError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3014,17 +3192,28 @@ export default function AdminSubscriptions() {
                   <select
                     id='add-code-type'
                     name='discount_type'
-                    required
                     value={codeType}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                    onChange={(e) => setCodeType(e.target.value)}
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${codeTypeError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    onChange={(e) => {
+                      setCodeType(e.target.value);
+                      setCodeTypeError(e.target.value ? "" : "Please select a discount type");
+                      // Re-validate discount value when type changes
+                      if (codeValue) {
+                        setCodeValueError(validateDiscountValue(codeValue, e.target.value));
+                      }
+                    }}
+                    onBlur={() => setCodeTypeError(codeType ? "" : "Please select a discount type")}
                   >
                     <option value=''>Select discount type</option>
                     <option value='PERCENTAGE'>Percentage</option>
                     <option value='FIXED'>Fixed Amount</option>
                   </select>
+                  {codeTypeError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{codeTypeError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3032,19 +3221,26 @@ export default function AdminSubscriptions() {
                     Discount Value
                   </label>
                   <input
-                    type='number'
+                    type='text'
                     id='add-code-value'
                     name='discount_value'
-                    required
-                    min='0'
-                    step='0.01'
                     value={codeValue}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${codeValueError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder={codeType === 'PERCENTAGE' ? 'Enter discount percentage' : 'Enter discount amount'}
-                    onChange={(e) => setCodeValue(e.target.value)}
+                    onChange={(e) => {
+                      setCodeValue(e.target.value);
+                      if (codeValueError) {
+                        setCodeValueError(validateDiscountValue(e.target.value, codeType));
+                      }
+                    }}
+                    onBlur={(e) => setCodeValueError(validateDiscountValue(e.target.value, codeType))}
                   />
+                  {codeValueError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{codeValueError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3056,12 +3252,22 @@ export default function AdminSubscriptions() {
                     name='description'
                     rows='3'
                     value={codeDescription}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${codeDescriptionError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter promo code description'
-                    onChange={(e) => setCodeDescription(e.target.value)}
+                    onChange={(e) => {
+                      setCodeDescription(e.target.value);
+                      if (codeDescriptionError) {
+                        setCodeDescriptionError(validateDescription(e.target.value));
+                      }
+                    }}
+                    onBlur={(e) => setCodeDescriptionError(validateDescription(e.target.value))}
                   />
+                  {codeDescriptionError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{codeDescriptionError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3069,19 +3275,28 @@ export default function AdminSubscriptions() {
                     Max Usage Count
                   </label>
                   <input
-                    type='number'
+                    type='text'
                     id='add-max-uses'
                     name='max_uses'
-                    required
-                    min='0'
                     value={maxUses}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${maxUsesError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter maximum number of uses'
-                    onChange={(e) => setMaxUses(e.target.value)}
+                    onChange={(e) => {
+                      setMaxUses(e.target.value);
+                      if (maxUsesError) {
+                        setMaxUsesError(validateMaxUses(e.target.value));
+                      }
+                    }}
+                    onBlur={(e) => setMaxUsesError(validateMaxUses(e.target.value))}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Enter 0 for unlimited uses</p>
+                  {maxUsesError ? (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{maxUsesError}</p>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">Enter 0 for unlimited uses</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3092,15 +3307,28 @@ export default function AdminSubscriptions() {
                     type='date'
                     id='add-start-date'
                     name='start_date'
-                    required
-                    min={new Date().toISOString().split('T')[0]}
                     value={startDate}
+                    min={new Date().toISOString().split('T')[0]}
                     lang="en"
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                    onChange={(e) => setStartDate(e.target.value)}
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${startDateError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      if (startDateError) {
+                        setStartDateError(validateStartDate(e.target.value));
+                      }
+                      // Re-validate end date when start date changes
+                      if (endDate) {
+                        setEndDateError(validateEndDate(endDate, e.target.value));
+                      }
+                    }}
+                    onBlur={(e) => setStartDateError(validateStartDate(e.target.value))}
                   />
+                  {startDateError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{startDateError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3111,14 +3339,24 @@ export default function AdminSubscriptions() {
                     type='date'
                     id='add-end-date'
                     name='end_date'
-                    required
                     value={endDate}
+                    min={startDate} 
                     lang="en"
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                    onChange={(e) => setEndDate(e.target.value)}
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${endDateError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      if (endDateError) {
+                        setEndDateError(validateEndDate(e.target.value, startDate));
+                      }
+                    }}
+                    onBlur={(e) => setEndDateError(validateEndDate(e.target.value, startDate))}
                   />
+                  {endDateError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{endDateError}</p>
+                  )}
                 </div>
               </div>
               
@@ -3200,6 +3438,30 @@ export default function AdminSubscriptions() {
             
             <form onSubmit={(e) => {
               e.preventDefault();
+              
+              // Validate form fields
+              const codeError = validatePromoCode(codeName);
+              const typeError = !codeType ? "Please select a discount type" : "";
+              const valueError = validateDiscountValue(codeValue, codeType);
+              const descError = validateDescription(codeDescription);
+              // For edit mode, we allow the start date to be in the past if it was already set
+              const startError = ""; // No validation for start date in edit mode
+              const endError = validateEndDate(endDate, startDate);
+              const usesError = validateMaxUses(maxUses);
+              
+              // Update error states
+              setCodeNameError(codeError);
+              setCodeTypeError(typeError);
+              setCodeValueError(valueError);
+              setCodeDescriptionError(descError);
+              setEndDateError(endError);
+              setMaxUsesError(usesError);
+              
+              // Check if there are any errors
+              if (codeError || typeError || valueError || descError || endError || usesError) {
+                return;
+              }
+              
               const codeData = {
                 code: codeName,
                 discount_type: codeType,
@@ -3225,14 +3487,23 @@ export default function AdminSubscriptions() {
                     type='text'
                     id='edit-code-name'
                     name='code'
-                    required
                     value={codeName}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${codeNameError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter promo code'
-                    onChange={(e) => setCodeName(e.target.value)}
+                    onChange={(e) => {
+                      setCodeName(e.target.value);
+                      if (codeNameError) {
+                        setCodeNameError(validatePromoCode(e.target.value));
+                      }
+                    }}
+                    onBlur={(e) => setCodeNameError(validatePromoCode(e.target.value))}
                   />
+                  {codeNameError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{codeNameError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3242,17 +3513,28 @@ export default function AdminSubscriptions() {
                   <select
                     id='edit-code-type'
                     name='discount_type'
-                    required
                     value={codeType}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                    onChange={(e) => setCodeType(e.target.value)}
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${codeTypeError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    onChange={(e) => {
+                      setCodeType(e.target.value);
+                      setCodeTypeError(e.target.value ? "" : "Please select a discount type");
+                      // Re-validate discount value when type changes
+                      if (codeValue) {
+                        setCodeValueError(validateDiscountValue(codeValue, e.target.value));
+                      }
+                    }}
+                    onBlur={() => setCodeTypeError(codeType ? "" : "Please select a discount type")}
                   >
                     <option value=''>Select discount type</option>
                     <option value='PERCENTAGE'>Percentage</option>
                     <option value='FIXED'>Fixed Amount</option>
                   </select>
+                  {codeTypeError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{codeTypeError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3260,19 +3542,26 @@ export default function AdminSubscriptions() {
                     Discount Value
                   </label>
                   <input
-                    type='number'
+                    type='text'
                     id='edit-code-value'
                     name='discount_value'
-                    required
-                    min='0'
-                    step='0.01'
                     value={codeValue}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${codeValueError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder={codeType === 'PERCENTAGE' ? 'Enter discount percentage' : 'Enter discount amount'}
-                    onChange={(e) => setCodeValue(e.target.value)}
+                    onChange={(e) => {
+                      setCodeValue(e.target.value);
+                      if (codeValueError) {
+                        setCodeValueError(validateDiscountValue(e.target.value, codeType));
+                      }
+                    }}
+                    onBlur={(e) => setCodeValueError(validateDiscountValue(e.target.value, codeType))}
                   />
+                  {codeValueError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{codeValueError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3284,12 +3573,22 @@ export default function AdminSubscriptions() {
                     name='description'
                     rows='3'
                     value={codeDescription}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${codeDescriptionError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter promo code description'
-                    onChange={(e) => setCodeDescription(e.target.value)}
+                    onChange={(e) => {
+                      setCodeDescription(e.target.value);
+                      if (codeDescriptionError) {
+                        setCodeDescriptionError(validateDescription(e.target.value));
+                      }
+                    }}
+                    onBlur={(e) => setCodeDescriptionError(validateDescription(e.target.value))}
                   />
+                  {codeDescriptionError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{codeDescriptionError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3297,19 +3596,28 @@ export default function AdminSubscriptions() {
                     Max Usage Count
                   </label>
                   <input
-                    type='number'
+                    type='text'
                     id='edit-max-uses'
                     name='max_uses'
-                    required
-                    min='0'
                     value={maxUses}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${maxUsesError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter maximum number of uses'
-                    onChange={(e) => setMaxUses(e.target.value)}
+                    onChange={(e) => {
+                      setMaxUses(e.target.value);
+                      if (maxUsesError) {
+                        setMaxUsesError(validateMaxUses(e.target.value));
+                      }
+                    }}
+                    onBlur={(e) => setMaxUsesError(validateMaxUses(e.target.value))}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Enter 0 for unlimited uses</p>
+                  {maxUsesError ? (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{maxUsesError}</p>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">Enter 0 for unlimited uses</p>
+                  )}
                 </div>
                 
                 <div>
@@ -3320,14 +3628,21 @@ export default function AdminSubscriptions() {
                     type='date'
                     id='edit-start-date'
                     name='start_date'
-                    required
-                    min={new Date().toISOString().split('T')[0]}
                     value={startDate}
                     lang="en"
                     className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                       focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => {
+                      const newStartDate = e.target.value;
+                      setStartDate(newStartDate);
+                      
+                      // Re-validate end date when start date changes
+                      if (endDate) {
+                        const endDateError = validateEndDate(endDate, newStartDate);
+                        setEndDateError(endDateError);
+                      }
+                    }}
                   />
                 </div>
                 
@@ -3339,14 +3654,30 @@ export default function AdminSubscriptions() {
                     type='date'
                     id='edit-end-date'
                     name='end_date'
-                    required
                     value={endDate}
+                    min={startDate}
                     lang="en"
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                    onChange={(e) => setEndDate(e.target.value)}
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${endDateError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    onChange={(e) => {
+                      const newEndDate = e.target.value;
+                      setEndDate(newEndDate);
+                      
+                      // Clear error if it exists and the new value is valid
+                      if (endDateError) {
+                        setEndDateError(validateEndDate(newEndDate, startDate));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const endDateError = validateEndDate(e.target.value, startDate);
+                      setEndDateError(endDateError);
+                    }}
                   />
+                  {endDateError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{endDateError}</p>
+                  )}
                 </div>
                 
                 <div>
