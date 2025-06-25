@@ -1683,7 +1683,16 @@
     "externalUserConfirmDescription": "{name} is not a member of any of your teams. Are you sure you want to invite this external user?",
     "userCheckFailed": "Failed to check user details",
     "confirm": "Confirm",
-    "schedule": "Schedule"
+    "schedule": "Schedule",
+    "eventType": "Event Type",
+    "sharedEvent": "Shared Event",
+    "sharing": "Sharing",
+    "eventShared": "Event Shared",
+    "shareCalendar": "Share Calendar",
+    "shareWith": "Share With",
+    "personalEvent": "Personal Event",
+    "googleEvent": "Google Event",
+    "taskEvent": "Task Event"
   },
   "CreateTag": {
     "tagDeleted": "Tag deleted",

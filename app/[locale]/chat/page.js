@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, createRef, useCallback, useMemo, memo } from 'react';
-import { Send, Paperclip, Smile, Image as ImageIcon, Gift, ChevronDown, Bot, MessageSquare, Reply, Trash2, Languages, MoreVertical, Search, Link, FileText, X, LogOut, Users } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { Send, Paperclip, Image, Reply, Trash2, Languages, MoreVertical, Search, LogOut, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { useUserStatus } from '@/contexts/UserStatusContext';
@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import InviteUserPopover from '@/components/chat/InviteUserPopover';
 import AIChatBot from '@/components/chat/AIChatBot';
-import Image from 'next/image';
 import PengyImage from '../../../public/pengy.webp';
 import EmojiPicker from '@/components/chat/EmojiPicker';
 import FileUploader from '@/components/chat/FileUploader';
@@ -25,14 +24,11 @@ import {
   DropdownMenuItem, 
   DropdownMenuSeparator, 
   DropdownMenuTrigger,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger
 } from '@/components/ui/dropdown-menu';
 import ChatSearch from '@/components/chat/ChatSearch';
-import useGetUser from '@/lib/hooks/useGetUser';
 import MentionSelector from '@/components/chat/MentionSelector';
 import MentionItem from '@/components/chat/MentionItem';
 import { debounce } from 'lodash';
@@ -40,7 +36,9 @@ import { useSearchParams } from 'next/navigation';
 import UserProfileDialog from '@/components/chat/UserProfileDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-// Removed useUserRelationship and ExternalBadge imports
+
+// Add the EventCard import
+import EventCard from '@/components/chat/EventCard';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -242,7 +240,18 @@ const useMemoizedMessageFormatter = (messages) => {
   }, []);
 };
 
-// Memoize the message component to prevent unnecessary re-renders
+// Add a function to detect if message content is a shared event
+const isEventMessage = (content) => {
+  if (!content) return false;
+  // Check for the event message pattern with emoji and standard format
+  return (
+    content.startsWith('📅 *') && 
+    content.includes('⏰') && 
+    content.includes('eventType')
+  );
+};
+
+// Modify the MemoizedMessage component to handle event messages
 const MemoizedMessage = memo(function Message({ 
   msg, 
   isMe, 
@@ -263,6 +272,7 @@ const MemoizedMessage = memo(function Message({
 }) {
   const isDeleted = msg.is_deleted;
   const [editContent, setEditContent] = useState('');
+  const isEventMsg = !isDeleted && !(isEditing && isEditing.id === msg.id) && isEventMessage(msg.content);
   
   // Initialize edit content when entering edit mode
   useEffect(() => {
@@ -370,9 +380,13 @@ const MemoizedMessage = memo(function Message({
                   if (ref) translatorRefs.current[`translator-${msg.id}`] = ref;
                 }}
               >
-                <div className={`break-words break-all ${msg.content.length > 500 ? 'max-h-60 overflow-y-auto' : ''}`}>
-                  {formatMessage(msg.id, msg.content, msg.mentions)}
-                </div>
+                {isEventMsg ? (
+                  <EventCard messageContent={msg.content} />
+                ) : (
+                  <div className={`break-words break-all ${msg.content.length > 500 ? 'max-h-60 overflow-y-auto' : ''}`}>
+                    {formatMessage(msg.id, msg.content, msg.mentions)}
+                  </div>
+                )}
               </GoogleTranslator>
             </div>
           )}
