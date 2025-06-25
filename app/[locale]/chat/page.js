@@ -243,12 +243,23 @@ const useMemoizedMessageFormatter = (messages) => {
 // Add a function to detect if message content is a shared event
 const isEventMessage = (content) => {
   if (!content) return false;
-  // Check for the event message pattern with emoji and standard format
-  return (
-    content.startsWith('📅 *') && 
-    content.includes('⏰') && 
-    content.includes('eventType')
-  );
+  
+  // Check for different types of event formats
+  
+  // 1. Original format with emoji
+  const hasOriginalFormat = content.trim().startsWith('📅 *') && 
+                            content.includes('⏰') && 
+                            content.includes('eventType');
+                            
+  // 2. Google calendar format with "Shared Event" text
+  const hasGoogleTextFormat = content.includes('*Shared Event:') && 
+                             (content.includes('Date and Time:') || content.includes('Event Type:'));
+  
+  // 3. Google calendar format with just icons (📅)
+  const hasGoogleIconFormat = content.includes('Google Calendar') && 
+                             (content.includes('📅') || content.includes('🗓️'));
+  
+  return hasOriginalFormat || hasGoogleTextFormat || hasGoogleIconFormat;
 };
 
 // Modify the MemoizedMessage component to handle event messages
@@ -272,7 +283,11 @@ const MemoizedMessage = memo(function Message({
 }) {
   const isDeleted = msg.is_deleted;
   const [editContent, setEditContent] = useState('');
-  const isEventMsg = !isDeleted && !(isEditing && isEditing.id === msg.id) && isEventMessage(msg.content);
+  
+  // Cache event message detection result with useMemo to prevent recalculation on every render
+  const isEventMsg = useMemo(() => {
+    return !isDeleted && !(isEditing && isEditing.id === msg.id) && isEventMessage(msg.content);
+  }, [isDeleted, isEditing, msg.id, msg.content]);
   
   // Initialize edit content when entering edit mode
   useEffect(() => {

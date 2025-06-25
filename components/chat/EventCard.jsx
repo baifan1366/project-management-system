@@ -26,49 +26,134 @@ export default function EventCard({ messageContent }) {
       let description = '';
       let eventType = '';
       
-      // Extract event title
-      const titleMatch = messageContent.match(/📅 \*.*?: (.*?)\*/);
-      if (titleMatch && titleMatch[1]) {
-        title = titleMatch[1];
-      }
+      // Check if this is a Google calendar format
+      const isGoogleFormat = messageContent.includes('*Shared Event:') || 
+                            (messageContent.includes('Google Calendar') && messageContent.includes('📅'));
       
-      // Extract date and time
-      const dateTimeMatch = messageContent.match(/⏰ .*?: (.*?)(\n|$)/);
-      if (dateTimeMatch && dateTimeMatch[1]) {
-        dateTime = dateTimeMatch[1];
-      }
-      
-      // Extract location if available
-      const locationMatch = messageContent.match(/📍 .*?: (.*?)(\n|$)/);
-      if (locationMatch && locationMatch[1]) {
-        location = locationMatch[1];
-      }
-      
-      // Extract description (any text between location/date and event type)
-      const descStart = locationMatch 
-        ? messageContent.indexOf(locationMatch[0]) + locationMatch[0].length 
-        : dateTimeMatch 
-          ? messageContent.indexOf(dateTimeMatch[0]) + dateTimeMatch[0].length
-          : -1;
-          
-      const eventTypeIndex = messageContent.lastIndexOf(t('eventType') || 'Event Type');
-      
-      if (descStart > -1 && eventTypeIndex > descStart) {
-        description = messageContent.substring(descStart, eventTypeIndex).trim();
-      }
-      
-      // Improved event type extraction
-      if (eventTypeIndex !== -1) {
-        const typeStartIndex = eventTypeIndex + (t('eventType') || 'Event Type').length;
-        // Look for the value after the colon
-        const eventTypeMatch = messageContent.substring(typeStartIndex).match(/:\s*(.*?)(\n|$)/);
-        if (eventTypeMatch && eventTypeMatch[1]) {
-          eventType = eventTypeMatch[1].trim();
+      if (isGoogleFormat) {
+        // Parse Google calendar format
+        
+        // Extract title - try multiple patterns
+        let titleMatch = messageContent.match(/\*Shared Event: (.*?)\*/);
+        if (titleMatch && titleMatch[1]) {
+          title = titleMatch[1];
         } else {
-          // Try alternative approach to extract anything after "Event Type: "
-          const fullTypeMatch = messageContent.match(new RegExp(`${t('eventType') || 'Event Type'}:\\s*(.*?)(\n|$)`));
-          if (fullTypeMatch && fullTypeMatch[1]) {
-            eventType = fullTypeMatch[1].trim();
+          // Try to extract the first line as title if it doesn't have a date format
+          const firstLine = messageContent.split('\n')[0].trim();
+          if (firstLine && !firstLine.match(/\d{1,2}\/\d{1,2}\/\d{4}/) && !firstLine.match(/\d{1,2}:\d{2}/)) {
+            title = firstLine.replace(/📅|🗓️|Google Calendar/, '').trim();
+          }
+        }
+        
+        // Extract date and time - try multiple patterns
+        const dateTimePatterns = [
+          /Date and Time: (.*?)(?=📍|Location:|Event Type:|$)/,
+          /📅\s*(.*?)(?=📍|🏢|🕒|Location:|Event Type:|$)/,
+          // Look for date patterns like MM/DD/YYYY or Jun 9, 2025
+          /(?:📅\s*|🗓️\s*|\s)(\w+\s+\d{1,2},?\s+\d{4}(?:,?\s+\d{1,2}:\d{2}\s*(?:AM|PM))?(?:\s*-\s*\w+\s+\d{1,2},?\s+\d{4}(?:,?\s+\d{1,2}:\d{2}\s*(?:AM|PM))?)?)/
+        ];
+        
+        for (const pattern of dateTimePatterns) {
+          const match = messageContent.match(pattern);
+          if (match && match[1]) {
+            dateTime = match[1].trim();
+            break;
+          }
+        }
+        
+        // If we still don't have a date, look for any date-like format in the message
+        if (!dateTime) {
+          const anyDateMatch = messageContent.match(/(\d{1,2}\/\d{1,2}\/\d{4}|\w+\s+\d{1,2},?\s+\d{4})/);
+          if (anyDateMatch && anyDateMatch[1]) {
+            dateTime = anyDateMatch[1];
+            
+            // Try to find time near the date
+            const timeMatch = messageContent.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/);
+            if (timeMatch && timeMatch[1]) {
+              dateTime += " " + timeMatch[1];
+            }
+          }
+        }
+        
+        // Extract location - try multiple patterns
+        const locationPatterns = [
+          /Location: (.*?)(?=Event Type:|$)/,
+          /📍\s*(.*?)(?=🕒|Event Type:|$)/
+        ];
+        
+        for (const pattern of locationPatterns) {
+          const match = messageContent.match(pattern);
+          if (match && match[1]) {
+            location = match[1].trim();
+            break;
+          }
+        }
+        
+        // Extract event type - try multiple patterns
+        const eventTypePatterns = [
+          /Event Type: (.*?)(\n|$)/,
+          /(?:Google Calendar|calendar)(?: type)?\s*[:：]?\s*(.*?)(\n|$)/i
+        ];
+        
+        for (const pattern of eventTypePatterns) {
+          const match = messageContent.match(pattern);
+          if (match && match[1]) {
+            eventType = match[1].trim();
+            break;
+          }
+        }
+        
+        // If no event type found but "Google Calendar" appears in the message
+        if (!eventType && messageContent.includes("Google Calendar")) {
+          eventType = "Google Calendar";
+        }
+      } else {
+        // Original emoji format
+        
+        // Extract event title
+        const titleMatch = messageContent.match(/📅 \*.*?: (.*?)\*/);
+        if (titleMatch && titleMatch[1]) {
+          title = titleMatch[1];
+        }
+        
+        // Extract date and time
+        const dateTimeMatch = messageContent.match(/⏰ .*?: (.*?)(\n|$)/);
+        if (dateTimeMatch && dateTimeMatch[1]) {
+          dateTime = dateTimeMatch[1];
+        }
+        
+        // Extract location if available
+        const locationMatch = messageContent.match(/📍 .*?: (.*?)(\n|$)/);
+        if (locationMatch && locationMatch[1]) {
+          location = locationMatch[1];
+        }
+        
+        // Extract description (any text between location/date and event type)
+        const descStart = locationMatch 
+          ? messageContent.indexOf(locationMatch[0]) + locationMatch[0].length 
+          : dateTimeMatch 
+            ? messageContent.indexOf(dateTimeMatch[0]) + dateTimeMatch[0].length
+            : -1;
+            
+        const eventTypeIndex = messageContent.lastIndexOf(t('eventType') || 'Event Type');
+        
+        if (descStart > -1 && eventTypeIndex > descStart) {
+          description = messageContent.substring(descStart, eventTypeIndex).trim();
+        }
+        
+        // Improved event type extraction
+        if (eventTypeIndex !== -1) {
+          const typeStartIndex = eventTypeIndex + (t('eventType') || 'Event Type').length;
+          // Look for the value after the colon
+          const eventTypeMatch = messageContent.substring(typeStartIndex).match(/:\s*(.*?)(\n|$)/);
+          if (eventTypeMatch && eventTypeMatch[1]) {
+            eventType = eventTypeMatch[1].trim();
+          } else {
+            // Try alternative approach to extract anything after "Event Type: "
+            const fullTypeMatch = messageContent.match(new RegExp(`${t('eventType') || 'Event Type'}:\\s*(.*?)(\n|$)`));
+            if (fullTypeMatch && fullTypeMatch[1]) {
+              eventType = fullTypeMatch[1].trim();
+            }
           }
         }
       }
