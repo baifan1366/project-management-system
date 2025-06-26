@@ -163,7 +163,8 @@ const TaskAgile = ({ projectId, teamId }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          status: 'PENDING'
+          status: 'PENDING',
+          start_on: new Date().toISOString()
         }),
       });
 
@@ -191,7 +192,8 @@ const TaskAgile = ({ projectId, teamId }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          status: 'RETROSPECTIVE'
+          status: 'RETROSPECTIVE',
+          completed_on: new Date().toISOString()
         }),
       });
 

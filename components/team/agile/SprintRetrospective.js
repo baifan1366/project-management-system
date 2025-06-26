@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Plus, ThumbsUp, ThumbsDown, Trash2 } from 'lucide-react';
 
-const SprintRetrospective = ({ sprint, agileMembers = [] }) => {
+const SprintRetrospective = ({ sprint, agileMembers = [], themeColor }) => {
   const t = useTranslations('Agile');
   const [loading, setLoading] = useState(true);
   const [whatWentWell, setWhatWentWell] = useState([]);
@@ -178,8 +178,9 @@ const SprintRetrospective = ({ sprint, agileMembers = [] }) => {
                   onChange={(e) => setNewWentWellItem(e.target.value)}
                   placeholder={t('enterWhatWentWell')}
                   onKeyDown={(e) => e.key === 'Enter' && addWentWellItem()}
+                  maxLength={50}
                 />
-                <Button onClick={addWentWellItem}>
+                <Button onClick={addWentWellItem} variant={themeColor}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -219,8 +220,9 @@ const SprintRetrospective = ({ sprint, agileMembers = [] }) => {
                   onChange={(e) => setNewImproveItem(e.target.value)}
                   placeholder={t('enterToImprove')}
                   onKeyDown={(e) => e.key === 'Enter' && addImproveItem()}
+                  maxLength={50}
                 />
-                <Button onClick={addImproveItem}>
+                <Button onClick={addImproveItem} variant={themeColor}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
