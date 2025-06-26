@@ -8,6 +8,7 @@ import SprintPlanning from './SprintPlanning';
 import AgileTools from './AgileTools';
 import { fetchTeamAgile, fetchAgileRoles, fetchAgileMembers } from '@/lib/redux/features/agileSlice';
 import { useDispatch, useSelector } from 'react-redux';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const TaskAgile = ({ projectId, teamId }) => {
   const t = useTranslations('Agile');
@@ -243,8 +244,23 @@ const TaskAgile = ({ projectId, teamId }) => {
       </div>
       
       {isLoading ? (
-        <div className="flex justify-center items-center h-40">
-          <p>{t('loading')}</p>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+          <Card className="p-6">
+            <Skeleton className="h-8 w-48 mb-4" />
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+            </div>
+            <Skeleton className="h-40 w-full" />
+          </Card>
         </div>
       ) : hasFailed ? (
         <div className="text-red-500 text-center">
