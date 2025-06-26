@@ -468,14 +468,37 @@ export const PaymentHistory = () => {
     }
   };
   
-  const downloadInvoice = (id) => {
+  const downloadInvoice = async (id) => {
     const toastId = toast.loading(t('preparingInvoice'));
     
-    // In a real implementation, this would call an API to generate an invoice
-    setTimeout(() => {
+    try {
+      // First verify the invoice can be generated
+      const checkResponse = await fetch(`/api/payment/invoice?id=${id}`, {
+        method: 'HEAD'
+      });
+      
+      if (!checkResponse.ok) {
+        throw new Error('Failed to access invoice data');
+      }
+      
+      // Create URL for invoice download and open in new tab
+      const invoiceUrl = `/api/payment/invoice?id=${id}`;
+      const newWindow = window.open(invoiceUrl, '_blank');
+      
+      // Check if window was blocked by popup blocker
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        throw new Error(t('subscription.paymentHistory.popupBlocked') || 'Popup blocked. Please allow popups for this site');
+      }
+      
       toast.dismiss(toastId);
       toast.success(t('invoiceReady'));
-    }, 1500);
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      toast.dismiss(toastId);
+      toast.error(t('subscription.paymentHistory.invoiceError') || 'Failed to download invoice', {
+        description: error.message || 'Please try again later'
+      });
+    }
   };
   
   const formatDate = (dateString) => {
@@ -615,13 +638,33 @@ export const UpgradeOptions = () => {
   useEffect(() => {
     async function loadPlans() {
       setLoading(true);
-      const toastId = toast.loading(t('subscription.upgradeOptions.loading'));
+      let toastId;
+      
       try {
-        await dispatch(fetchPlans()).unwrap();
-        await fetchCurrentPlan();
-        toast.dismiss(toastId);
+        // 只在非生产环境中显示加载toast，或者可以根据需要完全移除
+        if (process.env.NODE_ENV !== 'production') {
+          toastId = toast.loading(t('subscription.upgradeOptions.loading'));
+        }
+        
+        // 并行加载计划和当前用户的计划以提高性能
+        const [plansResult] = await Promise.all([
+          dispatch(fetchPlans()).unwrap(),
+          fetchCurrentPlan()
+        ]);
+        
+        // 确保关闭toast
+        if (toastId) {
+          toast.dismiss(toastId);
+        }
       } catch (error) {
-        toast.dismiss(toastId);
+        console.error('Error loading plans:', error);
+        
+        // 确保关闭加载toast
+        if (toastId) {
+          toast.dismiss(toastId);
+        }
+        
+        // 仅在实际错误时显示错误toast
         toast.error(t('subscription.upgradeOptions.loadError') || 'Failed to load plans', {
           description: error.message || 'Please try again later'
         });
@@ -771,10 +814,16 @@ export const UpgradeOptions = () => {
   
   // Format price with billing interval
   const formatPrice = (price, billingInterval) => {
+    const options = {
+      style: 'currency',
+      currency: 'MYR',
+      minimumFractionDigits: 2,
+    };
+
     if (billingInterval === 'YEARLY') {
-      return `US$${price.toFixed(2)}/mo`;
+      return new Intl.NumberFormat('ms-MY', options).format(price) + '/mo';
     } else {
-      return `US$${price.toFixed(2)}/mo`;
+      return new Intl.NumberFormat('ms-MY', options).format(price) + '/mo';
     }
   };
   

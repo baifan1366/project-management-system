@@ -321,9 +321,14 @@
         "currentUsage": "Penggunaan semasa: {current} / {limit}",
         "upgradeSubscription": "Naik Taraf Langganan",
         "operationLimited": "Operasi Terhad",
-        "createProjectLimited": "Penciptaan Projek Terhad",
-        "inviteMemberLimited": "Jemputan Ahli Terhad",
-        "createTeamLimited": "Penciptaan Pasukan Terhad"
+        "createProjectLimited": "Had Penciptaan Projek Tercapai",
+        "inviteMemberLimited": "Had Jemputan Ahli Tercapai",
+        "createTeamLimited": "Had Penciptaan Pasukan Tercapai",
+        "aiChatLimited": "Had Sembang AI Tercapai",
+        "operationLimited": "Operasi Terhad",
+        "subscriptionLimit": "Had Langganan",
+        "currentUsage": "Penggunaan Semasa: {current}/{limit}",
+        "upgradeSubscription": "Naik Taraf Langganan"
       }
     }
   },
@@ -1278,7 +1283,8 @@
     "alreadyMember": "You are already a member of this team",
     "alreadyTeamMember": "You are already a team member",
     "invitationDeclined": "Invitation Declined",
-    "declining": "Declining..."
+    "declining": "Declining...",
+    "teamIsFullError": "Pasukan ini sudah penuh. Pemilik pasukan perlu menaik taraf pelan mereka untuk menambah lebih ramai ahli."
   },
   "CustomField": {
     "title": "Custom Fields",

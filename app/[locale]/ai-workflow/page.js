@@ -69,6 +69,9 @@ import InputForm from './components/InputForm';
 import { cn } from '@/lib/utils';
 import useGetUser from '@/lib/hooks/useGetUser';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useDispatch } from 'react-redux';
+import { getSubscriptionLimit, trackSubscriptionUsage } from '@/lib/subscriptionService';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
 // Node types for React Flow
 const nodeTypes = {
@@ -154,6 +157,7 @@ const debounce = (func, wait) => {
 export default function AIWorkflow() {
   const t = useTranslations('AI_Workflow');
   const { confirm } = useConfirm();
+  const dispatch = useDispatch();
   
   // User state
   const [userId, setUserId] = useState(null);
@@ -664,6 +668,12 @@ export default function AIWorkflow() {
   
   // Execute workflow with streaming output
   const executeWorkflow = async (inputs) => {
+    const canExecute = await getSubscriptionLimit(userId, 'ai_workflow_runs');
+    if (!canExecute.allowed) {
+      dispatch(limitExceeded({ feature: 'AI Workflow', reason: canExecute.reason }));
+      return;
+    }
+
     if (!currentWorkflow) {
       toast.error('Please save the workflow before executing');
       return;
@@ -901,6 +911,7 @@ export default function AIWorkflow() {
                 // All AI responses are complete, move to review step
                 setIsStreaming(false);
                 setShowReviewStep(true);
+                trackSubscriptionUsage({ userId, actionType: 'ai_workflow_runs' });
               } else if (data.type === 'error') {
                 console.error('Error in stream:', data.error);
                 toast.error(`Error: ${data.error}`);

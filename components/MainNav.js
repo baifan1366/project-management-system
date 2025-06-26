@@ -18,6 +18,7 @@ import { fetchUserProjects, clearProjects } from '@/lib/redux/features/projectSl
 import { supabase } from '@/lib/supabase';
 import useGetUser from '@/lib/hooks/useGetUser';
 import CreateProjectDialog from '@/components/CreateProject';
+import UserProfileDialog from '@/components/chat/UserProfileDialog';
 
 // Quick Search component
 function QuickSearch({ open, onOpenChange }) {
@@ -26,6 +27,8 @@ function QuickSearch({ open, onOpenChange }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showUserProfile, setShowUserProfile] = useState(false);
   const router = useRouter();
   const locale = useLocale();
   const { user } = useGetUser();
@@ -88,8 +91,15 @@ function QuickSearch({ open, onOpenChange }) {
 
   // Handle result click
   const handleResultClick = (item) => {
-    router.push(getItemLink(item));
-    onOpenChange(false);
+    if (item.type === 'user') {
+      // For user type, open the UserProfileDialog
+      setSelectedUser(item);
+      setShowUserProfile(true);
+    } else {
+      // For other types, navigate to the corresponding page
+      router.push(getItemLink(item));
+      onOpenChange(false);
+    }
   };
   
   // Handle key press for navigation
@@ -194,6 +204,20 @@ function QuickSearch({ open, onOpenChange }) {
           <ResultSkeleton />
         ) : null}
       </div>
+      
+      {/* User Profile Dialog */}
+      <UserProfileDialog 
+        open={showUserProfile} 
+        onOpenChange={(open) => {
+          setShowUserProfile(open);
+          if (!open) {
+            setSelectedUser(null);
+            // Also close the search popup if the profile dialog is closed
+            onOpenChange(false);
+          }
+        }} 
+        user={selectedUser} 
+      />
     </div>
   );
 }

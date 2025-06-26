@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, createRef, useCallback, useMemo, memo } from 'react';
-import { Send, Paperclip, Smile, Image as ImageIcon, Gift, ChevronDown, Bot, MessageSquare, Reply, Trash2, Languages, MoreVertical, Search, Link, FileText, X, LogOut, Users } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { Send, Paperclip, Image, Reply, Trash2, Languages, MoreVertical, Search, LogOut, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { useUserStatus } from '@/contexts/UserStatusContext';
@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import InviteUserPopover from '@/components/chat/InviteUserPopover';
 import AIChatBot from '@/components/chat/AIChatBot';
-import Image from 'next/image';
 import PengyImage from '../../../public/pengy.webp';
 import EmojiPicker from '@/components/chat/EmojiPicker';
 import FileUploader from '@/components/chat/FileUploader';
@@ -25,14 +24,11 @@ import {
   DropdownMenuItem, 
   DropdownMenuSeparator, 
   DropdownMenuTrigger,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger
 } from '@/components/ui/dropdown-menu';
 import ChatSearch from '@/components/chat/ChatSearch';
-import useGetUser from '@/lib/hooks/useGetUser';
 import MentionSelector from '@/components/chat/MentionSelector';
 import MentionItem from '@/components/chat/MentionItem';
 import { debounce } from 'lodash';
@@ -40,7 +36,9 @@ import { useSearchParams } from 'next/navigation';
 import UserProfileDialog from '@/components/chat/UserProfileDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-// Removed useUserRelationship and ExternalBadge imports
+
+// Add the EventCard import
+import EventCard from '@/components/chat/EventCard';
 
 // Message skeleton component for loading state
 const MessageSkeleton = ({ isOwnMessage = false }) => (
@@ -242,7 +240,29 @@ const useMemoizedMessageFormatter = (messages) => {
   }, []);
 };
 
-// Memoize the message component to prevent unnecessary re-renders
+// Add a function to detect if message content is a shared event
+const isEventMessage = (content) => {
+  if (!content) return false;
+  
+  // Check for different types of event formats
+  
+  // 1. Original format with emoji
+  const hasOriginalFormat = content.trim().startsWith('📅 *') && 
+                            content.includes('⏰') && 
+                            content.includes('eventType');
+                            
+  // 2. Google calendar format with "Shared Event" text
+  const hasGoogleTextFormat = content.includes('*Shared Event:') && 
+                             (content.includes('Date and Time:') || content.includes('Event Type:'));
+  
+  // 3. Google calendar format with just icons (📅)
+  const hasGoogleIconFormat = content.includes('Google Calendar') && 
+                             (content.includes('📅') || content.includes('🗓️'));
+  
+  return hasOriginalFormat || hasGoogleTextFormat || hasGoogleIconFormat;
+};
+
+// Modify the MemoizedMessage component to handle event messages
 const MemoizedMessage = memo(function Message({ 
   msg, 
   isMe, 
@@ -263,6 +283,11 @@ const MemoizedMessage = memo(function Message({
 }) {
   const isDeleted = msg.is_deleted;
   const [editContent, setEditContent] = useState('');
+  
+  // Cache event message detection result with useMemo to prevent recalculation on every render
+  const isEventMsg = useMemo(() => {
+    return !isDeleted && !(isEditing && isEditing.id === msg.id) && isEventMessage(msg.content);
+  }, [isDeleted, isEditing, msg.id, msg.content]);
   
   // Initialize edit content when entering edit mode
   useEffect(() => {
@@ -370,9 +395,13 @@ const MemoizedMessage = memo(function Message({
                   if (ref) translatorRefs.current[`translator-${msg.id}`] = ref;
                 }}
               >
-                <div className={`break-words break-all ${msg.content.length > 500 ? 'max-h-60 overflow-y-auto' : ''}`}>
-                  {formatMessage(msg.id, msg.content, msg.mentions)}
-                </div>
+                {isEventMsg ? (
+                  <EventCard messageContent={msg.content} />
+                ) : (
+                  <div className={`break-words break-all ${msg.content.length > 500 ? 'max-h-60 overflow-y-auto' : ''}`}>
+                    {formatMessage(msg.id, msg.content, msg.mentions)}
+                  </div>
+                )}
               </GoogleTranslator>
             </div>
           )}
@@ -550,6 +579,7 @@ export default function ChatPage() {
   const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
   const textareaRef = useRef(null);
   const [mentions, setMentions] = useState([]);
+  const mentionSelectorRef = useRef(null);
   
   // Add refs for translator components and track translated messages
   const translatorRefs = useRef({});
@@ -797,6 +827,12 @@ export default function ChatPage() {
   // Optimize handleSendMessage to use the memoized mention extractor
   const handleSendMessage = useCallback(async (e) => {
     e.preventDefault();
+    
+    // Don't send if the mention selector is open
+    if (isMentionOpen) {
+      return;
+    }
+    
     const trimmedMessage = message.trim();
     
     // Add message length validation
@@ -830,7 +866,7 @@ export default function ChatPage() {
         console.error(t('errors.sendMessageFailed'), error);
       }
     }
-  }, [message, currentSession, mentions, replyToMessage, sendMessage, extractMentionsFromMessage, otherParticipantId, getUserStatus, t]);
+  }, [message, currentSession, mentions, replyToMessage, sendMessage, extractMentionsFromMessage, otherParticipantId, getUserStatus, t, isMentionOpen]);
   
   // 处理emoji选择
   const handleEmojiSelect = (emojiData) => {
@@ -979,8 +1015,13 @@ export default function ChatPage() {
     debouncedPositionCalculation(curValue, cursorPosition, textareaRef.current);
   }, [debouncedPositionCalculation]);
 
+  // Handle closing the mention selector
+  const handleCloseMention = useCallback(() => {
+    setIsMentionOpen(false);
+  }, []);
+
   // Handle selecting a mention from the dropdown
-  const handleMentionSelect = (mention) => {
+  const handleMentionSelect = useCallback((mention) => {
     // Get the current text and cursor position
     const curValue = message;
     const cursorPosition = textareaRef.current ? textareaRef.current.selectionStart : 0;
@@ -1018,8 +1059,31 @@ export default function ChatPage() {
         }
       }, 0);
     }
-  };
-  
+  }, [message]);
+
+  // Add effect to close mention selector when clicking outside
+  useEffect(() => {
+    const handleGlobalClick = (e) => {
+      // If clicking outside both the mention selector and the textarea, close the mention selector
+      if (
+        isMentionOpen && 
+        mentionSelectorRef.current && 
+        !mentionSelectorRef.current.contains(e.target) && 
+        textareaRef.current && 
+        !textareaRef.current.contains(e.target)
+      ) {
+        setIsMentionOpen(false);
+      }
+    };
+
+    // Add global click handler
+    document.addEventListener('mousedown', handleGlobalClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleGlobalClick);
+    };
+  }, [isMentionOpen]);
+
   // Optimize messages display
   const renderedMessages = useMemo(() => {
     // Using message ID to create a unique list with additional index to ensure uniqueness
@@ -1945,7 +2009,9 @@ export default function ChatPage() {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
-                          handleSendMessage(e);
+                          if (!isMentionOpen) { // Only send if mention selector is not open
+                            handleSendMessage(e);
+                          }
                         }
                         // Handle mention suggestion navigation
                         if (isMentionOpen) {
@@ -1964,13 +2030,17 @@ export default function ChatPage() {
                     />
                     
                     {/* @提及选择器 */}
-                    <MentionSelector
-                      isOpen={isMentionOpen}
-                      searchText={mentionSearchText}
-                      onSelect={handleMentionSelect}
-                      onClose={() => setIsMentionOpen(false)}
-                      position={mentionPosition}
-                    />
+                    <div ref={mentionSelectorRef}>
+                      <MentionSelector
+                        isOpen={isMentionOpen}
+                        searchText={mentionSearchText}
+                        onSelect={handleMentionSelect}
+                        onClose={handleCloseMention}
+                        position={mentionPosition}
+                        sessionId={currentSession?.id}
+                        userId={currentUser?.id}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pb-2">

@@ -171,7 +171,7 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md md:max-w-lg">
+      <DialogContent className="sm:max-w-md md:max-w-lg" hideCloseButton={true}>
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -260,7 +260,7 @@ function NotificationList({
     return (
       <div className="space-y-4 py-2">
         {/* Show multiple skeletons with varying layouts */}
-        {Array.from({ length: 5 }, (_, i) => (
+        {Array.from({ length: 3 }, (_, i) => (
           <NotificationItemSkeleton key={i} />
         ))}
       </div>

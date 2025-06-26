@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabase } from '@/lib/supabase';
+import crypto from 'crypto';
 
 // Initialize Stripe with API key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY, {
@@ -151,7 +152,8 @@ export async function POST(request) {
       currentPlanId: currentSubscription?.plan_id,
       newPlanId: newPlanId,
       upgradeType: 'immediate',
-      proratedAmount: amount.toFixed(2)
+      proratedAmount: amount.toFixed(2),
+      orderId: crypto.randomUUID()
     };
 
     // Create return URL with success/cancel paths
@@ -165,7 +167,7 @@ export async function POST(request) {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'myr',
             product_data: {
               name: `Upgrade to ${newPlan.name}`,
               description: `${prorationDetails ? 'Prorated upgrade' : 'Immediate upgrade'} from ${currentSubscription?.subscription_plan?.name || 'current plan'} to ${newPlan.name}`

@@ -41,8 +41,11 @@ export default function PaymentError() {
 
   // 格式化金额显示
   const formatAmount = (amount) => {
-    if (!amount) return '$0.00';
-    return `$${(amount / 100).toFixed(2)}`;
+    if (amount === null || amount === undefined) return 'RM 0.00';
+    return new Intl.NumberFormat('ms-MY', {
+      style: 'currency',
+      currency: 'MYR',
+    }).format(amount);
   };
 
   // 复制到剪贴板

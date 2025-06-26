@@ -21,6 +21,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { createSelector } from '@reduxjs/toolkit';
 import InvitationDialog from './InvitationDialog';
 import { handleAccessChangeFromInviteOnlyToCanEdit, handleAccessChangeFromCanEditToInviteOnly, handleAccessChangeFromInviteOnlyToCanView, handleAccessChangeFromCanViewToInviteOnly, handleAccessChangeFromCanViewToCanEdit, handleAccessChangeFromCanEditToCanView } from './TeamGuard';
+import { trackSubscriptionUsage } from '@/lib/subscriptionService';
+import { toast } from 'sonner';
 
 // 组件外部：创建记忆化的 selector 工厂函数
 const selectTeamUsers = createSelector(
@@ -179,36 +181,59 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
         );
       }
       
+      const updatePromises = {};
+      
       // 处理待处理的成员角色变更
-      const pendingRolePromises = Object.entries(pendingRoleChanges).map(([memberId, newRole]) => {
-        return dispatch(updateTeamUser({
+      Object.entries(pendingRoleChanges).forEach(([memberId, newRole]) => {
+        updatePromises[memberId] = dispatch(updateTeamUser({
           teamId: team.id,
           userId: memberId,
           role: newRole,
-          createdBy: userId
+          updated_by: userId
         })).unwrap();
       });
       
-      // 处理待处理的成员移除
-      const pendingRemovalPromises = pendingRemovals.map(memberId => {
-        return dispatch(removeTeamUser({
+      // 将所有Promise收集到一个数组中
+      const allPromises = [...Object.values(updatePromises)];
+
+      // 批量处理成员移除和订阅计数更新
+      if (pendingRemovals.length > 0) {
+        const removalActionPromises = pendingRemovals.map(memberId =>
+          dispatch(removeTeamUser({
           teamId: team.id,
           userId: memberId,
-          createdBy: userId
-        })).unwrap();
+            createdBy: userId,
+          })).unwrap()
+        );
+      
+        // 创建一个在所有移除成功后执行的 Promise
+        const allRemovalsDonePromise = Promise.all(removalActionPromises).then(() => {
+          if (team.created_by) {
+            // 一次性更新订阅计数
+            return trackSubscriptionUsage({
+              userId: team.created_by,
+              actionType: 'invite_member',
+              entityType: 'teamMembers',
+              deltaValue: -pendingRemovals.length,
+            });
+          }
+        });
+
+        allPromises.push(allRemovalsDonePromise);
+      }
+
+      await Promise.all(allPromises);
+      
+      toast.success(t('teamUpdated'), {
+        description: t('teamSettingsSaved'),
       });
-      
-      // 等待所有操作完成
-      await Promise.all([...pendingRolePromises, ...pendingRemovalPromises]);
-      
-      // 重置待处理的变更
-      resetPendingChanges();
-      
-      // 更新成功后，刷新用户团队列表
-      await dispatch(fetchUserTeams({ userId, projectId })).unwrap();
+
+      // 清空待处理的变更
+      setPendingRemovals([]);
+      setPendingRoleChanges({});
       
       // 重新获取团队成员列表
-      if (pendingRolePromises.length > 0 || pendingRemovalPromises.length > 0) {
+      if (Object.keys(pendingRoleChanges).length > 0 || pendingRemovals.length > 0) {
         await dispatch(fetchTeamUsers(team.id)).unwrap();
       }
       
@@ -233,6 +258,16 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
       
       // Then delete the team itself
       await dispatch(deleteTeam({userId, teamId})).unwrap();
+      
+      // Decrement current_teams in the active subscription plan
+      if (userId) {
+        await trackSubscriptionUsage({
+          userId,
+          actionType: 'createTeam',
+          entityType: 'teams',
+          deltaValue: -1
+        });
+      }
       
       // 删除成功后，刷新用户团队列表
       await dispatch(fetchUserTeams({ userId, projectId })).unwrap();

@@ -219,7 +219,8 @@ async function checkSubscriptionRenewal(userId) {
       // Create a payment intent with Stripe
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(subscription.plan.price * 100), // Convert to cents
-        currency: 'usd',
+        currency: 'myr',
+        payment_method_types: ['card'],
         customer: userRecord.stripe_customer_id,
         payment_method: userRecord.default_payment_method_id,
         confirm: true,
@@ -270,7 +271,7 @@ async function checkSubscriptionRenewal(userId) {
             order_id: crypto.randomUUID(),
             user_id: userId,
             amount: subscription.plan.price,
-            currency: 'USD',
+            currency: 'MYR',
             payment_method: 'CARD',
             status: 'COMPLETED',
             transaction_id: paymentIntent.id,

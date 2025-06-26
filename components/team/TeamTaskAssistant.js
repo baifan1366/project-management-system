@@ -17,6 +17,9 @@ import { Loader2, Sparkles } from "lucide-react";
 import { useTranslations } from 'next-intl';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { Badge } from "@/components/ui/badge";
+import { useDispatch } from 'react-redux';
+import { getSubscriptionLimit, trackSubscriptionUsage } from '@/lib/subscriptionService';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
 export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTasksCreated }) {
   const [instruction, setInstruction] = useState('');
@@ -25,6 +28,7 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
   const [userId, setUserId] = useState(null);
   const t = useTranslations();
   const { user } = useGetUser();
+  const dispatch = useDispatch();
 
   // Predefined prompt templates
   const promptTemplates = [
@@ -77,11 +81,18 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
     }
     
     getUserId();
-  }, []);
+  }, [user]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    const canExecute = await getSubscriptionLimit(userId, 'ai_task');
+    if (!canExecute.allowed) {
+      dispatch(limitExceeded({ feature: 'AI Task', reason: canExecute.reason }));
+      setIsOpen(false);
+      return;
+    }
+
     if (!instruction.trim()) {
       toast.error(t('CreateTask.taskNameRequired'));
       return;
@@ -135,6 +146,7 @@ export default function TeamTaskAssistant({ projectId, teamId, sectionId, onTask
         toast.success(t('CreateTask.tasksAddedSuccess') || "Tasks added successfully");
         setIsOpen(false);
         setInstruction('');
+        trackSubscriptionUsage({ userId, actionType: 'ai_task' });
         
         // 回调函数通知父组件刷新任务列表
         if (typeof onTasksCreated === 'function') {
