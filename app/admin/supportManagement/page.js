@@ -472,7 +472,7 @@ export default function AdminSupport() {
             processed_by: adminData.id,
             processed_at: new Date().toISOString(),
             refund_amount: 0,
-            notes: 'Refund request rejected'
+            notes: 'Refund request rejected: Your refund request does not meet our eligibility criteria.'
           })
           .eq('id', refundData.id);
       
@@ -506,9 +506,8 @@ export default function AdminSupport() {
 
         if (!userError && userData?.user?.email) {
           try {
-            // Send rejection email
-            const rejectionReason = window.prompt('Enter a reason for rejecting this refund request (this will be sent to the customer):', 'Your refund request does not meet our eligibility criteria.');
-            const emailReason = rejectionReason || 'Your refund request does not meet our eligibility criteria.';
+            // Use a default rejection reason instead of prompting
+            const emailReason = 'Your refund request does not meet our eligibility criteria.';
             
             const emailResponse = await fetch(`${window.location.origin}/api/send-email`, {
               method: 'POST',
@@ -594,19 +593,16 @@ export default function AdminSupport() {
       // Round to 2 decimal places
       const roundedRefundAmount = Math.round(calculatedRefundAmount * 100) / 100;
       
-      // Show the calculated amount but allow admin to adjust if needed
-      const refundAmount = window.prompt(
-        `Calculated refund amount: $${roundedRefundAmount}\n(Remaining days: ${remainingDays}, Total days: ${totalDays}, Total cost: $${totalCost})\n\nEnter refund amount:`, 
-        roundedRefundAmount.toString()
-      );
-
-      // If user cancels the prompt, abort the action
-      if (refundAmount === null) {
-        toast.dismiss(loadingToastId);
-        return;
-      }
-
-      const finalRefundAmount = parseFloat(refundAmount) || roundedRefundAmount;
+      // Use the calculated amount directly without prompting
+      const finalRefundAmount = roundedRefundAmount;
+      
+      // Log the calculation for admin reference
+      console.log(`Automatic refund calculation: $${finalRefundAmount} (${remainingDays} remaining days ÷ ${totalDays} total days × $${totalCost} total cost)`);
+      
+      // Show toast with calculation info
+      toast.info(`Calculated refund: $${finalRefundAmount}`, {
+        description: `Based on ${remainingDays}/${totalDays} days remaining and $${totalCost} total cost.`
+      });
 
       // Process the refund request
       const { error: refundError } = await supabase
@@ -616,7 +612,7 @@ export default function AdminSupport() {
           processed_by: adminData.id,
           processed_at: new Date().toISOString(),
           refund_amount: finalRefundAmount,
-          notes: `Refund approved for $${finalRefundAmount}. Calculation: (${remainingDays} remaining days ÷ ${totalDays} total days) × $${totalCost} total cost = $${roundedRefundAmount}`
+          notes: `Refund approved for $${finalRefundAmount}. Calculation: (${remainingDays} remaining days ÷ ${totalDays} total days) × $${totalCost} total cost = $${roundedRefundAmount}\nRefund payment record created with status 'REFUNDED'.\nUser subscription changed to FREE plan.`
         })
         .eq('id', refundData.id);
       
@@ -650,11 +646,11 @@ export default function AdminSupport() {
         const refundResult = await refundResponse.json();
         
         
-        // Update the notes to include Stripe refund confirmation
+        // Update the notes to include Stripe refund confirmation and refund payment record ID
         await supabase
           .from('refund_request')
           .update({
-            notes: `${refundData.notes || ''}\nStripe refund processed successfully. Refund ID: ${refundResult.refund.id}`
+            notes: `${refundData.notes || ''}\nStripe refund processed successfully. Refund ID: ${refundResult.refund.id}\nRefund payment record ID: ${refundResult.refundPaymentRecord?.id || 'N/A'}`
           })
           .eq('id', refundData.id);
         
@@ -666,7 +662,7 @@ export default function AdminSupport() {
       }
       
       // Add a note to the ticket
-      const noteContent = `Refund request approved. Amount: $${finalRefundAmount}\nCalculation: (${remainingDays} remaining days ÷ ${totalDays} total days) × $${totalCost} total cost = $${roundedRefundAmount}`;
+      const noteContent = `Refund request approved. Amount: $${finalRefundAmount}\nCalculation: (${remainingDays} remaining days ÷ ${totalDays} total days) × $${totalCost} total cost = $${roundedRefundAmount}\nRefund payment record created with status 'REFUNDED'.\nUser subscription changed to FREE plan.`;
         
       const { error: replyError } = await supabase
           .from('contact_reply')
@@ -688,7 +684,9 @@ export default function AdminSupport() {
       await fetchTicketReplies(selectedTicket.id);
       
       toast.dismiss(loadingToastId);
-      toast.success(`Refund request approved successfully for $${finalRefundAmount}`);
+      toast.success(`Refund processed successfully for $${finalRefundAmount}`, {
+        description: `Refund for ${refundData.current_subscription?.subscription_plan?.name || 'subscription'} has been approved and processed. User switched to FREE plan.`
+      });
       
     } catch (error) {
       console.error('Error processing refund request:', error);
