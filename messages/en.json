@@ -151,6 +151,9 @@
       "utc7": "Southeast Asia Standard Time (UTC+7)",
       "utc3": "Moscow Standard Time (UTC+3)"
     },
+    "enableAllNotifications": "Enable All Notifications",
+    "enableAllNotificationsDesc": "Enable or disable all notifications at once",
+    "notificationChannels": "Notification Channels",
     "emailNotifications": "Email Notifications",
     "emailNotificationsDesc": "Receive emails for important updates and alerts",
     "pushNotifications": "Push Notifications",

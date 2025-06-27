@@ -8,17 +8,14 @@ export async function PATCH(request, { params }) {
 
     // Create a notifications object to store all settings
     const notificationsData = {
-      notifications_enabled: notifications.pushNotifications,
+      notifications_enabled: notifications.notifications_enabled,
       pushNotifications: notifications.pushNotifications,
       addedChatNotifications: notifications.addedChatNotifications, 
       mentionNotifications: notifications.mentionNotifications,
       inviteMeetingNotifications: notifications.inviteMeetingNotifications,
       taskAssignments: notifications.taskAssignments,
-      taskComments: notifications.taskComments,
       teamAnnouncements: notifications.teamAnnouncements,
       teamInvitations: notifications.teamInvitations,
-      dueDates: notifications.dueDates,
-      weeklyDigest: notifications.weeklyDigest
     };
 
     // Update the user table with the JSONB notifications field
