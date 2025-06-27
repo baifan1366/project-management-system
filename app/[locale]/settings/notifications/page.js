@@ -18,14 +18,17 @@ export default function NotificationsPage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState({
-    emailNotifications: true,
+    notifications_enabled: true,
     pushNotifications: true,
-    weeklyDigest: true,
+    addedChatNotifications: true,
     mentionNotifications: true,
+    inviteMeetingNotifications: true,
     taskAssignments: true,
     taskComments: true,
     dueDates: true,
-    teamInvitations: true
+    teamAnnouncements: true,
+    teamInvitations: true,
+    weeklyDigest: true
   });
 
   useEffect(() => {
@@ -77,8 +80,7 @@ export default function NotificationsPage() {
       await dispatch(updateUserPreference({ 
         userId: user.id, 
         preferenceData: { 
-          notifications_settings: notifications,
-          notifications_enabled: notifications.emailNotifications || notifications.pushNotifications
+          notifications_settings: notifications
         }
       }));
       
@@ -101,20 +103,6 @@ export default function NotificationsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>{t('emailNotifications')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('emailNotificationsDesc')}
-              </p>
-            </div>
-            <Switch
-              checked={notifications.emailNotifications}
-              onCheckedChange={(checked) =>
-                setNotifications(prev => ({ ...prev, emailNotifications: checked }))
-              }
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
               <Label>{t('pushNotifications')}</Label>
               <p className="text-sm text-muted-foreground">
                 {t('pushNotificationsDesc')}
@@ -123,7 +111,11 @@ export default function NotificationsPage() {
             <Switch
               checked={notifications.pushNotifications}
               onCheckedChange={(checked) =>
-                setNotifications(prev => ({ ...prev, pushNotifications: checked }))
+                setNotifications(prev => ({ 
+                  ...prev, 
+                  pushNotifications: checked,
+                  notifications_enabled: checked
+                }))
               }
             />
           </div>
@@ -143,6 +135,20 @@ export default function NotificationsPage() {
           </div>
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
+              <Label>{t('addedChatNotifications')}</Label>
+              <p className="text-sm text-muted-foreground">
+                {t('addedChatNotificationsDesc', { fallback: 'Receive notifications when you are added to a chat.' })}
+              </p>
+            </div>
+            <Switch
+              checked={notifications.addedChatNotifications}
+              onCheckedChange={(checked) =>
+                setNotifications(prev => ({ ...prev, addedChatNotifications: checked }))
+              }
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
               <Label>{t('mentionNotifications')}</Label>
               <p className="text-sm text-muted-foreground">
                 {t('mentionNotificationsDesc')}
@@ -152,6 +158,20 @@ export default function NotificationsPage() {
               checked={notifications.mentionNotifications}
               onCheckedChange={(checked) =>
                 setNotifications(prev => ({ ...prev, mentionNotifications: checked }))
+              }
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>{t('inviteMeetingNotifications')}</Label>
+              <p className="text-sm text-muted-foreground">
+                {t('inviteMeetingNotificationsDesc', { fallback: 'Receive notifications for meeting invitations.' })}
+              </p>
+            </div>
+            <Switch
+              checked={notifications.inviteMeetingNotifications}
+              onCheckedChange={(checked) =>
+                setNotifications(prev => ({ ...prev, inviteMeetingNotifications: checked }))
               }
             />
           </div>
@@ -201,6 +221,21 @@ export default function NotificationsPage() {
                   checked={notifications.dueDates}
                   onCheckedChange={(checked) =>
                     setNotifications(prev => ({ ...prev, dueDates: checked }))
+                  }
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>{t('teamAnnouncements')}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('teamAnnouncementsDesc', { fallback: 'Receive notifications for team announcements.' })}
+                  </p>
+                </div>
+                <Switch
+                  checked={notifications.teamAnnouncements}
+                  onCheckedChange={(checked) =>
+                    setNotifications(prev => ({ ...prev, teamAnnouncements: checked }))
                   }
                 />
               </div>

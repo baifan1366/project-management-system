@@ -144,6 +144,12 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
         return <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600"><MessageSquare className="h-4 w-4" /></div>;
       case 'MENTION':
         return <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600"><User className="h-4 w-4" /></div>;
+      case 'ADDED_TO_CHAT':
+        return <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600"><MessageSquare className="h-4 w-4" /></div>;
+      case 'MEETING_INVITE':
+        return <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600"><Video className="h-4 w-4" /></div>;
+      case 'TEAM_ANNOUNCEMENT':
+        return <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><Bell className="h-4 w-4" /></div>;
       case 'SYSTEM':
         // Check if this is a meeting invitation
         try {
