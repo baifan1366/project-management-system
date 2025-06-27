@@ -11,6 +11,7 @@ import { fetchAllTags } from '@/lib/redux/features/tagSlice'
 import { useTranslations } from 'next-intl'
 import { useToast } from "@/hooks/use-toast"
 import useGetUser from '@/lib/hooks/useGetUser';
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFId, onTagsUpdated, existingTags = [] }) {
     const t = useTranslations('CreateTag')
@@ -203,7 +204,11 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
                         <h1 className="text-sm font-bold py-2 px-3">{t('newField')}</h1>
                         {/* fetch all tags */}
                         {isLoading ? (
-                            <p className="text-sm text-gray-500 py-2 px-3">{t('loading')}</p>
+                            <div className="space-y-2 px-3 py-2">
+                                <Skeleton className="h-5 w-full" />
+                                <Skeleton className="h-5 w-full" />
+                                <Skeleton className="h-5 w-full" />
+                            </div>
                         ) : tags.length > 0 ? (
                             tags.map(tag => (
                                 <div 
@@ -220,7 +225,7 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
                         )}
                     </div>
                     {/* create tag dialog */}
-                    <div className="border-t border-gray-200 bg-background w-full mt-auto">
+                    {/* <div className="border-t border-gray-200 bg-background w-full mt-auto">
                         <Button     
                             onClick={handleOpenTagDialog}
                             variant="ghost"
@@ -229,7 +234,7 @@ export default function TagPopover({ isOpen, onClose, projectId, teamId, teamCFI
                         >
                             <Plus className="w-4 h-4"/>
                         </Button>
-                    </div>
+                    </div> */}
                 </PopoverContent>
             </Popover>
             
