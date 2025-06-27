@@ -142,11 +142,17 @@ export default function NotificationItem({ notification, onAction, formatDateToU
   const getIcon = (type) => {
     switch (type) {
       case 'TASK_ASSIGNED':
-        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Task icon */}</div>;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full flex items-center justify-center"><Calendar className="h-4 w-4" /></div>;
       case 'COMMENT_ADDED':
-        return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full">{/* Comment icon */}</div>;
+        return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full flex items-center justify-center"><MessageSquare className="h-4 w-4" /></div>;
       case 'MENTION':
-        return <div className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 p-2 rounded-full">{/* Mention icon */}</div>;
+        return <div className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 p-2 rounded-full flex items-center justify-center"><User className="h-4 w-4" /></div>;
+      case 'ADDED_TO_CHAT':
+        return <div className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 p-2 rounded-full flex items-center justify-center"><MessageSquare className="h-4 w-4" /></div>;
+      case 'MEETING_INVITE':
+        return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full flex items-center justify-center"><Video className="h-4 w-4" /></div>;
+      case 'TEAM_ANNOUNCEMENT':
+        return <div className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 p-2 rounded-full flex items-center justify-center"><Bell className="h-4 w-4" /></div>;
       case 'SYSTEM':
         // Check if this is a meeting invitation
         try {
@@ -156,15 +162,15 @@ export default function NotificationItem({ notification, onAction, formatDateToU
               : notification.data;
             
             if (data.isMeetingInvitation) {
-              return <div className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 p-2 rounded-full">{/* System icon */}</div>;
+              return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full flex items-center justify-center"><Video className="h-4 w-4" /></div>;
             }
           }
         } catch (e) {
           console.error('Error parsing notification data', e);
         }
-        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Default icon */}</div>;
+        return <div className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 p-2 rounded-full flex items-center justify-center"><Bell className="h-4 w-4" /></div>;
       default:
-        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Default icon */}</div>;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full flex items-center justify-center"><Bell className="h-4 w-4" /></div>;
     }
   };
 
@@ -217,7 +223,7 @@ export default function NotificationItem({ notification, onAction, formatDateToU
         content: `${user.name || user.email} ${isAccepted 
           ? tNotif('acceptedYourMeeting') 
           : tNotif('declinedYourMeeting')} "${meetData.eventTitle || 'meeting'}"`,
-        type: 'SYSTEM',
+        type: 'MEETING_INVITE',
         is_read: false,
         data: {
           responseToMeeting: true,

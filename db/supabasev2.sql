@@ -15,8 +15,7 @@ CREATE TABLE "user" (
   "last_login_provider" VARCHAR(50),
   "mfa_secret" VARCHAR(255), -- TOTP 秘钥
   "is_mfa_enabled" BOOLEAN DEFAULT FALSE,
-  "notifications_enabled" BOOLEAN DEFAULT TRUE,
-  "notifications_settings" JSONB DEFAULT '{"emailNotifications": true, "pushNotifications": true, "weeklyDigest": true, "mentionNotifications": true, "taskAssignments": true, "taskComments": true, "dueDates": true, "teamInvitations": true}',
+  "notifications_settings" JSONB DEFAULT '{"notifications_enabled": true, "pushNotifications": true, "addedChatNotifications": true, "mentionNotifications": true, "inviteMeetingNotifications": true, "taskAssignments": true, "teamAnnouncements": true, "teamInvitations": true}',
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "email_verified" BOOLEAN DEFAULT FALSE,

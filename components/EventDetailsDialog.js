@@ -1,21 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from 'date-fns';
-import { Calendar as CalendarIcon, MapPin, Clock, Video, Trash2, Edit, ExternalLink, Users, AlertTriangle } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, Clock, Video, Trash2, Edit, ExternalLink, Users, AlertTriangle, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useChat } from '@/contexts/ChatContext';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType, onEdit, onDelete, onSuccess }) {
   const t = useTranslations('Calendar');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const { sessions, sendMessage } = useChat();
+  const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   
   if (!event) return null;
 
@@ -273,6 +286,47 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
     }
   };
 
+  // Share event to a chat session
+  const shareEventToChat = async (sessionId, sessionName) => {
+    setIsSharing(true);
+    try {
+      // Format event details as a message
+      const eventTitle = getEventTitle();
+      const eventTime = formatEventTime();
+      const eventLocation = getEventLocation();
+      const eventDescription = getEventDescription();
+      
+      // Create message content with event details
+      let messageContent = `📅 *${t('sharedEvent')}: ${eventTitle}*\n`;
+      messageContent += `⏰ ${t('dateAndTime')}: ${eventTime}\n`;
+      
+      if (eventLocation) {
+        messageContent += `📍 ${t('location')}: ${eventLocation}\n`;
+      }
+      
+      if (eventDescription) {
+        messageContent += `\n${eventDescription}`;
+      }
+      
+      // Add event type information
+      messageContent += `\n\n${t('eventType')}: ${
+        eventType === 'google' ? t('googleCalendar') : 
+        eventType === 'personal' ? t('personalCalendar') : t('task')
+      }`;
+      
+      // Send the message to the selected chat session
+      await sendMessage(sessionId, messageContent);
+      
+      toast.success(t('eventShared') || `Event shared to ${sessionName}`);
+      setIsShareMenuOpen(false);
+    } catch (error) {
+      console.error('Error sharing event:', error);
+      toast.error(t('shareEventFailed') || "Failed to share event");
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   const participants = getParticipants();
 
   return (
@@ -383,6 +437,58 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
           </div>
           
           <DialogFooter className="flex gap-2">
+            {/* Share dropdown */}
+            <DropdownMenu open={isShareMenuOpen} onOpenChange={setIsShareMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  disabled={isSharing}
+                >
+                  <Share2 className="h-4 w-4" />
+                  {isSharing ? t('sharing') || "Sharing..." : t('share') || "Share"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end">
+                <DropdownMenuLabel>{t('shareWith') || "Share with"}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <ScrollArea className="max-h-[200px]">
+                  {sessions && sessions.length > 0 ? (
+                    sessions.map(session => (
+                      <DropdownMenuItem
+                        key={session.id}
+                        disabled={isSharing}
+                        className="cursor-pointer"
+                        onClick={() => shareEventToChat(session.id, session.name || (session.participants?.[0]?.name || t('chat')))}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs overflow-hidden bg-primary text-primary-foreground">
+                            {session.type === 'GROUP' ? (
+                              <Users className="h-3 w-3" />
+                            ) : session.participants?.[0]?.avatar_url ? (
+                              <img src={session.participants[0].avatar_url} alt={session.participants[0].name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span>{(session.name || session.participants?.[0]?.name || '?').charAt(0)}</span>
+                            )}
+                          </div>
+                          <span className="truncate">
+                            {session.type === 'GROUP' 
+                              ? session.name || t('groupChat') 
+                              : session.participants?.[0]?.name || t('chat')}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <div className="text-center py-2 text-muted-foreground text-sm">
+                      {t('noChats') || "No chats available"}
+                    </div>
+                  )}
+                </ScrollArea>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
             {/* Delete button */}
             <Button 
               variant="destructive" 

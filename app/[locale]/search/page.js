@@ -264,7 +264,7 @@ export default function SearchPage() {
               user_id: user.id,
               title: chatT('newPrivateChat'),
               content: chatT('startedChatWithYou', { name: currentUser.name || currentUser.email }),
-              type: 'SYSTEM',
+              type: 'ADDED_TO_CHAT',
               related_entity_type: 'chat_session',
               related_entity_id: sessionId,
               data: {

@@ -357,7 +357,7 @@ export default function NewChatPopover({ className, buttonContent }) {
               content: selectedUsers.length === 1 
                 ? t('startedChatWithYou', { name: currentUser.name || currentUser.email })
                 : t('addedYouToGroup', { name: currentUser.name || currentUser.email, groupName: chatName }),
-              type: 'SYSTEM',
+              type: 'ADDED_TO_CHAT',
               related_entity_type: 'chat_session',
               related_entity_id: chatSession.id,
               data: {

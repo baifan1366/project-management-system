@@ -13,7 +13,10 @@ import {
   CheckCircle, 
   AlertCircle, 
   Info, 
-  Calendar
+  Calendar,
+  MessageSquare,
+  User,
+  Video
 } from "lucide-react";
 import useGetUser from '@/lib/hooks/useGetUser';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -113,14 +116,17 @@ export default function NotificationsPage() {
   // Get icon for notification type
   const getTypeIcon = (type) => {
     switch(type) {
-      case 'task': return <CheckCircle className="h-4 w-4" />;
-      case 'meeting': return <Calendar className="h-4 w-4" />;
-      case 'alert': return <AlertCircle className="h-4 w-4" />;
-      case 'TASK_ASSIGNED': return <CheckCircle className="h-4 w-4" />;
-      case 'COMMENT_ADDED': return <Info className="h-4 w-4" />;
-      case 'MENTION': return <Info className="h-4 w-4" />;
-      case 'SYSTEM': return <Info className="h-4 w-4" />;
-      default: return <Info className="h-4 w-4" />;
+      case 'task': return <div className="flex items-center justify-center"><CheckCircle className="h-4 w-4" /></div>;
+      case 'meeting': return <div className="flex items-center justify-center"><Calendar className="h-4 w-4" /></div>;
+      case 'alert': return <div className="flex items-center justify-center"><AlertCircle className="h-4 w-4" /></div>;
+      case 'TASK_ASSIGNED': return <div className="flex items-center justify-center"><CheckCircle className="h-4 w-4" /></div>;
+      case 'COMMENT_ADDED': return <div className="flex items-center justify-center"><MessageSquare className="h-4 w-4" /></div>;
+      case 'MENTION': return <div className="flex items-center justify-center"><User className="h-4 w-4" /></div>;
+      case 'ADDED_TO_CHAT': return <div className="flex items-center justify-center"><MessageSquare className="h-4 w-4" /></div>;
+      case 'MEETING_INVITE': return <div className="flex items-center justify-center"><Video className="h-4 w-4" /></div>;
+      case 'TEAM_ANNOUNCEMENT': return <div className="flex items-center justify-center"><Bell className="h-4 w-4" /></div>;
+      case 'SYSTEM': return <div className="flex items-center justify-center"><Info className="h-4 w-4" /></div>;
+      default: return <div className="flex items-center justify-center"><Info className="h-4 w-4" /></div>;
     }
   };
 
@@ -307,8 +313,8 @@ function NotificationList({ notifications, loading, onAction, t, formatDateToUse
   }
 
   return (
-    <ScrollArea className="h-full pr-2">
-      <div className="space-y-3 pb-4">
+    <ScrollArea className="h-full pr-4">
+      <div className="space-y-3 pb-4 pr-2">
         {notifications.map((notification) => (
           <NotificationItem 
             key={notification.id}

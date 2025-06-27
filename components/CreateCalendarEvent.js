@@ -709,7 +709,7 @@ export default function CreateCalendarEvent({
                 user_id: user.id,
                 title: `${t('meetingInvitation')}: ${formData.title}`,
                 content: `${session.name || '用户'} ${t('invitedYouToMeeting')}`,
-                type: 'SYSTEM',
+                type: 'MEETING_INVITE',
                 related_entity_type: 'calendar_event',
                 related_entity_id: eventResponseData.event.id,
                 data: {

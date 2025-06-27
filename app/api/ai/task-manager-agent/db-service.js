@@ -410,7 +410,7 @@ export async function inviteTeamMember(teamId, email, role = 'CAN_VIEW', invited
   if (invitedBy) {
     createTeamNotification(
       invitedBy,
-      'SYSTEM',
+      'TEAM_INVITATION',
       `Invitation sent to ${email}`,
       `You invited ${email} to join the team "${teamData.name}"`,
       teamId,
