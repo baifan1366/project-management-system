@@ -23,6 +23,7 @@ import { parseSingleSelectValue, generateColorFromLabel, renderStatusBadge } fro
 import { supabase } from '@/lib/supabase';
 import { getLabelByTeamId, updateLabel } from '@/lib/redux/features/teamLabelSlice';
 import { extractSingleSelectOptions } from './labelUtils';
+import { Skeleton } from '@/components/ui/skeleton';    
 
 // 使用唯一键记录全局请求状态，避免重复请求
 const requestCache = {
@@ -1197,7 +1198,33 @@ export default function BodyContent({ projectThemeColor }) {
     const [showLabelManager, setShowLabelManager] = useState(false);
 
     if (loading) {
-      return <div className="p-4 text-center">{t('loading')}</div>;
+      return (
+        <div className="p-4">
+          {/* 标签管理器骨架 */}
+          <div className="mb-4 flex justify-end items-center">
+            <Skeleton className="h-9 w-40" />
+          </div>
+          
+          {/* 选中任务详情骨架 */}
+          <div className="mb-6">
+            <Skeleton className="h-32 w-full mb-6" />
+          </div>
+          
+          {/* 任务列表骨架 */}
+          <div className="grid grid-cols-1 gap-4">
+            {Array(3).fill(0).map((_, index) => (
+              <div key={index} className="p-4 border rounded-md">
+                <div className="flex justify-between items-center mb-2">
+                  <Skeleton className="h-5 w-3/5" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+                <Skeleton className="h-4 w-4/5 mb-3" />
+                <Skeleton className="h-4 w-2/5" />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
     }
 
     return (

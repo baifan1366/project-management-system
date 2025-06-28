@@ -169,6 +169,16 @@ export default function HandleTask({ teamId, localTasks, setLocalTasks, taskInpu
           return updatedTasks;
         });
       }
+      
+      // 清除当前tagId的验证错误
+      setValidationErrors(prev => {
+        if (prev && prev[tagId]) {
+          const newErrors = { ...prev };
+          delete newErrors[tagId];
+          return newErrors;
+        }
+        return prev;
+      });
     }
   };
 

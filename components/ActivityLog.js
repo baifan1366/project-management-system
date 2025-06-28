@@ -8,6 +8,17 @@ import { zhCN, enUS } from 'date-fns/locale';
 import { useParams } from 'next/navigation';
 import { Clock, FilePlus, FileText, MessageSquare, User, CheckCircle, XCircle, Edit, Trash2, Plus } from 'lucide-react';
 import { useGetUser } from '@/lib/hooks/useGetUser';
+import { Skeleton } from '@/components/ui/skeleton';
+import globalEventBus, { createEventBus } from '@/lib/eventBus';
+
+// 使用全局事件总线，如果不存在则创建一个空的事件处理器
+const eventBus = globalEventBus || (typeof window !== 'undefined' ? createEventBus() : {
+  on: () => () => {},
+  emit: () => {}
+});
+
+// 定义事件名称常量
+const TEAM_CREATED_EVENT = 'team:created';
 
 export default function ActivityLog() {
   const t = useTranslations('Projects');
@@ -19,6 +30,22 @@ export default function ActivityLog() {
   const locale = params.locale || 'en';
   const [userId, setUserId] = useState(null);
   const { user } = useGetUser(); 
+  // 添加刷新触发器状态
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // 监听团队创建事件
+  useEffect(() => {
+    // 监听团队创建事件，当事件触发时刷新活动日志
+    const unsubscribe = eventBus.on(TEAM_CREATED_EVENT, () => {
+      // 通过更新trigger状态值来触发活动日志刷新
+      setRefreshTrigger(prev => prev + 1);
+    });
+    
+    // 组件卸载时取消订阅
+    return () => {
+      unsubscribe();
+    };
+  }, []);
   
   // 获取当前用户ID
   useEffect(() => {
@@ -61,7 +88,7 @@ export default function ActivityLog() {
     if (userId) {
       fetchActivities();
     }
-  }, [params.id, userId]);
+  }, [params.id, userId, refreshTrigger]); // 添加refreshTrigger作为依赖项，以便在创建新团队时刷新
   
   // 获取活动图标
   const getActivityIcon = (actionType, entityType) => {
@@ -75,6 +102,7 @@ export default function ActivityLog() {
     } else if (entityType === 'teams') {
       switch (actionType) {
         case 'createteam':
+        case 'createTeam':
           return <Plus className="h-4 w-4 text-green-500" />;
         case 'updateTeam':
           return <Edit className="h-4 w-4 text-blue-500" />;
@@ -165,8 +193,16 @@ export default function ActivityLog() {
       </CardHeader>
       <CardContent>
         {!userId || loading ? (
-          <div className="flex justify-center items-center h-40">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-start gap-3">
+                <Skeleton className="w-8 h-8 rounded-full" />
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-3/4 mb-2" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="text-center text-red-500 py-4">{error}</div>

@@ -1016,7 +1016,8 @@
     "everyoneCanEditDescription": "这个项目将对每个项目成员可见，作为编辑者。",
     "everyoneCanCheckDescription": "这个项目将对每个项目成员可见，作为检查者。",
     "everyoneCanViewDescription": "这个项目将对每个项目成员可见，作为查看者。",
-    "teamNameRequired": "请输入团队名称"
+    "teamNameRequired": "请输入团队名称",
+    "duplicateTeamName": "团队名称已存在，请更换名称后重试"
   },
   "Chat": {
     "title": "聊天",

@@ -164,6 +164,7 @@ const TeamCustomFieldPage = () => {
   const [editTeamOpen, setEditTeamOpen] = useState(false);
   const [editTeamActiveTab, setEditTeamActiveTab] = useState("details");
   const [addButtonText, setAddButtonText] = useState('addTask');  
+  const [triggerAction, setTriggerAction] = useState(false);
   const [onClose, setOnClose] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showVisibilityDialog, setShowVisibilityDialog] = useState(false);
@@ -265,6 +266,25 @@ const TeamCustomFieldPage = () => {
       const newValue = prev + 1;
       return newValue;
     }); // 每次编辑后递增
+  };
+
+  // 添加处理Plus按钮点击的函数
+  const handleAddButtonClick = () => {
+    // 如果addButtonText为空，设置默认值
+    if (!addButtonText) {
+      setAddButtonText('addTask');
+    }
+    
+    // 触发动作信号并重置
+    setTriggerAction(true);
+    
+    // 刷新内容
+    setRefreshKey(prev => prev + 1);
+    
+    // 在短暂延迟后重置triggerAction
+    setTimeout(() => {
+      setTriggerAction(false);
+    }, 500);
   };
 
   useEffect(() => {
@@ -550,40 +570,40 @@ const TeamCustomFieldPage = () => {
 
     const fieldType = currentItem.custom_field?.type;
     if (fieldType === 'LIST') {
-      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'GANTT') {
-      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText} triggerAction={triggerAction}/>;
     }
     if (fieldType === 'KANBAN') {
-      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'FILES') {
-      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'WORKFLOW') {
-      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'OVERVIEW') {
-      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'TIMELINE') {
-      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'CALENDAR') {
-      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'NOTE') {
-      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'AGILE') {
-      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'POSTS') {
-      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     return <div>暂不支持的字段类型: {fieldType}</div>;
-  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey, teamCFLoaded, fieldNotFoundText, fieldMayBeDeletedText]);
+  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey, teamCFLoaded, fieldNotFoundText, fieldMayBeDeletedText, addButtonText, triggerAction]);
 
   // 处理加载状态
   if (isLoading) {
@@ -942,7 +962,12 @@ const TeamCustomFieldPage = () => {
                 {currentItem?.custom_field?.type !== 'FILES' && 
                  currentItem?.custom_field?.type !== 'POSTS' && (
                   <>
-                    <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
+                    <Button 
+                      onClick={handleAddButtonClick}
+                      variant="outline" 
+                      size="sm" 
+                      className="rounded-l-md rounded-r-none border-r-0"
+                    >
                       <Plus className="h-4 w-4 mr-1" />
                       {t(addButtonText)}
                     </Button>
@@ -963,11 +988,6 @@ const TeamCustomFieldPage = () => {
                           <span className="text-sm">{t('section')}</span>
                           {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
                         </DropdownMenuItem>
-                        {/* <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
-                          <FileUp className="h-4 w-4 mr-1" />
-                          <span className="text-sm">{t('attachment')}</span>
-                          {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
-                        </DropdownMenuItem> */}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </>

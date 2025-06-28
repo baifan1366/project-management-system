@@ -39,6 +39,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const [formErrors, setFormErrors] = useState({});
   const [validationSchema, setValidationSchema] = useState(null);
   const { user } = useGetUser();
+  const projectTeams = useSelector((state) => (state.teams.projectTeams || {})[projectId] || []);
 
   useEffect(() => {
     setValidationSchema(createTeamValidationSchema(tValidation));
@@ -108,6 +109,44 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
     try {
       // 获取当前用户信息
       const userId = user?.id;
+
+      // 先获取项目的所有团队，确保有最新数据
+      try {
+        await dispatch(fetchProjectTeams(projectId)).unwrap();
+      } catch (fetchError) {
+        console.error('获取项目团队失败:', fetchError);
+      }
+      
+      // 重新获取最新的projectTeams数据
+      const currentProjectTeams = await dispatch(fetchProjectTeams(projectId)).unwrap();
+      
+      // 检查团队名称是否重复
+      const teamName = teamFormTransforms.teamName(data.teamName);
+      
+      // 调试输出
+      console.log('创建团队名称:', teamName);
+      console.log('当前项目所有团队:', currentProjectTeams);
+      
+      // 提取所有团队名称进行比较
+      const existingTeamNames = currentProjectTeams
+        .filter(team => team && team.name)
+        .map(team => team.name.toLowerCase());
+      console.log('现有团队名称列表:', existingTeamNames);
+      
+      const isDuplicateName = existingTeamNames.includes(teamName.toLowerCase());
+      console.log('检测到重复名称:', isDuplicateName);
+      
+      if (isDuplicateName) {
+        console.log('团队名称重复，拒绝创建');
+        setFormErrors({
+          ...formErrors,
+          teamName: t('duplicateTeamName')
+        });
+        setIsLoading(false);
+        setIsSubmitting(false);
+        return;
+      }
+      
       // 订阅限制检查
       const limitCheck = await getSubscriptionLimit(userId, 'create_team');
       if (!limitCheck.allowed) {
@@ -121,7 +160,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
       }
       // 创建团队
       const team = await dispatch(createTeam({
-        name: teamFormTransforms.teamName(data.teamName),
+        name: teamName,
         access: teamFormTransforms.teamAccess(data.teamAccess),
         project_id: projectId,
         star: false,
