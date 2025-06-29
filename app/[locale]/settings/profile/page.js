@@ -234,7 +234,7 @@ export default function ProfilePage() {
   
     } catch (error) {
       console.error('Error saving profile:', error);
-      toast.error(t('common.error'));
+      toast.error(t('error'));
     } finally {
       setLoading(false);
     }
@@ -300,7 +300,7 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('头像上传失败:', error);
       toast.dismiss(toastId);
-      toast.error(error.message || t('common.error'));
+      toast.error(error.message || t('error'));
     } finally {
       setLoading(false);
     }
@@ -485,6 +485,7 @@ export default function ProfilePage() {
                     onBlur={handleNameBlur}
                     placeholder={t('name')}
                     className={nameError ? 'border-red-500 focus:ring-red-500' : ''}
+                    maxLength={50}
                   />
                   {nameError && (
                     <p className="text-sm text-red-500 mt-1">{nameError}</p>
@@ -511,6 +512,7 @@ export default function ProfilePage() {
                     onBlur={handlePhoneBlur}
                     placeholder="+1234567890"
                     className={phoneError ? 'border-red-500 focus:ring-red-500' : ''}
+                    maxLength={14}
                   />
                   {phoneError && (
                     <p className="text-sm text-red-500 mt-1">{phoneError}</p>

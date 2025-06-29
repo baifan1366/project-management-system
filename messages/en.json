@@ -101,6 +101,8 @@
     "signOut": "Sign out",
     "profile": "Profile",
     "success": "Success",
+    "error": "Error",
+    "retry": "Retry",
     "name": "Name",
     "bio": "Bio",
     "avatar": "Avatar",
@@ -230,6 +232,7 @@
     "selectLanguage": "Select Language",
     "selectTimezone": "Select Timezone",
     "selectTimeFormat": "Select Time Format",
+    "samePasswordError": "New password cannot be the same as the current password",
     "billing": {
       "title": "Billing"
     },
@@ -345,7 +348,9 @@
         "loaded": "Payment history loaded",
         "error": "Failed to load payment history",
         "preparingInvoice": "Preparing invoice...",
-        "invoiceReady": "Invoice ready for download"
+        "invoiceReady": "Invoice ready for download",
+        "popupBlocked": "Popup blocked, please allow popups to view the invoice",
+        "invoiceError": "Failed to load invoice"
       },
       "upgradeOptions": {
         "title": "Upgrade Options",

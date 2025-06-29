@@ -172,7 +172,7 @@ export default function NotificationsPage() {
       toast.success(t('saved'));
     } catch (error) {
       console.error('Error saving notifications:', error);
-      toast.error(t('common.error'));
+      toast.error(t('error'));
     } finally {
       setLoading(false);
     }
