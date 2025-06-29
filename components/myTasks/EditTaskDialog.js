@@ -357,6 +357,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
               placeholder={t('taskTitlePlaceholder')}
               required
               disabled={task?.task_id && !isTeamMember || isPastDue}
+              maxLength={50}
             />
           </div>
           
@@ -372,6 +373,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
               placeholder={t('descriptionPlaceholder')}
               rows={3}
               disabled={task?.task_id && !isTeamMember || isPastDue}
+              maxLength={100}
             />
           </div>
           

@@ -126,9 +126,12 @@ export default function Home({ params }) {
       dispatch(fetchProjectTeams(projectId))
         .unwrap()
         .then(teamData => {
-          if (teamData) {
+          // 确保teamData是一个数组
+          const teamsArray = Array.isArray(teamData) ? teamData : [];
+          
+          if (teamsArray.length > 0) {
             // 添加处理每个团队的成员数和任务数
-            const teamsWithCounts = teamData.map(async (team) => {
+            const teamsWithCounts = teamsArray.map(async (team) => {
               // 获取团队成员数
               let memberCount = 0;
               let taskCount = 0;
@@ -166,7 +169,8 @@ export default function Home({ params }) {
               setTeamsLoading(false);
             });
           } else {
-            // 如果没有团队数据，也要结束加载状态
+            // 如果没有团队数据或数组为空，设置为空数组并结束加载状态
+            setTeams([]);
             setTeamsLoading(false);
           }
         })
@@ -195,7 +199,11 @@ export default function Home({ params }) {
         }
         
         let totalTaskCount = 0;
+        let pendingCount = 0;
+        let inProgressCount = 0;
+        let completedCount = 0;
         
+        // 获取当前项目的所有任务
         for (const team of teams) {
           if (!team.id) continue; // 跳过没有ID的团队
           
@@ -204,19 +212,52 @@ export default function Home({ params }) {
           
           if (teamSections && teamSections.length) {
             for (const section of teamSections) {
-              // 直接从section对象中获取task_ids
-              const sectionTaskCount = section && section.task_ids ? section.task_ids.length : 0;
+              if (!section || !section.task_ids) continue;
+              
+              // 计算section中的任务总数
+              const sectionTaskCount = section.task_ids.length;
               totalTaskCount += sectionTaskCount;
+              
+              // 获取每个任务的详细信息以统计状态
+              if (sectionTaskCount > 0) {
+                try {
+                  // 逐个获取任务详情来统计状态
+                  for (const taskId of section.task_ids) {
+                    // 尝试从已加载的tasks中查找
+                    const taskDetail = tasks ? tasks.find(t => String(t.id) === String(taskId)) : null;
+                    
+                    if (taskDetail) {
+                      const tagValues = taskDetail.tag_values || {};
+                      const status = tagValues.status?.toLowerCase() || '';
+                      
+                      if (status.includes('done') || status.includes('completed')) {
+                        completedCount++;
+                      } else if (status.includes('progress') || status.includes('working')) {
+                        inProgressCount++;
+                      } else {
+                        pendingCount++;
+                      }
+                    } else {
+                      // 如果任务不在已加载的任务中，默认为待处理
+                      pendingCount++;
+                    }
+                  }
+                } catch (err) {
+                  console.error(`Error processing tasks for section ${section.id}:`, err);
+                }
+              }
             }
           }
         }
         
         // 更新任务计数
         setTotalTasks(totalTaskCount);
-        setTaskCount(prev => ({
-          ...prev,
+        setTaskCount({
+          pending: pendingCount,
+          inProgress: inProgressCount,
+          completed: completedCount,
           total: totalTaskCount
-        }));
+        });
       } catch (err) {
         console.error('Error fetching tasks from sections:', err);
       } finally {
@@ -230,7 +271,7 @@ export default function Home({ params }) {
       setLoading(true);
       fetchAllTasksFromSections();
     }
-  }, [dispatch, teams, hasPermission]);
+  }, [dispatch, teams, hasPermission, tasks]);
 
   // 检查用户是否有权限访问此项目以及项目是否已归档
   useEffect(() => {
@@ -322,35 +363,6 @@ export default function Home({ params }) {
     }
   }, [dispatch, userId, hasPermission]);
 
-  // 计算任务统计数据
-  useEffect(() => {
-    if (tasks && tasks.length > 0) {
-      let pending = 0;
-      let inProgress = 0;
-      let completed = 0;
-      
-      tasks.forEach(task => {
-        const tagValues = task.tag_values || {};
-        const status = tagValues.status?.toLowerCase() || '';
-        
-        if (status.includes('done') || status.includes('completed')) {
-          completed++;
-        } else if (status.includes('progress') || status.includes('working')) {
-          inProgress++;
-        } else {
-          pending++;
-        }
-      });
-      
-      setTaskCount({
-        pending,
-        inProgress,
-        completed,
-        total: totalTasks || tasks.length // 优先使用section计算的总数
-      });
-    }
-  }, [tasks, totalTasks]);
-
   // 根据状态过滤团队
   const filteredTeams = teams.filter(team => {
     if (activeStatus === 'ALL') return true;
@@ -429,7 +441,7 @@ export default function Home({ params }) {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">{project?.project_name || t('projectDetails')}</h1>
         <div className="flex space-x-2">
-          <Dialog open={openAgentDialog} onOpenChange={setOpenAgentDialog}>
+          {/* <Dialog open={openAgentDialog} onOpenChange={setOpenAgentDialog}>
             <DialogTrigger asChild>
               <Button variant={themeColor} className="gap-2 px-2">
                 <Bot size={20} />
@@ -440,7 +452,7 @@ export default function Home({ params }) {
               <DialogTitle className="sr-only">{t_pengy('titleForProject')}</DialogTitle>
               <TaskManagerAgent userId={userId} projectId={projectId} />
             </DialogContent>
-          </Dialog>
+          </Dialog> */}
         </div>
       </div>
 

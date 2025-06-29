@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from "react-hook-form"
 import { toast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Form,
   FormControl,
@@ -191,10 +192,29 @@ export default function CreateProjectDialog({ open, onOpenChange }) {
     // 如果正在加载订阅信息，显示加载状态
     if (isLoading) {
       return (
-        <div className="flex justify-center items-center min-h-[30vh]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-800 dark:border-gray-200 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-300">{t('loading')}</p>
+        <div className="space-y-6 p-2">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-1/4" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-1/4" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-1/4" />
+            <div className="flex gap-3">
+              {Array(6).fill(0).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-8 rounded-full" />
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-3 mt-6">
+            <Skeleton className="h-10 w-20" />
+            <Skeleton className="h-10 w-20" />
           </div>
         </div>
       );
