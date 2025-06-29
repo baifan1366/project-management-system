@@ -2017,7 +2017,8 @@
       "backToLogin": "Back to Login",
       "remembered": "Remember your password?",
       "login": "Back to login",
-      "invalidEmail": "Please enter a valid email address"
+      "invalidEmail": "Please enter a valid email address",
+      "useAnotherEmail": "Use another email"
     },
     "resetPassword": {
       "title": "Reset Password",
