@@ -209,7 +209,7 @@ export default function PaymentPage() {
     if (planDetails && planId && user?.id) {
       initializePayment();
     }
-  }, [dispatch, planId, user, planDetails, discount]);
+  }, [dispatch, planId, user, planDetails, discount, appliedPromoCode]);
 
   // Stripe appearance configuration
   const appearance = {
@@ -575,14 +575,32 @@ export default function PaymentPage() {
       setValidPromo(true);
       setMessageType('success');
       setShowPromoInput(false);
+      
+      // Show success toast
+      toast.success('Promo code applied', {
+        description: `Discount of ${formatPrice(promoCodeData.discount_type === 'PERCENTAGE' ? 
+          calculateSubTotal() * (promoCodeData.discount_value / 100) : 
+          promoCodeData.discount_value)} applied to your order.`
+      });
 
       //increment the promo code usage count
       await increasePromoCodeUsage(promoCode);
+      
+      // If card payment is selected, we need to reinitialize the payment intent with the original amount
+      if (selectedPaymentMethod === 'card') {
+        // Clear the client secret to force a new payment intent to be created
+        setClientSecret('');
+      }
     } catch (err) {
       console.error('Error applying promo code:', err);
       setPromoMessage('Failed to apply promo code');
       setMessageType('error');
       setValidPromo(false);
+      
+      // Show error toast
+      toast.error('Failed to apply promo code', {
+        description: 'Please check the code and try again.'
+      });
     } finally {
       setIsPromoLoading(false);
     }
@@ -733,9 +751,20 @@ export default function PaymentPage() {
                                 setPromoCode('');
                                 setShowPromoInput(true);
                                 
+                                // Show toast for removing promo code
+                                toast.info('Promo code removed', {
+                                  description: 'The discount has been removed from your order.'
+                                });
+                                
                                 // Then decrease the usage count
                                 if (codeToRemove) {
                                   await decreasePromoCodeUsage(codeToRemove);
+                                }
+                                
+                                // If card payment is selected, we need to reinitialize the payment intent with the original amount
+                                if (selectedPaymentMethod === 'card') {
+                                  // Clear the client secret to force a new payment intent to be created
+                                  setClientSecret('');
                                 }
                               }}
                               className="text-gray-400 text-sm hover:text-white"
@@ -806,14 +835,14 @@ export default function PaymentPage() {
                 {validPromo && discount > 0 && (
                   <div className="flex justify-between text-green-400 pt-2">
                     <span>Discount ({appliedPromoCode})</span>
-                    <span>-{formatPlanPriceAndInterval(planDetails)}</span>
+                    <span>-{formatPrice(discount)}</span>
                   </div>
                 )}
 
                 {validPromo && (
                   <div className="flex justify-between border-t border-gray-800 pt-4 font-bold">
                     <span>Total</span>
-                    <span>{formatPlanPriceAndInterval(planDetails)}</span>
+                    <span>{formatPrice(calculateFinalTotal())}</span>
                   </div>
                 )}
               </div>
