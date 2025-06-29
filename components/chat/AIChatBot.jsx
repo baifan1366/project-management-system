@@ -18,18 +18,6 @@ import { getSubscriptionLimit, trackSubscriptionUsage } from '@/lib/subscription
 import { useDispatch } from 'react-redux';
 import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
-// 移除原SVG组件，改用Image组件
-const PenguinIcon = () => (
-  <div className="relative w-full h-full flex items-center justify-center">
-    <Image 
-      src={PengyImage} 
-      alt="Project Manager Penguin" 
-      fill
-      style={{ objectFit: 'cover' }}
-      priority
-    />
-  </div>
-);
 
 // AI Chat Skeleton Loading Component
 const AIChatSkeleton = () => (
@@ -219,7 +207,7 @@ export default function AIChatBot() {
 
     // 验证字数限制
     if (input.trim().length > 1000) {
-      toast.error(t('errors.messageTooLong') || '消息过长（最多1000个字符）');
+      toast.error(t('errors.messageTooLong'));
       return;
     }
     
