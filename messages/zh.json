@@ -111,6 +111,8 @@
     "passwordChanged": "密码已成功更改",
     "timezone": "时区",
     "timeFormat": "时间格式",
+    "phoneInvalid": "电话号码必须以+开头，后跟国家/地区代码",
+    "phoneMinDigits": "电话号码在国家/地区代码后必须包含9-14位数字",
     "password": {
       "requirementsTitle": "密码要求：",
       "minLength": "至少8个字符",

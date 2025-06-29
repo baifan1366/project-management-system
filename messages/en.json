@@ -113,8 +113,8 @@
     "passwordChanged": "Password has been changed successfully",
     "timezone": "Timezone",
     "timeFormat": "Time Format",
-    "phoneInvalid": "Invalid phone number",
-    "phoneMinDigits": "Phone number must be at least 8 digits",
+    "phoneInvalid": "Phone number must start with + followed by country code",
+    "phoneMinDigits": "Phone number must contain 9-14 digits after the country code",
     "nameRequired": "Name is required",
     "userNameMax": "Name must be less than 50 characters",
     "password": {
@@ -227,6 +227,9 @@
     "invoiceReady": "Invoice is ready for download",
     "contactingSupport": "Contacting support team",
     "supportRequestSent": "Support request sent successfully",
+    "selectLanguage": "Select Language",
+    "selectTimezone": "Select Timezone",
+    "selectTimeFormat": "Select Time Format",
     "billing": {
       "title": "Billing"
     },
@@ -1384,14 +1387,12 @@
     "updated": "Updated",
     "viewDetails": "View details",
     "createdBy": "Created by",
-    "viewProfile": "View Profile",
     "viewProject": "View Project",
     "viewTask": "View Task",
     "userDetails": "User Details",
     "projectDetails": "Project Details",
     "taskDetails": "Task Details",
-    "unknown": "Unknown",
-    "close": "Close"
+    "unknown": "Unknown"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
@@ -1928,12 +1929,10 @@
     "login": {
       "title": "Login",
       "subtitle": "Welcome back!",
-
       "password": "Password",
       "forgotPassword": "Forgot password?",
       "noAccount": "Don't have an account?",
       "signup": "Sign up",
-
       "button": "Log in",
       "success": "successful",
       "loading": "Logging in...",
@@ -1957,13 +1956,29 @@
       "emailCodeError": "Please enter the verification code from your email",
       "verificationSuccess": "Verification successful",
       "havingTrouble": "Having trouble?",
-      "contactSupport": "Contact support."
+      "contactSupport": "Contact support.",
+      "emailVerification": {
+        "title": "Email Verification",
+        "loading": "Verifying your email...",
+        "redirecting": "Redirecting you to login page...",
+        "backToLogin": "Back to login",
+        "spam": "If you didn't request this verification, please contact support.",
+        "resend": "Resend verification code",
+        "resending": "Resending...",
+        "resendSuccess": "Verification code resent successfully",
+        "resendFailed": "Failed to resend verification code"
+      }
     },
     "emailVerification": {
-      "title": "Email Verification",
-      "loading": "Verifying your email...",
-      "redirecting": "Redirecting you to login page...",
-      "backToLogin": "Back to login"
+        "title": "Email Verification",
+        "loading": "Verifying your email...",
+        "redirecting": "Redirecting you to login page...",
+        "backToLogin": "Back to login",
+        "spam": "If you didn't request this verification, please contact support.",
+        "resend": "Resend verification code",
+        "resending": "Resending...",
+        "resendSuccess": "Verification code resent successfully",
+        "resendFailed": "Failed to resend verification code"
     },
     "signup": {
       "title": "Sign up",
