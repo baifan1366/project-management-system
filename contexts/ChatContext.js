@@ -21,6 +21,8 @@ export function ChatProvider({ children }) {
   const { user:authSession, isLoading: authLoading } = useGetUser();
   // Add storage for user relationships to avoid repeated API calls
   const [userRelationships, setUserRelationships] = useState({});
+  // Create a state for caching user's session participants
+  const [userSessionsCache, setUserSessionsCache] = useState(new Set());
 
   // Add useEffect to handle the case where authentication is taking too long
   useEffect(() => {
@@ -1352,6 +1354,11 @@ export function ChatProvider({ children }) {
         // 获取当前用户
         if (!authSession) return;
         
+        // 使用缓存检查用户是否为会话参与者
+        if (!isSessionParticipant(payload.new.session_id)) {
+          return;
+        }
+        
         // 如果消息ID已在sentMessageIds中，说明是自己发的消息，直接用现有数据更新
         if (sentMessageIds.has(payload.new.id)) {
           return;
@@ -1672,6 +1679,43 @@ export function ChatProvider({ children }) {
         setMessagesRead();
       }
     }
+  };
+
+  // Add a function to fetch and cache all user's sessions
+  const fetchAndCacheUserSessions = async () => {
+    if (!authSession) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('chat_participant')
+        .select('session_id')
+        .eq('user_id', authSession.id);
+        
+      if (error) {
+        console.error('Error fetching user session participants:', error);
+        return;
+      }
+      
+      if (data) {
+        // Cache all session IDs the user is participating in
+        const sessionIds = data.map(item => item.session_id);
+        setUserSessionsCache(new Set(sessionIds));
+      }
+    } catch (err) {
+      console.error('Error caching user sessions:', err);
+    }
+  };
+
+  // Fetch user sessions in useEffect
+  useEffect(() => {
+    if (authSession) {
+      fetchAndCacheUserSessions();
+    }
+  }, [authSession]);
+
+  // Create a function to check if user is a participant without database query
+  const isSessionParticipant = (sessionId) => {
+    return userSessionsCache.has(sessionId);
   };
 
   return (

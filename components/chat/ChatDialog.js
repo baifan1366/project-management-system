@@ -282,77 +282,85 @@ export default function ChatDialog({
   // Fetch session messages
   useEffect(() => {
     const fetchMessages = async () => {
-      const { data, error } = await supabase
-        .from('chat_message')
-        .select(`
-          *,
-          user:user_id (
-            id,
-            name,
-            avatar_url,
-            email
-          ),
-          attachments:chat_attachment(
-            id,
-            file_url,
-            file_name,
-            file_type,
-            is_image
-          )
-        `)
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching messages:', error);
-        return;
-      }
-
-      // Fetch reply-to messages separately to avoid foreign key relationship issues
-      if (data && data.length > 0) {
-        const messageIds = data.filter(msg => msg.reply_to_message_id).map(msg => msg.reply_to_message_id);
+      try {
+        // Skip the participant check - we'll trust that the dialog only gets opened for valid sessions
+        // The parent components (ChatDialogContext and ChatContext) have already implemented
+        // checks to ensure we only show dialogs for sessions the user is part of
         
-        if (messageIds.length > 0) {
-          const { data: replyMessages, error: replyError } = await supabase
-            .from('chat_message')
-            .select(`
+        const { data, error } = await supabase
+          .from('chat_message')
+          .select(`
+            *,
+            user:user_id (
               id,
-              content,
-              user_id,
-              created_at,
-              user:user_id (
+              name,
+              avatar_url,
+              email
+            ),
+            attachments:chat_attachment(
+              id,
+              file_url,
+              file_name,
+              file_type,
+              is_image
+            )
+          `)
+          .eq('session_id', sessionId)
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error('Error fetching messages:', error);
+          return;
+        }
+
+        // Fetch reply-to messages separately to avoid foreign key relationship issues
+        if (data && data.length > 0) {
+          const messageIds = data.filter(msg => msg.reply_to_message_id).map(msg => msg.reply_to_message_id);
+          
+          if (messageIds.length > 0) {
+            const { data: replyMessages, error: replyError } = await supabase
+              .from('chat_message')
+              .select(`
                 id,
-                name,
-                avatar_url,
-                email
-              )
-            `)
-            .in('id', messageIds);
-            
-          if (!replyError && replyMessages) {
-            // Attach reply messages to their respective messages
-            const messagesWithReplies = data.map(msg => {
-              if (msg.reply_to_message_id) {
-                const replyMsg = replyMessages.find(rm => rm.id === msg.reply_to_message_id);
-                if (replyMsg) {
-                  return {
-                    ...msg,
-                    reply_to_message: replyMsg
-                  };
+                content,
+                user_id,
+                created_at,
+                user:user_id (
+                  id,
+                  name,
+                  avatar_url,
+                  email
+                )
+              `)
+              .in('id', messageIds);
+              
+            if (!replyError && replyMessages) {
+              // Attach reply messages to their respective messages
+              const messagesWithReplies = data.map(msg => {
+                if (msg.reply_to_message_id) {
+                  const replyMsg = replyMessages.find(rm => rm.id === msg.reply_to_message_id);
+                  if (replyMsg) {
+                    return {
+                      ...msg,
+                      reply_to_message: replyMsg
+                    };
+                  }
                 }
-              }
-              return msg;
-            });
-            
-            setSessionMessages(messagesWithReplies);
+                return msg;
+              });
+              
+              setSessionMessages(messagesWithReplies);
+            } else {
+              setSessionMessages(data);
+            }
           } else {
             setSessionMessages(data);
           }
         } else {
-          setSessionMessages(data);
+          setSessionMessages(data || []);
         }
-      } else {
-        setSessionMessages(data || []);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
       }
     };
 
