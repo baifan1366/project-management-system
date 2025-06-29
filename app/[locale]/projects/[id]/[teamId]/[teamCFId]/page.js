@@ -626,18 +626,7 @@ const TeamCustomFieldPage = () => {
               <TaskTabSkeleton />
             </div>
           </div>
-          <div className="w-full p-0">
-            <div className="w-full border-b py-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-9 w-32" />
-              </div>
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-9 w-20" />
-                <Skeleton className="h-9 w-20" />
-              </div>
-            </div>
-          </div>
-          <div className="overflow-y-auto flex-grow h-0 mb-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0">
+          <div className="overflow-y-auto flex-grow h-0 mb-2 mt-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0">
             <div className="grid grid-cols-1 gap-4 mt-4">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="space-y-2">

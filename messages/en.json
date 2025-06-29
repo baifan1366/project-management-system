@@ -2858,6 +2858,7 @@
     "dueDate": "Due Date"
   },
   "Agile": {
+    "clickToViewFullDescription": "Click to view full description",
     "itemAddedSuccess": "Item added successfully",
     "itemAddedError": "Failed to add item",
     "itemDeletedSuccess": "Item deleted successfully",
