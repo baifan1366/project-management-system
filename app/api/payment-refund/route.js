@@ -1,14 +1,87 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import Stripe from 'stripe';
+import { v4 as uuidv4 } from 'uuid';
 
 // Initialize Stripe with your secret key - use public variable since that's what you have in env.local
 const stripe = new Stripe(process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY);
 
+/**
+ * Switch user to free plan after refund
+ * @param {string} userId - The user ID
+ * @param {number} currentSubscriptionId - The current subscription ID to cancel
+ * @returns {Promise<Object>} - The newly created free subscription record
+ */
+async function switchUserToFreePlan(userId, currentSubscriptionId) {
+  try {
+    // Get the current subscription details to migrate usage data
+    const { data: currentSubscription, error: subError } = await supabase
+      .from('user_subscription_plan')
+      .select('*')
+      .eq('id', currentSubscriptionId)
+      .single();
+
+    if (subError) {
+      console.error('Error fetching current subscription:', subError);
+      throw subError;
+    }
+
+    // Set the current subscription to CANCELLED
+    const { error: updateError } = await supabase
+      .from('user_subscription_plan')
+      .update({
+        status: 'CANCELLED',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', currentSubscriptionId);
+
+    if (updateError) {
+      console.error('Error cancelling current subscription:', updateError);
+      throw updateError;
+    }
+
+    // Create a new subscription with the free plan (id=1)
+    const newSubscription = {
+      user_id: userId,
+      plan_id: 1, // Free plan ID
+      status: 'ACTIVE',
+      start_date: new Date().toISOString(),
+      end_date: null, // Free plans typically don't have an end date
+      auto_renew: false,
+      // Migrate usage data from the previous subscription
+      current_projects: currentSubscription?.current_projects || 0,
+      current_teams: currentSubscription?.current_teams || 0,
+      current_members: currentSubscription?.current_members || 0,
+      current_ai_chat: currentSubscription?.current_ai_chat || 0,
+      current_ai_task: currentSubscription?.current_ai_task || 0,
+      current_ai_workflow: currentSubscription?.current_ai_workflow || 0,
+      current_storage: currentSubscription?.current_storage || 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: newSubscriptionData, error: insertError } = await supabase
+      .from('user_subscription_plan')
+      .insert(newSubscription)
+      .select('*')
+      .single();
+
+    if (insertError) {
+      console.error('Error creating free plan subscription:', insertError);
+      throw insertError;
+    }
+
+    return newSubscriptionData;
+  } catch (error) {
+    console.error('Error in switchUserToFreePlan:', error);
+    throw error;
+  }
+}
+
 export async function POST(req) {
   
   try {
-    // Check if Stripe is properly initialized
+
     if (!process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY) {
       console.error('NEXT_PUBLIC_STRIPE_SECRET_KEY is not defined in environment variables');
       return NextResponse.json(
@@ -42,7 +115,8 @@ export async function POST(req) {
           stripe_payment_id,
           transaction_id,
           amount,
-          currency
+          currency,
+          payment_method
         ),
         user:user_id (
           id,
@@ -84,7 +158,35 @@ export async function POST(req) {
       amount: Math.round(refundRequest.refund_amount * 100), // Convert to cents
     });
     
+    // Update the original payment record to status "REFUNDED"
+    const { error: paymentUpdateError } = await supabase
+      .from('payment')
+      .update({
+        status: 'REFUNDED',
+        updated_at: new Date().toISOString(),
+        metadata: {
+          ...refundRequest.payment?.metadata,
+          refundId: refund.id,
+          refundAmount: refundRequest.refund_amount,
+          refundDate: new Date().toISOString(),
+          refundReason: refundRequest.reason
+        }
+      })
+      .eq('id', refundRequest.payment_id);
     
+    if (paymentUpdateError) {
+      console.error('Error updating original payment record:', paymentUpdateError);
+      // Continue processing even if this fails, but log the error
+    } else {
+      console.log('Updated original payment record status to REFUNDED');
+    }
+    
+    // Switch user to free plan after refund
+    const newSubscription = await switchUserToFreePlan(
+      refundRequest.user_id, 
+      refundRequest.current_subscription_id
+    );
+    console.log('Switched user to free plan:', newSubscription);
     
     // Update refund status
     await supabase
@@ -92,7 +194,7 @@ export async function POST(req) {
       .update({
         status: 'APPROVED',
         processed_at: new Date().toISOString(),
-        notes: `Refund processed. Stripe refund ID: ${refund.id}`
+        notes: `Refund processed. Stripe refund ID: ${refund.id}. Original payment record updated to REFUNDED. User switched to free plan.`
       })
       .eq('id', refundRequestId);
     
@@ -109,7 +211,7 @@ export async function POST(req) {
           body: JSON.stringify({
             to: refundRequest.user.email,
             subject: 'Your Refund Request Has Been Approved',
-            text: `Dear ${refundRequest.user.name || 'Customer'},\n\nWe're pleased to inform you that your refund request has been approved. A refund of $${(refundRequest.refund_amount).toFixed(2)} has been processed back to your original payment method.\n\nRefund details:\n- Refund Amount: $${(refundRequest.refund_amount).toFixed(2)}\n- Refund Date: ${new Date().toLocaleDateString()}\n- Refund ID: ${refund.id}\n\nPlease note that it may take 5-10 business days for the refund to appear in your account, depending on your payment provider.\n\nIf you have any questions about your refund, please contact our support team.\n\nThank you for your understanding.\n\nBest regards,\nTeam Sync Support Team`,
+            text: `Dear ${refundRequest.user.name || 'Customer'},\n\nWe're pleased to inform you that your refund request has been approved. A refund of $${(refundRequest.refund_amount).toFixed(2)} has been processed back to your original payment method.\n\nRefund details:\n- Refund Amount: $${(refundRequest.refund_amount).toFixed(2)}\n- Refund Date: ${new Date().toLocaleDateString()}\n- Refund ID: ${refund.id}\n- Original Payment Status: Updated to REFUNDED\n\nYour subscription has been changed to our Free plan. You can upgrade at any time from your account settings.\n\nPlease note that it may take 5-10 business days for the refund to appear in your account, depending on your payment provider.\n\nIf you have any questions about your refund, please contact our support team.\n\nThank you for your understanding.\n\nBest regards,\nTeam Sync Support Team`,
             // Use the new template system
             templateType: 'refund_approved',
             templateData: {
@@ -117,7 +219,8 @@ export async function POST(req) {
               refundAmount: refundRequest.refund_amount,
               refundDate: new Date().toLocaleDateString(),
               refundId: refund.id,
-              reason: refundRequest.reason
+              reason: refundRequest.reason,
+              originalPaymentId: refundRequest.payment_id
             }
           }),
         });
@@ -130,7 +233,13 @@ export async function POST(req) {
       }
     }
     
-    return NextResponse.json({ success: true, refund });
+    return NextResponse.json({ 
+      success: true, 
+      refund,
+      newSubscription,
+      originalPaymentUpdated: !paymentUpdateError,
+      originalPaymentId: refundRequest.payment_id
+    });
     
   } catch (error) {
     console.error('Refund processing error:', error);

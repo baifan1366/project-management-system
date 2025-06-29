@@ -128,17 +128,44 @@ export default function AdminSubscriptions() {
 
   const fetchSubscriptionPlans = async () => {
     try {
-      const { data, error } = await supabase
+      // First, get all subscription plans
+      const { data: plans, error } = await supabase
         .from('subscription_plan')
         .select('*')
         .order('id', { ascending: true });
 
       if(error){
         console.error('Error fetching subscription plans:', error);
-      } else {
-        
-        setSubscriptionPlans(data);
-      }    
+        return;
+      }
+      
+      // Then get all active user subscriptions
+      const { data: activeSubscriptions, error: subError } = await supabase
+        .from('user_subscription_plan')
+        .select('plan_id')
+        .eq('status', 'ACTIVE');
+      
+      if(subError){
+        console.error('Error fetching active subscriptions:', subError);
+      }
+      
+      // Count subscriptions per plan
+      const userCountMap = {};
+      if(activeSubscriptions) {
+        activeSubscriptions.forEach(sub => {
+          if (sub.plan_id) {
+            userCountMap[sub.plan_id] = (userCountMap[sub.plan_id] || 0) + 1;
+          }
+        });
+      }
+      
+      // Add active_users count to each plan
+      const plansWithUserCounts = plans.map(plan => ({
+        ...plan,
+        active_users: userCountMap[plan.id] || 0
+      }));
+      
+      setSubscriptionPlans(plansWithUserCounts);
     } catch (error) {
       console.error('Error in fetchSubscriptionPlans:', error);
     }

@@ -126,7 +126,7 @@ export default function PaymentSuccess() {
         const { error: updateError } = await supabase
           .from('user_subscription_plan')
           .update({ 
-            status: 'INACTIVE',
+            status: 'DEACTIVATED',
             updated_at: new Date().toISOString() 
           })
           .in('id', idsToDeactivate);
@@ -455,7 +455,7 @@ export default function PaymentSuccess() {
             await sendEmail(email, {
               orderId: paymentRecord.order_id,
               planName: paymentRecord.metadata.planName,
-              amount: paymentRecord.amount * 100,
+              amount: paymentRecord.amount,
               userId: paymentRecord.user_id
             });
           }
@@ -515,7 +515,7 @@ export default function PaymentSuccess() {
             id: result.metadata.orderId,
             orderId: result.metadata.orderId,
             planName: result.metadata.planName,
-            amount: result.amount,
+            amount: result.amount / 100,
             userId: result.metadata.userId
           });
         }

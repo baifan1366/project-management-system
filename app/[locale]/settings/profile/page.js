@@ -69,17 +69,18 @@ export default function ProfilePage() {
     // Allow empty phone numbers (optional field)
     if (!phone) return { valid: true, message: '' };
     
-    // Basic phone validation: minimum 7 digits, can contain +, -, (), and spaces
-    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/;
-    
-    if (!phoneRegex.test(phone)) {
-      return { valid: false, message: t('phoneInvalid') || 'Please enter a valid phone number' };
+    // Check if it starts with + (required country code)
+    if (!phone.startsWith('+')) {
+      return { valid: false, message: t('phoneInvalid') || 'Phone number must start with + followed by country code' };
     }
     
-    // Check minimum digits (excluding non-numeric characters)
-    const digitsOnly = phone.replace(/\D/g, '');
-    if (digitsOnly.length < 7) {
-      return { valid: false, message: t('phoneMinDigits') || 'Phone number must have at least 7 digits' };
+    // Remove all non-digit characters except the leading +
+    const cleanedPhone = '+' + phone.substring(1).replace(/\D/g, '');
+    
+    // Check if there are 9-14 digits after the + sign
+    const digitCount = cleanedPhone.length - 1; // Subtract 1 for the + sign
+    if (digitCount < 9 || digitCount > 14) {
+      return { valid: false, message: t('phoneMinDigits') || 'Phone number must contain 9-14 digits after the country code' };
     }
     
     return { valid: true, message: '' };
@@ -233,7 +234,7 @@ export default function ProfilePage() {
   
     } catch (error) {
       console.error('Error saving profile:', error);
-      toast.error(t('common.error'));
+      toast.error(t('error'));
     } finally {
       setLoading(false);
     }
@@ -299,7 +300,7 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('头像上传失败:', error);
       toast.dismiss(toastId);
-      toast.error(error.message || t('common.error'));
+      toast.error(error.message || t('error'));
     } finally {
       setLoading(false);
     }
@@ -484,6 +485,7 @@ export default function ProfilePage() {
                     onBlur={handleNameBlur}
                     placeholder={t('name')}
                     className={nameError ? 'border-red-500 focus:ring-red-500' : ''}
+                    maxLength={50}
                   />
                   {nameError && (
                     <p className="text-sm text-red-500 mt-1">{nameError}</p>
@@ -508,8 +510,9 @@ export default function ProfilePage() {
                     value={formData.phone}
                     onChange={handleInputChange}
                     onBlur={handlePhoneBlur}
-                    placeholder="+1 (123) 456-7890"
+                    placeholder="+1234567890"
                     className={phoneError ? 'border-red-500 focus:ring-red-500' : ''}
+                    maxLength={14}
                   />
                   {phoneError && (
                     <p className="text-sm text-red-500 mt-1">{phoneError}</p>

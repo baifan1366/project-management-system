@@ -15,8 +15,7 @@ CREATE TABLE "user" (
   "last_login_provider" VARCHAR(50),
   "mfa_secret" VARCHAR(255), -- TOTP 秘钥
   "is_mfa_enabled" BOOLEAN DEFAULT FALSE,
-  "notifications_enabled" BOOLEAN DEFAULT TRUE,
-  "notifications_settings" JSONB DEFAULT '{"emailNotifications": true, "pushNotifications": true, "weeklyDigest": true, "mentionNotifications": true, "taskAssignments": true, "taskComments": true, "dueDates": true, "teamInvitations": true}',
+  "notifications_settings" JSONB DEFAULT '{"notifications_enabled": true, "pushNotifications": true, "addedChatNotifications": true, "mentionNotifications": true, "inviteMeetingNotifications": true, "taskAssignments": true, "teamAnnouncements": true, "teamInvitations": true}',
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "email_verified" BOOLEAN DEFAULT FALSE,
@@ -317,7 +316,7 @@ CREATE TABLE "notification" (
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "title" VARCHAR(255) NOT NULL,
   "content" TEXT NOT NULL,
-  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('TASK_ASSIGNED', 'COMMENT_ADDED', 'MENTION', 'DUE_DATE', 'TEAM_INVITATION', 'SYSTEM', 'TEAM_ANNOUNCEMENT')),
+  "type" VARCHAR(50) NOT NULL CHECK ("type" IN ('TASK_ASSIGNED', 'COMMENT_ADDED', 'MENTION', 'ADDED_TO_CHAT', 'MEETING_INVITE', 'TEAM_INVITATION', 'SYSTEM', 'TEAM_ANNOUNCEMENT')),
   "related_entity_type" VARCHAR(50), -- 例如：'task', 'project', 'team', 'comment'
   "related_entity_id" VARCHAR(255), -- 相关实体的ID
   "data" JSONB,
@@ -543,7 +542,7 @@ CREATE TABLE "payment" (
   "amount" DECIMAL(10, 2) NOT NULL,
   "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
   "payment_method" TEXT NOT NULL,
-  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED')),
   "transaction_id" VARCHAR(255),
   "discount_amount" DECIMAL(10, 2) DEFAULT 0,
   "discount_percentage" DECIMAL(5, 2) DEFAULT 0,
