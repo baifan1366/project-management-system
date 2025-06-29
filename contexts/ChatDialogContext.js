@@ -15,6 +15,44 @@ export function ChatDialogProvider({ children }) {
   const { user:currentUser } = useGetUser();
   const pathname = usePathname();
   const [isMobileView, setIsMobileView] = useState(false);
+  // Add state for caching user's session participations
+  const [userSessionsCache, setUserSessionsCache] = useState(new Set());
+  
+  // Check if user is a participant in a session
+  const isSessionParticipant = (sessionId) => {
+    return userSessionsCache.has(sessionId);
+  };
+  
+  // Fetch and cache all sessions the user is participating in
+  const fetchUserSessionParticipations = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('chat_participant')
+        .select('session_id')
+        .eq('user_id', currentUser.id);
+      
+      if (error) {
+        console.error('Error fetching user session participations:', error);
+        return;
+      }
+      
+      if (data) {
+        const sessionIds = data.map(item => item.session_id);
+        setUserSessionsCache(new Set(sessionIds));
+      }
+    } catch (err) {
+      console.error('Error caching user sessions:', err);
+    }
+  };
+  
+  // Refresh cache when user changes
+  useEffect(() => {
+    if (currentUser) {
+      fetchUserSessionParticipations();
+    }
+  }, [currentUser]);
   
   // Check for mobile view
   useEffect(() => {
@@ -49,6 +87,12 @@ export function ChatDialogProvider({ children }) {
           
           // 如果消息不是自己发的，且不是当前打开的会话，则显示对话框
           if (payload.new.user_id !== currentUser.id && payload.new.session_id !== currentSession?.id) {
+            // 使用缓存检查用户是否是该会话的参与者
+            if (!isSessionParticipant(payload.new.session_id)) {
+              console.log('User is not a participant in this chat session');
+              return;
+            }
+
             // 获取发送者信息
             const { data: senderData } = await supabase
               .from('user')
@@ -116,10 +160,25 @@ export function ChatDialogProvider({ children }) {
       })
       .subscribe();
 
+    // 当会话发生变化时（新的会话创建或删除）时更新缓存
+    const participantChannel = supabase
+      .channel('chat_participant_changes')
+      .on('postgres_changes', {
+        event: '*',  // Listen for all event types
+        schema: 'public',
+        table: 'chat_participant',
+        filter: `user_id=eq.${currentUser.id}`
+      }, () => {
+        // Update our cache when participant records change
+        fetchUserSessionParticipations();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(participantChannel);
     };
-  }, [currentUser, currentSession, pathname, isMobileView]);
+  }, [currentUser, currentSession, pathname, isMobileView, userSessionsCache]);
 
   // 当切换到某个会话时，关闭对应的弹出对话框
   useEffect(() => {

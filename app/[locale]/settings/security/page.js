@@ -232,7 +232,7 @@ export default function SecurityPage() {
       toast.success(t('passwordChanged'));
     } catch (error) {
       console.error('Error changing password:', error);
-      toast.error(t('common.error'));
+      toast.error(t('error'));
     } finally {
       setLoading(false);
     }

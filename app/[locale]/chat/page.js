@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import InviteUserPopover from '@/components/chat/InviteUserPopover';
 import AIChatBot from '@/components/chat/AIChatBot';
-import PengyImage from '../../../public/pengy.webp';
 import EmojiPicker from '@/components/chat/EmojiPicker';
 import FileUploader from '@/components/chat/FileUploader';
 import GoogleTranslator from '@/components/chat/GoogleTranslator';
@@ -36,6 +35,7 @@ import { useSearchParams } from 'next/navigation';
 import UserProfileDialog from '@/components/chat/UserProfileDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import PengyImage from '@/public/pengy.webp';
 
 // Add the EventCard import
 import EventCard from '@/components/chat/EventCard';
@@ -1579,15 +1579,6 @@ export default function ChatPage() {
               </>
             ) : (
               <>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                  <div className="relative w-full h-full">
-                    <Image 
-                      src={PengyImage} 
-                      alt="Project Manager Penguin" 
-                      className="w-full h-full object-cover rounded-lg"
-                    />
-                  </div>
-                </div>
                 <div>
                   <h2 className="text-base font-medium">{t('aiAssistant')}</h2>
                   <p className="text-sm text-muted-foreground">{t('poweredBy', { model: 'Qwen QwQ-32B' })}</p>

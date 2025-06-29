@@ -24,13 +24,11 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
   const { user } = useGetUser();
   const { isMember: isTeamMember, checkTaskTeamMembership } = useTeamMembership();
   
-  if (!task) return null;
-
   // Check if task has a reference (is linked to a team task)
-  const hasReference = !!task.task_id;
+  const hasReference = task ? !!task.task_id : false;
   
   // Check if task is past due
-  const isPastDue = task.expected_completion_date ? 
+  const isPastDue = task && task.expected_completion_date ? 
     isBefore(new Date(task.expected_completion_date), endOfDay(new Date())) : 
     false;
     
@@ -58,8 +56,9 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
   // Format due date
   const formatDueDate = () => {
     try {
-      const dueDate = task.expected_completion_date;
+      if (!task) return t('noTask');
       
+      const dueDate = task.expected_completion_date;
       
       if (!dueDate) {
         return t('noDueDate');
@@ -78,8 +77,9 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
   // Format start date
   const formatStartDate = () => {
     try {
-      const startDate = task.expected_start_time;
+      if (!task) return t('noTask');
       
+      const startDate = task.expected_start_time;
       
       if (!startDate) {
         return t('noStartDate');
@@ -113,6 +113,12 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
 
   // Show delete confirmation
   const showDeleteConfirmation = () => {
+    // 首先检查任务是否存在
+    if (!task) {
+      toast.error(t('taskNotFound'));
+      return;
+    }
+    
     // Don't allow deletion if task has a reference
     if (hasReference) {
       toast.error(t('cannotDeleteReferencedTask'));
@@ -131,6 +137,13 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
   // Handle delete task
   const handleDeleteTask = async () => {
     try {
+      // 首先检查任务是否存在
+      if (!task) {
+        toast.error(t('taskNotFound'));
+        setConfirmDeleteOpen(false);
+        return;
+      }
+      
       // Additional check to prevent deletion of referenced tasks
       if (hasReference) {
         toast.error(t('cannotDeleteReferencedTask'));
@@ -175,6 +188,12 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
 
   // Handle edit task
   const handleEditTask = () => {
+    // 首先检查任务是否存在
+    if (!task) {
+      toast.error(t('taskNotFound'));
+      return;
+    }
+    
     // Don't allow editing past due tasks
     if (isPastDue) {
       toast.error(t('cannotEditPastDueTask'));
@@ -189,171 +208,183 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl">{task.title || t('noTitle')}</DialogTitle>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <Badge variant={getStatusVariant(task.status)}>
-                {task.status}
-              </Badge>
-              {task.priority && (
-                <Badge 
-                  variant={getPriorityVariant(task.priority)}
-                  className={getPriorityVariant(task.priority) === 'yellow' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
-                >
-                  {task.priority.toLowerCase()}
-                </Badge>
-              )}
-              {/* Show reference badge if it exists */}
-              {hasReference && (
-                <Badge variant="outline" className="gap-1">
-                  <InfoIcon className="h-3 w-3" /> 
-                  {t('reference')}: {task.task_id}
-                </Badge>
-              )}
-              {/* Show past due badge if applicable */}
-              {isPastDue && (
-                <Badge variant="destructive" className="gap-1">
-                  <ClockIcon className="h-3 w-3" /> 
-                  {t('pastDue')}
-                </Badge>
-              )}
+          {!task ? (
+            <div className="py-4 text-center">
+              {t('taskNotFound')}
             </div>
-          </DialogHeader>
-          
-          <div className="py-4 space-y-4">
-            {/* Start date */}
-            <div className="flex items-start gap-3">
-              <CalendarIcon className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-sm">{t('startDate')}</h4>
-                <p className="text-sm mt-1">{formatStartDate()}</p>
-              </div>
-            </div>
-            
-            {/* Due date */}
-            <div className="flex items-start gap-3">
-              <CalendarIcon className={`h-5 w-5 ${isPastDue ? 'text-destructive' : 'text-muted-foreground'} flex-shrink-0 mt-0.5`} />
-              <div>
-                <h4 className="font-medium text-sm">{t('dueDate.label')}</h4>
-                <p className={`text-sm mt-1 ${isPastDue ? 'text-destructive' : ''}`}>{formatDueDate()}</p>
-              </div>
-            </div>
-            
-            {/* Description if available */}
-            {task.description && (
-              <div className="flex items-start gap-3">
-                <div className="h-5 w-5 flex-shrink-0" /> {/* Spacer to align with icons */}
-                <div>
-                  <h4 className="font-medium text-sm">{t('description')}</h4>
-                  <p className="text-sm mt-1 whitespace-pre-wrap">{task.description}</p>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl">{task.title || t('noTitle')}</DialogTitle>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <Badge variant={getStatusVariant(task.status)}>
+                    {task.status}
+                  </Badge>
+                  {task.priority && (
+                    <Badge 
+                      variant={getPriorityVariant(task.priority)}
+                      className={getPriorityVariant(task.priority) === 'yellow' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
+                    >
+                      {task.priority.toLowerCase()}
+                    </Badge>
+                  )}
+                  {/* Show reference badge if it exists */}
+                  {hasReference && (
+                    <Badge variant="outline" className="gap-1">
+                      <InfoIcon className="h-3 w-3" /> 
+                      {t('reference')}: {task.task_id}
+                    </Badge>
+                  )}
+                  {/* Show past due badge if applicable */}
+                  {isPastDue && (
+                    <Badge variant="destructive" className="gap-1">
+                      <ClockIcon className="h-3 w-3" /> 
+                      {t('pastDue')}
+                    </Badge>
+                  )}
+                </div>
+              </DialogHeader>
+              
+              <div className="py-4 space-y-4">
+                {/* Start date */}
+                <div className="flex items-start gap-3">
+                  <CalendarIcon className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-sm">{t('startDate')}</h4>
+                    <p className="text-sm mt-1">{formatStartDate()}</p>
+                  </div>
+                </div>
+                
+                {/* Due date */}
+                <div className="flex items-start gap-3">
+                  <CalendarIcon className={`h-5 w-5 ${isPastDue ? 'text-destructive' : 'text-muted-foreground'} flex-shrink-0 mt-0.5`} />
+                  <div>
+                    <h4 className="font-medium text-sm">{t('dueDate.label')}</h4>
+                    <p className={`text-sm mt-1 ${isPastDue ? 'text-destructive' : ''}`}>{formatDueDate()}</p>
+                  </div>
+                </div>
+                
+                {/* Description if available */}
+                {task.description && (
+                  <div className="flex items-start gap-3">
+                    <div className="h-5 w-5 flex-shrink-0" /> {/* Spacer to align with icons */}
+                    <div>
+                      <h4 className="font-medium text-sm">{t('description')}</h4>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{task.description}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status info */}
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-sm">{t('status.label')}</h4>
+                    <p className="text-sm mt-1">{task.status}</p>
+                  </div>
                 </div>
               </div>
-            )}
-
-            {/* Status info */}
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-sm">{t('status.label')}</h4>
-                <p className="text-sm mt-1">{task.status}</p>
-              </div>
-            </div>
-          </div>
-          
-          <DialogFooter className="flex gap-2">
-            {/* Delete button with tooltip if disabled */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={showDeleteConfirmation}
-                      disabled={isDeleting || hasReference || isPastDue}
-                      className="gap-1"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {isDeleting ? t_common('deleting') : t_common('delete')}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {hasReference && (
-                  <TooltipContent>
-                    <p>{t('cannotDeleteReferencedTask')}</p>
-                  </TooltipContent>
-                )}
-                {!hasReference && isPastDue && (
-                  <TooltipContent>
-                    <p>{t('cannotDeletePastDueTask')}</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-            
-            {/* Edit button with tooltip if past due */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleEditTask}
-                      disabled={isPastDue}
-                      className="gap-1"
-                    >
-                      <Edit className="h-4 w-4" />
-                      {t_common('edit')}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {isPastDue && (
-                  <TooltipContent>
-                    <p>{t('cannotEditPastDueTask')}</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-            
-            {/* Close button */}
-            <Button 
-              variant="secondary" 
-              onClick={() => setIsOpen(false)}
-            >
-              {t_common('close')}
-            </Button>
-          </DialogFooter>
+              
+              <DialogFooter className="flex gap-2">
+                {/* Delete button with tooltip if disabled */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={showDeleteConfirmation}
+                          disabled={isDeleting || hasReference || isPastDue}
+                          className="gap-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {isDeleting ? t_common('deleting') : t_common('delete')}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {hasReference && (
+                      <TooltipContent>
+                        <p>{t('cannotDeleteReferencedTask')}</p>
+                      </TooltipContent>
+                    )}
+                    {!hasReference && isPastDue && (
+                      <TooltipContent>
+                        <p>{t('cannotDeletePastDueTask')}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+                
+                {/* Edit button with tooltip if past due */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleEditTask}
+                          disabled={isPastDue}
+                          className="gap-1"
+                        >
+                          <Edit className="h-4 w-4" />
+                          {t_common('edit')}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {isPastDue && (
+                      <TooltipContent>
+                        <p>{t('cannotEditPastDueTask')}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+                
+                {/* Close button */}
+                <Button 
+                  variant="secondary" 
+                  onClick={() => setIsOpen(false)}
+                >
+                  {t_common('close')}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('deleteConfirmationTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="flex flex-col gap-4">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
-                  <p>{t('deleteConfirmationMessage')}</p>
-                </div>
-                <div className="bg-muted/50 p-3 rounded-md">
-                  <p className="font-medium">{task.title || t('noTitle')}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{formatDueDate()}</p>
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t_common('cancel')}</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDeleteTask} 
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {t_common('confirmDelete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          {task && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('deleteConfirmationTitle')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
+                      <p>{t('deleteConfirmationMessage')}</p>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-md">
+                      <p className="font-medium">{task.title || t('noTitle')}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{formatDueDate()}</p>
+                    </div>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t_common('cancel')}</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleDeleteTask} 
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {t_common('confirmDelete')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
         </AlertDialogContent>
       </AlertDialog>
     </>

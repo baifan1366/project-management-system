@@ -95,7 +95,7 @@ export default function PreferencesPage() {
       }
     } catch (error) {
       console.error('Error saving preferences:', error);
-      toast.error(t('common.error'));
+      toast.error(t('error'));
     } finally {
       setLoading(false);
     }

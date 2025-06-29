@@ -61,13 +61,13 @@ export function ProfilePopover({ onClose }) {
     <PopoverContent className="w-64" side="right">
       {user && (
         <div className="flex flex-col">
-          <div className="px-4 pb-2 border-b">
+          <div className=" pb-2 border-b">
             <div className="flex items-center gap-3">
               {user.avatar_url ? (
                 <img 
                   src={user.avatar_url} 
                   alt={user.name} 
-                  className="w-10 h-8 rounded-full"
+                  className="w-8 h-8 rounded-full"
                 />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
@@ -75,8 +75,8 @@ export function ProfilePopover({ onClose }) {
                 </div>
               )}
               <div>
-                <h4 className="font-medium text-sm">{user.name}</h4>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
+                <h4 className="font-medium text-sm max-w-[95%] break-words">{user.name}</h4>
+                <p className="text-sm text-muted-foreground max-w-[95%] break-words">{user.email}</p>
               </div>
             </div>
           </div>

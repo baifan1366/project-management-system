@@ -194,13 +194,13 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
     
     // 确保有部门数据
     if (!sections || !Array.isArray(sections) || sections.length === 0) {
-      console.log('没有可用的部门数据');
+      
       return;
     }
     
     // 检查标签数据是否已加载
     if (!tagsData || (Array.isArray(tagsData.tags) && tagsData.tags.length === 0)) {
-      console.log('标签数据未加载');
+      
       return;
     }
     

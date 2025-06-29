@@ -101,6 +101,8 @@
     "signOut": "Sign out",
     "profile": "Profile",
     "success": "Success",
+    "error": "Error",
+    "retry": "Retry",
     "name": "Name",
     "bio": "Bio",
     "avatar": "Avatar",
@@ -230,6 +232,7 @@
     "selectLanguage": "Select Language",
     "selectTimezone": "Select Timezone",
     "selectTimeFormat": "Select Time Format",
+    "samePasswordError": "New password cannot be the same as the current password",
     "billing": {
       "title": "Billing"
     },
@@ -345,7 +348,9 @@
         "loaded": "Payment history loaded",
         "error": "Failed to load payment history",
         "preparingInvoice": "Preparing invoice...",
-        "invoiceReady": "Invoice ready for download"
+        "invoiceReady": "Invoice ready for download",
+        "popupBlocked": "Popup blocked, please allow popups to view the invoice",
+        "invoiceError": "Failed to load invoice"
       },
       "upgradeOptions": {
         "title": "Upgrade Options",
@@ -1161,13 +1166,19 @@
     "teamNameRequired": "Please enter a team name",
     "duplicateTeamName": "Team name already exists, please use a different name"
   },
-  "Chat": {
+      "Chat": {
     "title": "Chat",
     "searchPlaceholder": "Search chats",
     "subtitle": "Chat with your team members",
     "newChat": "New Chat",
     "newPrivateChat": "New Private Chat",
     "newGroupChat": "New Group Chat",
+    "noActiveChats": "No active chats",
+    "allChatsHidden": "All chats are hidden",
+    "allChats": "All",
+    "privateChats": "Private",
+    "groupChats": "Group",
+    "noChatsOfType": "No {type} found",
     "noMessages": "No messages yet",
     "noRecentMessages": "No recent messages",
     "inputPlaceholder": "Type a message here...",
@@ -1288,10 +1299,14 @@
     "notificationsMuted": "Notifications Muted",
     "notificationsEnabled": "Notifications Enabled",
     "hiddenChatsWithMessages": "Chats with new messages",
+    "hiddenNormalChatsWithMessages": "Hidden chats with new messages",
+    "hiddenAIChatsWithMessages": "Hidden AI chats with new messages",
     "activeChats": "Active chats",
     "unhide": "Unhide",
     "chatUnhidden": "Chat is now visible",
     "allHiddenChats": "All Hidden Chats",
+    "hiddenNormalChats": "Hidden Chats",
+    "hiddenAIChats": "Hidden AI Chats",
     "show": "Show",
     "hide": "Hide",
     "errors": {
@@ -1391,7 +1406,9 @@
     "userDetails": "User Details",
     "projectDetails": "Project Details",
     "taskDetails": "Task Details",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "viewProfile": "View Profile",
+    "text": "Text"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
