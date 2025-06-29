@@ -7,7 +7,7 @@ import React from 'react';
 import { FileText, File, Sheet, FileCode, X, User, Calendar, Fingerprint, Copy, CheckCheck, Trash, Plus, Edit, Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUserById } from '@/lib/redux/features/usersSlice';
 import { useTranslations } from 'next-intl';
@@ -50,24 +50,43 @@ export function isFileColumn(tagName) {
 /**
  * 判断文件类型并获取相应图标
  * @param {string} fileName - 文件名
- * @returns {JSX.Element} 对应文件类型的图标组件
+ * @returns {React.ComponentType} 对应文件类型的图标组件
  */
 export function getFileIcon(fileName) {
-  if (!fileName) return <File size={16} className="text-gray-500" />;
+  if (!fileName) return File;
   
-  const extension = fileName.split('.').pop()?.toLowerCase();
+  const extension = (fileName.split('.').pop() || '').toLowerCase();
   
-  if (['js', 'jsx', 'ts', 'tsx'].includes(extension)) {
-    return <FileCode size={16} className="text-blue-500" />;
-  } else if (['java'].includes(extension)) {
-    return <FileCode size={16} className="text-orange-500" />;
-  } else if (['doc', 'docx', 'txt'].includes(extension)) {
-    return <FileText size={16} className="text-blue-600" />;
-  } else if (['xls', 'xlsx', 'csv'].includes(extension)) {
-    return <Sheet size={16} className="text-green-600" />;
+  switch (extension) {
+    case 'pdf':
+      return FileText;
+    case 'doc':
+    case 'docx':
+      return FileText;
+    case 'xls':
+    case 'xlsx':
+      return Sheet;
+    case 'js':
+    case 'ts':
+    case 'jsx':
+    case 'tsx':
+      return FileCode;
+    case 'json':
+      return FileCode;
+    case 'html':
+    case 'htm':
+      return FileCode;
+    case 'css':
+    case 'scss':
+    case 'less':
+      return FileCode;
+    case 'csv':
+      return Sheet;
+    case 'md':
+      return FileText;
+    default:
+      return File;
   }
-  
-  return <File size={16} className="text-gray-500" />;
 }
 
 /**
@@ -77,16 +96,51 @@ export function getFileIcon(fileName) {
  * @returns {JSX.Element} 渲染的文件单元格组件
  */
 export function renderFileCell(fileName, onClick) {
-  return (
-    <div 
-      className={`flex items-center gap-2 justify-between cursor-pointer transition-colors p-1 rounded hover:text-primary hover:bg-accent border dark:border-gray-800 border-gray-300`}
-    >
-      <div className="flex items-center gap-2">
-        {getFileIcon(fileName)}
-        <span>{fileName}</span>
+  if (!fileName) {
+    return (
+      <div className="text-muted-foreground text-sm">
+        <File className="w-4 h-4 mr-1 inline" />
+        <span>No file</span>
       </div>
-    </div>
-  );
+    );
+  }
+  
+  try {
+    // 尝试解析文件名数据
+    const parsedFileName = typeof fileName === 'string' ? 
+      (fileName.startsWith('{') ? JSON.parse(fileName) : fileName) : 
+      fileName;
+    
+    // 获取显示名称
+    const displayName = typeof parsedFileName === 'object' ? 
+      (parsedFileName.name || parsedFileName.fileName || 'Unknown file') : 
+      String(parsedFileName);
+    
+    // 获取文件图标组件，确保是正确的组件引用
+    const IconComponent = getFileIcon(displayName);
+    
+    return (
+      <a 
+        href="#" 
+        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors"
+        onClick={(e) => {
+          if (onClick) onClick(e);
+          e.preventDefault();
+        }}
+      >
+        <IconComponent className="w-4 h-4" />
+        <span className="truncate">{displayName}</span>
+      </a>
+    );
+  } catch (error) {
+    console.error('Rendering file cell failed:', error);
+    return (
+      <div className="text-muted-foreground text-sm">
+        <FileText className="w-4 h-4 mr-1 inline" />
+        <span>{String(fileName).substring(0, 20)}</span>
+      </div>
+    );
+  }
 }
 
 /**
@@ -198,31 +252,68 @@ export function isNumberColumn(tagName) {
  * @param {Function} onIncrease - 增加数字的处理函数
  * @param {Function} onDecrease - 减少数字的处理函数
  * @param {Function} onChange - 直接修改数字的处理函数
+ * @param {Object} options - 选项
  * @returns {JSX.Element} 渲染的数字单元格组件
  */
-export function renderNumberCell(value, onIncrease, onDecrease, onChange) {
+export function renderNumberCell(value, onIncrease, onDecrease, onChange, options = {}) {
+  const { fieldName = '', min = 0, max = 999, step = 1, showAsPercentage = false, readOnly = false } = options;
+  
   // 确保value是数字
   const numValue = typeof value === 'number' ? value : Number(value) || 0;
   
-  // 格式化小数点显示，小数点数字只显示2位
-  const displayValue = numValue % 1 !== 0 ? numValue.toFixed(2) : numValue;
+  // 验证数字是否在有效范围内
+  const isProgress = fieldName.toLowerCase().includes('progress') || 
+                     fieldName.toLowerCase().includes('进度');
+  
+  // 对于progress字段，限制在0-1之间并显示为百分比
+  const actualMax = isProgress ? 1 : max;
+  const actualStep = isProgress ? 0.1 : step;
+  
+  // 确保值在范围内
+  const safeValue = Math.max(min, Math.min(numValue, actualMax));
+  
+  // 格式化显示值
+  let displayValue;
+  if (isProgress) {
+    // 显示为百分比
+    displayValue = `${Math.round(safeValue * 100)}%`;
+  } else {
+    // 普通数字格式化
+    displayValue = safeValue % 1 !== 0 ? safeValue.toFixed(2) : safeValue;
+  }
+  
+  // 处理增加值
+  const handleIncrease = () => {
+    const newValue = Math.min(safeValue + actualStep, actualMax);
+    if (onIncrease) {
+      onIncrease(newValue);
+    }
+  };
+  
+  // 处理减少值
+  const handleDecrease = () => {
+    const newValue = Math.max(safeValue - actualStep, min);
+    if (onDecrease) {
+      onDecrease(newValue);
+    }
+  };
   
   return (
     <div className="flex items-center justify-between rounded">
       <button 
         className="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-gray-500 hover:text-primary"
-        onClick={() => onDecrease(numValue)}
+        onClick={handleDecrease}
         aria-label="减少数值"
-        min={0}
+        disabled={safeValue <= min || readOnly}
       >
         -
       </button>
-      <span className="w-8 text-center">{displayValue}</span>
+      <span className="w-12 text-center">{displayValue}</span>
       <button 
         className="w-6 h-6 flex items-center justify-center rounded hover:bg-accent text-gray-500 hover:text-primary"
-        onClick={() => onIncrease(numValue)}
+        onClick={handleIncrease}
         aria-label="增加数值"
-        max={999}
+        disabled={safeValue >= actualMax || readOnly}
       >
         +
       </button>
@@ -240,32 +331,41 @@ export function renderNumberCell(value, onIncrease, onDecrease, onChange) {
  * @returns {number} 格式化后的数字
  */
 export function formatNumberValue(value, options = {}) {
-  // 将输入转换为数字
-  let num = typeof value === 'number' ? value : Number(value);
+  const { 
+    decimals = 2, 
+    prefix = '', 
+    suffix = '',
+    useGrouping = true,
+    defaultValue = 0,
+    allowNegative = true
+  } = options;
   
-  // 处理NaN情况
-  if (isNaN(num)) return 0;
-  
-  // 应用最小值和最大值约束
-  if (options.min !== undefined && num < options.min) {
-    num = options.min;
+  try {
+    // 确保输入转为数字
+    let num = Number(value);
+    
+    // 处理NaN的情况
+    if (isNaN(num)) {
+      return `${prefix}${defaultValue}${suffix}`;
+    }
+    
+    // 如果不允许负数且值为负数
+    if (!allowNegative && num < 0) {
+      num = 0;
+    }
+    
+    // 格式化数字
+    const formatted = num.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+      useGrouping
+    });
+    
+    return `${prefix}${formatted}${suffix}`;
+  } catch (error) {
+    console.error('格式化数字失败:', error);
+    return `${prefix}${defaultValue}${suffix}`;
   }
-  
-  if (options.max !== undefined && num > options.max) {
-    num = options.max;
-  }
-  
-  // 处理小数位数
-  if (options.decimalPlaces !== undefined) {
-    const factor = Math.pow(10, options.decimalPlaces);
-    num = Math.round(num * factor) / factor;
-  } else if (num % 1 !== 0) {
-    // 如果是小数且未指定小数位数，自动调整为两位小数
-    const factor = Math.pow(10, 2);
-    num = Math.round(num * factor) / factor;
-  }
-  
-  return num;
 }
 
 //check people
@@ -2018,35 +2118,68 @@ export function isSingleSelectColumn(tagName) {
  * @returns {Object} 解析后的单选选项对象
  */
 export function parseSingleSelectValue(value) {
-  // 如果值是空的，返回null
-  if (!value) return null;
-  
-  // 如果已经是对象形式，直接返回
-  if (typeof value === 'object' && value !== null) {
-    return value;
+  // 如果值为空，返回null
+  if (value === null || value === undefined || value === '') {
+    return null;
   }
   
-  // 尝试解析JSON字符串
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      if (typeof parsed === 'object' && parsed !== null) {
-        return parsed;
+  try {
+    // 如果值是字符串，尝试解析为JSON
+    if (typeof value === 'string') {
+      // 处理空字符串
+      if (value.trim() === '') {
+        return null;
       }
-    } catch (e) {
-      // 不是有效的JSON，将作为纯文本选项处理
+      
+      try {
+        const parsed = JSON.parse(value);
+        
+        // 验证解析后的对象格式是否符合预期
+        if (parsed && typeof parsed === 'object') {
+          // 确保返回的对象有必要的属性
+          return {
+            label: parsed.label || '',
+            value: parsed.value || parsed.label?.toLowerCase().replace(/\s+/g, '_') || '',
+            color: parsed.color || '#10b981'
+          };
+        }
+        // 如果解析后不是对象，将其作为label使用
+        return {
+          label: String(parsed),
+          value: String(parsed).toLowerCase().replace(/\s+/g, '_'),
+          color: '#10b981'
+        };
+      } catch (e) {
+        // 如果不能解析为JSON，则直接使用字符串值
+        return {
+          label: value,
+          value: value.toLowerCase().replace(/\s+/g, '_'),
+          color: '#10b981'
+        };
+      }
     }
     
-    // 作为普通文本处理
+    // 如果值已经是对象
+    if (typeof value === 'object') {
+      // 确保返回的对象有必要的属性
+      return {
+        label: value.label || '',
+        value: value.value || value.label?.toLowerCase().replace(/\s+/g, '_') || '',
+        color: value.color || '#10b981'
+      };
+    }
+    
+    // 其他类型转换为字符串
+    const strValue = String(value);
     return {
-      label: value,
-      value: value,
-      color: generateColorFromLabel(value)
+      label: strValue,
+      value: strValue.toLowerCase().replace(/\s+/g, '_'),
+      color: '#10b981'
     };
+  } catch (error) {
+    console.error('解析单选值失败:', error);
+    return null;
   }
-  
-  // 返回默认值
-  return null;
 }
 
 /**
@@ -2524,67 +2657,106 @@ export function isMultiSelectColumn(tagName) {
  * @returns {Array} 解析后的多选选项对象数组
  */
 export function parseMultiSelectValue(value) {
-  // 如果值是空的，返回空数组
-  if (!value) return [];
-  
-  // 如果已经是数组形式，确保每个元素是对象
-  if (Array.isArray(value)) {
-    return value.map(item => {
-      if (typeof item === 'object' && item !== null) {
-        return item;
-      }
-      return {
-        label: String(item),
-        value: String(item),
-        color: generateColorFromLabel(String(item)) // 使用通用颜色生成函数
-      };
-    });
+  // 处理空值
+  if (value === null || value === undefined || value === '') {
+    return [];
   }
   
-  // 尝试解析JSON字符串
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
+  try {
+    // 处理字符串格式
+    if (typeof value === 'string') {
+      // 处理空字符串
+      if (value.trim() === '') {
+        return [];
+      }
       
-      // 如果解析结果是数组，处理每个元素
-      if (Array.isArray(parsed)) {
-        return parsed.map(item => {
-          if (typeof item === 'object' && item !== null) {
-            return item;
-          }
+      try {
+        const parsed = JSON.parse(value);
+        
+        // 如果解析为数组，确保每个元素都是正确格式
+        if (Array.isArray(parsed)) {
+          return parsed.map(item => {
+            if (typeof item === 'object' && item !== null) {
+              return {
+                label: item.label || '',
+                value: item.value || item.label?.toLowerCase().replace(/\s+/g, '_') || '',
+                color: item.color || '#10b981'
+              };
+            } else {
+              const strItem = String(item);
+              return {
+                label: strItem,
+                value: strItem.toLowerCase().replace(/\s+/g, '_'),
+                color: '#10b981'
+              };
+            }
+          });
+        }
+        
+        // 如果解析为对象，返回包含该对象的数组
+        if (parsed && typeof parsed === 'object') {
+          return [{
+            label: parsed.label || '',
+            value: parsed.value || parsed.label?.toLowerCase().replace(/\s+/g, '_') || '',
+            color: parsed.color || '#10b981'
+          }];
+        }
+        
+        // 其他情况，使用解析值作为单个项
+        return [{
+          label: String(parsed),
+          value: String(parsed).toLowerCase().replace(/\s+/g, '_'),
+          color: '#10b981'
+        }];
+      } catch (e) {
+        // 如果不能解析为JSON，返回包含原字符串的数组
+        return [{
+          label: value,
+          value: value.toLowerCase().replace(/\s+/g, '_'),
+          color: '#10b981'
+        }];
+      }
+    }
+    
+    // 处理已经是数组的情况
+    if (Array.isArray(value)) {
+      return value.map(item => {
+        if (typeof item === 'object' && item !== null) {
           return {
-            label: String(item),
-            value: String(item),
-            color: generateColorFromLabel(String(item))
+            label: item.label || '',
+            value: item.value || item.label?.toLowerCase().replace(/\s+/g, '_') || '',
+            color: item.color || '#10b981'
           };
-        });
-      }
-      
-      // 如果解析结果是单个对象，放入数组返回
-      if (typeof parsed === 'object' && parsed !== null) {
-        return [parsed];
-      }
-    } catch (e) {
-      // 不是有效的JSON，仅将作为逗号分隔的文本处理
-      if (value.includes(',')) {
-        return value.split(',').map(item => ({
-          label: item.trim(),
-          value: item.trim(),
-          color: generateColorFromLabel(item.trim())
-        }));
-      }
-      
-      // 单个文本值
+        } else {
+          const strItem = String(item);
+          return {
+            label: strItem,
+            value: strItem.toLowerCase().replace(/\s+/g, '_'),
+            color: '#10b981'
+          };
+        }
+      });
+    }
+    
+    // 处理单个对象
+    if (typeof value === 'object' && value !== null) {
       return [{
-        label: value,
-        value: value,
-        color: generateColorFromLabel(value)
+        label: value.label || '',
+        value: value.value || value.label?.toLowerCase().replace(/\s+/g, '_') || '',
+        color: value.color || '#10b981'
       }];
     }
+    
+    // 其他情况
+    return [{
+      label: String(value),
+      value: String(value).toLowerCase().replace(/\s+/g, '_'),
+      color: '#10b981'
+    }];
+  } catch (error) {
+    console.error('解析多选值失败:', error);
+    return [];
   }
-  
-  // 返回默认空数组
-  return [];
 }
 
 /**
@@ -3064,73 +3236,93 @@ export function isTagsColumn(tagName) {
  * @returns {Array} 解析后的标签对象数组
  */
 export function parseTagsValue(value) {
-  // 如果值是空的，返回空数组
-  if (!value) return [];
-  
-  // 如果已经是数组形式，确保每个元素是对象
-  if (Array.isArray(value)) {
-    return value.map(item => {
-      if (typeof item === 'object' && item !== null) {
-        return item;
-      }
-      return {
-        label: String(item),
-        value: String(item),
-        color: generateTagColor(String(item)) // 使用标签专用的颜色生成
-      };
-    });
+  // 处理空值
+  if (value === null || value === undefined || value === '') {
+    return [];
   }
   
-  // 尝试解析JSON字符串
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      
-      // 如果解析结果是数组，处理每个元素
-      if (Array.isArray(parsed)) {
-        return parsed.map(item => {
-          if (typeof item === 'object' && item !== null) {
-            return item;
-          }
-          return {
-            label: String(item),
-            value: String(item),
-            color: generateTagColor(String(item))
-          };
-        });
+  try {
+    // 处理字符串格式
+    if (typeof value === 'string') {
+      // 处理空字符串
+      if (value.trim() === '') {
+        return [];
       }
       
-      // 如果解析结果是单个对象，放入数组返回
-      if (typeof parsed === 'object' && parsed !== null) {
-        return [parsed];
-      }
-    } catch (e) {
-      // 不是有效的JSON，特殊处理为空格或分号分隔的标签格式
-      const separators = [',', ';', ' ']; 
-      for (const separator of separators) {
-        if (value.includes(separator)) {
-          return value.split(separator)
-            .map(item => item.trim())
-            .filter(Boolean) // 过滤空字符串
-            .map(item => ({
-              label: item,
-              value: item,
-              color: generateTagColor(item)
-            }));
+      try {
+        const parsed = JSON.parse(value);
+        
+        if (Array.isArray(parsed)) {
+          return parsed.map(tag => {
+            if (typeof tag === 'object' && tag !== null) {
+              return {
+                text: tag.text || tag.label || '',
+                color: tag.color || generateTagColor(tag.text || tag.label || '')
+              };
+            } else {
+              const strTag = String(tag);
+              return {
+                text: strTag,
+                color: generateTagColor(strTag)
+              };
+            }
+          });
         }
+        
+        if (parsed && typeof parsed === 'object') {
+          return [{
+            text: parsed.text || parsed.label || '',
+            color: parsed.color || generateTagColor(parsed.text || parsed.label || '')
+          }];
+        }
+        
+        return [{
+          text: String(parsed),
+          color: generateTagColor(String(parsed))
+        }];
+      } catch (e) {
+        return [{
+          text: value,
+          color: generateTagColor(value)
+        }];
       }
-      
-      // 单个文本值
+    }
+    
+    // 处理已经是数组的情况
+    if (Array.isArray(value)) {
+      return value.map(tag => {
+        if (typeof tag === 'object' && tag !== null) {
+          return {
+            text: tag.text || tag.label || '',
+            color: tag.color || generateTagColor(tag.text || tag.label || '')
+          };
+        } else {
+          const strTag = String(tag);
+          return {
+            text: strTag,
+            color: generateTagColor(strTag)
+          };
+        }
+      });
+    }
+    
+    // 处理单个对象
+    if (typeof value === 'object' && value !== null) {
       return [{
-        label: value,
-        value: value,
-        color: generateTagColor(value)
+        text: value.text || value.label || '',
+        color: value.color || generateTagColor(value.text || value.label || '')
       }];
     }
+    
+    // 其他情况
+    return [{
+      text: String(value),
+      color: generateTagColor(String(value))
+    }];
+  } catch (error) {
+    console.error('解析标签值失败:', error);
+    return [];
   }
-  
-  // 返回默认空数组
-  return [];
 }
 
 /**
@@ -3415,24 +3607,111 @@ export function isTextColumn(tagName) {
  * 验证文本输入
  * @param {string} value - 文本值
  * @param {Object} options - 验证选项
- * @param {boolean} options.required - 是否必填
- * @param {number} options.maxLength - 最大长度
- * @param {number} options.minLength - 最小长度
- * @returns {Object} 验证结果，包含isValid和message
+ * @returns {{isValid: boolean, message: string}} 验证结果
  */
 export function validateTextInput(value, options = {}) {
-  const { required = false, maxLength, minLength } = options;
+  let { required = false, maxLength, minLength, fieldName, t = null, skipMaxLengthCheck = false } = options;
+  
+  // 提供默认错误信息（如果没有传入t函数）
+  const errorMessages = {
+    required: t ? t('validation.required') : 'This field is required',
+    minLength: t ? t('validation.minLength', { min: minLength }) : `The input content must be at least ${minLength} characters`,
+    maxLength: t ? t('validation.maxLength', { max: maxLength }) : `The input content must be less than ${maxLength} characters`,
+  };
+  
+  // 根据字段名称应用特定验证规则
+  if (fieldName) {
+    const lowerFieldName = fieldName.toLowerCase();
+    
+    // 对于Name字段：最小长度2，最大长度50
+    if (lowerFieldName === 'name' || lowerFieldName.includes('name') || 
+        lowerFieldName === '名称' || lowerFieldName.includes('标题')) {
+      minLength = 2;
+      maxLength = 50;
+      // 通常Name字段为必填
+      if (required === undefined) required = true;
+    }
+    
+    // 对于Description字段：最小长度0，最大长度100
+    else if (lowerFieldName === 'description' || lowerFieldName.includes('desc') || 
+             lowerFieldName === '描述' || lowerFieldName.includes('描述')) {
+      minLength = 0;
+      maxLength = 100;
+    }
+    
+    // 对于Content字段：最小长度0，最大长度100
+    else if (lowerFieldName === 'content' || lowerFieldName.includes('content') || 
+             lowerFieldName === '内容' || lowerFieldName.includes('内容')) {
+      minLength = 0;
+      maxLength = 100;
+    }
+    
+    // 对于Duration字段：处理为数字验证
+    else if (lowerFieldName === 'duration' || lowerFieldName.includes('duration') ||
+             lowerFieldName === '持续时间' || lowerFieldName.includes('时长')) {
+      // 数字验证在validateNumberInput中处理
+      const numValue = Number(value);
+      if (isNaN(numValue)) {
+        return {
+          isValid: false,
+          message: 'Duration must be a number'
+        };
+      }
+      if (numValue < 0) {
+        return {
+          isValid: false,
+          message: 'Duration cannot be negative'
+        };
+      }
+      if (numValue > 999) {
+        return {
+          isValid: false,
+          message: 'Duration cannot exceed 999'
+        };
+      }
+      return { isValid: true, message: '' };
+    }
+    
+    // 对于Progress字段：处理为百分比验证
+    else if (lowerFieldName === 'progress' || lowerFieldName.includes('progress') ||
+             lowerFieldName === '进度' || lowerFieldName.includes('进度')) {
+      // 百分比验证
+      const numValue = Number(value);
+      if (isNaN(numValue)) {
+        return {
+          isValid: false,
+          message: 'Progress must be a number'
+        };
+      }
+      if (numValue < 0) {
+        return {
+          isValid: false,
+          message: 'Progress cannot be negative'
+        };
+      }
+      if (numValue > 1) {
+        return {
+          isValid: false,
+          message: 'Progress cannot exceed 100%'
+        };
+      }
+      return { isValid: true, message: '' };
+    }
+  }
+  
+  // 安全处理值，避免undefined或null导致错误
+  const safeValue = value != null ? String(value) : '';
   
   // 检查必填
-  if (required && (!value || value.trim() === '')) {
+  if (required && safeValue.trim() === '') {
     return {
       isValid: false,
-      message: 'This field is required.'
+      message: errorMessages.required
     };
   }
   
   // 如果非必填且值为空，直接返回有效
-  if (!required && (!value || value.trim() === '')) {
+  if (!required && safeValue.trim() === '') {
     return {
       isValid: true,
       message: ''
@@ -3440,18 +3719,18 @@ export function validateTextInput(value, options = {}) {
   }
   
   // 检查最小长度
-  if (minLength !== undefined && value && value.length < minLength) {
+  if (minLength !== undefined && safeValue.length < minLength) {
     return {
       isValid: false,
-      message: `输入内容至少需要${minLength}个字符`
+      message: errorMessages.minLength
     };
   }
   
-  // 检查最大长度
-  if (maxLength !== undefined && value && value.length > maxLength) {
+  // 检查最大长度 - 当skipMaxLengthCheck为true或未定义maxLength时跳过
+  if (maxLength !== undefined && !skipMaxLengthCheck && safeValue.length > maxLength) {
     return {
       isValid: false,
-      message: `输入内容不能超过${maxLength}个字符`
+      message: errorMessages.maxLength
     };
   }
   
@@ -3462,37 +3741,135 @@ export function validateTextInput(value, options = {}) {
 }
 
 /**
- * 渲染文本单元格内容
+ * 文本单元格组件 - 简化版本，使用HTML的maxLength属性限制输入
+ */
+export function TextCellComponent({ value, onChange, options = {} }) {
+  const { multiline = false, placeholder = 'Please enter...', fieldName = '', readOnly = false, maxLength, minLength, required = false } = options;
+  
+  // 处理可能的对象值，例如 {text: "some text"}
+  const processValue = (val) => {
+    if (typeof val === 'object' && val !== null) {
+      if (val.text !== undefined) return val.text;
+      if (val.value !== undefined) return val.value;
+      try { return JSON.stringify(val); } catch (e) { return ''; }
+    }
+    return val || '';
+  };
+  
+  const [inputValue, setInputValue] = useState(processValue(value));
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef(null);
+  
+  // 同步外部value和内部状态
+  useEffect(() => {
+    if (!isFocused) {
+      setInputValue(processValue(value));
+    }
+  }, [value, isFocused]);
+  
+  // 组件挂载后自动聚焦
+  useEffect(() => {
+    if (inputRef.current && !readOnly) {
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [readOnly]);
+  
+  const handleInputChange = (e) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    if (onChange) {
+      onChange(newValue);
+    }
+  };
+  
+  const handleBlur = () => {
+    setIsFocused(false);
+    if (onChange) {
+      onChange(inputValue);
+    }
+  };
+  
+  // 在只读模式下，只显示文本而不是输入框
+  if (readOnly) {
+    return (
+      <div className="w-full text-sm py-1 px-1 overflow-hidden truncate">
+        {inputValue}
+      </div>
+    );
+  }
+  
+  return (
+    <div className="w-full">
+      {multiline ? (
+        <div>
+          <textarea
+            ref={inputRef}
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={() => setIsFocused(true)}
+            onBlur={handleBlur}
+            placeholder={placeholder}
+            className="w-full bg-transparent border rounded focus:outline-none focus:ring-1 p-1 text-sm border-input focus:ring-primary"
+            rows={2}
+            maxLength={maxLength}
+          />
+          {/* {maxLength && (
+            <div className="flex justify-end mt-1">
+              <span className="text-xs text-muted-foreground">
+                {inputValue.length}/{maxLength}
+              </span>
+            </div>
+          )} */}
+        </div>
+      ) : (
+        <div>
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={() => setIsFocused(true)}
+            onBlur={handleBlur}
+            placeholder={placeholder}
+            className="w-full bg-transparent border rounded focus:outline-none focus:ring-1 p-1 text-sm border-input focus:ring-primary"
+            maxLength={maxLength}
+          />
+          {/* {maxLength && (
+            <div className="flex justify-end mt-1">
+              <span className="text-xs text-muted-foreground">
+                {inputValue.length}/{maxLength}
+              </span>
+            </div>
+          )} */}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 渲染文本单元格内容 - 工厂函数，返回TextCellComponent
  * @param {string} value - 文本值
  * @param {Function} onChange - 文本修改处理函数
  * @param {Object} options - 选项
  * @returns {JSX.Element} 渲染的文本单元格组件
  */
 export function renderTextCell(value, onChange, options = {}) {
-  const { multiline = false, placeholder = 'Please enter...' } = options;
+  // 确保onChange被正确传递且类型为函数
+  const handleChange = typeof onChange === 'function' ? onChange : () => {};
+  
+  // 如果设置了maxLength，自动添加skipMaxLengthCheck=true以跳过验证
+  const updatedOptions = {
+    ...options,
+    skipMaxLengthCheck: options.maxLength !== undefined ? true : options.skipMaxLengthCheck
+  };
   
   return (
-    <div className="w-full">
-      {multiline ? (
-        <textarea
-          value={value || ''}
-          onChange={(e) => onChange && onChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded p-1 text-sm"
-          rows={2}
-          max={100}
-        />
-      ) : (
-        <input
-          type="text"
-          value={value || ''}
-          onChange={(e) => onChange && onChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded p-1 text-sm"
-          max={50}
-        />
-      )}
-    </div>
+    <TextCellComponent 
+      value={value} 
+      onChange={handleChange} 
+      options={updatedOptions} 
+    />
   );
 }
 
@@ -4103,4 +4480,101 @@ export function EnhancedSingleSelect({
       </PopoverContent>
     </Popover>
   );
+}
+
+/**
+ * 验证数字输入
+ * @param {number|string} value - 数字值
+ * @param {Object} options - 验证选项
+ * @returns {{isValid: boolean, message: string}} 验证结果
+ */
+export function validateNumberInput(value, options = {}) {
+  const { min = 0, max, fieldName, required = false, t = null } = options;
+  
+  // 提供默认错误信息
+  const errorMessages = {
+    required: t ? t('validation.required') : 'This field is required',
+    notNumber: t ? t('validation.notNumber') : 'Please enter a valid number',
+    tooSmall: t ? t('validation.tooSmall', { min }) : `Value must be at least ${min}`,
+    tooLarge: t ? t('validation.tooLarge', { max }) : `Value must be less than ${max}`
+  };
+  
+  // 处理空值
+  if (value === '' || value === null || value === undefined) {
+    if (required) {
+      return {
+        isValid: false,
+        message: errorMessages.required
+      };
+    }
+    return { isValid: true, message: '' };
+  }
+  
+  // 转换为数字并验证
+  const numValue = Number(value);
+  
+  // 验证是否为有效数字
+  if (isNaN(numValue)) {
+    return {
+      isValid: false,
+      message: errorMessages.notNumber
+    };
+  }
+  
+  // 根据字段名称应用特定验证规则
+  if (fieldName) {
+    const lowerFieldName = fieldName.toLowerCase();
+    
+    // Duration字段：最小值0，最大值999
+    if (lowerFieldName === 'duration' || lowerFieldName.includes('duration') ||
+        lowerFieldName === '持续时间' || lowerFieldName.includes('时长')) {
+      if (numValue < 0) {
+        return {
+          isValid: false,
+          message: 'Duration cannot be negative'
+        };
+      }
+      if (numValue > 999) {
+        return {
+          isValid: false,
+          message: 'Duration cannot exceed 999'
+        };
+      }
+    }
+    
+    // Progress字段：最小值0，最大值1（100%）
+    else if (lowerFieldName === 'progress' || lowerFieldName.includes('progress') ||
+             lowerFieldName === '进度' || lowerFieldName.includes('进度')) {
+      if (numValue < 0) {
+        return {
+          isValid: false,
+          message: 'Progress cannot be negative'
+        };
+      }
+      if (numValue > 1) {
+        return {
+          isValid: false,
+          message: 'Progress cannot exceed 100%'
+        };
+      }
+    }
+  }
+  
+  // 检查最小值
+  if (min !== undefined && numValue < min) {
+    return {
+      isValid: false,
+      message: errorMessages.tooSmall
+    };
+  }
+  
+  // 检查最大值
+  if (max !== undefined && numValue > max) {
+    return {
+      isValid: false,
+      message: errorMessages.tooLarge
+    };
+  }
+  
+  return { isValid: true, message: '' };
 }

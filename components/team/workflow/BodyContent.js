@@ -23,6 +23,7 @@ import { parseSingleSelectValue, generateColorFromLabel, renderStatusBadge } fro
 import { supabase } from '@/lib/supabase';
 import { getLabelByTeamId, updateLabel } from '@/lib/redux/features/teamLabelSlice';
 import { extractSingleSelectOptions } from './labelUtils';
+import { Skeleton } from '@/components/ui/skeleton';    
 
 // 使用唯一键记录全局请求状态，避免重复请求
 const requestCache = {
@@ -37,7 +38,7 @@ const findTagById = (tagId, tags) => {
   return tags.find(tag => tag.id === parseInt(tagId) || tag.id === tagId || tag.id.toString() === tagId);
 };
 
-export default function BodyContent({ projectThemeColor }) {
+export default function BodyContent({ projectThemeColor, addTask }) {
     const dispatch = useDispatch();
     const t = useTranslations('CreateTask');
     const allTags = useSelector(state => state.tags.tags);
@@ -97,6 +98,22 @@ export default function BodyContent({ projectThemeColor }) {
         status: null,
         dueDate: ''
     });
+
+    // 添加 useEffect 以监听 addTask 属性变化
+    useEffect(() => {
+        // 当 addTask 为 true 且当前没有在创建或编辑任务时，触发创建任务表单
+        if (addTask && !isCreating && !isEditing && !loading) {
+            // 如果正在编辑任务，先取消编辑
+            if (isEditing) {
+                setIsEditing(false);
+                setEditingTask(null);
+                setEditingValues({});
+            }
+            
+            // 激活创建任务表单
+            setIsCreating(true);
+        }
+    }, [addTask, isCreating, isEditing, loading]);
 
     // 获取今天的日期，格式为YYYY-MM-DD
     const today = new Date().toISOString().split('T')[0];
@@ -1197,7 +1214,33 @@ export default function BodyContent({ projectThemeColor }) {
     const [showLabelManager, setShowLabelManager] = useState(false);
 
     if (loading) {
-      return <div className="p-4 text-center">{t('loading')}</div>;
+      return (
+        <div className="p-4">
+          {/* 标签管理器骨架 */}
+          <div className="mb-4 flex justify-end items-center">
+            <Skeleton className="h-9 w-40" />
+          </div>
+          
+          {/* 选中任务详情骨架 */}
+          <div className="mb-6">
+            <Skeleton className="h-32 w-full mb-6" />
+          </div>
+          
+          {/* 任务列表骨架 */}
+          <div className="grid grid-cols-1 gap-4">
+            {Array(3).fill(0).map((_, index) => (
+              <div key={index} className="p-4 border rounded-md">
+                <div className="flex justify-between items-center mb-2">
+                  <Skeleton className="h-5 w-3/5" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+                <Skeleton className="h-4 w-4/5 mb-3" />
+                <Skeleton className="h-4 w-2/5" />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
     }
 
     return (
@@ -1229,7 +1272,7 @@ export default function BodyContent({ projectThemeColor }) {
             {selectedTask && !isEditing && (
                 <div className="mb-6 p-4 border rounded-lg">
                     <div className="flex justify-between items-center border-b pb-2 mb-3">
-                        <h3 className="text-lg max-w-[80%] break-words font-semibold">{selectedTask.name}</h3>
+                        <h3 className="text-lg max-w-[90%] break-words font-semibold">{selectedTask.name}</h3>
                         <div className="flex items-center space-x-2">
                             <button 
                                 className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -1246,7 +1289,7 @@ export default function BodyContent({ projectThemeColor }) {
                         </div>
                         <div>
                             <span className="font-medium">{t('description')}:</span>
-                            <p className="text-gray-500 mt-1">{selectedTask.description || '-'}</p>
+                            <p className="text-gray-500 mt-1 break-words max-w-[90%]">{selectedTask.description || '-'}</p>
                         </div>
                         <div className="flex justify-between">
                             <div>
@@ -1276,7 +1319,7 @@ export default function BodyContent({ projectThemeColor }) {
                             <h3 className="font-semibold break-words max-w-[80%]">{item.name}</h3>
                             {item.statusData ? renderStatusBadge(item.statusData) : renderStatusBadge(item.status)}
                         </div>
-                        <p className="text-gray-600 text-sm mt-1">{item.description || '-'}</p>
+                        <p className="text-gray-600 text-sm mt-1 max-w-[90%] break-words">{item.description || '-'}</p>
                         <div className="mt-2 text-sm text-gray-500 flex justify-between">
                             <span>{t('dueDate')}: {item.dueDate || '-'}</span>
                         </div>

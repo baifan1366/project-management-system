@@ -265,12 +265,6 @@ const StatusSelect = ({ teamId, value, onChange }) => {
               </div>
             </SelectItem>
           ))}
-          <SelectItem value="create_new" className="text-primary">
-            <div className="flex items-center gap-2">
-              <Plus className="w-3 h-3" />
-              <span>{t('createNewStatus')}</span>
-            </div>
-          </SelectItem>
         </SelectContent>
       </Select>
       

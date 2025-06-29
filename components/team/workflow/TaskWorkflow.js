@@ -8,7 +8,7 @@ import { useSelector } from 'react-redux';
 // 创建工作流上下文
 export const WorkflowContext = createContext(null);
 
-export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey}) {
+export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey, addTask}) {
     const [selectedTaskId, setSelectedTaskId] = useState(null);
     const [workflowData, setWorkflowData] = useState({
         nodes: [],
@@ -133,7 +133,7 @@ export default function TaskWorkflow({projectId, teamId, teamCFId, refreshKey}) 
                         <WorkflowTools />
                     </div>
                     <div className="lg:w-1/3 rounded-lg shadow h-[600px] overflow-auto">
-                        <BodyContent projectThemeColor={projectThemeColor} />
+                        <BodyContent projectThemeColor={projectThemeColor} addTask={addTask} />
                     </div>
                 </div>
             </div>

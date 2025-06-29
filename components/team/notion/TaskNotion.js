@@ -164,7 +164,7 @@ function CreateSectionDialog({ projectId, isOpen, setIsOpen, teamId, onSectionCr
   )
 }
 
-export default function TaskNotion({ projectId, teamId }) {
+export default function TaskNotion({ projectId, teamId, addButtonText, triggerAction }) {
   const t = useTranslations('Notion')
   const { user: currentUser } = useGetUser()
   const { confirm } = useConfirm();
@@ -198,11 +198,23 @@ export default function TaskNotion({ projectId, teamId }) {
     state.projects.projects.find(p => String(p.id) === String(projectId))
   );
   
+  // 处理触发操作
+  useEffect(() => {
+    if (triggerAction) {
+      if (addButtonText === 'addSection') {
+        setIsCreateSectionOpen(true);
+      } else if (addButtonText === 'addTask') {
+        setIsCreatePageOpen(true);
+      }
+    }
+  }, [triggerAction, addButtonText]);
+  
   useEffect(() => {
     if (project?.theme_color) {
       setProjectThemeColor(project.theme_color);
     }
   }, [project]);
+  
   // Fetch team details
   useEffect(() => {
     async function fetchTeamDetails() {
@@ -1027,7 +1039,7 @@ export default function TaskNotion({ projectId, teamId }) {
               <span className="mr-2 text-lg">
                 {node.icon || <FileText className="h-4 w-4" />}
               </span>
-              <span className="truncate text-sm">{node.title}</span>
+              <span className="truncate max-w-[40%] text-sm">{node.title}</span>
             </div>
             
             <div className="flex items-center">
@@ -1331,7 +1343,7 @@ export default function TaskNotion({ projectId, teamId }) {
                   <span className="text-3xl mr-2">
                     {selectedPage.icon || <FileText className="h-8 w-8" />}
                   </span>
-                  <h1 className="text-2xl font-bold">{selectedPage.title}</h1>
+                  <h1 className="text-2xl font-bold break-words">{selectedPage.title}</h1>
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -1459,7 +1471,7 @@ export default function TaskNotion({ projectId, teamId }) {
                               <span className="mr-2">
                                 {page.icon || <FileText className="h-4 w-4" />}
                               </span>
-                              {page.title}
+                              <span className="truncate">{page.title}</span>
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="text-sm text-muted-foreground">

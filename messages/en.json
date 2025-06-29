@@ -1154,11 +1154,12 @@
     "create": "Create",
     "creating": "Creating...",
     "close": "Close",
-    "inviteOnlyDescription": "This project will only be visible to you and members you invite.",
-    "everyoneCanEditDescription": "This project will be visible to every project member as editor.",
-    "everyoneCanCheckDescription": "This project will be visible to every project member as checker.",
-    "everyoneCanViewDescription": "This project will be visible to every project member as viewer.",
-    "teamNameRequired": "Please enter a team name"
+    "inviteOnlyDescription": "This team will only be visible to you and members you invite.",
+    "everyoneCanEditDescription": "This team will be visible to every project member as editor.",
+    "everyoneCanCheckDescription": "This team will be visible to every project member as checker.",
+    "everyoneCanViewDescription": "This team will be visible to every project member as viewer.",
+    "teamNameRequired": "Please enter a team name",
+    "duplicateTeamName": "Team name already exists, please use a different name"
   },
   "Chat": {
     "title": "Chat",
@@ -1190,9 +1191,7 @@
     "lastSeen": "Last seen {time}",
     "minimize": "Minimize",
     "maximize": "Maximize",
-    "close": "Close",
     "members": "members",
-    "viewProfile": "View profile",
     "viewMembers": "View Members",
     "groupMembers": "Group Members",
     "totalMembers": "Total {count} members",
@@ -2438,6 +2437,9 @@
     "userNameMax": "Name must be less than 50 characters."
   },
   "Team": {
+    "optionCreated": "Option created successfully",
+    "optionUpdated": "Option updated successfully",
+    "optionDeleted": "Option deleted successfully",
     "retry": "Retry",
     "deleteOptionTitle": "Delete Option",
     "deleteOptionWarning": "Are you sure you want to delete this option?",
@@ -2489,10 +2491,10 @@
     "everyoneAt{projectName}CanEdit": "Everyone at {projectName} can edit",
     "everyoneAt{projectName}CanCheck": "Everyone at {projectName} can check",
     "everyoneAt{projectName}CanView": "Everyone at {projectName} can view",
-    "inviteOnlyDescription": "This project will only be visible to you and members you invite.",
-    "everyoneCanEditDescription": "This project will be visible to every project member as editor..",
+    "inviteOnlyDescription": "This team will only be visible to you and members you invite.",
+    "everyoneCanEditDescription": "This team will be visible to every project member as editor..",
     "everyoneCanCheckDescription": "Project editors will be downgraded to checkers.",
-    "everyoneCanViewDescription": "This project will be visible to every project member as viewer.",
+    "everyoneCanViewDescription": "This team will be visible to every project member as viewer.",
     "noDate": "No Date",
     "clear": "Clear",
     "noID": "No ID",
@@ -2886,6 +2888,7 @@
     "dueDate": "Due Date"
   },
   "Agile": {
+    "clickToViewFullDescription": "Click to view full description",
     "itemAddedSuccess": "Item added successfully",
     "itemAddedError": "Failed to add item",
     "itemDeletedSuccess": "Item deleted successfully",

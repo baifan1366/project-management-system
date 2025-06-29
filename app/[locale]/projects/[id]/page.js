@@ -23,6 +23,16 @@ import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
 import ProjectStatsCard from '@/components/ProjectStatsCard';
 import TeamMemberCount from '@/components/TeamMemberCount';
 import { Skeleton } from '@/components/ui/skeleton';
+import globalEventBus, { createEventBus } from '@/lib/eventBus';
+
+// 定义事件名称常量
+const TEAM_CREATED_EVENT = 'team:created';
+
+// 使用导入的全局事件总线，如果不存在则创建一个新的
+const eventBus = globalEventBus || (typeof window !== 'undefined' ? createEventBus() : {
+  on: () => () => {},
+  emit: () => {}
+});
 
 export default function Home({ params }) {
   const projectParams = use(params);
@@ -62,6 +72,7 @@ export default function Home({ params }) {
   const [totalTasks, setTotalTasks] = useState(0);
   const [userId, setUserId] = useState(null);
   const [uniqueMembers, setUniqueMembers] = useState(new Set());
+  const [teamRefreshTrigger, setTeamRefreshTrigger] = useState(0);
   
   // 重定向处理的useEffect要放在组件顶层，不在条件渲染中
   useEffect(() => {
@@ -94,9 +105,24 @@ export default function Home({ params }) {
     getCurrentUser();
   }, [user]);
 
+  // 监听团队创建事件
+  useEffect(() => {
+    // 监听团队创建事件，当事件触发时刷新团队数据
+    const unsubscribe = eventBus.on(TEAM_CREATED_EVENT, () => {
+      // 通过更新trigger状态值来触发团队数据刷新
+      setTeamRefreshTrigger(prev => prev + 1);
+    });
+    
+    // 组件卸载时取消订阅
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   // 获取项目中的团队数据
   useEffect(() => {
     if (projectId && hasPermission) {
+      setTeamsLoading(true); // 在开始加载前设置加载状态
       dispatch(fetchProjectTeams(projectId))
         .unwrap()
         .then(teamData => {
@@ -137,8 +163,11 @@ export default function Home({ params }) {
             // 等待所有异步操作完成并更新状态
             Promise.all(teamsWithCounts).then(processedTeams => {
               setTeams(processedTeams);
-            setTeamsLoading(false);
+              setTeamsLoading(false);
             });
+          } else {
+            // 如果没有团队数据，也要结束加载状态
+            setTeamsLoading(false);
           }
         })
         .catch(err => {
@@ -146,14 +175,25 @@ export default function Home({ params }) {
           setTeamsLoading(false);
         });
     }
-  }, [dispatch, projectId, hasPermission]);
+  }, [dispatch, projectId, hasPermission, teamRefreshTrigger]);
 
   // 获取所有任务通过section
   useEffect(() => {
     async function fetchAllTasksFromSections() {
-      if (!teams || !teams.length) return;
+      if (!hasPermission) return;
       
       try {
+        // 如果没有团队，直接设置任务数为0并结束加载状态
+        if (!teams || !teams.length) {
+          setTotalTasks(0);
+          setTaskCount(prev => ({
+            ...prev,
+            total: 0
+          }));
+          setLoading(false);
+          return;
+        }
+        
         let totalTaskCount = 0;
         
         for (const team of teams) {
@@ -177,15 +217,17 @@ export default function Home({ params }) {
           ...prev,
           total: totalTaskCount
         }));
-        
-        setLoading(false);
       } catch (err) {
         console.error('Error fetching tasks from sections:', err);
+      } finally {
+        // 无论成功或失败，都结束加载状态
         setLoading(false);
       }
     }
     
-    if (hasPermission && teams && teams.length > 0) {
+    // 开始获取任务时设置加载状态
+    if (hasPermission) {
+      setLoading(true);
       fetchAllTasksFromSections();
     }
   }, [dispatch, teams, hasPermission]);
@@ -373,6 +415,12 @@ export default function Home({ params }) {
         <PageSkeleton />
       </div>
     );
+  }
+
+  // 在返回JSX之前，确保导出事件总线供其他组件使用
+  // 全局暴露事件总线，以便ProjectSidebar可以使用
+  if (typeof window !== 'undefined') {
+    window._projectEventBus = eventBus;
   }
 
   return (

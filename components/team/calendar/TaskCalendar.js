@@ -41,12 +41,11 @@ const formatUsers = (users) => {
   return [...new Set(userArray)];
 };
 
-export default function TaskCalendar({ teamId }) {
+export default function TaskCalendar({ teamId, projectId, teamCFId, refreshKey, addTask }) {
   const t = useTranslations('Calendar')
   const dispatch = useDispatch()
   const { user: currentUser, isLoading: userLoading } = useGetUser()
   const params = useParams()
-  const { id: projectId } = params
   const [themeColor, setThemeColor] = useState('#64748b')
   // Redux state
   const tasks = useSelector(state => state.tasks.tasks)
@@ -86,6 +85,15 @@ export default function TaskCalendar({ teamId }) {
   const [lastFetchTime, setLastFetchTime] = useState(null)
   const [dataLoadingProgress, setDataLoadingProgress] = useState(0)
   
+  // 添加处理addTask属性的useEffect
+  useEffect(() => {
+    // 当addTask为true时，触发创建任务对话框
+    if (addTask) {
+      // 使用当前日期作为默认日期
+      handleOpenCreateTask(new Date());
+    }
+  }, [addTask]);
+
   useEffect(() => {
     if (project?.theme_color) {
       setThemeColor(project.theme_color);
