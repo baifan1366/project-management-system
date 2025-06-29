@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
-import { X, Minus, Paperclip, Image, Smile, Send, Trash, Reply, Languages, XCircle } from 'lucide-react';
+import { X, Minus, Paperclip, Image, Smile, Send, Trash, Reply, Languages, XCircle, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChat } from '@/contexts/ChatContext';
 import { supabase } from '@/lib/supabase';
@@ -91,7 +91,13 @@ const ChatMessage = memo(({
           </div>
         )}
         <div 
-          className="group relative max-w-[72%] min-w-0" 
+          id={`message-${msg.id}`}
+          data-message-id={msg.id}
+          className={cn(
+            "group relative max-w-[72%] min-w-0",
+            isMe ? "flex-row-reverse" : "flex-row",
+            "message-item message-item-" + msg.id
+          )}
           style={{
             ...customStyles.messageContainer,
             maxWidth: 'var(--chat-message-max-width, 72%)'
@@ -616,13 +622,18 @@ export default function ChatDialog({
         <div className="flex items-center gap-2">
           <div className="relative">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden">
-              {user.avatar_url ? (
+              {sessionName ? (
+                // If sessionName exists (group chat), show group icon
+                <Users className="h-5 w-5" />
+              ) : user.avatar_url ? (
+                // For private chats with avatar
                 <img 
                   src={user.avatar_url} 
                   alt={user.name}
                   className="w-full h-full object-cover"
                 />
               ) : (
+                // Fallback for private chats without avatar
                 <span>{user.name?.charAt(0) || '?'}</span>
               )}
             </div>
@@ -630,10 +641,18 @@ export default function ChatDialog({
               <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background"></div>
             )}
           </div>
-          <div className="flex flex-col overflow-hidden">
-            <span className="font-medium text-sm truncate">{user.name}</span>
-            {!isMinimized && sessionName && (
-              <span className="text-xs text-muted-foreground truncate">{sessionName}</span>
+          <div className="flex flex-col overflow-hidden max-w-[200px]">
+            {sessionName ? (
+              // If sessionName exists, it's a group chat - show group name at top
+              <span className="font-medium text-sm truncate" title={sessionName}>{sessionName}</span>
+            ) : (
+              // If no sessionName, it's a 1:1 chat - show user name
+              <span className="font-medium text-sm truncate">{user.name}</span>
+            )}
+            {!isMinimized && !sessionName && (
+              <span className="text-xs text-muted-foreground truncate">
+                {user.email || ''}
+              </span>
             )}
           </div>
         </div>

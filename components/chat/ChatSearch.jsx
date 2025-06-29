@@ -36,7 +36,7 @@ export default function ChatSearch({
 
   // Function to search messages
   const searchMessages = async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() && searchType !== 'media') return;
     
     setIsSearching(true);
     
@@ -45,19 +45,22 @@ export default function ChatSearch({
       let filteredMessages = [...messages];
       
       if (searchType === 'media') {
-        // Filter for messages with image attachments
+        // Filter for messages with any attachments
         filteredMessages = filteredMessages.filter(msg => 
-          msg.attachments?.some(att => att.is_image)
+          msg.attachments && msg.attachments.length > 0 && 
+          (!searchQuery.trim() || msg.content.toLowerCase().includes(searchQuery.toLowerCase()))
         );
       } else if (searchType === 'links') {
         // Filter for messages containing links
         filteredMessages = filteredMessages.filter(msg => 
-          extractLinks(msg.content).length > 0
+          extractLinks(msg.content).length > 0 &&
+          msg.content.toLowerCase().includes(searchQuery.toLowerCase())
         );
       } else if (searchType === 'files') {
         // Filter for messages with non-image attachments
         filteredMessages = filteredMessages.filter(msg => 
-          msg.attachments?.some(att => !att.is_image)
+          msg.attachments?.some(att => !att.is_image) &&
+          msg.content.toLowerCase().includes(searchQuery.toLowerCase())
         );
       } else if (searchType === 'message') {
         // Filter for text messages without attachments
@@ -66,7 +69,7 @@ export default function ChatSearch({
           msg.content.toLowerCase().includes(searchQuery.toLowerCase())
         );
       } else {
-        // Text search in 'all' mode
+        // Text search in 'all' mode - search across all message types
         filteredMessages = filteredMessages.filter(msg => 
           msg.content.toLowerCase().includes(searchQuery.toLowerCase())
         );

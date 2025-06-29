@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MessageSquare, X, MoreVertical, Trash2, BellOff, BellRing, Users, User } from 'lucide-react';
+import { Search, MessageSquare, X, MoreVertical, Trash2, BellOff, BellRing, Users, User, ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { useUserStatus } from '@/contexts/UserStatusContext';
@@ -47,6 +47,11 @@ function ChatLayout({ children }) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [sessionFilter, setSessionFilter] = useState('ALL'); // Add filter state
+  // Add current search index tracking
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  // Add state to track matching messages within a session
+  const [matchingMessages, setMatchingMessages] = useState([]);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const { confirm } = useConfirm();
   const { 
     sessions, 
@@ -107,6 +112,8 @@ function ChatLayout({ children }) {
   const handleSearch = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
+      setMatchingMessages([]);
+      setSelectedSearchSessionId(null);
       return;
     }
 
@@ -130,6 +137,48 @@ function ChatLayout({ children }) {
       }
       
       const sessionIds = userSessions.map(s => s.session_id);
+      
+      // 获取会话信息 - 首先按名称搜索
+      const { data: sessionsByName, error: sessionNameError } = await supabase
+        .from('chat_session')
+        .select(`
+          id,
+          type,
+          name,
+          participants:chat_participant(
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email,
+              is_online,
+              last_seen_at
+            )
+          )
+        `)
+        .in('id', sessionIds)
+        .ilike('name', `%${query}%`);
+      
+      // 然后获取所有私聊会话
+      const { data: privateChats, error: privateChatsError } = await supabase
+        .from('chat_session')
+        .select(`
+          id,
+          type,
+          name,
+          participants:chat_participant(
+            user:user_id (
+              id,
+              name,
+              avatar_url,
+              email,
+              is_online,
+              last_seen_at
+            )
+          )
+        `)
+        .in('id', sessionIds)
+        .eq('type', 'PRIVATE');
       
       // 搜索消息内容
       const { data: messageResults, error: messageError } = await supabase
@@ -157,50 +206,84 @@ function ChatLayout({ children }) {
       
       const filteredMessageResults = messageResults || [];
       
-      // 获取会话信息
-      const { data: sessionData, error: sessionDataError } = await supabase
-        .from('chat_session')
-        .select(`
-          id,
-          type,
-          name,
-          participants:chat_participant(
-            user:user_id (
-              id,
-              name,
-              avatar_url,
-              email,
-              is_online,
-              last_seen_at
-            )
-          )
-        `)
-        .in('id', sessionIds)
-        .or(`name.ilike.%${query}%, type.eq.PRIVATE`);
-        
-      if (sessionDataError) {
-        console.error('获取会话信息错误:', sessionDataError);
+      // 合并结果并去重
+      const sessionData = [...(sessionsByName || [])];
+      const sessionIdSet = new Set(sessionData.map(s => s.id));
+      
+      // 添加私聊会话，并检查对方用户名是否匹配搜索词
+      if (privateChats) {
+        for (const session of privateChats) {
+          // 如果会话已经添加则跳过
+          if (sessionIdSet.has(session.id)) continue;
+          
+                  // 检查私聊对方用户名是否匹配
+        const otherUser = session.participants
+          .filter(p => p.user && p.user.id && p.user.id !== currentUser?.id)
+          .map(p => p.user)
+          .filter(Boolean)[0];
+            
+          if (otherUser && otherUser.name.toLowerCase().includes(query.toLowerCase())) {
+            sessionData.push(session);
+            sessionIdSet.add(session.id);
+          }
+        }
       }
       
-      // 处理会话数据，添加匹配的消息
-      const processedSessions = sessionData?.map(session => {
-        // 过滤掉自己
+      // 添加包含匹配消息的会话
+      if (filteredMessageResults.length > 0) {
+        // 获取包含匹配消息的会话ID
+        const messageSessionIds = [...new Set(filteredMessageResults.map(msg => msg.session_id))];
+        
+        // 如果会话不在结果中，获取会话详情
+        const missingSessionIds = messageSessionIds.filter(id => !sessionIdSet.has(id));
+        
+        if (missingSessionIds.length > 0) {
+          const { data: messageSessions } = await supabase
+            .from('chat_session')
+            .select(`
+              id,
+              type,
+              name,
+              participants:chat_participant(
+                user:user_id (
+                  id,
+                  name,
+                  avatar_url,
+                  email,
+                  is_online,
+                  last_seen_at
+                )
+              )
+            `)
+            .in('id', missingSessionIds);
+            
+          if (messageSessions) {
+            sessionData.push(...messageSessions);
+            messageSessions.forEach(s => sessionIdSet.add(s.id));
+          }
+        }
+      }
+      
+      // 处理会话数据，为每个会话添加参与者信息和匹配的消息
+      const processedSessions = sessionData.map(session => {
+        // 过滤掉自己并处理可能的空值
         const filteredParticipants = session.participants
-          .filter(p => p.user.id !== session.user?.id)
-          .map(p => p.user);
+          .filter(p => p.user && p.user.id && p.user.id !== currentUser?.id)
+          .map(p => p.user)
+          .filter(Boolean);
           
-        // 对于私聊，检查对方用户名是否匹配搜索词
+        // 获取该会话中匹配的消息
+        const matchedMessages = filteredMessageResults.filter(msg => msg.session_id === session.id);
+        
+        // 判断是否匹配
         let matches = false;
         if (session.type === 'PRIVATE' && filteredParticipants.length > 0) {
-          const otherUser = filteredParticipants[0];
-          matches = otherUser.name.toLowerCase().includes(query.toLowerCase());
+          // 私聊：检查用户名匹配
+          matches = filteredParticipants[0].name.toLowerCase().includes(query.toLowerCase());
         } else {
-          // 对于群聊，检查群名是否匹配
-          matches = session.name.toLowerCase().includes(query.toLowerCase());
+          // 群聊：检查群名匹配
+          matches = session.name?.toLowerCase().includes(query.toLowerCase());
         }
-        
-        // 获取该会话中匹配的消息
-        const matchedMessages = filteredMessageResults?.filter(msg => msg.session_id === session.id) || [];
         
         return {
           ...session,
@@ -208,9 +291,43 @@ function ChatLayout({ children }) {
           matchedMessages,
           matches
         };
-      }).filter(session => session.matches || session.matchedMessages.length > 0) || [];
+      });
       
-      setSearchResults(processedSessions);
+      // 过滤出有匹配的会话
+      const filteredSessions = processedSessions.filter(
+        session => session.matches || session.matchedMessages.length > 0
+      );
+        
+      if (sessionNameError || privateChatsError) {
+        console.error('获取会话信息错误:', sessionNameError || privateChatsError);
+      }
+      
+      setSearchResults(filteredSessions);
+      setCurrentSearchIndex(0);
+      
+      // 重置之前的搜索会话选择
+      setSelectedSearchSessionId(null);
+      
+      // 自动选择第一个搜索结果（如果有）
+      if (filteredSessions.length > 0) {
+        const session = filteredSessions[0];
+        setCurrentSession(session);
+        setSelectedSearchSessionId(session.id);
+        
+        // 提取此会话的匹配消息
+        if (session.matchedMessages && session.matchedMessages.length > 0) {
+          setMatchingMessages(session.matchedMessages);
+          setCurrentMessageIndex(0);
+          
+          // 延迟高亮第一条匹配消息
+          setTimeout(() => {
+            if (session.matchedMessages[0] && session.matchedMessages[0].id) {
+              highlightMessage(session.matchedMessages[0].id);
+            }
+          }, 500);
+        }
+      }
+      
     } catch (error) {
       console.error('搜索过程中发生错误:', error);
     } finally {
@@ -226,27 +343,146 @@ function ChatLayout({ children }) {
         handleSearch(searchQuery);
       } else {
         setSearchResults([]);
+        setCurrentSearchIndex(0);
       }
     }, 300);
     
     return () => clearTimeout(debounceTimeout);
   }, [searchQuery]);
 
-  // 处理清除搜索
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    setSearchResults([]);
-  };
+  // Add state to track the currently selected chat from search
+  const [selectedSearchSessionId, setSelectedSearchSessionId] = useState(null);
 
+  // Update the handleChatClick function 
   const handleChatClick = (session) => {
+    // Update chat mode if needed
     if (chatMode === 'ai' && session.type !== 'AI') {
       setChatMode('normal');
     } else if (chatMode === 'normal' && session.type === 'AI') {
       setChatMode('ai');
     }
+    
+    // Set current session
     setCurrentSession(session);
+    
+    // If searching and this is a different session than currently selected
+    if (searchQuery && session.matchedMessages && session.matchedMessages.length > 0) {
+      // Clear previous selection
+      setSelectedSearchSessionId(null);
+      
+      // Set new selection with slight delay
+      setTimeout(() => {
+        setSelectedSearchSessionId(session.id);
+        setMatchingMessages(session.matchedMessages);
+        setCurrentMessageIndex(0);
+        
+        // Highlight the first matching message
+        if (session.matchedMessages[0] && session.matchedMessages[0].id) {
+          highlightMessage(session.matchedMessages[0].id);
+        }
+      }, 50);
+    } else {
+      // Not from search results, clear search selection
+      setSelectedSearchSessionId(null);
+      setMatchingMessages([]);
+    }
+  };
+
+  // Update handleClearSearch to clear selected session
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setCurrentSearchIndex(0);
+    setMatchingMessages([]);
+    setCurrentMessageIndex(0);
+    setSelectedSearchSessionId(null);
+  };
+
+  // Add function to navigate through search results
+  const navigateSearchResults = (direction) => {
+    if (matchingMessages.length === 0) return;
+    
+    let newIndex;
+    if (direction === 'next') {
+      newIndex = (currentMessageIndex + 1) % matchingMessages.length;
+    } else {
+      newIndex = (currentMessageIndex - 1 + matchingMessages.length) % matchingMessages.length;
+    }
+    
+    console.log('Navigating to message', newIndex + 1, 'of', matchingMessages.length);
+    setCurrentMessageIndex(newIndex);
+    
+    // Make sure the current session is set as the selected search session
+    if (currentSession) {
+      setSelectedSearchSessionId(currentSession.id);
+    }
+    
+    // Highlight the selected message
+    if (matchingMessages[newIndex] && matchingMessages[newIndex].id) {
+      highlightMessage(matchingMessages[newIndex].id);
+    }
   };
   
+  // Improved function to highlight a message
+  const highlightMessage = (messageId) => {
+    console.log('Attempting to highlight message ID:', messageId);
+    
+    // Try different possible message ID formats
+    const possibleSelectors = [
+      `#message-${messageId}`,
+      `[data-message-id="${messageId}"]`,
+      `[data-id="${messageId}"]`,
+      `#msg-${messageId}`,
+      `.message-item-${messageId}`,
+      `.message-${messageId}`
+    ];
+    
+    // Find the first selector that works
+    let messageElement = null;
+    for (const selector of possibleSelectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        console.log('Found message element with selector:', selector);
+        messageElement = element;
+        break;
+      }
+    }
+    
+    // If we found the element, scroll to it and highlight it
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      // Remove any existing highlights first
+      const highlighted = document.querySelectorAll('.message-highlight');
+      highlighted.forEach(el => {
+        el.classList.remove('bg-amber-100', 'dark:bg-amber-800/30', 'message-highlight');
+        el.style.outline = '';
+        el.style.outlineOffset = '';
+      });
+      
+      // Add highlight effect
+      messageElement.classList.add('bg-amber-100', 'dark:bg-amber-800/30', 'message-highlight');
+      // Create a more visible temporary outline
+      messageElement.style.outline = '2px solid rgba(245, 158, 11, 0.5)';
+      messageElement.style.outlineOffset = '2px';
+      
+      // Remove highlight after delay
+      setTimeout(() => {
+        messageElement.classList.remove('bg-amber-100', 'dark:bg-amber-800/30', 'message-highlight');
+        messageElement.style.outline = '';
+        messageElement.style.outlineOffset = '';
+      }, 2000);
+    } else {
+      console.log('Could not find message element with ID:', messageId);
+      
+      // If we couldn't find the specific message, at least highlight the chat
+      const chatContainer = document.querySelector('.chat-messages-container');
+      if (chatContainer) {
+        chatContainer.scrollTop = 0; // Scroll to top of chat to make new messages visible
+      }
+    }
+  };
+
   const toggleChatMode = () => {
     const newMode = chatMode === 'normal' ? 'ai' : 'normal';
     setChatMode(newMode);
@@ -262,7 +498,18 @@ function ChatLayout({ children }) {
     window.history.replaceState({}, '', url);
   };
   
-  // 过滤会话列表
+  // 确保只有一个会话被选中
+  useEffect(() => {
+    if (selectedSearchSessionId && selectedSearchSessionId !== currentSession?.id) {
+      // 如果当前会话ID和搜索选中的会话ID不同，重置搜索选择
+      // 这种情况通常发生在用户手动点击不同的聊天
+      if (currentSession) {
+        setSelectedSearchSessionId(currentSession.id);
+      }
+    }
+  }, [currentSession, selectedSearchSessionId]);
+
+  // 更新处理搜索结果的函数，移除isCurrentSearchResult相关逻辑
   const filteredSessions = useMemo(() => {
     // 如果有搜索结果，使用搜索结果
     if (searchQuery.trim() && searchResults.length > 0) {
@@ -528,6 +775,35 @@ function ChatLayout({ children }) {
     });
   };
 
+  // Add keyboard shortcut for searching
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (matchingMessages.length === 0) return;
+      
+      // Ignore if focus is on an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      // Down arrow for next result
+      if (e.key === 'ArrowUp' && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        console.log('Down arrow pressed, navigating to next message');
+        navigateSearchResults('next');
+      }
+      
+      // Up arrow for previous result
+      if (e.key === 'ArrowDown' && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        console.log('Up arrow pressed, navigating to previous message');
+        navigateSearchResults('prev');
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [matchingMessages, currentMessageIndex, selectedSearchSessionId, currentSession]);
+
   return (
     <div className="flex h-screen">
       {/* 聊天列表侧边栏 */}
@@ -598,6 +874,50 @@ function ChatLayout({ children }) {
           {searchQuery && !isSearching && searchResults.length === 0 && (
             <div className="mt-2 text-center text-sm text-muted-foreground">
               {t('search.noResults')}
+            </div>
+          )}
+          
+          {/* Add search results navigation controls */}
+          {searchQuery && matchingMessages.length > 0 && (
+            <div className="mt-2 mb-4 flex justify-between items-center px-2 py-1 bg-accent/30 rounded-md relative">
+              <span className="text-xs font-medium">
+                {t('search.resultCount', { current: currentMessageIndex + 1, total: matchingMessages.length })}
+              </span>
+              <div className="flex space-x-1">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Next message clicked');
+                    navigateSearchResults('next');
+                  }}
+                  className="p-2 rounded-md bg-primary hover:bg-primary/80 text-primary-foreground"
+                  disabled={matchingMessages.length <= 1}
+                  title={t('nextResult') + " (↓)"}
+                  aria-label={t('nextResult')}
+                >
+                  <ChevronDown className="h-4 w-4 rotate-180" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Previous message clicked');
+                    navigateSearchResults('prev');
+                  }}
+                  className="p-2 rounded-md bg-primary hover:bg-primary/80 text-primary-foreground"
+                  disabled={matchingMessages.length <= 1}
+                  title={t('previousResult') + " (↑)"}
+                  aria-label={t('previousResult')}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+              
+              {/* Keyboard shortcut hint */}
+              <div className="absolute -bottom-6 right-0 pb-2 text-xs text-muted-foreground">
+                {t('keyboardNavHint')}
+              </div>
             </div>
           )}
           
@@ -840,7 +1160,7 @@ function ChatLayout({ children }) {
                 </div>
               )}
               
-              {filteredSessions.map((session) => {
+              {filteredSessions.map((session, idx) => {
                 // 处理显示内容
                 const sessionName = session.type === 'PRIVATE' 
                   ? session.participants[0]?.name
@@ -853,13 +1173,16 @@ function ChatLayout({ children }) {
                 const lastMessageContent = session.matchedMessages && session.matchedMessages.length > 0
                   ? session.matchedMessages[0].content 
                   : session.lastMessage?.content;
+
+                // Add selected chat styling 
+                const isSelected = selectedSearchSessionId === session.id;
                   
                 return (
                   <div
                     key={`${session.id}-${new Date(session.created_at || 0).getTime()}`}
                     className={`flex items-center gap-3 p-4 hover:bg-accent/50 cursor-pointer transition-colors relative group ${
-                      currentSession?.id === session.id ? 'bg-accent' : ''
-                    }`}
+                      currentSession?.id === session.id && !selectedSearchSessionId ? 'bg-accent' : ''
+                    } ${isSelected ? 'bg-amber-100/50 dark:bg-amber-700/30 border-l-4 border-amber-500 pl-3 shadow-md ring-1 ring-amber-400/50' : ''}`}
                     onClick={() => handleChatClick(session)}
                     title={session.type === 'PRIVATE' 
                       ? t('privateChat') + ': ' + (sessionName || '')

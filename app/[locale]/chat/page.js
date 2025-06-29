@@ -867,6 +867,14 @@ export default function ChatPage() {
       }
     }
   }, [message, currentSession, mentions, replyToMessage, sendMessage, extractMentionsFromMessage, otherParticipantId, getUserStatus, t, isMentionOpen]);
+
+  // Create a debounced version of handleSendMessage
+  const debouncedSendMessage = useCallback(
+    debounce((e) => {
+      handleSendMessage(e);
+    }, 100, { leading: true, trailing: false }),
+    [handleSendMessage]
+  );
   
   // 处理emoji选择
   const handleEmojiSelect = (emojiData) => {
@@ -1242,7 +1250,6 @@ export default function ChatPage() {
                               currentSession.created_by === currentUser?.id;
                             
     if (!hasEditPermission) {
-      toast.error(t('errors.onlyOwnerCanEditName') || 'Only the group owner can edit the group name');
       return;
     }
     
@@ -1436,6 +1443,65 @@ export default function ChatPage() {
       setIsDeleting(false);
     }
   };
+
+  // Handle paste event for images
+  const handlePaste = useCallback(async (e) => {
+    // Check if we have access to clipboard items
+    const clipboardItems = e.clipboardData?.items;
+    if (!clipboardItems) return;
+    
+    // Look for image items in the clipboard
+    for (let i = 0; i < clipboardItems.length; i++) {
+      const item = clipboardItems[i];
+      
+      // Check if item is an image
+      if (item.type.startsWith('image/')) {
+        e.preventDefault(); // Prevent default paste behavior
+        
+        // Extract the image as a file
+        const file = item.getAsFile();
+        if (!file) continue;
+        
+        // Instead of uploading directly, open the FileUploader with this file
+        // Create a file reference for the FileUploader
+        const fileWithId = {
+          id: Date.now() + Math.random(),
+          file,
+          preview: URL.createObjectURL(file),
+          name: `pasted-image-${Date.now()}.${file.type.split('/')[1] || 'png'}`,
+          type: file.type,
+          size: file.size
+        };
+
+        // Store the file and set the FileUploader dialog state
+        setClipboardFile(fileWithId);
+        setShowFileUploader(true);
+        
+        // Exit the loop after finding the first image
+        break;
+      }
+    }
+  }, []);
+
+  // Add state to manage FileUploader visibility and clipboard files
+  const [showFileUploader, setShowFileUploader] = useState(false);
+  const [clipboardFile, setClipboardFile] = useState(null);
+
+  // Handle file upload dialog completion
+  const handleFileUploaderComplete = useCallback(async (uploadResults, messageText) => {
+    await handleFileUploadComplete(uploadResults, messageText);
+    setClipboardFile(null);
+    setShowFileUploader(false);
+  }, [handleFileUploadComplete]);
+
+  // Handle closing the file uploader without uploading
+  const handleFileUploaderClose = useCallback(() => {
+    if (clipboardFile?.preview) {
+      URL.revokeObjectURL(clipboardFile.preview);
+    }
+    setClipboardFile(null);
+    setShowFileUploader(false);
+  }, [clipboardFile]);
 
   if (!currentSession && chatMode === 'normal') {
     return (
@@ -1970,7 +2036,7 @@ export default function ChatPage() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSendMessage} className="flex items-end gap-2">
+              <form onSubmit={debouncedSendMessage} className="flex items-end gap-2">
                 <div className="flex-1 bg-accent rounded-lg">
                   {/* 回复消息提示栏 */}
                   {replyToMessage && (
@@ -2014,6 +2080,7 @@ export default function ChatPage() {
                           }
                         }
                       }}
+                      onPaste={handlePaste}
                       placeholder={t('inputPlaceholder')}
                       className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm p-2 min-h-[40px] overflow-y-auto"
                       rows={1}
@@ -2077,6 +2144,18 @@ export default function ChatPage() {
         <div className="flex-1 flex">
           <AIChatBot />
         </div>
+      )}
+
+      {/* Add clipboard file uploader dialog */}
+      {showFileUploader && (
+        <FileUploader
+          onUploadComplete={handleFileUploaderComplete}
+          onClose={handleFileUploaderClose}
+          sessionId={currentSession?.id}
+          userId={currentUser?.id}
+          isOpen={true}
+          initialFiles={clipboardFile ? [clipboardFile] : []}
+        />
       )}
     </div>
   );
