@@ -18,7 +18,17 @@ import { getSubscriptionLimit, trackSubscriptionUsage } from '@/lib/subscription
 import { useDispatch } from 'react-redux';
 import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
-
+const PenguinIcon = () => (
+  <div className="relative w-full h-full flex items-center justify-center">
+    <Image 
+      src={PengyImage} 
+      alt="Project Manager Penguin" 
+      fill
+      style={{ objectFit: 'cover' }}
+      priority
+    />
+  </div>
+);
 // AI Chat Skeleton Loading Component
 const AIChatSkeleton = () => (
   <div className="flex flex-col space-y-6 animate-pulse">
