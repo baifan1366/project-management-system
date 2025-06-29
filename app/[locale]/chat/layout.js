@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MessageSquare, X, MoreVertical, Trash2, BellOff, BellRing } from 'lucide-react';
+import { Search, MessageSquare, X, MoreVertical, Trash2, BellOff, BellRing, Users, User } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
 import { useUserStatus } from '@/contexts/UserStatusContext';
@@ -46,6 +46,7 @@ function ChatLayout({ children }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
+  const [sessionFilter, setSessionFilter] = useState('ALL'); // Add filter state
   const { confirm } = useConfirm();
   const { 
     sessions, 
@@ -94,6 +95,10 @@ function ChatLayout({ children }) {
     const mode = searchParams.get('mode');
     if (mode === 'ai' && chatMode !== 'ai') {
       setChatMode('ai');
+      setCurrentSession(null);
+    } else if (!mode && chatMode === 'ai') {
+      // If mode parameter is removed and we're still in AI mode, switch back to normal
+      setChatMode('normal');
       setCurrentSession(null);
     }
   }, [searchParams, setChatMode, setCurrentSession, chatMode]);
@@ -246,22 +251,55 @@ function ChatLayout({ children }) {
     const newMode = chatMode === 'normal' ? 'ai' : 'normal';
     setChatMode(newMode);
     setCurrentSession(null);
+    
+    // Update the URL when switching modes
+    const url = new URL(window.location.href);
+    if (newMode === 'ai') {
+      url.searchParams.set('mode', 'ai');
+    } else {
+      url.searchParams.delete('mode');
+    }
+    window.history.replaceState({}, '', url);
   };
   
   // 过滤会话列表
   const filteredSessions = useMemo(() => {
     // 如果有搜索结果，使用搜索结果
     if (searchQuery.trim() && searchResults.length > 0) {
-      return searchResults.filter(session => !hiddenSessions[session.id]);
+      const filteredResults = searchResults.filter(session => !hiddenSessions[session.id]);
+      
+      // Apply additional type filtering if not showing ALL
+      if (sessionFilter !== 'ALL') {
+        return filteredResults.filter(session => {
+          if (sessionFilter === 'PRIVATE') return session.type === 'PRIVATE';
+          if (sessionFilter === 'GROUP') return session.type === 'GROUP';
+          if (sessionFilter === 'AI') return session.type === 'AI';
+          return true;
+        });
+      }
+      
+      return filteredResults;
     }
     
     // 否则根据聊天模式显示不同类型的会话，并排除隐藏的会话
-    return sessions
+    let sessions_filtered = sessions
       .filter(session => 
         (chatMode === 'normal' ? session.type !== 'AI' : session.type === 'AI') && 
         !hiddenSessions[session.id]
       );
-  }, [chatMode, sessions, searchQuery, searchResults, hiddenSessions]);
+      
+    // Apply additional type filtering if not in AI mode and not showing ALL
+    if (chatMode === 'normal' && sessionFilter !== 'ALL') {
+      sessions_filtered = sessions_filtered.filter(session => session.type === sessionFilter);
+    }
+    
+    return sessions_filtered;
+  }, [chatMode, sessions, searchQuery, searchResults, hiddenSessions, sessionFilter]);
+  
+  // Check if we have any visible sessions in current mode
+  const hasVisibleSessions = useMemo(() => {
+    return filteredSessions.length > 0;
+  }, [filteredSessions]);
 
   // 渲染聊天会话项的骨架屏
   const ChatItemSkeleton = ({ index }) => (
@@ -422,20 +460,29 @@ function ChatLayout({ children }) {
   // Check if there are hidden sessions with new messages to show
   const hiddenSessionsWithMessages = useMemo(() => {
     return sessions
-      .filter(session => hiddenSessions[session.id] && session.unreadCount > 0)
+      .filter(session => 
+        hiddenSessions[session.id] && 
+        session.unreadCount > 0 &&
+        // Only show hidden sessions that match the current mode
+        (chatMode === 'normal' ? session.type !== 'AI' : session.type === 'AI')
+      )
       .sort((a, b) => 
         new Date(b.lastMessage?.created_at || 0) - new Date(a.lastMessage?.created_at || 0)
       );
-  }, [sessions, hiddenSessions]);
+  }, [sessions, hiddenSessions, chatMode]);
 
   // Get all hidden sessions for the "Show All Hidden" section
   const allHiddenSessions = useMemo(() => {
     return sessions
-      .filter(session => hiddenSessions[session.id])
+      .filter(session => 
+        hiddenSessions[session.id] &&
+        // Only show hidden sessions that match the current mode
+        (chatMode === 'normal' ? session.type !== 'AI' : session.type === 'AI')
+      )
       .sort((a, b) => 
         new Date(b.lastMessage?.created_at || 0) - new Date(a.lastMessage?.created_at || 0)
       );
-  }, [sessions, hiddenSessions]);
+  }, [sessions, hiddenSessions, chatMode]);
 
   // Function to hide chat session
   const handleHideSession = async (e, sessionId) => {
@@ -553,6 +600,39 @@ function ChatLayout({ children }) {
               {t('search.noResults')}
             </div>
           )}
+          
+          {/* Add filter buttons */}
+          {!chatLoading && chatMode === 'normal' && (
+            <div className="mt-3 flex gap-1 justify-between">
+              <button
+                onClick={() => setSessionFilter('ALL')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  sessionFilter === 'ALL' ? 'bg-primary text-primary-foreground' : 'bg-accent/50 text-muted-foreground hover:bg-accent'
+                }`}
+              >
+                <MessageSquare size={12} />
+                {t('allChats') || 'All'}
+              </button>
+              <button
+                onClick={() => setSessionFilter('PRIVATE')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  sessionFilter === 'PRIVATE' ? 'bg-primary text-primary-foreground' : 'bg-accent/50 text-muted-foreground hover:bg-accent'
+                }`}
+              >
+                <User size={12} />
+                {t('privateChats') || 'Private'}
+              </button>
+              <button
+                onClick={() => setSessionFilter('GROUP')}
+                className={`px-2 py-1 text-xs rounded-md flex items-center gap-1 ${
+                  sessionFilter === 'GROUP' ? 'bg-primary text-primary-foreground' : 'bg-accent/50 text-muted-foreground hover:bg-accent'
+                }`}
+              >
+                <Users size={12} />
+                {t('groupChats') || 'Group'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 聊天列表 */}
@@ -567,7 +647,11 @@ function ChatLayout({ children }) {
               {/* Show hidden sessions with new messages */}
               {hiddenSessionsWithMessages.length > 0 && (
                 <div className="px-4 pt-3 pb-1">
-                  <h3 className="text-sm font-semibold text-muted-foreground">{t('hiddenChatsWithMessages')}</h3>
+                  <h3 className="text-sm font-semibold text-muted-foreground">
+                    {chatMode === 'normal' 
+                      ? (t('hiddenNormalChatsWithMessages') || 'Hidden chats with new messages')
+                      : (t('hiddenAIChatsWithMessages') || 'Hidden AI chats with new messages')}
+                  </h3>
                 </div>
               )}
               
@@ -587,7 +671,9 @@ function ChatLayout({ children }) {
                 return (
                   <div
                     key={`${session.id}-${new Date(session.created_at || 0).getTime()}`}
-                    className="flex items-center gap-3 p-3 hover:bg-accent/50 transition-colors relative group border-l-4 border-blue-500 mx-2 my-1 rounded-md bg-accent/20"
+                    className={`flex items-center gap-3 p-3 hover:bg-accent/50 transition-colors relative group border-l-4 mx-2 my-1 rounded-md bg-accent/20 ${
+                      session.type === 'AI' ? 'border-purple-500' : 'border-blue-500'
+                    }`}
                   >
                     <div className="relative flex-shrink-0">
                       <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-medium overflow-hidden">
@@ -655,7 +741,10 @@ function ChatLayout({ children }) {
                 <div className="mt-2">
                   <div className="px-4 pt-2 pb-1 flex justify-between items-center">
                     <h3 className="text-sm font-semibold text-muted-foreground">
-                      {t('allHiddenChats') || 'All Hidden Chats'}
+                      {chatMode === 'normal' 
+                        ? (t('hiddenNormalChats') || 'Hidden Chats')
+                        : (t('hiddenAIChats') || 'Hidden AI Chats')}
+                      <span className="ml-1 text-xs">({allHiddenSessions.length})</span>
                     </h3>
                     <button 
                       onClick={() => setShowAllHidden(prev => !prev)}
@@ -737,9 +826,17 @@ function ChatLayout({ children }) {
                 </div>
               )}
               
-              {filteredSessions.length > 0 && hiddenSessionsWithMessages.length > 0 && (
+              {(hiddenSessionsWithMessages.length > 0 || allHiddenSessions.length > 0) && filteredSessions.length > 0 && (
                 <div className="px-4 py-1 mt-2">
                   <h3 className="text-sm font-semibold text-muted-foreground">{t('activeChats')}</h3>
+                </div>
+              )}
+              
+              {/* Show message when no active chats but hidden chats exist */}
+              {!hasVisibleSessions && (hiddenSessionsWithMessages.length > 0 || (showAllHidden && allHiddenSessions.length > 0)) && (
+                <div className="p-4 text-center text-muted-foreground">
+                  <p>{t('noActiveChats') || 'No active chats'}</p>
+                  <p className="text-sm mt-1">{t('allChatsHidden') || 'All chats are hidden'}</p>
                 </div>
               )}
               
@@ -792,7 +889,7 @@ function ChatLayout({ children }) {
                           <span>{sessionName?.charAt(0) || '?'}</span>
                         )}
                       </div>
-                      {session.unreadCount > 0 && !mutedSessions[session.id] && (
+                      {session.unreadCount > 0 && (session.type !== 'AI' ? !mutedSessions[session.id] : true) && (
                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-background flex items-center justify-center shadow-sm"
                              title={t('unreadMessages', { count: session.unreadCount }) || `${session.unreadCount} 未读消息`}>
                           <span className="text-xs text-white font-bold">{session.unreadCount > 9 ? '9+' : session.unreadCount}</span>
@@ -802,7 +899,7 @@ function ChatLayout({ children }) {
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background"
                              title={t('online')}></div>
                       )}
-                      {mutedSessions[session.id] && (
+                      {session.type !== 'AI' && mutedSessions[session.id] && (
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-muted text-muted-foreground rounded-full border border-background flex items-center justify-center"
                              title={t('notificationsMuted')}>
                           <BellOff className="w-3 h-3" />
@@ -844,7 +941,8 @@ function ChatLayout({ children }) {
                       {session.type === 'PRIVATE' && (
                         <div className="mt-0.5">
                           {/* 使用usersStatus获取最新状态 */}
-                          {session.participants[0]?.id && usersStatus[session.participants[0].id]?.isOnline ? (
+                          {(session.participants[0]?.id && usersStatus[session.participants[0].id]?.isOnline) || 
+                           (session.participants[0]?.is_online) ? (
                             <p className="text-xs text-green-600">{t('online')}</p>
                           ) : (
                             <p className="text-xs text-muted-foreground">
@@ -874,23 +972,28 @@ function ChatLayout({ children }) {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem 
-                            onClick={(e) => handleToggleMute(e, session.id)}
-                            className="flex items-center gap-2 cursor-pointer"
-                          >
-                            {mutedSessions[session.id] ? (
-                              <>
-                                <BellRing className="h-4 w-4" />
-                                <span>{t('enableNotifications')}</span>
-                              </>
-                            ) : (
-                              <>
-                                <BellOff className="h-4 w-4" />
-                                <span>{t('muteNotifications')}</span>
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
+                          {/* Only show mute option for non-AI chats */}
+                          {session.type !== 'AI' && (
+                            <>
+                              <DropdownMenuItem 
+                                onClick={(e) => handleToggleMute(e, session.id)}
+                                className="flex items-center gap-2 cursor-pointer"
+                              >
+                                {mutedSessions[session.id] ? (
+                                  <>
+                                    <BellRing className="h-4 w-4" />
+                                    <span>{t('enableNotifications')}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <BellOff className="h-4 w-4" />
+                                    <span>{t('muteNotifications')}</span>
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
                           <DropdownMenuItem 
                             onClick={(e) => handleHideSession(e, session.id)}
                             className="flex items-center gap-2 cursor-pointer"
@@ -919,6 +1022,13 @@ function ChatLayout({ children }) {
               {searchQuery && filteredSessions.length === 0 && !isSearching && (
                 <div className="p-4 text-center text-muted-foreground">
                   {t('search.noResults')}
+                </div>
+              )}
+              
+              {/* 如果应用了过滤器但没有结果 */}
+              {!searchQuery && filteredSessions.length === 0 && !chatLoading && sessionFilter !== 'ALL' && (
+                <div className="p-4 text-center text-muted-foreground">
+                  {t('noChatsOfType', {type: t(sessionFilter.toLowerCase() + 'Chats')}) || `No ${sessionFilter.toLowerCase()} chats found`}
                 </div>
               )}
             </>

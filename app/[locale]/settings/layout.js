@@ -225,7 +225,7 @@ export default function SettingsLayout({ children }) {
         <div className="h-[calc(100vh-120px)] overflow-y-auto pr-4">
           <div className="flex space-x-8">
             <Tabs value={currentTab || "profile"} className="min-w-[200px]" orientation="vertical">
-              <TabsList className="flex flex-col h-fit space-y-2 w-full">
+              <TabsList className="flex flex-col h-fit space-y-2 w-full py-2">
                 <TabsTrigger 
                   value="profile" 
                   className="w-full justify-start gap-2"

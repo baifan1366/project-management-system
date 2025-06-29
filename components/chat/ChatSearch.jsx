@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { Search, X, ChevronDown, Link, FileText, Image as ImageIcon } from 'lucide-react';
+import { Search, X, ChevronDown, Link, FileText, Image as ImageIcon, MessageSquare } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent, 
@@ -58,6 +58,12 @@ export default function ChatSearch({
         // Filter for messages with non-image attachments
         filteredMessages = filteredMessages.filter(msg => 
           msg.attachments?.some(att => !att.is_image)
+        );
+      } else if (searchType === 'message') {
+        // Filter for text messages without attachments
+        filteredMessages = filteredMessages.filter(msg => 
+          (!msg.attachments || msg.attachments.length === 0) &&
+          msg.content.toLowerCase().includes(searchQuery.toLowerCase())
         );
       } else {
         // Text search in 'all' mode
@@ -162,8 +168,12 @@ export default function ChatSearch({
           </div>
           
           <Tabs defaultValue="all" value={searchType} onValueChange={setSearchType}>
-            <TabsList className="grid grid-cols-4">
+            <TabsList className="grid grid-cols-5">
               <TabsTrigger value="all" className="text-xs">{t('all')}</TabsTrigger>
+              <TabsTrigger value="message" className="text-xs">
+                <MessageSquare className="h-4 w-4 mr-1" />
+                {t('text')}
+              </TabsTrigger>
               <TabsTrigger value="media" className="text-xs">
                 <ImageIcon className="h-4 w-4 mr-1" />
                 {t('media')}

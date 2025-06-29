@@ -314,6 +314,7 @@ const WorkflowLabelManager = ({
                   onChange={(e) => setNewOption({...newOption, label: e.target.value})}
                   className="w-full p-2 border border-gray-700 rounded-md focus:ring-1 focus:ring-offset-0 focus:outline-none"
                   placeholder={t('enterOptionName')}
+                  maxLength={15}
                 />
               </div>
               <div>

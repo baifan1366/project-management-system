@@ -6,6 +6,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
 import { useDispatch } from 'react-redux';
@@ -19,6 +26,7 @@ export default function PreferencesPage() {
   const dispatch = useDispatch();
   const { user: currentUser, isLoading: userLoading } = useGetUser();
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const [formData, setFormData] = useState({
@@ -26,6 +34,11 @@ export default function PreferencesPage() {
     timezone: 'UTC+0',
     hourFormat: '24h'
   });
+
+  // Handle hydration mismatch by only showing the actual theme state after mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (currentUser) {
@@ -43,8 +56,7 @@ export default function PreferencesPage() {
     });
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
+  const handleInputChange = (name, value) => {
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -83,7 +95,7 @@ export default function PreferencesPage() {
       }
     } catch (error) {
       console.error('Error saving preferences:', error);
-      toast.error(t('common.error'));
+      toast.error(t('error'));
     } finally {
       setLoading(false);
     }
@@ -106,57 +118,63 @@ export default function PreferencesPage() {
                 </p>
               </div>
               <Switch
-                checked={theme === 'dark'}
+                checked={mounted && theme === 'dark'}
                 onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="language">{t('language')}</Label>
-              <select
-                id="language"
-                name="language"
+              <Select
                 value={formData.language}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md"
+                onValueChange={(value) => handleInputChange('language', value)}
               >
-                <option value="zh">{t('languages.chinese')}</option>
-                <option value="en">{t('languages.english')}</option>
-                <option value="my">{t('languages.malay')}</option>
-              </select>
+                <SelectTrigger id="language">
+                  <SelectValue placeholder={t('selectLanguage')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="zh">{t('languages.chinese')}</SelectItem>
+                  <SelectItem value="en">{t('languages.english')}</SelectItem>
+                  <SelectItem value="my">{t('languages.malay')}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="timezone">{t('timezone')}</Label>
-              <select
-                id="timezone"
-                name="timezone"
+              <Select
                 value={formData.timezone}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md"
+                onValueChange={(value) => handleInputChange('timezone', value)}
               >
-                <option value="UTC+8">{t('timezones.utc8')}</option>
-                <option value="UTC+0">{t('timezones.utc0')}</option>
-                <option value="UTC-8">{t('timezones.utc-8')}</option>
-                <option value="UTC-5">{t('timezones.utc-5')}</option>
-                <option value="UTC+1">{t('timezones.utc1')}</option>
-                <option value="UTC+9">{t('timezones.utc9')}</option>
-                <option value="UTC+10">{t('timezones.utc10')}</option>
-                <option value="UTC+5.5">{t('timezones.utc55')}</option>
-                <option value="UTC+7">{t('timezones.utc7')}</option>
-                <option value="UTC+3">{t('timezones.utc3')}</option>
-              </select>
+                <SelectTrigger id="timezone">
+                  <SelectValue placeholder={t('selectTimezone')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UTC+8">{t('timezones.utc8')}</SelectItem>
+                  <SelectItem value="UTC+0">{t('timezones.utc0')}</SelectItem>
+                  <SelectItem value="UTC-8">{t('timezones.utc-8')}</SelectItem>
+                  <SelectItem value="UTC-5">{t('timezones.utc-5')}</SelectItem>
+                  <SelectItem value="UTC+1">{t('timezones.utc1')}</SelectItem>
+                  <SelectItem value="UTC+9">{t('timezones.utc9')}</SelectItem>
+                  <SelectItem value="UTC+10">{t('timezones.utc10')}</SelectItem>
+                  <SelectItem value="UTC+5.5">{t('timezones.utc55')}</SelectItem>
+                  <SelectItem value="UTC+7">{t('timezones.utc7')}</SelectItem>
+                  <SelectItem value="UTC+3">{t('timezones.utc3')}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="hourFormat">{t('timeFormat')}</Label>
-              <select
-                id="hourFormat"
-                name="hourFormat"
+              <Select
                 value={formData.hourFormat}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded-md"
+                onValueChange={(value) => handleInputChange('hourFormat', value)}
               >
-                <option value="24h">{t('hourFormats.format24h')}</option>
-                <option value="12h">{t('hourFormats.format12h')}</option>
-              </select>
+                <SelectTrigger id="hourFormat">
+                  <SelectValue placeholder={t('selectTimeFormat')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24h">{t('hourFormats.format24h')}</SelectItem>
+                  <SelectItem value="12h">{t('hourFormats.format12h')}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>

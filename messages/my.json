@@ -111,6 +111,8 @@
     "passwordChanged": "Kata laluan telah berjaya ditukar",
     "timezone": "Zon Waktu",
     "timeFormat": "Format Masa",
+    "phoneInvalid": "Nombor telefon mesti bermula dengan + diikuti dengan kod negara",
+    "phoneMinDigits": "Nombor telefon mesti mengandungi 9-14 digit selepas kod negara",
     "password": {
       "requirementsTitle": "Keperluan Kata Laluan:",
       "minLength": "Sekurang-kurangnya 8 aksara",

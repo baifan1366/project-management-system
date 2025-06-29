@@ -592,8 +592,7 @@ export default function ProjectSidebar({ projectId }) {
                           );
                         })
                       ) : (
-                        <div className="px-4 py-3 text-center text-sm text-muted-foreground">
-                          {t('noTeamsFound')}
+                        <div>
                         </div>
                       )}
                       {provided.placeholder}
@@ -634,6 +633,11 @@ export default function ProjectSidebar({ projectId }) {
           onClose={() => {
             setDialogOpen(false);
             fetchTeams();
+            
+            // 触发团队创建事件，通知页面刷新团队列表
+            if (typeof window !== 'undefined' && window._projectEventBus) {
+              window._projectEventBus.emit('team:created');
+            }
           }} 
           projectId={projectId}
         />

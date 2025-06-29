@@ -107,25 +107,29 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
   } = useTableContext();
   
   // 从Redux中获取标签数据，用于获取真实的标签ID
-  const { tags: tagsData } = useSelector((state) => state.teamCF);
+  const { tags: tagsData = { tags: [] } } = useSelector((state) => state.teamCF || {});
   
   // 从Redux状态中获取部门数据
-  const { sections, status: sectionsStatus } = useSelector((state) => state.sections);
+  const { sections = [], status: sectionsStatus } = useSelector((state) => state.sections || {});
   
   // 获取标签宽度
   const { getTagWidth } = useResizeTools();
 
   // 获取Name标签的ID
   const nameTagId = useMemo(() => {
-    if (!tagsData?.length) return null;
-    const nameTag = tagsData.find(tag => tag.name === 'Name');
-    return nameTag?.id?.toString();
+    if (!tagsData || !Array.isArray(tagsData.tags) || tagsData.tags.length === 0) {
+      return null;
+    }
+    const nameTag = tagsData.tags.find(tag => tag && tag.name === 'Name');
+    return nameTag?.id?.toString() || null;
   }, [tagsData]);
 
   // 处理部门数据
   const sectionInfo = useMemo(() => {
-    if (!sections || !sections.length) return [];
-    return sections.map(section => section);
+    if (!sections || !Array.isArray(sections) || sections.length === 0) {
+      return [];
+    }
+    return sections.map(section => section).filter(Boolean);
   }, [sections]);
 
   // 添加一个重试加载任务的函数
@@ -189,12 +193,14 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
     if (!teamId || isTaskRequestInProgress.current) return;
     
     // 确保有部门数据
-    if (!sections || sections.length === 0) {
+    if (!sections || !Array.isArray(sections) || sections.length === 0) {
+      
       return;
     }
     
     // 检查标签数据是否已加载
     if (!tagsData || (Array.isArray(tagsData.tags) && tagsData.tags.length === 0)) {
+      
       return;
     }
     
@@ -208,74 +214,83 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
       // 获取标签数组
       const tags = tagsData?.tags || tagsData || [];
       
-      // 为每个部门加载任务
+      // 使用Promise.all进行并行加载，但限制并行数量
+      const batchSize = 3; // 每批加载的部门数
       
-      // 设置延迟间隔 - 每个部门加载后等待一段时间再加载下一个部门
-      const sectionLoadDelay = 200; // 毫秒
-      
-      for (let i = 0; i < sections.length; i++) {
-        const section = sections[i];
-        if (section && section.id) {
-          
-          // 如果不是第一个部门，添加延迟
-          if (i > 0) {
-            await new Promise(resolve => setTimeout(resolve, sectionLoadDelay));
-          }
-          
-          try {
-            const taskData = await dispatch(fetchTasksBySectionId(section.id)).unwrap();
-            
-            if (taskData.length === 0) {
-              newTasksData[section.id] = [];
-              continue;
-            }
-            
-            // 过滤掉没有名称的任务
-            const filteredTasks = taskData.filter(task => {
-              // 确保task和tag_values存在
-              if (!task || !task.tag_values) return false;
-              
-              // 遍历task的tag_values
-              for (const [tagId, value] of Object.entries(task.tag_values)) {
-                // 检查这个tag是否是Name类型
-                const tag = tags.find(t => t.id.toString() === tagId);
-                if (tag?.name === 'Name' && value) {
-                  return true;
-                }
-              }
-              return false;
-            });
-            
-            
-            // 将过滤后的任务数据添加到新对象中
-            newTasksData[section.id] = filteredTasks;
-            
-            // 立即更新这个部门的任务到状态，而不是等待所有部门加载完成
-            // 这样用户可以更快看到已加载的部门任务
-            setLocalTasks(prev => ({
-              ...prev,
-              [section.id]: filteredTasks
-            }));
-            
-          } catch (sectionError) {
-            console.error(`加载部门"${section.name}"(ID:${section.id})的任务失败:`, sectionError);
-            // 为失败的部门设置空数组
-            newTasksData[section.id] = [];
-            
-            // 立即更新失败的部门任务状态
-            setLocalTasks(prev => ({
-              ...prev,
-              [section.id]: []
-            }));
-            
-            // 如果是因为网络问题，可以尝试重新加载
-            if (sectionError.name === 'NetworkError') {
-              // 这里可以选择是否立即重试，或者标记为需要重试
-            }
-          }
-        }
+      // 将部门分批
+      const sectionBatches = [];
+      for (let i = 0; i < sections.length; i += batchSize) {
+        sectionBatches.push(sections.slice(i, i + batchSize));
       }
-            
+      
+      // 按批次顺序加载
+      for (const batch of sectionBatches) {
+        // 并行加载一批部门
+        await Promise.all(batch.map(async (section) => {
+          if (section && section.id) {
+            try {
+              const taskData = await dispatch(fetchTasksBySectionId(section.id)).unwrap();
+              
+              if (!taskData || taskData.length === 0) {
+                newTasksData[section.id] = [];
+                
+                // 立即更新状态
+                setLocalTasks(prev => ({
+                  ...prev,
+                  [section.id]: []
+                }));
+                
+                return;
+              }
+              
+              // 过滤和处理任务
+              const filteredTasks = taskData
+                .filter(task => {
+                  // 确保task和tag_values存在
+                  if (!task || !task.tag_values) return false;
+                  
+                  // 检查是否有名称
+                  if (nameTagId && task.tag_values[nameTagId]) {
+                    return true;
+                  }
+                  
+                  // 遍历task的tag_values寻找Name字段
+                  for (const [tagId, value] of Object.entries(task.tag_values)) {
+                    const tag = tags.find(t => t && t.id && t.id.toString() === tagId);
+                    if (tag?.name === 'Name' && value) {
+                      return true;
+                    }
+                  }
+                  
+                  return false;
+                });
+              
+              // 更新数据
+              newTasksData[section.id] = filteredTasks;
+              
+              // 立即更新状态
+              setLocalTasks(prev => ({
+                ...prev,
+                [section.id]: filteredTasks
+              }));
+              
+            } catch (sectionError) {
+              console.error(`加载部门"${section.name}"(ID:${section.id})的任务失败:`, sectionError);
+              
+              // 设置空数组
+              newTasksData[section.id] = [];
+              setLocalTasks(prev => ({
+                ...prev,
+                [section.id]: []
+              }));
+            }
+          }
+        }));
+        
+        // 批次之间添加小延迟
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
     } catch (error) {
       console.error('加载所有任务失败:', error);
     } finally {
@@ -348,93 +363,192 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
   const [taskOptions, setTaskOptions] = useState({});
   
   // 处理创建新选项
-  const handleCreateOption = (taskId, tagId, newOption) => {
-    // 确保选项有一个唯一的值
-    const optionWithValue = {
-      ...newOption,
-      value: newOption.value || newOption.label.toLowerCase().replace(/\s+/g, '_')
-    };
-    
-    // 更新本地选项状态
-    setTaskOptions(prev => {
-      const taskKey = `${taskId}-${tagId}`;
-      const currentOptions = prev[taskKey] || [];
-      
-      // 检查选项是否已存在
-      const optionExists = currentOptions.some(opt => 
-        opt.value === optionWithValue.value || opt.label === optionWithValue.label
-      );
-      
-      if (optionExists) {
-        return prev; // 如果选项已存在，不添加
-      }
-      
-      // 添加新选项
-      const updatedOptions = [...currentOptions, optionWithValue];
-      
-      return {
-        ...prev,
-        [taskKey]: updatedOptions
+  const handleCreateOption = async (taskId, tagId, newOption) => {
+    try {
+      // 确保选项有一个唯一的值
+      const optionWithValue = {
+        ...newOption,
+        value: newOption.value || newOption.label.toLowerCase().replace(/\s+/g, '_')
       };
-    });
-    
-    // 自动选择新创建的选项
-    handleTaskValueChange(taskId, tagId, JSON.stringify(optionWithValue));
-    
-    // 在这里可以添加调用API将选项保存到服务器的逻辑
-    // 例如: saveOptionsToServer(tagId, updatedOptions);
+      
+      // 更新本地选项状态
+      setTaskOptions(prev => {
+        const taskKey = `${taskId}-${tagId}`;
+        const currentOptions = prev[taskKey] || [];
+        
+        // 检查选项是否已存在
+        const optionExists = currentOptions.some(opt => 
+          opt.value === optionWithValue.value || opt.label === optionWithValue.label
+        );
+        
+        if (optionExists) {
+          return prev; // 如果选项已存在，不添加
+        }
+        
+        // 添加新选项
+        const updatedOptions = [...currentOptions, optionWithValue];
+        
+        return {
+          ...prev,
+          [taskKey]: updatedOptions
+        };
+      });
+      
+      // 自动选择新创建的选项
+      handleTaskValueChange(taskId, tagId, JSON.stringify(optionWithValue));
+      
+      // 调用API将选项保存到服务器
+      // 添加服务器同步代码
+      if (teamId && tagId) {
+        try {
+          // 这里替换为实际的API调用
+          // 例如: await dispatch(saveTagOption({ teamId, tagId, option: optionWithValue }));
+          
+          // 假设使用现有API调用结构
+          await dispatch({
+            type: 'team/saveTagOption',
+            payload: {
+              teamId,
+              tagId,
+              option: optionWithValue
+            }
+          });
+          
+          // 或者使用直接的fetch调用
+          /*
+          await fetch(`/api/teams/${teamId}/tags/${tagId}/options`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(optionWithValue),
+          });
+          */
+        } catch (error) {
+          console.error('保存选项到服务器失败:', error);
+          // 可以添加错误处理，例如显示通知
+        }
+      }
+    } catch (error) {
+      console.error('创建选项失败:', error);
+    }
   };
   
   // 处理编辑选项
-  const handleEditOption = (taskId, tagId, editedOption) => {
-    setTaskOptions(prev => {
-      const taskKey = `${taskId}-${tagId}`;
-      const currentOptions = prev[taskKey] || [];
+  const handleEditOption = async (taskId, tagId, editedOption) => {
+    try {
+      setTaskOptions(prev => {
+        const taskKey = `${taskId}-${tagId}`;
+        const currentOptions = prev[taskKey] || [];
+        
+        // 更新选项
+        const updatedOptions = currentOptions.map(opt => 
+          opt.value === editedOption.value ? editedOption : opt
+        );
+        
+        return {
+          ...prev,
+          [taskKey]: updatedOptions
+        };
+      });
       
-      // 更新选项
-      const updatedOptions = currentOptions.map(opt => 
-        opt.value === editedOption.value ? editedOption : opt
-      );
+      // 如果当前选择的是被编辑的选项，更新选择的值
+      const currentValue = JSON.parse(externalEditingTaskValues[tagId] || '{}');
+      if (currentValue && currentValue.value === editedOption.value) {
+        handleTaskValueChange(taskId, tagId, JSON.stringify(editedOption));
+      }
       
-      return {
-        ...prev,
-        [taskKey]: updatedOptions
-      };
-    });
-    
-    // 如果当前选择的是被编辑的选项，更新选择的值
-    const currentValue = JSON.parse(externalEditingTaskValues[tagId] || '{}');
-    if (currentValue && currentValue.value === editedOption.value) {
-      handleTaskValueChange(taskId, tagId, JSON.stringify(editedOption));
+      // 调用API将更新后的选项保存到服务器
+      if (teamId && tagId) {
+        try {
+          // 这里替换为实际的API调用
+          // 例如: await dispatch(updateTagOption({ teamId, tagId, option: editedOption }));
+          
+          // 假设使用现有API调用结构
+          await dispatch({
+            type: 'team/updateTagOption',
+            payload: {
+              teamId,
+              tagId,
+              option: editedOption
+            }
+          });
+          
+          // 或者使用直接的fetch调用
+          /*
+          await fetch(`/api/teams/${teamId}/tags/${tagId}/options/${editedOption.value}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(editedOption),
+          });
+          */
+        } catch (error) {
+          console.error('更新选项到服务器失败:', error);
+        }
+      }
+    } catch (error) {
+      console.error('编辑选项失败:', error);
     }
-    
-    // 在这里可以添加调用API将更新后的选项保存到服务器的逻辑
   };
   
   // 处理删除选项
-  const handleDeleteOption = (taskId, tagId, optionToDelete) => {
-    setTaskOptions(prev => {
-      const taskKey = `${taskId}-${tagId}`;
-      const currentOptions = prev[taskKey] || [];
+  const handleDeleteOption = async (taskId, tagId, optionToDelete) => {
+    try {
+      setTaskOptions(prev => {
+        const taskKey = `${taskId}-${tagId}`;
+        const currentOptions = prev[taskKey] || [];
+        
+        // 过滤掉要删除的选项
+        const updatedOptions = currentOptions.filter(opt => 
+          opt.value !== optionToDelete.value
+        );
+        
+        return {
+          ...prev,
+          [taskKey]: updatedOptions
+        };
+      });
       
-      // 过滤掉要删除的选项
-      const updatedOptions = currentOptions.filter(opt => 
-        opt.value !== optionToDelete.value
-      );
+      // 如果当前选择的是被删除的选项，清空选择
+      const currentValue = JSON.parse(externalEditingTaskValues[tagId] || '{}');
+      if (currentValue && currentValue.value === optionToDelete.value) {
+        handleTaskValueChange(taskId, tagId, '');
+      }
       
-      return {
-        ...prev,
-        [taskKey]: updatedOptions
-      };
-    });
-    
-    // 如果当前选择的是被删除的选项，清空选择
-    const currentValue = JSON.parse(externalEditingTaskValues[tagId] || '{}');
-    if (currentValue && currentValue.value === optionToDelete.value) {
-      handleTaskValueChange(taskId, tagId, '');
+      // 调用API将删除选项的操作保存到服务器
+      if (teamId && tagId) {
+        try {
+          // 这里替换为实际的API调用
+          // 例如: await dispatch(deleteTagOption({ teamId, tagId, optionValue: optionToDelete.value }));
+          
+          // 假设使用现有API调用结构
+          await dispatch({
+            type: 'team/deleteTagOption',
+            payload: {
+              teamId,
+              tagId,
+              optionValue: optionToDelete.value
+            }
+          });
+          
+          // 或者使用直接的fetch调用
+          /*
+          await fetch(`/api/teams/${teamId}/tags/${tagId}/options/${optionToDelete.value}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+          */
+        } catch (error) {
+          console.error('从服务器删除选项失败:', error);
+        }
+      }
+    } catch (error) {
+      console.error('删除选项失败:', error);
     }
-    
-    // 在这里可以添加调用API将删除选项的操作保存到服务器的逻辑
   };
   
   // 获取任务选项
@@ -659,6 +773,27 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                               ? (externalEditingTaskValues[tagId] || '')
                               : (task.tag_values?.[tagId] || '');
                             
+                            // 预处理currentValue，确保对象类型值被正确处理
+                            const processCurrentValue = (value) => {
+                              if (typeof value === 'object' && value !== null) {
+                                // 如果是对象但不是数组，尝试提取text或value属性
+                                if (!Array.isArray(value)) {
+                                  if (value.text !== undefined) {
+                                    return value.text;
+                                  } else if (value.value !== undefined) {
+                                    return value.value;
+                                  } else {
+                                    try {
+                                      return JSON.stringify(value);
+                                    } catch (e) {
+                                      return '';
+                                    }
+                                  }
+                                }
+                              }
+                              return value;
+                            };
+                            
                             return (
                               <div 
                                 key={`task-${task.id}-tag-${tagId}`} 
@@ -763,8 +898,36 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                           currentValue,
                                           getTaskOptions(task.id, tagId),
                                           (options) => {
-                                            const newValue = JSON.stringify(options);
-                                            handleTaskValueChange(task.id, tagId, newValue);
+                                            // 激活编辑模式并设置新值
+                                            if (!isEditing) {
+                                              setEditingTask(task.id);
+                                              
+                                              // 初始化所有字段值
+                                              const allTagValues = {};
+                                              sortedTagInfo.forEach((tag, idx) => {
+                                                const rIndex = tagOrder[idx];
+                                                let tId = String(rIndex + 1);
+                                                
+                                                if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                  tId = String(tagsData.tags[rIndex].id);
+                                                }
+                                                
+                                                allTagValues[tId] = task.tag_values?.[tId] || '';
+                                              });
+                                              
+                                              // 更新当前字段值
+                                              allTagValues[tagId] = JSON.stringify(options);
+                                              
+                                              setEditingTaskValues(allTagValues);
+                                              
+                                              // 直接提交更改
+                                              setTimeout(() => {
+                                                handleTaskEditComplete(task.id, sectionId);
+                                              }, 0);
+                                            } else {
+                                              const newValue = JSON.stringify(options);
+                                              handleTaskValueChange(task.id, tagId, newValue);
+                                            }
                                           },
                                           (newOption) => handleCreateOption(task.id, tagId, newOption),
                                           (editedOption) => handleEditOption(task.id, tagId, editedOption),
@@ -775,58 +938,200 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                           currentValue,
                                           getTaskOptions(task.id, tagId),
                                           (tags) => {
-                                            const newValue = JSON.stringify(tags);
-                                            handleTaskValueChange(task.id, tagId, newValue);
+                                            // 激活编辑模式并设置新值
+                                            if (!isEditing) {
+                                              setEditingTask(task.id);
+                                              
+                                              // 初始化所有字段值
+                                              const allTagValues = {};
+                                              sortedTagInfo.forEach((tag, idx) => {
+                                                const rIndex = tagOrder[idx];
+                                                let tId = String(rIndex + 1);
+                                                
+                                                if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                  tId = String(tagsData.tags[rIndex].id);
+                                                }
+                                                
+                                                allTagValues[tId] = task.tag_values?.[tId] || '';
+                                              });
+                                              
+                                              // 更新当前字段值
+                                              allTagValues[tagId] = JSON.stringify(tags);
+                                              
+                                              setEditingTaskValues(allTagValues);
+                                              
+                                              // 直接提交更改
+                                              setTimeout(() => {
+                                                handleTaskEditComplete(task.id, sectionId);
+                                              }, 0);
+                                            } else {
+                                              const newValue = JSON.stringify(tags);
+                                              handleTaskValueChange(task.id, tagId, newValue);
+                                            }
                                           }
                                         );
-                                      } else if (isNumberColumn(tag) || (tagObj && isNumberType(tagObj))) {
-                                        return renderNumberCell(
-                                          currentValue,
-                                          // 增加数值
-                                          (value) => {
-                                            handleTaskValueChange(task.id, tagId, value + 1);
-                                          },
-                                          // 减少数值
-                                          (value) => {
-                                            handleTaskValueChange(task.id, tagId, value - 1);
-                                          },
-                                          // 直接设置数值
+                                      } else if (isNumberColumn(tag) || (tagObj && isNumberType(tagObj)) || 
+                                                (typeof tag === 'string' && (tag.toLowerCase().includes('duration') || tag.toLowerCase().includes('progress'))) || 
+                                                (tagObj && tagObj.name && (tagObj.name.toLowerCase().includes('duration') || tagObj.name.toLowerCase().includes('progress')))) {
+                                        // 对于数字类型、Duration和Progress字段，始终使用数字控件
+                                        return (
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            {renderNumberCell(
+                                              processCurrentValue(currentValue),
+                                              // 增加数值
+                                              (value) => {
+                                                // 激活编辑模式并增加数值
+                                                if (!isEditing) {
+                                                  setEditingTask(task.id);
+                                                  
+                                                  // 初始化所有字段值
+                                                  const allTagValues = {};
+                                                  sortedTagInfo.forEach((tag, idx) => {
+                                                    const rIndex = tagOrder[idx];
+                                                    let tId = String(rIndex + 1);
+                                                    
+                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                      tId = String(tagsData.tags[rIndex].id);
+                                                    }
+                                                    
+                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                  });
+                                                  
+                                                  // 更新当前数字字段值
+                                                  allTagValues[tagId] = value;
+                                                  
+                                                  setEditingTaskValues(allTagValues);
+                                                  
+                                                  // 直接提交更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                } else {
+                                                  handleTaskValueChange(task.id, tagId, value);
+                                                  
+                                                  // 自动保存更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                }
+                                              },
+                                              // 减少数值
+                                              (value) => {
+                                                // 激活编辑模式并减少数值
+                                                if (!isEditing) {
+                                                  setEditingTask(task.id);
+                                                  
+                                                  // 初始化所有字段值
+                                                  const allTagValues = {};
+                                                  sortedTagInfo.forEach((tag, idx) => {
+                                                    const rIndex = tagOrder[idx];
+                                                    let tId = String(rIndex + 1);
+                                                    
+                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                      tId = String(tagsData.tags[rIndex].id);
+                                                    }
+                                                    
+                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                  });
+                                                  
+                                                  // 更新当前数字字段值
+                                                  allTagValues[tagId] = value;
+                                                  
+                                                  setEditingTaskValues(allTagValues);
+                                                  
+                                                  // 直接提交更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                } else {
+                                                  handleTaskValueChange(task.id, tagId, value);
+                                                  
+                                                  // 自动保存更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                }
+                                              },
+                                              // 直接设置数值
+                                              (value) => {
+                                                // 激活编辑模式并设置数值
+                                                if (!isEditing) {
+                                                  setEditingTask(task.id);
+                                                  
+                                                  // 初始化所有字段值
+                                                  const allTagValues = {};
+                                                  sortedTagInfo.forEach((tag, idx) => {
+                                                    const rIndex = tagOrder[idx];
+                                                    let tId = String(rIndex + 1);
+                                                    
+                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
+                                                      tId = String(tagsData.tags[rIndex].id);
+                                                    }
+                                                    
+                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
+                                                  });
+                                                  
+                                                  // 更新当前数字字段值
+                                                  allTagValues[tagId] = value;
+                                                  
+                                                  setEditingTaskValues(allTagValues);
+                                                  
+                                                  // 直接提交更改
+                                                  setTimeout(() => {
+                                                    handleTaskEditComplete(task.id, sectionId);
+                                                  }, 0);
+                                                } else {
+                                                  handleTaskValueChange(task.id, tagId, value);
+                                                }
+                                              },
+                                              // 选项
+                                              {
+                                                fieldName: typeof tag === 'string' ? tag : (tagObj?.name || ''),
+                                                min: 0,
+                                                max: (typeof tag === 'string' ? tag : (tagObj?.name || '')).toLowerCase().includes('progress') ? 1 : 999,
+                                                step: (typeof tag === 'string' ? tag : (tagObj?.name || '')).toLowerCase().includes('progress') ? 0.1 : 1
+                                              }
+                                            )}
+                                          </div>
+                                        );
+                                      } else if (isTextColumn(tag) || isTextType(tagObj)) {
+                                        // 修改编辑状态下的文本字段处理
+                                        const fieldName = typeof tag === 'string' ? tag : (tagObj?.name || '');
+                                        return renderTextCell(
+                                          typeof currentValue === 'object' && currentValue !== null 
+                                            ? (currentValue.text || currentValue.value || JSON.stringify(currentValue)) 
+                                            : currentValue,
                                           (value) => {
                                             handleTaskValueChange(task.id, tagId, value);
+                                          },
+                                          { 
+                                            fieldName,
+                                            // 如果是Name标签，则设为必填
+                                            required: fieldName === 'Name' || tagId === nameTagId,
+                                            // 根据字段名称设置合适的最大长度
+                                            maxLength: fieldName.toLowerCase().includes('name') ? 50 :
+                                                     fieldName.toLowerCase().includes('desc') ? 100 :
+                                                     fieldName.toLowerCase().includes('title') ? 50 : 100
                                           }
                                         );
                                       } else {
                                         // 默认作为文本类型处理 - TEXT类型或未识别类型
+                                        const fieldName = typeof tag === 'string' ? tag : (tagObj?.name || '');
                                         return renderTextCell(
-                                          currentValue,
+                                          typeof currentValue === 'object' && currentValue !== null 
+                                            ? (currentValue.text || currentValue.value || JSON.stringify(currentValue)) 
+                                            : currentValue,
                                           (value) => {
-                                            // 更新文本值
                                             handleTaskValueChange(task.id, tagId, value);
                                           },
                                           { 
-                                            placeholder: `${t('input')} ${tag}`,
-                                            // Name字段默认为必填
-                                            required: tag === 'Name' || (tagObj && tagObj.name === 'Name'),
-                                            // 添加按键事件处理
-                                            onKeyDown: (e) => {
-                                              if (e.key === 'Enter' && !e.shiftKey) {
-                                                // 当按下Enter且不按住Shift时提交
-                                                e.preventDefault(); // 防止换行
-                                                // 在表单的最后一个字段时提交整个表单
-                                                if (tagIndex === sortedTagInfo.length - 1) {
-                                                  handleTaskEditComplete(task.id, sectionId);
-                                                } else {
-                                                  // 在其他字段时，焦点移到下一个字段
-                                                  const nextField = document.querySelector(`[data-rfd-draggable-id="task-${task.id}"] input:nth-child(${tagIndex + 2})`);
-                                                  if (nextField) {
-                                                    nextField.focus();
-                                                  }
-                                                }
-                                              } else if (e.key === 'Escape') {
-                                                // 按ESC键取消编辑
-                                                handleKeyDown(e, task.id, sectionId);
-                                              }
-                                            }
+                                            fieldName,
+                                            // 如果是Name标签，则设为必填
+                                            required: fieldName === 'Name' || tagId === nameTagId,
+                                            // 根据字段名称设置合适的最大长度
+                                            maxLength: fieldName.toLowerCase().includes('name') ? 50 :
+                                                     fieldName.toLowerCase().includes('desc') ? 100 :
+                                                     fieldName.toLowerCase().includes('title') ? 50 : 100
                                           }
                                         );
                                       }
@@ -849,7 +1154,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                       );
                                       
                                       // 检查不同类型并渲染相应查看组件
-                                      if (isFileColumn(tag) && currentValue) {
+                                      if (isFileColumn(tag)) {
                                         return renderFileCell(currentValue, (e) => {
                                           e.stopPropagation();
                                         });
@@ -1064,123 +1369,22 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                             )}
                                           </div>
                                         );
-                                      } else if (isNumberColumn(tag) || (tagObj && isNumberType(tagObj))) {
-                                        return (
-                                          <div onClick={(e) => e.stopPropagation()}>
-                                            {renderNumberCell(
-                                              currentValue,
-                                              // 增加数值
-                                              (value) => {
-                                                // 激活编辑模式并增加数值
-                                                if (!isEditing) {
-                                                  setEditingTask(task.id);
-                                                  
-                                                  // 初始化所有字段值
-                                                  const allTagValues = {};
-                                                  sortedTagInfo.forEach((tag, idx) => {
-                                                    const rIndex = tagOrder[idx];
-                                                    let tId = String(rIndex + 1);
-                                                    
-                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
-                                                      tId = String(tagsData.tags[rIndex].id);
-                                                    }
-                                                    
-                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
-                                                  });
-                                                  
-                                                  // 更新当前数字字段值
-                                                  allTagValues[tagId] = value + 1;
-                                                  
-                                                  setEditingTaskValues(allTagValues);
-                                                  
-                                                  // 直接提交更改
-                                                  setTimeout(() => {
-                                                    handleTaskEditComplete(task.id, sectionId);
-                                                  }, 0);
-                                                } else {
-                                                  handleTaskValueChange(task.id, tagId, value + 1);
-                                                  
-                                                  // 自动保存更改
-                                                  setTimeout(() => {
-                                                    handleTaskEditComplete(task.id, sectionId);
-                                                  }, 0);
-                                                }
-                                              },
-                                              // 减少数值
-                                              (value) => {
-                                                // 激活编辑模式并减少数值
-                                                if (!isEditing) {
-                                                  setEditingTask(task.id);
-                                                  
-                                                  // 初始化所有字段值
-                                                  const allTagValues = {};
-                                                  sortedTagInfo.forEach((tag, idx) => {
-                                                    const rIndex = tagOrder[idx];
-                                                    let tId = String(rIndex + 1);
-                                                    
-                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
-                                                      tId = String(tagsData.tags[rIndex].id);
-                                                    }
-                                                    
-                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
-                                                  });
-                                                  
-                                                  // 更新当前数字字段值
-                                                  allTagValues[tagId] = value - 1;
-                                                  
-                                                  setEditingTaskValues(allTagValues);
-                                                  
-                                                  // 直接提交更改
-                                                  setTimeout(() => {
-                                                    handleTaskEditComplete(task.id, sectionId);
-                                                  }, 0);
-                                                } else {
-                                                  handleTaskValueChange(task.id, tagId, value - 1);
-                                                  
-                                                  // 自动保存更改
-                                                  setTimeout(() => {
-                                                    handleTaskEditComplete(task.id, sectionId);
-                                                  }, 0);
-                                                }
-                                              },
-                                              // 直接设置数值
-                                              (value) => {
-                                                // 激活编辑模式并设置数值
-                                                if (!isEditing) {
-                                                  setEditingTask(task.id);
-                                                  
-                                                  // 初始化所有字段值
-                                                  const allTagValues = {};
-                                                  sortedTagInfo.forEach((tag, idx) => {
-                                                    const rIndex = tagOrder[idx];
-                                                    let tId = String(rIndex + 1);
-                                                    
-                                                    if (tagsData && tagsData.tags && Array.isArray(tagsData.tags) && tagsData.tags[rIndex]) {
-                                                      tId = String(tagsData.tags[rIndex].id);
-                                                    }
-                                                    
-                                                    allTagValues[tId] = task.tag_values?.[tId] || '';
-                                                  });
-                                                  
-                                                  // 更新当前数字字段值
-                                                  allTagValues[tagId] = value;
-                                                  
-                                                  setEditingTaskValues(allTagValues);
-                                                  
-                                                  // 直接提交更改
-                                                  setTimeout(() => {
-                                                    handleTaskEditComplete(task.id, sectionId);
-                                                  }, 0);
-                                                } else {
-                                                  handleTaskValueChange(task.id, tagId, value);
-                                                }
-                                              }
-                                            )}
-                                          </div>
-                                        );
                                       } else {
                                         // 默认作为文本类型处理 - TEXT类型或未识别类型
-                                        return currentValue;
+                                        const fieldName = typeof tag === 'string' ? tag : (tagObj?.name || '');
+                                        return renderTextCell(
+                                          typeof currentValue === 'object' && currentValue !== null 
+                                            ? (currentValue.text || currentValue.value || JSON.stringify(currentValue)) 
+                                            : currentValue,
+                                          (value) => {
+                                            handleTaskValueChange(task.id, tagId, value);
+                                          },
+                                          { 
+                                            fieldName,
+                                            // 如果是Name标签，则设为必填
+                                            required: fieldName === 'Name' || tagId === nameTagId
+                                          }
+                                        );
                                       }
                                     })()}
                                   </div>

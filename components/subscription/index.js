@@ -87,14 +87,6 @@ const UsageStatsSkeleton = () => (
         <Skeleton className="h-2.5 w-full rounded-full" />
       </div>
       
-      {/* Storage Usage Skeleton */}
-      <div className="space-y-2">
-        <div className="flex justify-between text-sm">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-36" />
-        </div>
-        <Skeleton className="h-2.5 w-full rounded-full" />
-      </div>
     </div>
   </div>
 );
@@ -310,15 +302,6 @@ export const UsageStats = () => {
             subscriptionData.current_ai_workflow || 0,
             subscriptionData.subscription_plan.max_ai_workflow
           )
-        },
-        storage: {
-          current: subscriptionData.current_storage || 0,
-          limit: subscriptionData.subscription_plan.max_storage,
-          percentage: calculatePercentage(
-            subscriptionData.current_storage || 0,
-            subscriptionData.subscription_plan.max_storage
-          ),
-          unit: 'GB'
         }
       };
       
@@ -339,6 +322,14 @@ export const UsageStats = () => {
   const calculatePercentage = (current, limit) => {
     if (!limit || limit === 0) return 0;
     return Math.round((current / limit) * 100);
+  };
+  
+  // Helper function to format the limit display
+  const formatLimit = (current, limit, unit = '') => {
+    if (!limit || limit === 0) {
+      return `${current}${unit} / Unlimited`;
+    }
+    return `${current}${unit} / ${limit}${unit} (${calculatePercentage(current, limit)}%)`;
   };
   
   // Fetch stats when component mounts or user changes
@@ -405,20 +396,24 @@ export const UsageStats = () => {
               <div className="flex justify-between text-sm">
                 <span className="font-medium">{t(`subscription.usageStats.${key}`)}</span>
                 <span>
-                  {data.current}{data.unit || ''} / {data.limit}{data.unit || ''} ({data.percentage}%)
+                  {formatLimit(data.current, data.limit, data.unit || '')}
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                <div 
-                  className={`h-2.5 rounded-full ${
-                    data.percentage > 80 
-                      ? 'bg-red-500 dark:bg-red-600' 
-                      : data.percentage > 60 
-                        ? 'bg-yellow-500 dark:bg-yellow-600' 
-                        : 'bg-green-500 dark:bg-emerald-600'
-                  }`} 
-                  style={{ width: `${data.percentage}%` }}
-                ></div>
+                {data.limit === 0 ? (
+                  <div className="h-2.5 rounded-full bg-blue-500 dark:bg-blue-600" style={{ width: '100%' }}></div>
+                ) : (
+                  <div 
+                    className={`h-2.5 rounded-full ${
+                      data.percentage > 80 
+                        ? 'bg-red-500 dark:bg-red-600' 
+                        : data.percentage > 60 
+                          ? 'bg-yellow-500 dark:bg-yellow-600' 
+                          : 'bg-green-500 dark:bg-emerald-600'
+                    }`} 
+                    style={{ width: `${data.percentage}%` }}
+                  ></div>
+                )}
               </div>
             </div>
           ))}
@@ -433,12 +428,17 @@ export const PaymentHistory = () => {
   const [payments, setPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user } = useGetUser();
   
   useEffect(() => {
-    fetchPaymentHistory();
-  }, []);
+    if (user?.id) {
+      fetchPaymentHistory(user.id);
+    }
+  }, [user?.id]);
   
-  const fetchPaymentHistory = async () => {
+  const fetchPaymentHistory = async (userId) => {
+    if (!userId) return;
+    
     const toastId = toast.loading(t('subscription.paymentHistory.loading'));
     try {
       setIsLoading(true);
@@ -447,6 +447,7 @@ export const PaymentHistory = () => {
       const { data, error } = await supabase
         .from('payment')
         .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -535,8 +536,8 @@ export const PaymentHistory = () => {
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={fetchPaymentHistory}
-          disabled={isLoading}
+          onClick={() => user?.id && fetchPaymentHistory(user.id)}
+          disabled={isLoading || !user?.id}
           className="ml-auto"
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -546,14 +547,14 @@ export const PaymentHistory = () => {
       
       {error && (
         <div className="p-4 bg-destructive/10 dark:bg-destructive/20 text-destructive dark:text-destructive/90 rounded-md">
-          <p>{t('common.error')}: {error}</p>
+          <p>{t('error')}: {error}</p>
           <Button 
             variant="link" 
             size="sm" 
             onClick={fetchPaymentHistory}
             className="mt-2 text-destructive dark:text-destructive/90"
           >
-            {t('common.retry')}
+            {t('retry')}
           </Button>
         </div>
       )}

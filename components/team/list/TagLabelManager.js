@@ -138,7 +138,7 @@ const TagLabelManager = ({
       await dispatch(getLabelByTeamId(teamId)).unwrap();
       
       // 成功提示
-      toast.success('选项已创建');
+      toast.success(t('optionCreated') || '选项已创建');
       
       // 重置表单
       setNewOption({
@@ -164,7 +164,7 @@ const TagLabelManager = ({
   // 处理编辑选项
   const handleUpdateOption = async () => {
     if (!editingOption || !editingOption.label.trim()) {
-      toast.error('选项名称不能为空');
+      toast.error(t('optionNameRequired') || '选项名称不能为空');
       return;
     }
     
@@ -203,7 +203,7 @@ const TagLabelManager = ({
       await dispatch(getLabelByTeamId(teamId)).unwrap();
       
       // 成功提示
-      toast.success('选项已更新');
+      toast.success(t('optionUpdated') || '选项已更新');
       
       // 重置表单
       setEditingOption(null);
@@ -211,7 +211,7 @@ const TagLabelManager = ({
       
     } catch (error) {
       console.error('更新选项失败:', error);
-      toast.error(error.message || '更新选项失败');
+      toast.error(error.message || t('updateOptionFailed') || '更新选项失败');
     } finally {
       setLoading(false);
     }
@@ -269,11 +269,11 @@ const TagLabelManager = ({
       await dispatch(getLabelByTeamId(teamId)).unwrap();
       
       // 成功提示
-      toast.success('选项已删除');
+      toast.success(t('optionDeleted') || '选项已删除');
       
     } catch (error) {
       console.error('删除选项失败:', error);
-      toast.error(error.message || '删除选项失败');
+      toast.error(error.message || t('deleteOptionFailed') || '删除选项失败');
     } finally {
       setLoading(false);
     }

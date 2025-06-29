@@ -111,6 +111,8 @@
     "passwordChanged": "密码已成功更改",
     "timezone": "时区",
     "timeFormat": "时间格式",
+    "phoneInvalid": "电话号码必须以+开头，后跟国家/地区代码",
+    "phoneMinDigits": "电话号码在国家/地区代码后必须包含9-14位数字",
     "password": {
       "requirementsTitle": "密码要求：",
       "minLength": "至少8个字符",
@@ -1016,7 +1018,8 @@
     "everyoneCanEditDescription": "这个项目将对每个项目成员可见，作为编辑者。",
     "everyoneCanCheckDescription": "这个项目将对每个项目成员可见，作为检查者。",
     "everyoneCanViewDescription": "这个项目将对每个项目成员可见，作为查看者。",
-    "teamNameRequired": "请输入团队名称"
+    "teamNameRequired": "请输入团队名称",
+    "duplicateTeamName": "团队名称已存在，请更换名称后重试"
   },
   "Chat": {
     "title": "聊天",

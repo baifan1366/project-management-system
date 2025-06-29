@@ -161,6 +161,9 @@ export function useLoadTag() {
         throw new Error('无效的标签索引');
       }
       
+      // 获取要删除的标签名称，用于提示消息
+      const tagName = sortedTagInfo[index] || '';
+      
       // 创建新的标签ID数组，排除要删除的标签
       const updatedTagIds = currentTagIds.filter((_, i) => i !== realIndex);
       
@@ -175,10 +178,10 @@ export function useLoadTag() {
       // 不在这里更新tagOrder，而是让获取数据后自动更新
       // 删除后直接重新加载标签数据而不是手动修改状态
       
-      // 通知成功
+      // 通知成功，传入tag参数到翻译
       toast({
         title: t('tagDeleted') || '标签已删除',
-        description: t('tagDeletedDescription') || '标签已成功从此视图中删除',
+        description: t('tagDeletedDescription', { tag: tagName }) || `标签"${tagName}"已成功从此视图中删除`,
       });
       
       // 重新加载标签数据，让系统自动更新状态
@@ -265,15 +268,17 @@ export function useLoadTag() {
                           )}
                         </div>
                       </ContextMenuTrigger>
-                      <ContextMenuContent>
-                        <ContextMenuItem 
-                          onClick={() => handleDeleteTag(index)}
-                          className="flex items-center gap-2"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
-                          <span className="text-red-500 hover:text-red-600">{t('deleteTag') || '删除标签'}</span>
-                        </ContextMenuItem>
-                      </ContextMenuContent>
+                      {index !== 0 && (
+                        <ContextMenuContent>
+                          <ContextMenuItem 
+                            onClick={() => handleDeleteTag(index)}
+                            className="flex items-center gap-2"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
+                            <span className="text-red-500 hover:text-red-600">{t('deleteTag') || '删除标签'}</span>
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      )}
                     </ContextMenu>
                   )}
                 </Draggable>

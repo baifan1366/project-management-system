@@ -678,22 +678,6 @@ export default function ProjectsPage() {
                             </div>
                           </PopoverContent>
                         </Popover>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              size="icon" 
-                              className="h-8 w-8 rounded-full bg-background/80 hover:bg-primary/10 hover:text-primary border-none shadow-sm"
-                              onClick={(e) => handleAddTask(e, project.id)}
-                            >
-                              <PlusCircleIcon className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{t('addTask')}</p>
-                          </TooltipContent>
-                        </Tooltip>
                       </>
                     )}
                   </TooltipProvider>

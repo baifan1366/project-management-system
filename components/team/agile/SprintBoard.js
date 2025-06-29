@@ -53,9 +53,9 @@ import { getContrastColor, getStatusColor } from '@/components/team/agile/colorU
 import StatusSelect from '@/components/team/agile/StatusSelect';
 
 const TASK_STATUS = {
-  'todo': '待处理',
-  'in_progress': '进行中',
-  'done': '已完成'
+  'todo': '-',
+  'in_progress': '-',
+  'done': '-'
 };
 
 const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], selectedType }) => {
@@ -1351,7 +1351,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
     const assigneeValue = task.tag_values && task.tag_values['2'] ? task.tag_values['2'] : 'none';
     
     // 获取任务状态 - 从标签系统获取
-    let taskStatus = 'todo'; // 默认状态
+    let taskStatus = ''; // 默认状态为空
     
     // 从任务的tag_values中获取状态
     if (task.tag_values && statusTagId && task.tag_values[statusTagId]) {
