@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserShield, FaUserCog } from 'react-icons/fa';
+import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserShield, FaUserCog, FaSort, FaCamera } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
 import { checkAdminSession } from '@/lib/redux/features/adminSlice';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
@@ -23,6 +23,7 @@ export default function AdminUserManagement() {
   const [admins, setAdmins] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [sortOption, setSortOption] = useState('created_at_desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [adminsPerPage] = useState(10);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
@@ -48,6 +49,20 @@ export default function AdminUserManagement() {
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [permissionError, setPermissionError] = useState(null);
   const [adminRoles, setAdminRoles] = useState({});
+  const [emailError, setEmailError] = useState('');
+  const [editEmailError, setEditEmailError] = useState('');
+  // Add for full name validation:
+  const [fullNameError, setFullNameError] = useState('');
+  const [editFullNameError, setEditFullNameError] = useState('');
+  // Add for username validation:
+  const [usernameError, setUsernameError] = useState('');
+  const [editUsernameError, setEditUsernameError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  
+  // Avatar upload states
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // initialize the page
   useEffect(() => {
@@ -82,15 +97,18 @@ export default function AdminUserManagement() {
     };
     
     initDashboard();
-  }, [dispatch, router, reduxAdminData]);
+  }, [dispatch, router, reduxAdminData, filter, sortOption]);
 
   // Fetch admin users from database
-  const fetchAdminUsers = useCallback(async () => {
+  const fetchAdminUsers = async () => {
     try {
+      const parts = sortOption.split('_');
+      const sortOrder = parts.pop();
+      const sortBy = parts.join('_');
       let query = supabase
         .from('admin_user')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order(sortBy, { ascending: sortOrder === 'asc' });
       
       // Apply filter if not 'all'
       if (filter === 'active') {
@@ -111,7 +129,7 @@ export default function AdminUserManagement() {
     } catch (error) {
       console.error('Error fetching admin users:', error);
     }
-  }, [filter]);
+  };
 
   // Fetch permissions for all admins
   const fetchAllAdminPermissions = async (adminsList) => {
@@ -176,6 +194,11 @@ export default function AdminUserManagement() {
     setCurrentPage(1);
   };
   
+  const handleSortChange = (newSortOption) => {
+    setSortOption(newSortOption);
+    setCurrentPage(1);
+  };
+  
   // Handle search
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
@@ -187,6 +210,20 @@ export default function AdminUserManagement() {
     setModalType(type);
     setSelectedAdmin(admin);
     setIsModalOpen(true);
+    
+    // If opening edit modal, initialize form values
+    if (type === 'edit' && admin) {
+      setUsername(admin.username || '');
+      setFullName(admin.full_name || '');
+      setEmail(admin.email || '');
+      setPassword('');
+      setConfirmPassword('');
+      setEditUsernameError('');
+      setEditFullNameError('');
+      setEditEmailError('');
+      setPasswordError('');
+      setConfirmPasswordError('');
+    }
     
     // If opening permission edit modal, fetch permissions
     if (type === 'editPermission' && admin) {
@@ -866,6 +903,23 @@ export default function AdminUserManagement() {
       .join(' ');
   };
 
+  const validateEmail = (email) => {
+    // Simple regex for demonstration; you can use a more robust one if needed
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  // Add this function for full name validation
+  const validateFullName = (name) => {
+    // Only letters (including unicode letters) and spaces, 2-50 chars
+    return /^[A-Za-z\u00C0-\u024F\s]{2,50}$/.test(name.trim());
+  };
+
+  // Add this function for username validation
+  const validateUsername = (name) => {
+    // 2-50 chars, no spaces, not empty, can have special chars
+    return /^[^\s]{2,50}$/.test(name);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -996,6 +1050,23 @@ export default function AdminUserManagement() {
                   </select>
                 </div>
                 
+                {/* Sort */}
+                <div className="flex items-center space-x-2">
+                  <FaSort className="text-gray-400" />
+                  <select 
+                    className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md py-1.5 px-3 text-sm"
+                    value={sortOption}
+                    onChange={(e) => handleSortChange(e.target.value)}
+                  >
+                    <option value="created_at_desc">Newest First</option>
+                    <option value="created_at_asc">Oldest First</option>
+                    <option value="username_asc">Username (A-Z)</option>
+                    <option value="username_desc">Username (Z-A)</option>
+                    <option value="full_name_asc">Full Name (A-Z)</option>
+                    <option value="full_name_desc">Full Name (Z-A)</option>
+                  </select>
+                </div>
+
                 {/* Search */}
                 <div className="relative">
                   <input
@@ -1053,8 +1124,18 @@ export default function AdminUserManagement() {
                         <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">
-                                {admin.full_name?.charAt(0).toUpperCase() || admin.username?.charAt(0).toUpperCase()}
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center mr-3 overflow-hidden">
+                                {admin.avatar_url ? (
+                                  <img 
+                                    src={admin.avatar_url} 
+                                    alt={`${admin.username}'s avatar`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold">
+                                    {admin.full_name?.charAt(0).toUpperCase() || admin.username?.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
                               </div>
                               <div>
                                 <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -1193,6 +1274,26 @@ export default function AdminUserManagement() {
           
           <form onSubmit={(e) => {
             e.preventDefault();
+            if (!validateUsername(username)) {
+              setUsernameError('Username must be 2-50 characters, no spaces.');
+              return;
+            }
+            if (fullName && !validateFullName(fullName)) {
+              setFullNameError('Full name must be 2-50 letters and spaces only.');
+              return;
+            }
+            if (!validateEmail(email)) {
+              setEmailError('Please enter a valid email address.');
+              return;
+            }
+            if (!password) {
+              setPasswordError('Password cannot be empty.');
+              return;
+            }
+            if (!confirmPassword) {
+              setConfirmPasswordError('Confirm password cannot be empty.');
+              return;
+            }
             const adminUserData = {
               username: username,
               full_name: fullName,
@@ -1204,20 +1305,30 @@ export default function AdminUserManagement() {
           }}>
             <div className='space-y-4'>
               <div>
-                  <label htmlFor='name' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  <label htmlFor='username' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                     Username
                   </label>
                   <input
                     type='text'
                     id='username'
                     name='username'
-                    onChange={(e)=>{setUsername(e.target.value)}}
-                    required
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={username}
+                    onChange={(e) => {
+                      setUsername(e.target.value);
+                      setUsernameError('');
+                    }}
+                    onBlur={(e) => {
+                      if (!validateUsername(e.target.value)) {
+                        setUsernameError('Username must be 2-50 characters, no spaces.');
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${usernameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='How should we call you?'
                   />
+                  <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{usernameError}</p>
                 </div>
 
               <div>
@@ -1228,12 +1339,25 @@ export default function AdminUserManagement() {
                   type='text'
                   id='fullName'
                   name='fullName'
-                  onChange={(e)=>{setFullName(e.target.value)}}
-                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                  value={fullName}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    setFullNameError('');
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value && !validateFullName(e.target.value)) {
+                      setFullNameError('Full name must be 2-50 letters and spaces only.');
+                    }
+                  }}
+                  className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                     placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                    ${fullNameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                   placeholder='Enter user name'
                 />
+                {fullNameError && (
+                  <p className="text-xs text-red-600 mt-1">{fullNameError}</p>
+                )}
               </div>
               
               <div>
@@ -1241,50 +1365,84 @@ export default function AdminUserManagement() {
                   Email
                 </label>
                 <input
-                  type='email'
+                  type='text'
                   id='email'
                   name='email'
-                  onChange={(e)=>{setEmail(e.target.value)}}
-                  required
-                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailError('');
+                  }}
+                  onBlur={(e) => {
+                    if (!validateEmail(e.target.value)) {
+                      setEmailError('Please enter a valid email address.');
+                    }
+                  }}
+                  className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                     placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                    ${emailError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                   placeholder='Enter email address'
                 />
+                {emailError && (
+                  <p className="text-xs text-red-600 mt-1">{emailError}</p>
+                )}
               </div>
               
               <div>
-                <label htmlFor='password ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                <label htmlFor='password' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                   Password
                 </label>
                 <input
                   type='password'
                   id='password'
                   name='password'
-                  onChange={(e)=>{setPassword(e.target.value)}}
-                  required
-                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setPasswordError('');
+                  }}
+                  onBlur={(e) => {
+                    if (!e.target.value) {
+                      setPasswordError('Password cannot be empty.');
+                    } else if (!validatePassword(e.target.value).isValid) {
+                      setPasswordError('Password must meet all requirements.');
+                    }
+                  }}
+                  className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                     placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                    ${passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                   placeholder='Enter password'
                 />
+                <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{passwordError}</p>
               </div>
 
               <div>
-                <label htmlFor='password ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                <label htmlFor='confirm_password' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                   Confirm Password
                 </label>
-                <input 
-                type='password'
-                name='confirm_password'
-                id='confirm_password'
-                onChange={(e)=>{setConfirmPassword(e.target.value)}}
-                required
-                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                placeholder='Enter confirm password'
+                <input
+                  type='password'
+                  name='confirm_password'
+                  id='confirm_password'
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setConfirmPasswordError('');
+                  }}
+                  onBlur={(e) => {
+                    if (!e.target.value) {
+                      setConfirmPasswordError('Confirm password cannot be empty.');
+                    } else if (e.target.value !== password) {
+                      setConfirmPasswordError('Passwords do not match.');
+                    }
+                  }}
+                  className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
+                    placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                    ${confirmPasswordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                  placeholder='Enter confirm password'
                 />
+                <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{confirmPasswordError}</p>
               </div>
 
               {password && (
@@ -1336,11 +1494,8 @@ export default function AdminUserManagement() {
               
               <button
                 type='submit'
-                disabled={!isPasswordValid || !isPasswordMatch || !username || !email}
                 className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
-                  text-white ${isPasswordValid && isPasswordMatch && username && email
-                    ? 'bg-indigo-600 hover:bg-indigo-700' 
-                    : 'bg-indigo-400 cursor-not-allowed'} 
+                  text-white bg-indigo-600 hover:bg-indigo-700
                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
               >
                 Add User
@@ -1367,6 +1522,31 @@ export default function AdminUserManagement() {
             
             <form onSubmit={(e) => {
               e.preventDefault();
+              if (!validateUsername(username)) {
+                setEditUsernameError('Username must be 2-50 characters, no spaces.');
+                return;
+              }
+              if (fullName && !validateFullName(fullName)) {
+                setEditFullNameError('Full name must be 2-50 letters and spaces only.');
+                return;
+              }
+              if (!validateEmail(email)) {
+                setEditEmailError('Please enter a valid email address.');
+                return;
+              }
+              
+              // Check if password is provided and valid
+              if (password && !isPasswordValid) {
+                setPasswordError('Password must meet all requirements.');
+                return;
+              }
+              
+              // Check if passwords match when a new password is being set
+              if (password && password !== confirmPassword) {
+                setConfirmPasswordError('Passwords do not match.');
+                return;
+              }
+              
               const newAdminData = {
                 username: username,
                 full_name: fullName,
@@ -1387,14 +1567,25 @@ export default function AdminUserManagement() {
                     type='text'
                     id='edit-username'
                     name='username'
-                    required
-                    defaultValue={selectedAdmin.username}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={username}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${editUsernameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter new username'
-                    onChange={(e)=> {setUsername(e.target.value)}}
+                    onChange={(e) => {
+                      setUsername(e.target.value);
+                      setEditUsernameError('');
+                    }}
+                    onBlur={(e) => {
+                      if (!validateUsername(e.target.value)) {
+                        setEditUsernameError('Username must be 2-50 characters, no spaces.');
+                      }
+                    }}
                   />
+                  {editUsernameError && (
+                    <p className="text-xs text-red-600 mt-1">{editUsernameError}</p>
+                  )}
                 </div>
 
                 <div>
@@ -1405,13 +1596,25 @@ export default function AdminUserManagement() {
                     type='text'
                     id='edit-fullName'
                     name='fullName'
-                    defaultValue={selectedAdmin.full_name || ''}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={fullName}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${editFullNameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter new full name'
-                    onChange={(e)=> {setFullName(e.target.value)}}
+                    onChange={(e)=> {
+                      setFullName(e.target.value);
+                      setEditFullNameError('');
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value && !validateFullName(e.target.value)) {
+                        setEditFullNameError('Full name must be 2-50 letters and spaces only.');
+                      }
+                    }}
                   />
+                  {editFullNameError && (
+                    <p className="text-xs text-red-600 mt-1">{editFullNameError}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -1419,17 +1622,29 @@ export default function AdminUserManagement() {
                     Email
                   </label>
                   <input
-                    type='email'
+                    type='text'
                     id='edit-email'
                     name='email'
                     required
-                    defaultValue={selectedAdmin.email || ''}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={email}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${editEmailError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter email address'
-                    onChange={(e)=>{setEmail(e.target.value)}}
+                    onChange={(e)=>{
+                      setEmail(e.target.value);
+                      setEditEmailError('');
+                    }}
+                    onBlur={(e) => {
+                      if (!validateEmail(e.target.value)) {
+                        setEditEmailError('Please enter a valid email address.');
+                      }
+                    }}
                   />
+                  {editEmailError && (
+                    <p className="text-xs text-red-600 mt-1">{editEmailError}</p>
+                  )}
                 </div>
 
                 <div>
@@ -1440,12 +1655,24 @@ export default function AdminUserManagement() {
                   type='password'
                   id='newPassword'
                   name='newPassword'
-                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                  className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                     placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                    ${passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                   placeholder='Enter new password'
-                  onChange={(e)=>{setPassword(e.target.value)}}
+                  onChange={(e)=>{
+                    setPassword(e.target.value);
+                    setPasswordError('');
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value && !validatePassword(e.target.value).isValid) {
+                      setPasswordError('Password must meet all requirements.');
+                    }
+                  }}
                 />
+                {passwordError && (
+                  <p className="text-xs text-red-600 mt-1">{passwordError}</p>
+                )}
               </div>
 
               <div>
@@ -1456,12 +1683,24 @@ export default function AdminUserManagement() {
                 type='password'
                 name='confirmNewPassword'
                 id='confirmNewPassword'
-                onChange={(e)=>{setConfirmPassword(e.target.value)}}
-                className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                onChange={(e)=>{
+                  setConfirmPassword(e.target.value);
+                  setConfirmPasswordError('');
+                }}
+                onBlur={(e) => {
+                  if (e.target.value && e.target.value !== password) {
+                    setConfirmPasswordError('Passwords do not match.');
+                  }
+                }}
+                className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                 placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                ${confirmPasswordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                 placeholder='Enter confirm password'
                 />
+                {confirmPasswordError && (
+                  <p className="text-xs text-red-600 mt-1">{confirmPasswordError}</p>
+                )}
               </div>
               
               {password && (
@@ -1575,8 +1814,18 @@ export default function AdminUserManagement() {
               <div className='p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700'>
                 <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>Admin Details</h4>
                 <div className='flex items-center mb-2'>
-                  <div className='w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3'>
-                    {selectedAdmin.full_name?.charAt(0).toUpperCase() || selectedAdmin.username?.charAt(0).toUpperCase() || 'A'}
+                  <div className='w-8 h-8 rounded-full overflow-hidden flex items-center justify-center mr-3'>
+                    {selectedAdmin.avatar_url ? (
+                      <img 
+                        src={selectedAdmin.avatar_url} 
+                        alt={`${selectedAdmin.username}'s avatar`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className='w-full h-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold'>
+                        {selectedAdmin.full_name?.charAt(0).toUpperCase() || selectedAdmin.username?.charAt(0).toUpperCase() || 'A'}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.username || 'Admin'}</p>
@@ -1852,8 +2101,18 @@ export default function AdminUserManagement() {
           <div className='space-y-6 overflow-y-auto pr-2'>
             {/* Admin Header with Avatar */}
             <div className='flex items-center'>
-              <div className='w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 text-xl font-semibold mr-4'>
-                {selectedAdmin.full_name?.charAt(0).toUpperCase() || selectedAdmin.username?.charAt(0).toUpperCase()}
+              <div className='w-16 h-16 rounded-full overflow-hidden flex items-center justify-center mr-4'>
+                {selectedAdmin.avatar_url ? (
+                  <img 
+                    src={selectedAdmin.avatar_url} 
+                    alt={`${selectedAdmin.username}'s avatar`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className='w-full h-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 text-xl font-semibold'>
+                    {selectedAdmin.full_name?.charAt(0).toUpperCase() || selectedAdmin.username?.charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
               <div>
                 <h3 className='text-lg font-medium text-gray-900 dark:text-white'>{selectedAdmin.full_name || selectedAdmin.username}</h3>

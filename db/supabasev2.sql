@@ -155,7 +155,9 @@ CREATE TABLE "team_agile" (
   "toImprove" JSONB,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "start_on" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "completed_on" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE "agile_role" (
@@ -540,7 +542,7 @@ CREATE TABLE "payment" (
   "amount" DECIMAL(10, 2) NOT NULL,
   "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
   "payment_method" TEXT NOT NULL,
-  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED')),
   "transaction_id" VARCHAR(255),
   "discount_amount" DECIMAL(10, 2) DEFAULT 0,
   "discount_percentage" DECIMAL(5, 2) DEFAULT 0,

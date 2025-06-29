@@ -55,6 +55,7 @@ import RoleForm from './RoleForm';
 import { fetchAgileRoles } from '@/lib/redux/features/agileSlice';
 import { createRole } from '@/lib/redux/features/agileSlice';
 import { useMemo } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // 角色职责简述（保留，因为这些通常是固定的业务规则）
 const ROLE_RESPONSIBILITIES = {
@@ -882,7 +883,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
             {isTeamCreator && (
               <div className="flex items-center space-x-2">
                 <Button 
-                  variant="outline" 
+                  variant={themeColor} 
                   size="sm"
                   onClick={() => setIsRoleInfoExpanded(!isRoleInfoExpanded)}
                 >
@@ -896,7 +897,7 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
                 </Button>
                 
                 <Button 
-                  variant="outline" 
+                  variant={themeColor} 
                   size="sm"
                   onClick={() => setCreateRoleDialogOpen(true)}
                 >
@@ -943,8 +944,22 @@ const RoleAssignment = ({ teamId, agileId, agileRoles = [], agileMembers = [], o
           )}
           
           {loading ? (
-            <div className="flex justify-center items-center h-40">
-              <p>{t('loading')}</p>
+            <div className="space-y-4">
+              {Array(5).fill(0).map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-3 border rounded-md bg-background">
+                  <div className="flex items-center space-x-3">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div>
+                      <Skeleton className="h-5 w-32 mb-1" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Skeleton className="h-9 w-32 rounded-md mr-2" />
+                    <Skeleton className="h-9 w-9 rounded-md" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             renderRoleAssignmentTable()

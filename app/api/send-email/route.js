@@ -407,8 +407,11 @@ function generateOrderConfirmationTemplate(data) {
                   Quantity: ${data.quantity || '1'}
                 </div>
                 <div style="margin-bottom: 10px">
-                  Amount: ${(data.amount || 0).toFixed(2)}
-                  ${data.currency || 'MYR'}
+                  Amount: ${new Intl.NumberFormat('ms-MY', {
+                    style: 'currency',
+                    currency: data.currency || 'MYR',
+                    minimumFractionDigits: 2,
+                  }).format(data.amount || 0)}
                 </div>
                 <div style="margin-bottom: 0">
                   Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric',
