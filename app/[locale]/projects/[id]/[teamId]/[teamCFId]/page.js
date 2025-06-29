@@ -570,31 +570,31 @@ const TeamCustomFieldPage = () => {
 
     const fieldType = currentItem.custom_field?.type;
     if (fieldType === 'LIST') {
-      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
+      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText} triggerAction={triggerAction}/>;
     }
     if (fieldType === 'GANTT') {
       return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText} triggerAction={triggerAction}/>;
     }
     if (fieldType === 'KANBAN') {
-      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
+      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText} triggerAction={triggerAction}/>;
     }
     if (fieldType === 'FILES') {
       return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'WORKFLOW') {
-      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
+      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addTask={triggerAction && addButtonText === 'addTask'}/>;
     }
     if (fieldType === 'OVERVIEW') {
       return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'TIMELINE') {
-      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
+      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addTask={triggerAction && addButtonText === 'addTask'}/>;
     }
     if (fieldType === 'CALENDAR') {
-      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
+      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addTask={triggerAction && addButtonText === 'addTask'}/>;
     }
-    if (fieldType === 'NOTE') {
-      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
+    if (fieldType === 'NOTE') { 
+      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText} triggerAction={triggerAction}/>;
     }
     if (fieldType === 'AGILE') {
       return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
@@ -602,7 +602,7 @@ const TeamCustomFieldPage = () => {
     if (fieldType === 'POSTS') {
       return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
-    return <div>暂不支持的字段类型: {fieldType}</div>;
+    return <div>Not supported field type: {fieldType}</div>;
   }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey, teamCFLoaded, fieldNotFoundText, fieldMayBeDeletedText, addButtonText, triggerAction]);
 
   // 处理加载状态
@@ -952,14 +952,15 @@ const TeamCustomFieldPage = () => {
             <TaskTab projectId={projectId} teamId={teamId} onViewChange={handleViewChange} handleRefreshContent={handleRefreshContent} />
           </div>
         </div>
-        <div className="w-full p-0">
+        {/* <div className="w-full p-0">
           { currentItem?.custom_field?.type !== 'AGILE' &&
           currentItem?.custom_field?.type !== 'OVERVIEW' && (
             <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex">
-                {/* if currentItem?.custom_field?.type !== 'FILES' and POSTS */}
                 {currentItem?.custom_field?.type !== 'FILES' && 
+                 currentItem?.custom_field?.type !== 'KANBAN' &&
+                 currentItem?.custom_field?.type !== 'LIST' &&
                  currentItem?.custom_field?.type !== 'POSTS' && (
                   <>
                     <Button 
@@ -983,7 +984,11 @@ const TeamCustomFieldPage = () => {
                           <span className="text-sm">{t('task')}</span>
                           {addButtonText === 'addTask' && <Check className="h-4 w-4 ml-auto" />}                      
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAddButtonText('addSection')} className="flex">
+                        <DropdownMenuItem 
+                          onClick={() => setAddButtonText('addSection')} 
+                          className="flex"
+                          disabled={currentItem?.custom_field?.type === 'TIMELINE' || currentItem?.custom_field?.type === 'WORKFLOW' || currentItem?.custom_field?.type === 'CALENDAR'} 
+                        >
                           <TextQuote className="h-4 w-4 mr-1" />
                           <span className="text-sm">{t('section')}</span>
                           {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
@@ -1008,8 +1013,8 @@ const TeamCustomFieldPage = () => {
           </div>
           )}
           
-        </div>
-        <div className="overflow-y-auto flex-grow h-0 mb-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0" data-rbd-scroll-container-style="true">
+        </div> */}
+        <div className="overflow-y-auto flex-grow h-0 mb-2 mt-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0" data-rbd-scroll-container-style="true">
           {customFieldContent}
         </div>
       </div>
