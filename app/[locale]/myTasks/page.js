@@ -986,10 +986,10 @@ export default function MyTasksPage() {
           </div>
 
           {/* DUE DATE 过滤器 */}
-          <div className="mb-5">
+          {/* <div className="mb-5">
             <h3 className="text-xs text-muted-foreground mb-2">{t_tasks('dueDate.label')}</h3>
             {renderFilterItem(t_tasks('dueDate.createdBy'), 'createdBy', '', () => {})}
-          </div>
+          </div> */}
         </div>
 
         {/* 右侧任务看板 */}

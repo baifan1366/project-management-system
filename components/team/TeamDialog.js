@@ -40,6 +40,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
   const [validationSchema, setValidationSchema] = useState(null);
   const { user } = useGetUser();
   const projectTeams = useSelector((state) => (state.teams.projectTeams || {})[projectId] || []);
+  const [currentProjectTeams, setCurrentProjectTeams] = useState([]);
 
   useEffect(() => {
     setValidationSchema(createTeamValidationSchema(tValidation));
@@ -124,20 +125,23 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
       const teamName = teamFormTransforms.teamName(data.teamName);
       
       // 调试输出
-      console.log('创建团队名称:', teamName);
-      console.log('当前项目所有团队:', currentProjectTeams);
+      
+      
+      
+      // 添加这行确保 currentProjectTeams 为数组
+      const teamsArray = Array.isArray(currentProjectTeams) ? currentProjectTeams : [];
       
       // 提取所有团队名称进行比较
-      const existingTeamNames = currentProjectTeams
+      const existingTeamNames = teamsArray
         .filter(team => team && team.name)
         .map(team => team.name.toLowerCase());
-      console.log('现有团队名称列表:', existingTeamNames);
+      
       
       const isDuplicateName = existingTeamNames.includes(teamName.toLowerCase());
-      console.log('检测到重复名称:', isDuplicateName);
+      
       
       if (isDuplicateName) {
-        console.log('团队名称重复，拒绝创建');
+        
         setFormErrors({
           ...formErrors,
           teamName: t('duplicateTeamName')

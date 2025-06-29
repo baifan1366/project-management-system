@@ -253,6 +253,7 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={t_tasks('newTask.titlePlaceholder')}
                 required
+                maxLength={50}
               />
             </div>
             
@@ -266,6 +267,7 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t_tasks('newTask.descriptionPlaceholder')}
                 rows={3}
+                maxLength={100}
               />
             </div>
             
