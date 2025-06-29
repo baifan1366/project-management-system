@@ -95,6 +95,10 @@ function ChatLayout({ children }) {
     if (mode === 'ai' && chatMode !== 'ai') {
       setChatMode('ai');
       setCurrentSession(null);
+    } else if (!mode && chatMode === 'ai') {
+      // If mode parameter is removed and we're still in AI mode, switch back to normal
+      setChatMode('normal');
+      setCurrentSession(null);
     }
   }, [searchParams, setChatMode, setCurrentSession, chatMode]);
 
@@ -246,6 +250,15 @@ function ChatLayout({ children }) {
     const newMode = chatMode === 'normal' ? 'ai' : 'normal';
     setChatMode(newMode);
     setCurrentSession(null);
+    
+    // Update the URL when switching modes
+    const url = new URL(window.location.href);
+    if (newMode === 'ai') {
+      url.searchParams.set('mode', 'ai');
+    } else {
+      url.searchParams.delete('mode');
+    }
+    window.history.replaceState({}, '', url);
   };
   
   // 过滤会话列表
@@ -844,7 +857,8 @@ function ChatLayout({ children }) {
                       {session.type === 'PRIVATE' && (
                         <div className="mt-0.5">
                           {/* 使用usersStatus获取最新状态 */}
-                          {session.participants[0]?.id && usersStatus[session.participants[0].id]?.isOnline ? (
+                          {(session.participants[0]?.id && usersStatus[session.participants[0].id]?.isOnline) || 
+                           (session.participants[0]?.is_online) ? (
                             <p className="text-xs text-green-600">{t('online')}</p>
                           ) : (
                             <p className="text-xs text-muted-foreground">

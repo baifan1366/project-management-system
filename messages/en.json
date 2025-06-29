@@ -1391,7 +1391,8 @@
     "userDetails": "User Details",
     "projectDetails": "Project Details",
     "taskDetails": "Task Details",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "viewProfile": "View Profile"
   },
   "Invitation": {
     "inviteToTeam": "Invite to",
