@@ -90,7 +90,7 @@ function formatGanttDate(date) {
   }
 }
 
-export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
+export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey, addButtonText, triggerAction }) {
   const ganttContainer = useRef(null);
   const t = useTranslations('CreateTask');
   const tConfirm = useTranslations('confirmation')
@@ -114,6 +114,22 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey }) {
     duration: 1,
     progress: 0
   });
+  
+  // 使用 ref 追踪前一个 addButtonText 值
+  const prevAddButtonTextRef = useRef('');
+  
+  // 监听triggerAction属性，当它为true时触发相应的对话框
+  useEffect(() => {
+    if (triggerAction && addButtonText) {
+      if (addButtonText === 'addTask') {
+        setShowCreateSection(false);
+        setShowTaskForm(true);
+      } else if (addButtonText === 'addSection') {
+        setShowTaskForm(false);
+        setShowCreateSection(true);
+      }
+    }
+  }, [triggerAction, addButtonText]);
   
   // 颜色名称到颜色代码的映射，与button.jsx中的颜色一致
   const colorMap = {

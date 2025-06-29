@@ -31,7 +31,7 @@ import { zhCN, enUS } from 'date-fns/locale';
 import { Check, Trash, Bell, BellOff, Calendar, User, MessageSquare, Video } from 'lucide-react';
 import { useGetUser } from '@/lib/hooks/useGetUser';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import NotificationItem from '@/components/notifications/NotificationItem';
+import NotificationItem, { NotificationItemSkeleton } from '@/components/notifications/NotificationItem';
 
 export function NotificationDialog({ open, onOpenChange, headerHandlesSubscription = false }) {
   const t = useTranslations();
@@ -144,6 +144,12 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
         return <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600"><MessageSquare className="h-4 w-4" /></div>;
       case 'MENTION':
         return <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600"><User className="h-4 w-4" /></div>;
+      case 'ADDED_TO_CHAT':
+        return <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600"><MessageSquare className="h-4 w-4" /></div>;
+      case 'MEETING_INVITE':
+        return <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600"><Video className="h-4 w-4" /></div>;
+      case 'TEAM_ANNOUNCEMENT':
+        return <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><Bell className="h-4 w-4" /></div>;
       case 'SYSTEM':
         // Check if this is a meeting invitation
         try {
@@ -171,7 +177,7 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md md:max-w-lg">
+      <DialogContent className="sm:max-w-md md:max-w-lg" hideCloseButton={true}>
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -246,6 +252,7 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
   );
 }
 
+// Enhanced NotificationList with skeleton loading state
 function NotificationList({ 
   notifications, 
   loading, 
@@ -257,9 +264,11 @@ function NotificationList({
 }) {
   if (loading) {
     return (
-      <div className="py-10 text-center">
-        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-        <p className="text-muted-foreground">{t('common.loading')}</p>
+      <div className="space-y-4 py-2">
+        {/* Show multiple skeletons with varying layouts */}
+        {Array.from({ length: 3 }, (_, i) => (
+          <NotificationItemSkeleton key={i} />
+        ))}
       </div>
     );
   }

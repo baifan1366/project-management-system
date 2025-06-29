@@ -19,6 +19,8 @@ import ProjectSettings from '@/components/ProjectSettings';
 import { api } from '@/lib/api';
 import { useConfirm } from '@/hooks/use-confirm';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getSubscriptionLimit } from '@/lib/subscriptionService';
+import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
 
 // 获取团队自定义字段
 const selectTeamCustomFields = state => state?.teams?.teamCustomFields ?? [];
@@ -66,6 +68,7 @@ export default function ProjectSidebar({ projectId }) {
   const [projectCreatedBy, setProjectCreatedBy] = useState(null);
   const [canCreateTeam, setCanCreateTeam] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
 
   // 项目名称下拉菜单
   useEffect(() => {
@@ -177,10 +180,34 @@ export default function ProjectSidebar({ projectId }) {
   const filteredMenuItems = useMemo(() => {
     if (!searchQuery.trim()) return menuItems;
     
-    return menuItems.filter(item => 
-      item.label.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [menuItems, searchQuery]);
+    const query = searchQuery.toLowerCase().trim();
+    return menuItems.filter(item => {
+      // 匹配团队名称
+      const nameMatch = item.label.toLowerCase().includes(query);
+      
+      // 匹配团队访问权限（按访问类型搜索）
+      const accessMatch = item.access?.toLowerCase().includes(query);
+      
+      // 匹配翻译的访问权限名称
+      let accessTranslationMatch = false;
+      try {
+        if (item.access) {
+          const accessTranslation = t(item.access) || '';
+          accessTranslationMatch = accessTranslation.toLowerCase().includes(query);
+        }
+      } catch (e) {
+        // 忽略翻译错误
+      }
+      
+      // 如果是数字搜索，则匹配团队ID
+      let idMatch = false;
+      if (/^\d+$/.test(query)) {
+        idMatch = String(item.id).includes(query);
+      }
+      
+      return nameMatch || accessMatch || accessTranslationMatch || idMatch;
+    });
+  }, [menuItems, searchQuery, t]);
 
   // 处理拖拽结束
   const handleDragEnd = useCallback(async (result) => {
@@ -319,8 +346,17 @@ export default function ProjectSidebar({ projectId }) {
 
   // 处理搜索输入
   const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
+    const value = e.target.value;
+    setSearchQuery(value);
+    setSearchActive(!!value.trim());
   };
+
+  // 清除搜索
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchActive(false);
+  };
+
   // Skeleton loaders for different parts of the UI
   const ProjectHeaderSkeleton = () => (
     <div className="flex items-center justify-between w-full px-4 py-2.5">
@@ -439,9 +475,28 @@ export default function ProjectSidebar({ projectId }) {
                   value={searchQuery}
                   onChange={handleSearchChange}
                   placeholder={t('searchPlaceholder')}
-                  className="w-full pl-8 pr-3 py-1.5 bg-muted text-foreground placeholder-muted-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                  className="w-full pl-8 pr-8 py-1.5 bg-muted text-foreground placeholder-muted-foreground rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                 />
+                {searchActive && (
+                  <button
+                    onClick={clearSearch}
+                    className="absolute right-2 top-1.5 text-muted-foreground hover:text-foreground focus:outline-none"
+                    aria-label={t('clearSearch')}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                )}
               </div>
+              {searchActive && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {filteredMenuItems.length === 0 
+                    ? t('noTeamsFound')
+                    : t('foundTeamsCount', { count: filteredMenuItems.length })}
+                </div>
+              )}
             </div>
           )}
 
@@ -477,64 +532,69 @@ export default function ProjectSidebar({ projectId }) {
                       {...provided.droppableProps}
                       ref={provided.innerRef}
                     >
-                      {menuItems.map((item, index) => {
-                        // 修改检查逻辑：检查路径名是否包含团队ID部分
-                        const isActive = pathname.includes(`/projects/${projectId}/${item.id}/`);
-                        return (
-                          <Draggable key={item.id} draggableId={String(item.id)} index={index}>
-                            {(provided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                              >
-                                <Link
-                                  href={item.href}
-                                  className={cn(
-                                    "flex items-center px-4 py-1.5 text-foreground group",
-                                    isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
-                                    "transition-colors"
-                                  )}
+                      {filteredMenuItems.length > 0 ? (
+                        filteredMenuItems.map((item, index) => {
+                          // 修改检查逻辑：检查路径名是否包含团队ID部分
+                          const isActive = pathname.includes(`/projects/${projectId}/${item.id}/`);
+                          return (
+                            <Draggable key={item.id} draggableId={String(item.id)} index={index}>
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
                                 >
-                                  <div className="flex items-center w-full justify-between flex-wrap">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <div 
-                                        className={cn(
-                                          "w-4 h-4 rounded-md flex items-center justify-center text-xs font-medium transition-all",
-                                          getColorClass(themeColor),
-                                          "ring-offset-background",
-                                          isActive
-                                            ? ""
-                                            : ""
-                                        )}
-                                      >
-                                        {getProjectInitial(item.label)}
+                                  <Link
+                                    href={item.href}
+                                    className={cn(
+                                      "flex items-center px-4 py-1.5 text-foreground group",
+                                      isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+                                      "transition-colors"
+                                    )}
+                                  >
+                                    <div className="flex items-center w-full justify-between flex-wrap">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div 
+                                          className={cn(
+                                            "w-4 h-4 rounded-md flex items-center justify-center text-xs font-medium transition-all",
+                                            getColorClass(themeColor),
+                                            "ring-offset-background",
+                                            isActive
+                                              ? ""
+                                              : ""
+                                          )}
+                                        >
+                                          {getProjectInitial(item.label)}
+                                        </div>
+                                        <span className="text-sm break-all w-[130px]">{item.label}</span>
                                       </div>
-                                      <span className="text-sm break-all w-[130px]">{item.label}</span>
+                                      <div className="flex items-center">
+                                        {(() => {
+                                          switch (item.access) {
+                                            case 'invite_only':
+                                              return renderTooltip(Lock, t('inviteOnlyTooltip'));
+                                            case 'can_edit':
+                                              return renderTooltip(Pencil, t('canEditTooltip'));
+                                            case 'can_check':
+                                              return renderTooltip(Eye, t('canCheckTooltip'));
+                                            case 'can_view':
+                                              return renderTooltip(Eye, t('canViewTooltip'));
+                                            default:
+                                              return renderTooltip(Lock, t('inviteOnlyTooltip'));
+                                          }
+                                        })()}
+                                      </div>
                                     </div>
-                                    <div className="flex items-center">
-                                      {(() => {
-                                        switch (item.access) {
-                                          case 'invite_only':
-                                            return renderTooltip(Lock, t('inviteOnlyTooltip'));
-                                          case 'can_edit':
-                                            return renderTooltip(Pencil, t('canEditTooltip'));
-                                          case 'can_check':
-                                            return renderTooltip(Eye, t('canCheckTooltip'));
-                                          case 'can_view':
-                                            return renderTooltip(Eye, t('canViewTooltip'));
-                                          default:
-                                            return renderTooltip(Lock, t('inviteOnlyTooltip'));
-                                        }
-                                      })()}
-                                    </div>
-                                  </div>
-                                </Link>
-                              </div>
-                            )}
-                          </Draggable>
-                        );
-                      })}
+                                  </Link>
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })
+                      ) : (
+                        <div>
+                        </div>
+                      )}
                       {provided.placeholder}
                     </div>
                   )}
@@ -546,7 +606,18 @@ export default function ProjectSidebar({ projectId }) {
           {/* 创建团队按钮 - 仅当当前用户是项目创建者时显示且不在加载状态 */}
           {!isProjectLoading && canCreateTeam && (
             <button 
-              onClick={() => {
+              onClick={async () => {
+                // Check team creation limit before opening dialog
+                if (user && user.id) {
+                  const limitCheck = await getSubscriptionLimit(user.id, 'create_team');
+                  if (!limitCheck.allowed) {
+                    dispatch(limitExceeded({
+                      actionType: 'create_team',
+                      limitInfo: limitCheck
+                    }));
+                    return;
+                  }
+                }
                 setDialogOpen(true);
               }} 
               className="flex items-center w-full px-4 py-2 text-foreground hover:bg-accent/50 transition-colors"
@@ -562,6 +633,11 @@ export default function ProjectSidebar({ projectId }) {
           onClose={() => {
             setDialogOpen(false);
             fetchTeams();
+            
+            // 触发团队创建事件，通知页面刷新团队列表
+            if (typeof window !== 'undefined' && window._projectEventBus) {
+              window._projectEventBus.emit('team:created');
+            }
           }} 
           projectId={projectId}
         />

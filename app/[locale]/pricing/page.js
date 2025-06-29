@@ -20,32 +20,33 @@ export default function PricingPage() {
   // Move the hook call to component level
   const { user, error: userError } = useGetUser()
 
-  //cta 按钮更新状态
   const [currentUserPlan, setCurrentUserPlan] = useState(null)
   const [ctaText, setCtaText] = useState("Subscribe")
 
-  // 获取当前语言
   const locale = params.locale || 'en'
 
-  // 只获取计划，不检查认证
   useEffect(() => {
     if (status === 'idle') {
       dispatch(fetchPlans())
     }
   }, [status, dispatch])
 
-  // 处理计划选择
   const handlePlanSelection = async (plan) => {
     try {
       // Special handling for Enterprise plans - redirect to contact us page
       if (plan.type === 'ENTERPRISE') {
+        // If user is on Enterprise plan, redirect to /projects
+        if (currentUserPlan && Number(currentUserPlan.plan_id) === Number(plan.id)) {
+          router.push(`/${locale}/projects`);
+          return;
+        }
         router.push(`/${locale}/contactUs?form=enterprise`);
         return;
       }
 
       // 检查是否是当前计划，如果是则重定向到仪表板
       if (currentUserPlan) {
-        const currentPlanId = currentUserPlan.id || currentUserPlan.plan_id;
+        const currentPlanId = currentUserPlan.plan_id;
         if (Number(currentPlanId) === Number(plan.id)) {
           // 如果是当前计划，直接去仪表板
           router.push(`/${locale}/dashboard`);
@@ -78,9 +79,22 @@ export default function PricingPage() {
           // 检查用户是否已有订阅记录
           const { data: existingSubscription } = await supabase
             .from('user_subscription_plan')
-            .select('*')
+            .select(`
+              plan_id,
+              status,
+              subscription_plan (
+                id,
+                name,
+                type,
+                price,
+                billing_interval
+              )
+            `)
             .eq('user_id', user.id)
-            .single();
+            .eq('status', 'ACTIVE')
+            .order('start_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
           if (existingSubscription) {
             // 如果存在订阅记录，则更新
@@ -151,12 +165,7 @@ export default function PricingPage() {
 
         const { isLoggedIn, plan } = userData;
 
-        if (
-          isLoggedIn &&
-          plan &&
-          plan.status &&
-          plan.status.toUpperCase() === 'ACTIVE'
-        ) {
+        if (isLoggedIn && plan) {
           setCurrentUserPlan(plan);
           setCtaText('Current Plan');
         } else {
@@ -173,40 +182,60 @@ export default function PricingPage() {
   }, [dispatch, user]);
 
   // 获取每个计划的CTA文本
-  const getPlanCtaText = (plan) => {
-    // Special handling for Enterprise plans
-    if (plan.type === 'ENTERPRISE') {
-      return 'Contact Us';
+  const getPlanCtaConfig = (plan, currentUserPlan) => {
+    if (!plan) return { text: '', disabled: true };
+
+    // Not logged in
+    if (!currentUserPlan) {
+      if (plan.type === 'ENTERPRISE') return { text: 'Contact Us', disabled: false };
+      if (plan.id === 1) return { text: 'Get Started for Free', disabled: false };
+      if (plan.id === 2 || plan.id === 3) return { text: `Buy ${plan.name}`, disabled: false };
+      return { text: 'Subscribe', disabled: false };
     }
 
-    // 如果用户未登录或没有计划数据
-    if (!currentUserPlan) {
-      if(plan.id === 1){
-        return 'Get Started for Free';
-      }else if(plan.id === 2 || plan.id === 3){
-        return 'Buy '+ plan.name;
-      }
-      return 'Subscribe';
+    const currentPlanId = Number(currentUserPlan.plan_id);
+    const thisPlanId = Number(plan.id);
+
+    // Enterprise plan
+    if (plan.type === 'ENTERPRISE') {
+      if (currentPlanId === thisPlanId) return { text: 'Current Plan', disabled: false };
+      return { text: 'Contact Us', disabled: false };
     }
-    
-    // 检查当前计划是否与此计划匹配
-    const currentPlanId = currentUserPlan.id || currentUserPlan.plan_id;
-    if (Number(currentPlanId) === Number(plan.id)) {
-      return 'Current Plan';
+
+    // Free plan (downgrade)
+    if (plan.id === 1 && currentPlanId !== 1) {
+      return { text: 'Contact Us to Downgrade', disabled: true };
     }
-    
-    // 判断是升级还是降级
-    const isDowngrade = Number(currentPlanId) > Number(plan.id);
-    const isUpgrade = Number(currentPlanId) < Number(plan.id);
-    
-    if (isUpgrade) {
-      return 'Upgrade';
-    } else if (isDowngrade) {
-      return 'Downgrade';
+
+    // Current plan
+    if (currentPlanId === thisPlanId) {
+      return { text: 'Current Plan', disabled: false };
     }
-    
-    // 默认情况
-    return 'Change Plan';
+
+    // Lower tier (downgrade)
+    if (thisPlanId < currentPlanId) {
+      return { text: 'Unavailable', disabled: true };
+    }
+
+    // Upgrade
+    if (thisPlanId > currentPlanId) {
+      return { text: 'Upgrade', disabled: false };
+    }
+
+    // Fallback
+    return { text: 'Unavailable', disabled: true };
+  };
+
+  const formatCurrency = (price, interval) => {
+    const formattedPrice = new Intl.NumberFormat('ms-MY', {
+      style: 'currency',
+      currency: 'MYR',
+    }).format(price);
+
+    if (interval === 'yearly') {
+      return `${formattedPrice}/month`;
+    }
+    return `${formattedPrice}/month`;
   };
 
   // 渲染骨架屏加载状态
@@ -225,30 +254,68 @@ export default function PricingPage() {
           
           {/* 计划卡片骨架 */}
           <div className="grid md:grid-cols-3 gap-8">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="border rounded-lg p-6 shadow-lg relative">
-                {/* Plan Type 标签骨架 */}
-                <div className="absolute -top-3 right-6 w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
-                
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-4"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
-                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6"></div>
-                
-                {/* 功能列表骨架 */}
-                <div className="space-y-3 mb-8">
-                  {[1, 2, 3, 4].map((j) => (
-                    <div key={j} className="flex items-center">
-                      <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded-full mr-2"></div>
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-                    </div>
-                  ))}
+            {(selectedInterval === 'monthly' ? plans.monthly : plans.yearly).map((plan) => {
+              const ctaConfig = getPlanCtaConfig(plan, currentUserPlan);
+              return (
+                <div 
+                  key={plan.id} 
+                  className={clsx(
+                    "border rounded-lg p-6 shadow-lg relative transition-all duration-300",
+                    "hover:shadow-xl hover:scale-105",
+                    {
+                      'border-indigo-500 ring-2 ring-indigo-500': plan.type === 'ENTERPRISE',
+                      'bg-gray-50 dark:bg-gray-800': ctaConfig.disabled,
+                    }
+                  )}
+                >
+                  {/* Plan Type 标签 */}
+                  <div className={clsx(
+                    "absolute -top-3 right-6 text-xs font-semibold py-1 px-3 rounded-full uppercase",
+                    {
+                      'bg-indigo-100 text-indigo-800': plan.type === 'ENTERPRISE',
+                      'bg-gray-100 text-gray-800': plan.type !== 'ENTERPRISE',
+                    }
+                  )}>
+                    {plan.type}
+                  </div>
+                  
+                  <h2 className="text-2xl font-bold mb-4">{plan.name}</h2>
+                  <div className="text-4xl font-extrabold mb-4">
+                    {plan.price === 0 ? 'Free' : formatCurrency(plan.price, selectedInterval)}
+                  </div>
+                  
+                  <p className="text-sm text-gray-500 mb-6 h-10">
+                    {plan.description}
+                  </p>
+
+                  <ul className="space-y-3 mb-8">
+                    {plan.features && plan.features.features && 
+                      plan.features.features.map((feature, index) => (
+                        <li key={index} className="flex items-center">
+                          <span className="text-green-500 mr-2">✓</span>
+                          {feature}
+                        </li>
+                      ))
+                    }
+                  </ul>
+                  
+                  <button
+                    onClick={() => handlePlanSelection(plan)}
+                    className={clsx(
+                      'w-full py-2 px-4 rounded-lg font-medium mt-auto',
+                      'transform transition-all duration-200',
+                      plan.type === 'PRO'
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        : 'bg-gray-100 text-gray-900 hover:bg-gray-200',
+                      ctaConfig.disabled && 'opacity-50 cursor-not-allowed'
+                    )}
+                    disabled={ctaConfig.disabled}
+                  >
+                    {ctaConfig.text}
+                  </button>
                 </div>
-                
-                {/* 按钮骨架 */}
-                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-full mt-auto"></div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -325,66 +392,71 @@ export default function PricingPage() {
 
       {/* 计划网格 */}
       <div className="grid md:grid-cols-3 gap-8">
-        {sortedPlans.map((plan) => (
-          <div 
-            key={plan.id}
-            className="transform transition-all duration-300 hover:scale-105 cursor-pointer"
-          >
-            <div className={clsx(
-              'border rounded-lg p-6 shadow-lg',
-              'flex flex-col h-full',
-              'animate-heightIn',
-              'relative'
-            )}>
-              {/* Plan Type 标签 */}
+        {sortedPlans.map((plan) => {
+          const { text: ctaText, disabled: ctaDisabled } = getPlanCtaConfig(plan, currentUserPlan);
+          return (
+            <div 
+              key={plan.id}
+              className="transform transition-all duration-300 hover:scale-105 cursor-pointer"
+            >
               <div className={clsx(
-                'absolute -top-3 right-6 px-3 py-1 rounded-full text-xs font-semibold',
-                plan.type === 'FREE' ? 'bg-green-100 text-green-800' :
-                plan.type === 'PRO' ? 'bg-indigo-100 text-indigo-800' :
-                plan.type === 'ENTERPRISE' ? 'bg-purple-100 text-purple-800' :
-                'bg-gray-100 text-gray-800'
+                'border rounded-lg p-6 shadow-lg',
+                'flex flex-col h-full',
+                'animate-heightIn',
+                'relative'
               )}>
-                {plan.type}
-              </div>
-              
-              <div className="flex-grow">
-                <h2 className="text-2xl font-bold mb-4">{plan.name}</h2>
-                <p className="text-gray-600 mb-4">{plan.description}</p>
-                <div className="text-4xl font-bold mb-6">
-                  ${plan.price}
-                  <span className="text-lg text-gray-500">
-                    {plan.billing_interval ? `/${selectedInterval === 'monthly' ? 'mo' : 'yr'}` : ''}
-                  </span>
+                {/* Plan Type 标签 */}
+                <div className={clsx(
+                  'absolute -top-3 right-6 px-3 py-1 rounded-full text-xs font-semibold',
+                  plan.type === 'FREE' ? 'bg-green-100 text-green-800' :
+                  plan.type === 'PRO' ? 'bg-indigo-100 text-indigo-800' :
+                  plan.type === 'ENTERPRISE' ? 'bg-purple-100 text-purple-800' :
+                  'bg-gray-100 text-gray-800'
+                )}>
+                  {plan.type}
                 </div>
                 
-                {/* 功能列表 */}
-                <ul className="space-y-3 mb-8">
-                  {plan.features && plan.features.features && 
-                    plan.features.features.map((feature, index) => (
-                      <li key={index} className="flex items-center">
-                        <span className="text-green-500 mr-2">✓</span>
-                        {feature}
-                      </li>
-                    ))
-                  }
-                </ul>
-              </div>
+                <div className="flex-grow">
+                  <h2 className="text-2xl font-bold mb-4">{plan.name}</h2>
+                  <p className="text-gray-600 mb-4">{plan.description}</p>
+                  <div className="text-4xl font-bold mb-6">
+                    RM{plan.price}
+                    <span className="text-lg text-gray-500">
+                      {plan.billing_interval ? `/${selectedInterval === 'monthly' ? 'mo' : 'yr'}` : ''}
+                    </span>
+                  </div>
+                  
+                  {/* 功能列表 */}
+                  <ul className="space-y-3 mb-8">
+                    {plan.features && plan.features.features && 
+                      plan.features.features.map((feature, index) => (
+                        <li key={index} className="flex items-center">
+                          <span className="text-green-500 mr-2">✓</span>
+                          {feature}
+                        </li>
+                      ))
+                    }
+                  </ul>
+                </div>
 
-              <button
-                onClick={() => handlePlanSelection(plan)}
-                className={clsx(
-                  'w-full py-2 px-4 rounded-lg font-medium mt-auto',
-                  'transform transition-all duration-200',
-                  plan.type === 'PRO'
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                )}
-              >
-                {getPlanCtaText(plan)}
-              </button>
+                <button
+                  onClick={() => handlePlanSelection(plan)}
+                  className={clsx(
+                    'w-full py-2 px-4 rounded-lg font-medium mt-auto',
+                    'transform transition-all duration-200',
+                    plan.type === 'PRO'
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200',
+                    ctaDisabled && 'opacity-50 cursor-not-allowed'
+                  )}
+                  disabled={ctaDisabled}
+                >
+                  {ctaText}
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   )

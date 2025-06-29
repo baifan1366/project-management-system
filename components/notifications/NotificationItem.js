@@ -11,6 +11,64 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Notification Item Skeleton Component
+export const NotificationItemSkeleton = () => {
+  // Randomly determine if we should show action buttons (like a meeting invitation)
+  const showActions = Math.random() > 0.6;
+  // Randomly determine if we should show a link
+  const showLink = Math.random() > 0.7;
+
+  return (
+    <Card className="border bg-card/50 shadow-sm transition-all">
+      <CardContent className="p-4">
+        <div className="flex gap-3">
+          {/* Icon placeholder */}
+          <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="w-full">
+                {/* Title placeholder */}
+                <Skeleton className="h-4 w-3/4 mb-2" />
+                {/* Content placeholder - multi-line */}
+                <Skeleton className="h-3 w-full mb-1.5" />
+                <Skeleton className="h-3 w-5/6" />
+              </div>
+              
+              {/* Action buttons */}
+              <div className="flex flex-shrink-0 gap-1">
+                <Skeleton className="h-7 w-7 rounded-md" />
+                <Skeleton className="h-7 w-7 rounded-md" />
+              </div>
+            </div>
+            
+            {/* Meeting action buttons (randomly shown) */}
+            {showActions && (
+              <div className="mt-2 flex space-x-2">
+                <Skeleton className="h-7 w-16 rounded-md" />
+                <Skeleton className="h-7 w-16 rounded-md" />
+              </div>
+            )}
+            
+            {/* Link placeholder (randomly shown) */}
+            {showLink && (
+              <div className="mt-2">
+                <Skeleton className="h-3 w-24 rounded-sm" />
+              </div>
+            )}
+            
+            {/* Timestamp placeholder */}
+            <div className="mt-2">
+              <Skeleton className="h-3 w-16 rounded-sm" />
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function NotificationItem({ notification, onAction, formatDateToUserTimezone, formatToUserTimezone }) {
   const t = useTranslations('notifications');
@@ -84,11 +142,17 @@ export default function NotificationItem({ notification, onAction, formatDateToU
   const getIcon = (type) => {
     switch (type) {
       case 'TASK_ASSIGNED':
-        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Task icon */}</div>;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full flex items-center justify-center"><Calendar className="h-4 w-4" /></div>;
       case 'COMMENT_ADDED':
-        return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full">{/* Comment icon */}</div>;
+        return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full flex items-center justify-center"><MessageSquare className="h-4 w-4" /></div>;
       case 'MENTION':
-        return <div className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 p-2 rounded-full">{/* Mention icon */}</div>;
+        return <div className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 p-2 rounded-full flex items-center justify-center"><User className="h-4 w-4" /></div>;
+      case 'ADDED_TO_CHAT':
+        return <div className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 p-2 rounded-full flex items-center justify-center"><MessageSquare className="h-4 w-4" /></div>;
+      case 'MEETING_INVITE':
+        return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full flex items-center justify-center"><Video className="h-4 w-4" /></div>;
+      case 'TEAM_ANNOUNCEMENT':
+        return <div className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 p-2 rounded-full flex items-center justify-center"><Bell className="h-4 w-4" /></div>;
       case 'SYSTEM':
         // Check if this is a meeting invitation
         try {
@@ -98,15 +162,15 @@ export default function NotificationItem({ notification, onAction, formatDateToU
               : notification.data;
             
             if (data.isMeetingInvitation) {
-              return <div className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 p-2 rounded-full">{/* System icon */}</div>;
+              return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full flex items-center justify-center"><Video className="h-4 w-4" /></div>;
             }
           }
         } catch (e) {
           console.error('Error parsing notification data', e);
         }
-        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Default icon */}</div>;
+        return <div className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 p-2 rounded-full flex items-center justify-center"><Bell className="h-4 w-4" /></div>;
       default:
-        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full">{/* Default icon */}</div>;
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full flex items-center justify-center"><Bell className="h-4 w-4" /></div>;
     }
   };
 
@@ -159,7 +223,7 @@ export default function NotificationItem({ notification, onAction, formatDateToU
         content: `${user.name || user.email} ${isAccepted 
           ? tNotif('acceptedYourMeeting') 
           : tNotif('declinedYourMeeting')} "${meetData.eventTitle || 'meeting'}"`,
-        type: 'SYSTEM',
+        type: 'MEETING_INVITE',
         is_read: false,
         data: {
           responseToMeeting: true,
@@ -219,7 +283,13 @@ export default function NotificationItem({ notification, onAction, formatDateToU
       }
       
       if (onAction) onAction('accept', id);
-      toast.success(tNotif('meetingAccepted'));
+      
+      const toastId = toast.success(tNotif('meetingAccepted'));
+      
+      // Automatically dismiss the toast after 3 seconds
+      setTimeout(() => {
+        toast.dismiss(toastId);
+      }, 3000);
     } catch (error) {
       console.error('Failed to accept meeting invitation:', error);
       toast.error(t('actionFailed'));
@@ -258,10 +328,17 @@ export default function NotificationItem({ notification, onAction, formatDateToU
       
       // Notify parent component to update state
       if (onAction) onAction('decline', id);
-      toast.success(tCalendar('meetingDeclined'));
+      
+      const toastId = toast.success(tCalendar('meetingDeclined'));
+      
+      // Automatically dismiss the toast after 3 seconds
+      setTimeout(() => {
+        toast.dismiss(toastId);
+      }, 3000);
     } catch (error) {
       console.error('Failed to decline meeting:', error);
-      toast.error(t('actionFailed'));
+      const toastId = toast.error(t('actionFailed'));
+      setTimeout(() => toast.dismiss(toastId), 3000);
     } finally {
       setTimeout(() => setIsActioning(false), 500);
     }

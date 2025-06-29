@@ -23,6 +23,7 @@ export async function GET(request, { params }) {
       .from('team')
       .select('id')
       .eq('project_id', id);
+    
 
     if (teamsError) {
       console.error('Error fetching teams:', teamsError);
@@ -42,7 +43,7 @@ export async function GET(request, { params }) {
         created_at,
         user:user_id (name, avatar_url)
       `)
-      .in('entity_id', id)
+      .eq('entity_id', id)
       .eq('entity_type', 'projects')
       .order('created_at', { ascending: false })
       .limit(20);
@@ -51,6 +52,8 @@ export async function GET(request, { params }) {
       console.error('Error fetching activities:', projectActivitiesError);
       return NextResponse.json({ error: 'Failed to fetch activities' }, { status: 500 });
     }
+    
+    
 
     // 如果没有找到团队，返回空数组
     if (!teams || teams.length === 0) {
@@ -59,6 +62,7 @@ export async function GET(request, { params }) {
     
     // 提取团队ID列表
     const teamIds = teams.map(team => team.id);
+    
     
     // 获取与这些团队相关的活动记录
     const { data: activities, error: activitiesError } = await supabase
@@ -84,6 +88,8 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Failed to fetch activities' }, { status: 500 });
     }
     
+    
+
     //fetch team user inv by using team id
     const { data: teamUserInv, error: teamUserInvError } = await supabase
       .from('user_team_invitation')
@@ -119,8 +125,10 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Failed to fetch team users activities' }, { status: 500 });
     }
     
+    
+    
     // 合并团队和任务活动记录
-    const allActivities = [...projectActivities, ...teamUsersActivities]
+    const allActivities = [...projectActivities, ...activities, ...teamUsersActivities]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 20);
     

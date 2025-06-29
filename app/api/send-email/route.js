@@ -132,14 +132,14 @@ function generateRefundApprovedTemplate(data) {
               </p>
               
               <p style="color: #6b7280; font-size: 16px; line-height: 24px; margin: 0 0 24px 0;">
-                We're pleased to inform you that your refund request has been approved. A refund of $${(data.refundAmount || 0).toFixed(2)} has been processed back to your original payment method.
+                We're pleased to inform you that your refund request has been approved. A refund of RM ${(data.refundAmount || 0).toFixed(2)} has been processed back to your original payment method.
               </p>
     
               <!-- Refund Details -->
               <div style="background-color: #f9f9f9; padding: 16px; border-radius: 5px; margin-bottom: 20px;">
                 <h2 style="font-size: 18px; margin-top: 0; margin-bottom: 12px; color: #111827;">Refund Details</h2>
                 <div style="margin-bottom: 8px;">
-                  <strong>Refund Amount:</strong> $${(data.refundAmount || 0).toFixed(2)}
+                  <strong>Refund Amount:</strong> RM ${(data.refundAmount || 0).toFixed(2)}
                 </div>
                 <div style="margin-bottom: 8px;">
                   <strong>Refund Date:</strong> ${data.refundDate || new Date().toLocaleDateString()}
@@ -407,8 +407,11 @@ function generateOrderConfirmationTemplate(data) {
                   Quantity: ${data.quantity || '1'}
                 </div>
                 <div style="margin-bottom: 10px">
-                  Amount: $${((data.amount || 0) / 100).toFixed(2)}
-                  ${data.currency || 'USD'}
+                  Amount: ${new Intl.NumberFormat('ms-MY', {
+                    style: 'currency',
+                    currency: data.currency || 'MYR',
+                    minimumFractionDigits: 2,
+                  }).format(data.amount || 0)}
                 </div>
                 <div style="margin-bottom: 0">
                   Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric',

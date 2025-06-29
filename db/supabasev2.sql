@@ -15,8 +15,7 @@ CREATE TABLE "user" (
   "last_login_provider" VARCHAR(50),
   "mfa_secret" VARCHAR(255), -- TOTP 秘钥
   "is_mfa_enabled" BOOLEAN DEFAULT FALSE,
-  "notifications_enabled" BOOLEAN DEFAULT TRUE,
-  "notifications_settings" JSONB DEFAULT '{"emailNotifications": true, "pushNotifications": true, "weeklyDigest": true, "mentionNotifications": true, "taskAssignments": true, "taskComments": true, "dueDates": true, "teamInvitations": true}',
+  "notifications_settings" JSONB DEFAULT '{"notifications_enabled": true, "pushNotifications": true, "addedChatNotifications": true, "mentionNotifications": true, "inviteMeetingNotifications": true, "taskAssignments": true, "teamAnnouncements": true, "teamInvitations": true}',
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "email_verified" BOOLEAN DEFAULT FALSE,
@@ -156,7 +155,9 @@ CREATE TABLE "team_agile" (
   "toImprove" JSONB,
   "created_by" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "start_on" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "completed_on" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE "agile_role" (
@@ -464,7 +465,7 @@ CREATE TABLE "user_subscription_plan" (
   "id" SERIAL PRIMARY KEY,
   "user_id" UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "plan_id" INT NOT NULL REFERENCES "subscription_plan"("id"),
-  "status" TEXT NULL,
+  "status" TEXT NOT NULL CHECK (status IN ('ACTIVE', 'INACTIVE', 'CANCELLED')),
   "start_date" TIMESTAMP NOT NULL,
   "end_date" TIMESTAMP,
   "auto_renew" BOOLEAN DEFAULT FALSE,
@@ -541,7 +542,7 @@ CREATE TABLE "payment" (
   "amount" DECIMAL(10, 2) NOT NULL,
   "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
   "payment_method" TEXT NOT NULL,
-  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED')),
+  "status" TEXT NOT NULL CHECK ("status" IN ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED')),
   "transaction_id" VARCHAR(255),
   "discount_amount" DECIMAL(10, 2) DEFAULT 0,
   "discount_percentage" DECIMAL(5, 2) DEFAULT 0,

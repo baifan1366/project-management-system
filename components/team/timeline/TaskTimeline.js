@@ -89,7 +89,7 @@ function formatGanttDate(date) {
   }
 }
 
-export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }) {
+export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey, addTask }) {
   const ganttContainer = useRef(null);
   const t = useTranslations('CreateTask');
   const tConfirm = useTranslations('confirmation')
@@ -111,6 +111,18 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
     duration: 1,
     progress: 0
   });
+  
+  // 添加对addTask属性的监听
+  useEffect(() => {
+    if (addTask) {
+      setShowTaskForm(true);
+    }
+  }, [addTask]);
+  
+  // 当外部传入的refreshKey变化时，强制更新内部的refreshFlag
+  useEffect(() => {
+    setRefreshFlag(prev => prev + 1);
+  }, [refreshKey]);
   
   // 颜色名称到颜色代码的映射，与button.jsx中的颜色一致
   const colorMap = {
@@ -145,11 +157,6 @@ export default function TaskTimeline({ projectId, teamId, teamCFId, refreshKey }
   const { sections, allTasks, ganttTasks, links, tags } = useTimelineData(teamId, teamCFId, ganttObj, refreshFlag, refreshKey);
 
   const dispatch = useDispatch();
-
-  // 当外部传入的refreshKey变化时，强制更新内部的refreshFlag
-  useEffect(() => {
-    setRefreshFlag(prev => prev + 1);
-  }, [refreshKey]);
 
   // Apply zoom level
   const setZoom = (value) => {

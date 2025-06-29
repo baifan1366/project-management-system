@@ -86,13 +86,22 @@ export default function ForgotPasswordPage() {
               <p className="mt-2 text-gray-600 dark:text-gray-400">
                 {t('forgotPassword.checkInbox')}
               </p>
-              <div className="mt-6">
+              <div className="mt-6 flex flex-col space-y-3">
                 <Link 
                   href="/login" 
                   className="text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   {t('forgotPassword.backToLogin')}
                 </Link>
+                <button 
+                  onClick={() => {
+                    setSuccess(false);
+                    setError('');
+                  }}
+                  className="text-pink-600 dark:text-pink-400 hover:underline"
+                >
+                  {t('forgotPassword.useAnotherEmail') || 'Use another email'}
+                </button>
               </div>
             </div>
           ) : (

@@ -23,11 +23,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { useSearchParams } from 'next/navigation';
 
 function ChatLayout({ children }) {
   const t = useTranslations('Chat');
   const { formatLastSeen } = useLastSeen(); // 使用上次在线时间钩子
   const { formatChatTime } = useChatTime(); // 使用聊天时间钩子
+  
+  // Add useSearchParams hook to check for mode parameter
+  const searchParams = useSearchParams();
   
   // Utility function to truncate text
   const truncateText = (text, maxLength) => {
@@ -84,6 +88,15 @@ function ChatLayout({ children }) {
     unreadCount: totalUnreadCount,
     currentSession
   });
+
+  // Check for mode parameter in URL and set chat mode accordingly
+  useEffect(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'ai' && chatMode !== 'ai') {
+      setChatMode('ai');
+      setCurrentSession(null);
+    }
+  }, [searchParams, setChatMode, setCurrentSession, chatMode]);
 
   // 搜索聊天功能
   const handleSearch = async (query) => {
@@ -253,15 +266,32 @@ function ChatLayout({ children }) {
   // 渲染聊天会话项的骨架屏
   const ChatItemSkeleton = ({ index }) => (
     <div className="flex items-center gap-3 p-4 animate-pulse">
-      <Skeleton className="w-10 h-10 rounded-lg flex-shrink-0" />
+      <div className="relative flex-shrink-0">
+        <Skeleton className="w-10 h-10 rounded-lg flex-shrink-0" />
+        {/* Randomly show unread indicator or online status */}
+        {index % 3 === 0 && (
+          <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-muted-foreground/30"></div>
+        )}
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between">
           <Skeleton className={`h-4 w-${index % 2 === 0 ? '1/3' : '1/2'} mb-1`} />
           <Skeleton className="h-3 w-12" />
         </div>
         <Skeleton className="h-3 w-full mt-1.5" />
-        <Skeleton className="h-2 w-2/3 mt-1.5" />
+        <div className="flex justify-between items-center mt-1.5">
+          <Skeleton className="h-2 w-2/3" />
+          {index % 4 === 0 && <Skeleton className="h-2 w-2 rounded-full" />}
+        </div>
+        {/* Show status line for some items */}
+        {index % 2 === 1 && (
+          <Skeleton className="h-2 w-16 mt-1.5" />
+        )}
       </div>
+      {/* Simulate action button on hover */}
+      {index % 3 === 2 && (
+        <Skeleton className="w-6 h-6 rounded-full" />
+      )}
     </div>
   );
 
@@ -482,25 +512,37 @@ function ChatLayout({ children }) {
           </button>
         </div>
         <div className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder={t('search.placeholder')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 bg-accent/50 rounded-md text-sm placeholder:text-muted-foreground focus:outline-none"
-              aria-label={t('search.placeholder')}
-            />
-            {searchQuery && (
-              <button 
-                onClick={handleClearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
+          {chatLoading ? (
+            <div className="animate-pulse">
+              <div className="relative">
+                <Skeleton className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+              <div className="mt-2 flex justify-center">
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </div>
+          ) : (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder={t('search.placeholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-accent/50 rounded-md text-sm placeholder:text-muted-foreground focus:outline-none"
+                aria-label={t('search.placeholder')}
+              />
+              {searchQuery && (
+                <button 
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          )}
           {isSearching && (
             <div className="mt-2 text-center text-sm text-muted-foreground">
               {t('search.searching')}
@@ -885,7 +927,13 @@ function ChatLayout({ children }) {
 
         {/* 新建聊天按钮 */}
         <div className="p-4 border-t">
-          <NewChatPopover />
+          {chatLoading ? (
+            <div className="animate-pulse">
+              <Skeleton className="h-10 w-full rounded-md" />
+            </div>
+          ) : (
+            <NewChatPopover />
+          )}
         </div>
       </div>
 

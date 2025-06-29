@@ -17,35 +17,35 @@ export default function HandlePost({ teamId }) {
   const CreatePost = async ({ title, description, type = 'post', teamId, attachments = [] }) => {
     try {
       if (!title) {
-        toast.error('Post title is required');
+        toast.error(t('postTitleRequired'));
         return null;
       }
       
       // 从附件中提取ID数组
       const attachmentIds = attachments.map(attachment => attachment.id);
       
-      // 创建帖子记录
-      const { data: post, error } = await supabase
-        .from('team_post')
-        .insert({
-          title,
-          description,
-          type,
-          team_id: teamId,
-          created_by: user?.id,
-          is_pinned: false,
-          attachment_id: attachmentIds.length > 0 ? attachmentIds : null // 将附件ID保存为数组
-        })
-        .select()
-        .single();
+      const postData = {
+        title,
+        description,
+        type,
+        team_id: teamId,
+        created_by: user?.id,
+        is_pinned: false,
+        attachment_id: attachmentIds.length > 0 ? attachmentIds : null
+      };
       
-      if (error) throw error;
+      const result = await dispatch(createPost(postData)).unwrap();
       
-      toast.success('Post created successfully');
-      return post;
+      if (result) {
+        toast.success(t('postCreated'));
+        return result;
+      } else {
+        toast.error(t('createPostFailed'));
+        return null;
+      }
     } catch (error) {
       console.error('Error creating post:', error);
-      toast.error('Failed to create post');
+      toast.error(t('createPostError'));
       return null;
     }
   };

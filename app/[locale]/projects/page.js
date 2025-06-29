@@ -33,30 +33,50 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import UserProfileDialog from '@/components/chat/UserProfileDialog';
+import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
+import { fetchProjectTeams } from '@/lib/redux/features/teamSlice';
 
 // 组件外部的辅助函数，避免重复创建
-function checkUserInProjectTeams(project, user, teams, userTeams) {
-  if (!user || !user.id || !project) return false;
+function checkUserInProjectTeams(project, user, teams, teamUsers) {
+  if (!user || !user.id || !project) {
+    console.log("DEBUG checkUserInProjectTeams: Missing user or project data");
+    return false;
+  }
   
   try {
+    console.log(`DEBUG checkUserInProjectTeams: Checking user ${user.id} for project ${project.id}`);
+    console.log(`DEBUG checkUserInProjectTeams: Teams count: ${teams?.length || 0}, teamUsers keys: ${Object.keys(teamUsers || {}).length}`);
+    
     // 查找与项目关联的团队
     const projectTeams = Array.isArray(teams) ? 
       teams.filter(team => team && team.project_id === project.id) : [];
     
+    console.log(`DEBUG checkUserInProjectTeams: Found ${projectTeams.length} teams for project ${project.id}`);
+    
     if (projectTeams.length === 0) return false;
     
-    // 提取项目团队ID
-    const projectTeamIds = projectTeams.map(team => team.id);
+    // Check all project teams if the user is a member of any
+    for (const team of projectTeams) {
+      const teamId = team.id;
+      const members = teamUsers[teamId] || [];
+      
+      console.log(`DEBUG checkUserInProjectTeams: Team ${teamId} has ${members.length} members`);
+      
+      // Check if user is in this team's members
+      const userInTeam = members.some(member => 
+        member && member.user && member.user.id === user.id
+      );
+      
+      if (userInTeam) {
+        console.log(`DEBUG checkUserInProjectTeams: User ${user.id} found in team ${teamId}`);
+        return true;
+      }
+    }
     
-    // 检查用户是否在这些团队中
-    const isInTeam = Array.isArray(userTeams) && userTeams.some(userTeam => 
-      userTeam && userTeam.user_id === user.id && 
-      projectTeamIds.includes(userTeam.team_id)
-    );
-    
-    return isInTeam;
+    console.log(`DEBUG checkUserInProjectTeams: User ${user.id} not found in any project team`);
+    return false;
   } catch (error) {
-    console.error('检查用户团队关系出错:', error);
+    console.error('Error checking user team relationship:', error);
     return false;
   }
 }
@@ -79,8 +99,17 @@ export default function ProjectsPage() {
   // 分开选择器以避免不必要的重新渲染
   const teams = useSelector((state) => state.teams?.teams || [], shallowEqual);
   const teamUsers = useSelector((state) => state.teamUsers?.teamUsers || {}, shallowEqual);
-  const userTeams = useSelector((state) => state.userTeams?.userTeams || [], shallowEqual);
   const allUsers = useSelector((state) => state.users?.users || [], shallowEqual);
+  const reduxTeamsStatus = useSelector((state) => state.teams?.status);
+  const reduxTeamUsersStatus = useSelector((state) => state.teamUsers?.status);
+  
+  // Add debug logs to examine Redux state
+  useEffect(() => {
+    console.log("DEBUG Redux State - teams count:", teams?.length || 0);
+    console.log("DEBUG Redux State - teamUsers keys:", Object.keys(teamUsers || {}).length);
+    console.log("DEBUG Redux State - teams status:", reduxTeamsStatus);
+    console.log("DEBUG Redux State - teamUsers status:", reduxTeamUsersStatus);
+  }, [teams, teamUsers, reduxTeamsStatus, reduxTeamUsersStatus]);
   
   const t = useTranslations('Projects');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -89,6 +118,52 @@ export default function ProjectsPage() {
   const { confirm } = useConfirm();
   const [selectedUser, setSelectedUser] = useState(null);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
+
+  // Add useEffect to fetch project teams for visible projects
+  useEffect(() => {
+    const loadTeams = async () => {
+      if (projects.length > 0 && user) {
+        console.log("DEBUG: Fetching teams for projects");
+        
+        // Get visible projects based on archive status and filters
+        const visibleProjects = projects.filter(project => {
+          const matchesArchiveState = showArchived ? project.archived : !project.archived;
+          const matchesStatusFilter = statusFilter === 'ALL' || project.status === statusFilter;
+          
+          // Check visibility permissions
+          const visibility = project.visibility?.toLowerCase?.() || 'private';
+          const hasVisibilityAccess = 
+            visibility === 'public' || 
+            (visibility === 'private' && user && user.id === project.created_by);
+          
+          return matchesArchiveState && matchesStatusFilter && hasVisibilityAccess;
+        });
+        
+        // Fetch teams for each visible project
+        for (const project of visibleProjects) {
+          console.log(`DEBUG: Dispatching fetchProjectTeams for project ${project.id}`);
+          await dispatch(fetchProjectTeams(project.id));
+        }
+      }
+    };
+    
+    loadTeams();
+  }, [projects, user, showArchived, statusFilter, dispatch]);
+
+  // Add useEffect to load team users for each project's teams - this will run after teams are loaded
+  useEffect(() => {
+    if (teams.length > 0 && reduxTeamsStatus === 'succeeded') {
+      console.log(`DEBUG: Found ${teams.length} teams in Redux store, loading team users`);
+      
+      // Fetch team users for each team
+      teams.forEach(team => {
+        if (!teamUsers[team.id] || teamUsers[team.id].length === 0) {
+          console.log(`DEBUG: Dispatching fetchTeamUsers for team ${team.id}`);
+          dispatch(fetchTeamUsers(team.id));
+        }
+      });
+    }
+  }, [teams, reduxTeamsStatus, teamUsers, dispatch]);
 
   // 使用useMemo计算过滤后的项目列表
   const formattedProjects = useMemo(() => {
@@ -115,14 +190,22 @@ export default function ProjectsPage() {
         if (visibility === 'public') {
           hasVisibilityAccess = true;
         }
-        // 对于private项目，只有创建者可以查看
-        else if (visibility === 'private' && user && user.id === project.created_by) {
-          hasVisibilityAccess = true;
+        // 对于private项目，只有创建者可以查看，或者用户在项目的团队中
+        else if (visibility === 'private' && user) {
+          // Creator always has access
+          if (user.id === project.created_by) {
+            hasVisibilityAccess = true;
+          }
+          // Check if user is in any team for this project
+          else if (checkUserInProjectTeams(project, user, teams, teamUsers)) {
+            console.log(`DEBUG: User ${user.id} has team access to project ${project.id}`);
+            hasVisibilityAccess = true;
+          }
         }
         
         return matchesArchiveState && matchesStatusFilter && hasVisibilityAccess;
       } catch (error) {
-        console.error('项目过滤错误:', error, project);
+        console.error('Project filtering error:', error, project);
         return false;
       }
     });
@@ -132,36 +215,102 @@ export default function ProjectsPage() {
       created_at: new Date(project.created_at || Date.now()).toLocaleDateString('en-US', { timeZone: 'UTC' }),
       // 添加标志表示项目是否与用户相关
       isUserCreated: user && user.id === project.created_by,
-      isUserInTeam: user ? checkUserInProjectTeams(project, user, teams, userTeams) : false
+      isUserInTeam: user ? checkUserInProjectTeams(project, user, teams, teamUsers) : false
     }));
-  }, [projects, showArchived, statusFilter, user, teams, userTeams]);
+  }, [projects, showArchived, statusFilter, user, teams, teamUsers]);
 
-  // 获取项目的团队成员
+  // Use useEffect to check for and load missing team user data
+  useEffect(() => {
+    if (projects.length > 0 && teams.length > 0) {
+      // Get potentially visible projects (same logic as in formattedProjects)
+      const potentiallyVisibleProjects = projects.filter(project => {
+        const matchesArchiveState = showArchived ? project.archived : !project.archived;
+        const matchesStatusFilter = statusFilter === 'ALL' || project.status === statusFilter;
+        
+        // Basic visibility check
+        const visibility = project.visibility?.toLowerCase?.() || 'private';
+        const basicVisibilityAccess = 
+          visibility === 'public' || 
+          (visibility === 'private' && user && user.id === project.created_by);
+        
+        return matchesArchiveState && matchesStatusFilter && basicVisibilityAccess;
+      });
+      
+      // For each potentially visible project, make sure we have team user data
+      potentiallyVisibleProjects.forEach(project => {
+        const projectTeams = teams.filter(team => team && team.project_id === project.id);
+        
+        projectTeams.forEach(team => {
+          if (!teamUsers[team.id] || teamUsers[team.id].length === 0) {
+            dispatch(fetchTeamUsers(team.id));
+          }
+        });
+      });
+    }
+  }, [projects, teams, teamUsers, showArchived, statusFilter, user, dispatch]);
+
+  // 获取项目的团队成员 - MODIFIED: Make this a pure function without dispatches
   const getProjectTeamMembers = useCallback((projectId) => {
     try {
+      if (!teams || !Array.isArray(teams)) {
+        console.error("DEBUG: teams is not an array:", teams);
+        return [];
+      }
+      
+      if (!teamUsers || typeof teamUsers !== 'object') {
+        console.error("DEBUG: teamUsers is not an object:", teamUsers);
+        return [];
+      }
+      
       // 获取项目的所有团队
-      const projectTeams = teams.filter(team => team.project_id === projectId);
+      const projectTeams = teams.filter(team => team && team.project_id === projectId);
+      
       if (!projectTeams.length) return [];
       
       // 获取这些团队的所有成员
       const teamMembers = [];
       projectTeams.forEach(team => {
         const teamId = team.id;
+        
+        // Check if teamUsers has data for this team
+        if (!teamUsers[teamId]) {
+          return; // Skip this team
+        }
+        
         const members = teamUsers[teamId] || [];
         
         members.forEach(member => {
+          // Check if member object is valid
+          if (!member) {
+            return; // Skip this member
+          }
+          
           if (member.user) {
             // 查找完整的用户信息
-            const fullUserInfo = allUsers.find(u => u.id === member.user.id);
+            const fullUserInfo = allUsers.find(u => u && u.id === member.user.id);
+            let memberData;
+            
             if (fullUserInfo) {
               // 避免重复添加同一用户
               if (!teamMembers.some(m => m.id === fullUserInfo.id)) {
-                teamMembers.push(fullUserInfo);
+                // Include role information from the team_user entry
+                memberData = {
+                  ...fullUserInfo,
+                  role: member.role || 'CAN_VIEW',
+                  teamId: teamId
+                };
+                teamMembers.push(memberData);
               }
             } else {
               // 使用 teamUsers 中的基本用户信息
               if (!teamMembers.some(m => m.id === member.user.id)) {
-                teamMembers.push(member.user);
+                // Include role information from the team_user entry
+                memberData = {
+                  ...member.user,
+                  role: member.role || 'CAN_VIEW',
+                  teamId: teamId
+                };
+                teamMembers.push(memberData);
               }
             }
           }
@@ -170,7 +319,7 @@ export default function ProjectsPage() {
       
       return teamMembers;
     } catch (error) {
-      console.error('获取项目团队成员失败:', error);
+      console.error('Getting project team members failed:', error);
       return [];
     }
   }, [teams, teamUsers, allUsers]);
@@ -487,7 +636,37 @@ export default function ProjectsPage() {
                                         )}
                                       </div>
                                       <div className="flex-1 truncate">
-                                        <p className="text-sm font-medium">{member.name || member.email}</p>
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                          <p className="text-sm font-medium">{member.name || member.email}</p>
+                                          
+                                          {/* Show Owner badge only if user is the project creator */}
+                                          {project.created_by === member.id && (
+                                            <Badge variant="outline" className="text-xs py-0 h-5 bg-white text-black border-amber-500">
+                                              {t('owner') || 'Owner'}
+                                            </Badge>
+                                          )}
+                                          
+                                          {/* Current user badge */}
+                                          {user && user.id === member.id && (
+                                            <Badge variant="outline" className="text-xs py-0 h-5 bg-white text-black border-blue-500">
+                                              {t('you') || 'You'}
+                                            </Badge>
+                                          )}
+                                          
+                                          {/* Role badges - but don't show OWNER since we already show the owner badge above */}
+                                          {member.role && member.role !== 'OWNER' && (
+                                            <Badge 
+                                              variant="outline" 
+                                              className={`text-xs py-0 h-5 bg-white text-black ${
+                                                member.role === 'CAN_EDIT' ? 'border-green-500' :
+                                                member.role === 'CAN_CHECK' ? 'border-orange-500' :
+                                                'border-gray-500'
+                                              }`}
+                                            >
+                                              {t(`role.${member.role.toLowerCase()}`) || member.role.replace('_', ' ')}
+                                            </Badge>
+                                          )}
+                                        </div>
                                         {member.email && <p className="text-xs text-muted-foreground truncate">{member.email}</p>}
                                       </div>
                                     </div>
@@ -499,22 +678,6 @@ export default function ProjectsPage() {
                             </div>
                           </PopoverContent>
                         </Popover>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              size="icon" 
-                              className="h-8 w-8 rounded-full bg-background/80 hover:bg-primary/10 hover:text-primary border-none shadow-sm"
-                              onClick={(e) => handleAddTask(e, project.id)}
-                            >
-                              <PlusCircleIcon className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{t('addTask')}</p>
-                          </TooltipContent>
-                        </Tooltip>
                       </>
                     )}
                   </TooltipProvider>

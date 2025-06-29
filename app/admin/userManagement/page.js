@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck } from 'react-icons/fa';
+import { FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck, FaSort } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 import { toast } from 'sonner';
@@ -35,12 +35,34 @@ const generateSecurePassword = () => {
   return password.split('').sort(() => Math.random() - 0.5).join('');
 };
 
+// Phone validation function
+const validatePhone = (phone) => {
+  // Allow empty phone numbers (optional field)
+  if (!phone) return { valid: true, message: '' };
+  
+  // Basic phone validation: minimum 7 digits, can contain +, -, (), and spaces
+  const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/;
+  
+  if (!phoneRegex.test(phone)) {
+    return { valid: false, message: 'Please enter a valid phone number' };
+  }
+  
+  // Check minimum digits (excluding non-numeric characters)
+  const digitsOnly = phone.replace(/\D/g, '');
+  if (digitsOnly.length < 7) {
+    return { valid: false, message: 'Phone number must have at least 7 digits' };
+  }
+  
+  return { valid: true, message: '' };
+};
+
 export default function UserManagement() {
   const router = useRouter();
   
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [sortOption, setSortOption] = useState('created_at_desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(10);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -55,12 +77,17 @@ export default function UserManagement() {
   const [processing, setProcessing] = useState(false);
   const dispatch = useDispatch();
   const permissions = useSelector((state) => state.admin.permissions);
+  
+  // Add validation error states
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   // initialize the page
   useEffect(() => {
     const initializeUserManagement = async () => {
       try {
-        
+        setLoading(true);
         // Fetch users
         await fetchUsers();
 
@@ -72,7 +99,7 @@ export default function UserManagement() {
     };
     
     initializeUserManagement();
-  }, [dispatch, router]);
+  }, [dispatch, router, filter, sortOption]);
   
   // Add function to verify permission access
   const hasPermission = (permissionName) => {
@@ -82,10 +109,13 @@ export default function UserManagement() {
   // Fetch users from database
   const fetchUsers = async () => {
     try {
+      const parts = sortOption.split('_');
+      const sortOrder = parts.pop();
+      const sortBy = parts.join('_');
       let query = supabase
         .from('user')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order(sortBy, { ascending: sortOrder === 'asc' });
       
       // Apply filter if not 'all'
       if (filter === 'verified') {
@@ -110,6 +140,11 @@ export default function UserManagement() {
     setFilter(newFilter);
     setCurrentPage(1);
   };
+
+  const handleSortChange = (newSortOption) => {
+    setSortOption(newSortOption);
+    setCurrentPage(1);
+  };
   
   // Handle search
   const handleSearch = (e) => {
@@ -128,12 +163,20 @@ export default function UserManagement() {
       setEmail(user.email || '');
       setPhone(user.phone || '');
       setIsEmailVerified(user.email_verified || false);
+      // Reset error states
+      setNameError('');
+      setEmailError('');
+      setPhoneError('');
     } else {
       // Reset form values for other modal types
       setName('');
       setEmail('');
       setPhone('');
       setIsEmailVerified(false);
+      // Reset error states
+      setNameError('');
+      setEmailError('');
+      setPhoneError('');
     }
     
     setIsModalOpen(true);
@@ -143,6 +186,14 @@ export default function UserManagement() {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedUser(null);
+    // Reset form values and errors
+    setName('');
+    setEmail('');
+    setPhone('');
+    setIsEmailVerified(false);
+    setNameError('');
+    setEmailError('');
+    setPhoneError('');
   };
   
   // Add function to hash password
@@ -510,6 +561,29 @@ export default function UserManagement() {
         throw error;
       }
       
+      // If user creation was successful, create a free subscription for them
+      if (data) {
+        try {
+          const subResponse = await fetch('/api/subscription/create-free', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: data.id,
+              email: data.email,
+              name: data.name,
+            }),
+          });
+
+          if (!subResponse.ok) {
+            const subErrorData = await subResponse.json();
+            toast.error(`User created, but failed to add free subscription: ${subErrorData.error || 'Unknown error'}`);
+          }
+        } catch (subError) {
+          console.error('Error creating subscription:', subError);
+          toast.error('User created, but an error occurred while creating the subscription.');
+        }
+      }
+      
       // Send account creation email with the plain text password
       try {
         await sendEmail('account_creation', {
@@ -672,6 +746,21 @@ export default function UserManagement() {
                 <option value="all">All Users</option>
                 <option value="verified">Verified</option>
                 <option value="unverified">Unverified</option>
+              </select>
+            </div>
+            
+            {/* Sort */}
+            <div className="flex items-center space-x-2">
+              <FaSort className="text-gray-400" />
+              <select 
+                className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md py-1.5 px-3 text-sm"
+                value={sortOption}
+                onChange={(e) => handleSortChange(e.target.value)}
+              >
+                <option value="created_at_desc">Newest First</option>
+                <option value="created_at_asc">Oldest First</option>
+                <option value="name_asc">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
               </select>
             </div>
             
@@ -852,10 +941,40 @@ export default function UserManagement() {
             
             <form onSubmit={(e) => {
               e.preventDefault();
+              
+              // Validate inputs
+              let hasError = false;
+              
+              if (!name || name.trim() === '') {
+                setNameError('Full name is required.');
+                hasError = true;
+              }
+              
+              if (!email || email.trim() === '') {
+                setEmailError('Email is required.');
+                hasError = true;
+              } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                setEmailError('Please enter a valid email address.');
+                hasError = true;
+              }
+              
+              // Validate phone if provided
+              if (phone && phone.trim() !== '') {
+                const phoneValidation = validatePhone(phone);
+                if (!phoneValidation.valid) {
+                  setPhoneError(phoneValidation.message);
+                  hasError = true;
+                }
+              }
+              
+              if (hasError) {
+                return;
+              }
+              
               const userData = {
                 name: name,
                 email: email,
-                phone: phone|| null,
+                phone: phone || null,
                 email_verified: true,
                 created_at: new Date().toISOString()
               };
@@ -871,13 +990,23 @@ export default function UserManagement() {
                     type='text'
                     id='name'
                     name='name'
-                    required
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={name}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${nameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter user name'
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      setNameError('');
+                    }}
+                    onBlur={(e) => {
+                      if (!e.target.value || e.target.value.trim() === '') {
+                        setNameError('Full name is required.');
+                      }
+                    }}
                   />
+                  <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{nameError}</p>
                 </div>
                 
                 <div>
@@ -885,16 +1014,28 @@ export default function UserManagement() {
                     Email
                   </label>
                   <input
-                    type='email'
+                    type='text'
                     id='email'
                     name='email'
-                    required
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={email}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${emailError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter email address'
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError('');
+                    }}
+                    onBlur={(e) => {
+                      if (!e.target.value || e.target.value.trim() === '') {
+                        setEmailError('Email is required.');
+                      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
+                        setEmailError('Please enter a valid email address.');
+                      }
+                    }}
                   />
+                  <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{emailError}</p>
                 </div>
                 
                 <div>
@@ -902,15 +1043,29 @@ export default function UserManagement() {
                     Phone (optional)
                   </label>
                   <input
-                    type='tel'
+                    type='text'
                     id='phone'
                     name='phone'
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={phone}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${phoneError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter phone number'
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setPhoneError('');
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value && e.target.value.trim() !== '') {
+                        const phoneValidation = validatePhone(e.target.value);
+                        if (!phoneValidation.valid) {
+                          setPhoneError(phoneValidation.message);
+                        }
+                      }
+                    }}
                   />
+                  <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{phoneError}</p>
                 </div>
               </div>
               
@@ -961,6 +1116,36 @@ export default function UserManagement() {
             
             <form onSubmit={(e) => {
               e.preventDefault();
+              
+              // Validate inputs
+              let hasError = false;
+              
+              if (!name || name.trim() === '') {
+                setNameError('Full name is required.');
+                hasError = true;
+              }
+              
+              if (!email || email.trim() === '') {
+                setEmailError('Email is required.');
+                hasError = true;
+              } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                setEmailError('Please enter a valid email address.');
+                hasError = true;
+              }
+              
+              // Validate phone if provided
+              if (phone && phone.trim() !== '') {
+                const phoneValidation = validatePhone(phone);
+                if (!phoneValidation.valid) {
+                  setPhoneError(phoneValidation.message);
+                  hasError = true;
+                }
+              }
+              
+              if (hasError) {
+                return;
+              }
+              
               const userData = {
                 name: name,
                 email: email,
@@ -981,14 +1166,23 @@ export default function UserManagement() {
                     type='text'
                     id='edit-name'
                     name='name'
-                    required
-                    defaultValue={selectedUser.name || ''}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={name}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${nameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter user name'
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      setNameError('');
+                    }}
+                    onBlur={(e) => {
+                      if (!e.target.value || e.target.value.trim() === '') {
+                        setNameError('Full name is required.');
+                      }
+                    }}
                   />
+                  <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{nameError}</p>
                 </div>
                 
                 <div>
@@ -996,17 +1190,28 @@ export default function UserManagement() {
                     Email
                   </label>
                   <input
-                    type='email'
+                    type='text'
                     id='edit-email'
                     name='email'
-                    required
-                    defaultValue={selectedUser.email || ''}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={email}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${emailError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter email address'
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError('');
+                    }}
+                    onBlur={(e) => {
+                      if (!e.target.value || e.target.value.trim() === '') {
+                        setEmailError('Email is required.');
+                      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
+                        setEmailError('Please enter a valid email address.');
+                      }
+                    }}
                   />
+                  <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{emailError}</p>
                 </div>
                 
                 <div>
@@ -1014,16 +1219,29 @@ export default function UserManagement() {
                     Phone (optional)
                   </label>
                   <input
-                    type='tel'
+                    type='text'
                     id='edit-phone'
                     name='phone'
-                    defaultValue={selectedUser.phone || ''}
-                    className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
+                    value={phone}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
                       placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${phoneError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter phone number'
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setPhoneError('');
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value && e.target.value.trim() !== '') {
+                        const phoneValidation = validatePhone(e.target.value);
+                        if (!phoneValidation.valid) {
+                          setPhoneError(phoneValidation.message);
+                        }
+                      }
+                    }}
                   />
+                  <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{phoneError}</p>
                 </div>
                 
                 <div>

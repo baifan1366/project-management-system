@@ -116,10 +116,10 @@ export default function SubscriptionStatus() {
 
   const formatCurrency = (amount) => {
     if (!amount && amount !== 0) return c('notAvailable');
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('ms-MY', {
       style: 'currency',
-      currency: 'USD',
-    }).format(amount / 100); // Assuming amount is in cents
+      currency: 'MYR',
+    }).format(amount); // Amount is already in dollars, not cents
   };
 
   // Check if the plan is a free plan

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -11,6 +11,7 @@ import { useConfirm } from '@/hooks/use-confirm'
 import { useGetUser } from '@/lib/hooks/useGetUser'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { api } from '@/lib/api'
+import { trackSubscriptionUsage } from '@/lib/subscriptionService'
 
 // 归档团队设置对话框组件
 export default function ProjectSettings({ isOpen, onClose, projectId }) {
@@ -21,6 +22,8 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
   const [activeTab, setActiveTab] = useState('archivedTeams')
   const [archivedTeams, setArchivedTeams] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const pathname = usePathname()
+  const locale = pathname.split('/')[1] || 'en'
   
   // 获取项目所有团队
   const fetchProjectTeams = async () => {
@@ -40,7 +43,6 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
     }
   }
   
-  // 组件挂载或对话框打开时获取团队数据
   useEffect(() => {
     fetchProjectTeams()
   }, [projectId, isOpen])
@@ -94,8 +96,34 @@ export default function ProjectSettings({ isOpen, onClose, projectId }) {
       onConfirm: async () => {
         setIsLoading(true)
         try {
-          // 实现删除项目的功能
+          // 1. Delete all teams under the project and decrement current_teams for each
+          if (user && user.id) {
+            const teams = await api.teams.listByProject(projectId);
+            if (Array.isArray(teams)) {
+              for (const team of teams) {
+                await api.teams.delete(team.id);
+                await trackSubscriptionUsage({
+                  userId: user.id,
+                  actionType: 'create_team',
+                  entityType: 'teams',
+                  deltaValue: -1
+                });
+              }
+            }
+          }
+
+          // 2. Delete the project itself
           await api.projects.delete(projectId)
+          
+          // 3. Decrement current_projects
+          if (user && user.id) {
+            await trackSubscriptionUsage({
+              userId: user.id,
+              actionType: 'createProject',
+              entityType: 'projects',
+              deltaValue: -1
+            });
+          }
           
           // 关闭对话框
           onClose()

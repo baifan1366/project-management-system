@@ -163,7 +163,8 @@ export async function POST(req) {
     try {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(currentSubscription.plan.price * 100), // Convert to cents
-        currency: 'usd',
+        currency: 'myr',
+        payment_method_types: ['card'],
         customer: user.stripe_customer_id,
         payment_method: user.default_payment_method_id,
         confirm: true,
@@ -215,7 +216,7 @@ export async function POST(req) {
             order_id: crypto.randomUUID(),
             user_id: userId,
             amount: currentSubscription.plan.price,
-            currency: 'USD',
+            currency: 'MYR',
             payment_method: 'CARD',
             status: 'COMPLETED',
             transaction_id: paymentIntent.id,

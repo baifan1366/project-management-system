@@ -25,9 +25,7 @@ import TaskOverview from '@/components/team/overview/TaskOverview';
 import TaskTimeline from '@/components/team/timeline/TaskTimeline';
 import TaskNotion from '@/components/team/notion/TaskNotion';
 import TaskCalendar from '@/components/team/calendar/TaskCalendar';
-//agile
 import TaskAgile from '@/components/team/agile/TaskAgile';
-//posts
 import TaskPosts from '@/components/team/posts/TaskPosts';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
@@ -125,9 +123,7 @@ const GanttSkeleton = () => (
 // Add another skeleton component
 const TaskTabSkeleton = () => (
   <div className="flex space-x-1 pb-4 overflow-x-auto">
-    {[1, 2, 3, 4, 5].map((i) => (
-      <Skeleton key={i} className="h-9 w-24 rounded-md" />
-    ))}
+    <Skeleton className="h-9 w-full rounded-md" />
   </div>
 );
 
@@ -168,6 +164,7 @@ const TeamCustomFieldPage = () => {
   const [editTeamOpen, setEditTeamOpen] = useState(false);
   const [editTeamActiveTab, setEditTeamActiveTab] = useState("details");
   const [addButtonText, setAddButtonText] = useState('addTask');  
+  const [triggerAction, setTriggerAction] = useState(false);
   const [onClose, setOnClose] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showVisibilityDialog, setShowVisibilityDialog] = useState(false);
@@ -269,6 +266,25 @@ const TeamCustomFieldPage = () => {
       const newValue = prev + 1;
       return newValue;
     }); // 每次编辑后递增
+  };
+
+  // 添加处理Plus按钮点击的函数
+  const handleAddButtonClick = () => {
+    // 如果addButtonText为空，设置默认值
+    if (!addButtonText) {
+      setAddButtonText('addTask');
+    }
+    
+    // 触发动作信号并重置
+    setTriggerAction(true);
+    
+    // 刷新内容
+    setRefreshKey(prev => prev + 1);
+    
+    // 在短暂延迟后重置triggerAction
+    setTimeout(() => {
+      setTriggerAction(false);
+    }, 500);
   };
 
   useEffect(() => {
@@ -554,40 +570,40 @@ const TeamCustomFieldPage = () => {
 
     const fieldType = currentItem.custom_field?.type;
     if (fieldType === 'LIST') {
-      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskList projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText} triggerAction={triggerAction}/>;
     }
     if (fieldType === 'GANTT') {
-      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskGantt projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText} triggerAction={triggerAction}/>;
     }
     if (fieldType === 'KANBAN') {
-      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskKanban projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText} triggerAction={triggerAction}/>;
     }
     if (fieldType === 'FILES') {
-      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskFile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'WORKFLOW') {
-      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskWorkflow projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addTask={triggerAction && addButtonText === 'addTask'}/>;
     }
     if (fieldType === 'OVERVIEW') {
-      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskOverview projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'TIMELINE') {
-      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskTimeline projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addTask={triggerAction && addButtonText === 'addTask'}/>;
     }
     if (fieldType === 'CALENDAR') {
-      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskCalendar projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addTask={triggerAction && addButtonText === 'addTask'}/>;
     }
-    if (fieldType === 'NOTE') {
-      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+    if (fieldType === 'NOTE') { 
+      return <TaskNotion projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText} triggerAction={triggerAction}/>;
     }
     if (fieldType === 'AGILE') {
-      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskAgile projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
     if (fieldType === 'POSTS') {
-      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey}/>;
+      return <TaskPosts projectId={projectId} teamId={teamId} teamCFId={teamCFId} refreshKey={refreshKey} addButtonText={addButtonText}/>;
     }
-    return <div>暂不支持的字段类型: {fieldType}</div>;
-  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey, teamCFLoaded, fieldNotFoundText, fieldMayBeDeletedText]);
+    return <div>Not supported field type: {fieldType}</div>;
+  }, [currentItem, projectId, teamId, teamCFId, cfStatus, cfError, refreshKey, teamCFLoaded, fieldNotFoundText, fieldMayBeDeletedText, addButtonText, triggerAction]);
 
   // 处理加载状态
   if (isLoading) {
@@ -610,19 +626,7 @@ const TeamCustomFieldPage = () => {
               <TaskTabSkeleton />
             </div>
           </div>
-          <div className="w-full p-0">
-            <div className="w-full border-b py-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-9 w-32" />
-              </div>
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-9 w-20" />
-                <Skeleton className="h-9 w-20" />
-                <Skeleton className="h-9 w-20" />
-              </div>
-            </div>
-          </div>
-          <div className="overflow-y-auto flex-grow h-0 mb-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0">
+          <div className="overflow-y-auto flex-grow h-0 mb-2 mt-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0">
             <div className="grid grid-cols-1 gap-4 mt-4">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="space-y-2">
@@ -937,17 +941,23 @@ const TeamCustomFieldPage = () => {
             <TaskTab projectId={projectId} teamId={teamId} onViewChange={handleViewChange} handleRefreshContent={handleRefreshContent} />
           </div>
         </div>
-        <div className="w-full p-0">
+        {/* <div className="w-full p-0">
           { currentItem?.custom_field?.type !== 'AGILE' &&
           currentItem?.custom_field?.type !== 'OVERVIEW' && (
             <div className="w-full border-b py-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex">
-                {/* if currentItem?.custom_field?.type !== 'FILES' and POSTS */}
                 {currentItem?.custom_field?.type !== 'FILES' && 
+                 currentItem?.custom_field?.type !== 'KANBAN' &&
+                 currentItem?.custom_field?.type !== 'LIST' &&
                  currentItem?.custom_field?.type !== 'POSTS' && (
                   <>
-                    <Button variant="outline" size="sm" className="rounded-l-md rounded-r-none border-r-0">
+                    <Button 
+                      onClick={handleAddButtonClick}
+                      variant="outline" 
+                      size="sm" 
+                      className="rounded-l-md rounded-r-none border-r-0"
+                    >
                       <Plus className="h-4 w-4 mr-1" />
                       {t(addButtonText)}
                     </Button>
@@ -963,16 +973,15 @@ const TeamCustomFieldPage = () => {
                           <span className="text-sm">{t('task')}</span>
                           {addButtonText === 'addTask' && <Check className="h-4 w-4 ml-auto" />}                      
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAddButtonText('addSection')} className="flex">
+                        <DropdownMenuItem 
+                          onClick={() => setAddButtonText('addSection')} 
+                          className="flex"
+                          disabled={currentItem?.custom_field?.type === 'TIMELINE' || currentItem?.custom_field?.type === 'WORKFLOW' || currentItem?.custom_field?.type === 'CALENDAR'} 
+                        >
                           <TextQuote className="h-4 w-4 mr-1" />
                           <span className="text-sm">{t('section')}</span>
                           {addButtonText === 'addSection' && <Check className="h-4 w-4 ml-auto" />}                      
                         </DropdownMenuItem>
-                        {/* <DropdownMenuItem onClick={() => setAddButtonText('addAttachment')} className="flex">
-                          <FileUp className="h-4 w-4 mr-1" />
-                          <span className="text-sm">{t('attachment')}</span>
-                          {addButtonText === 'addAttachment' && <Check className="h-4 w-4 ml-auto" />}
-                        </DropdownMenuItem> */}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </>
@@ -993,8 +1002,8 @@ const TeamCustomFieldPage = () => {
           </div>
           )}
           
-        </div>
-        <div className="overflow-y-auto flex-grow h-0 mb-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0" data-rbd-scroll-container-style="true">
+        </div> */}
+        <div className="overflow-y-auto flex-grow h-0 mb-2 mt-2 w-full max-w-full lg:px-2 md:px-1 sm:px-0.5 px-0" data-rbd-scroll-container-style="true">
           {customFieldContent}
         </div>
       </div>

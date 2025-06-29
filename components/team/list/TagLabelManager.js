@@ -138,7 +138,7 @@ const TagLabelManager = ({
       await dispatch(getLabelByTeamId(teamId)).unwrap();
       
       // 成功提示
-      toast.success('选项已创建');
+      toast.success(t('optionCreated') || '选项已创建');
       
       // 重置表单
       setNewOption({
@@ -164,7 +164,7 @@ const TagLabelManager = ({
   // 处理编辑选项
   const handleUpdateOption = async () => {
     if (!editingOption || !editingOption.label.trim()) {
-      toast.error('选项名称不能为空');
+      toast.error(t('optionNameRequired') || '选项名称不能为空');
       return;
     }
     
@@ -203,7 +203,7 @@ const TagLabelManager = ({
       await dispatch(getLabelByTeamId(teamId)).unwrap();
       
       // 成功提示
-      toast.success('选项已更新');
+      toast.success(t('optionUpdated') || '选项已更新');
       
       // 重置表单
       setEditingOption(null);
@@ -211,7 +211,7 @@ const TagLabelManager = ({
       
     } catch (error) {
       console.error('更新选项失败:', error);
-      toast.error(error.message || '更新选项失败');
+      toast.error(error.message || t('updateOptionFailed') || '更新选项失败');
     } finally {
       setLoading(false);
     }
@@ -269,11 +269,11 @@ const TagLabelManager = ({
       await dispatch(getLabelByTeamId(teamId)).unwrap();
       
       // 成功提示
-      toast.success('选项已删除');
+      toast.success(t('optionDeleted') || '选项已删除');
       
     } catch (error) {
       console.error('删除选项失败:', error);
-      toast.error(error.message || '删除选项失败');
+      toast.error(error.message || t('deleteOptionFailed') || '删除选项失败');
     } finally {
       setLoading(false);
     }
@@ -313,7 +313,7 @@ const TagLabelManager = ({
             }
           }}
         >
-          重试获取数据
+          {t('retry')}
         </Button>
       </div>
     );
@@ -339,7 +339,7 @@ const TagLabelManager = ({
               className="h-8"
             >
               <Plus className="w-4 h-4 mr-1" />
-              {'添加选项'}
+              {t('addOption')}
             </Button>
           )}
         </div>
@@ -348,7 +348,7 @@ const TagLabelManager = ({
         {isCreating && (
           <div className="mb-4 p-3 border rounded-lg bg-background">
             <div className="flex justify-between items-center mb-3">
-              <h4 className="font-medium text-sm">{'添加选项'}</h4>
+              <h4 className="font-medium text-sm">{t('addOption')}</h4>
               <Button
                 variant="ghost"
                 size="sm"
@@ -367,17 +367,17 @@ const TagLabelManager = ({
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm mb-1 font-medium">{'选项名称'}</label>
+                <label className="block text-sm mb-1 font-medium">{t('optionName')}</label>
                 <input
                   type="text"
                   value={newOption.label}
                   onChange={(e) => setNewOption({...newOption, label: e.target.value})}
                   className="w-full p-2 border rounded-md focus:ring-1 focus:outline-none text-sm"
-                  placeholder={'输入选项名称'}
+                  placeholder={t('enterOptionName')}
                 />
               </div>
               <div>
-                <label className="block text-sm mb-1 font-medium">{'选项颜色'}</label>
+                <label className="block text-sm mb-1 font-medium">{t('optionColor')}</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
@@ -405,7 +405,7 @@ const TagLabelManager = ({
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-background border-t-primary rounded-full animate-spin mr-1" />
                   ) : null}
-                  {'创建'}
+                  {t('create')}
                 </Button>
               </div>
             </div>
@@ -535,7 +535,7 @@ const TagLabelManager = ({
             ))
           ) : (
             <div className="text-center py-4 text-muted-foreground border border-gray-300 dark:border-gray-700 rounded-lg text-sm">
-              {'没有可选项'}
+              {t('noOptions')}
             </div>
           )}
         </div>
@@ -554,7 +554,7 @@ const TagLabelManager = ({
               className="w-full h-8"
             >
               <Plus className="w-4 h-4 mr-1" />
-              {'添加选项'}
+              {t('addOption')}
             </Button>
           </div>
         )}

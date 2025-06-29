@@ -111,6 +111,8 @@
     "passwordChanged": "密码已成功更改",
     "timezone": "时区",
     "timeFormat": "时间格式",
+    "phoneInvalid": "电话号码必须以+开头，后跟国家/地区代码",
+    "phoneMinDigits": "电话号码在国家/地区代码后必须包含9-14位数字",
     "password": {
       "requirementsTitle": "密码要求：",
       "minLength": "至少8个字符",
@@ -319,6 +321,15 @@
         "back": "返回",
         "subscriptionLimit": "订阅限制",
         "currentUsage": "当前使用量: {current} / {limit}",
+        "upgradeSubscription": "升级订阅",
+        "operationLimited": "操作受限",
+        "createProjectLimited": "已达到项目创建上限",
+        "inviteMemberLimited": "已达到成员邀请上限",
+        "createTeamLimited": "已达到团队创建上限",
+        "aiChatLimited": "已达到AI聊天次数限制",
+        "operationLimited": "操作受限",
+        "subscriptionLimit": "订阅限制",
+        "currentUsage": "当前用量: {current}/{limit}",
         "upgradeSubscription": "升级订阅",
         "operationLimited": "操作受限",
         "createProjectLimited": "项目创建受限",
@@ -1007,7 +1018,8 @@
     "everyoneCanEditDescription": "这个项目将对每个项目成员可见，作为编辑者。",
     "everyoneCanCheckDescription": "这个项目将对每个项目成员可见，作为检查者。",
     "everyoneCanViewDescription": "这个项目将对每个项目成员可见，作为查看者。",
-    "teamNameRequired": "请输入团队名称"
+    "teamNameRequired": "请输入团队名称",
+    "duplicateTeamName": "团队名称已存在，请更换名称后重试"
   },
   "Chat": {
     "title": "聊天",
@@ -2222,7 +2234,10 @@
     "me": "我",
     "mustHaveOwner": "必须有所有者",
     "ownerDescription": "团队所有者。可以管理团队成员和访问设置。",
-    "checkerDescription": "可以标记和评论任务。不能创建任务和项目。"
+    "checkerDescription": "可以标记和评论任务。不能创建任务和项目。",
+    "random": "随机",
+    "addStatus": "添加状态",
+    "teamIsFullError": "该团队已满。团队所有者需要升级他们的计划以添加更多成员。"
   },
   "Notion": {
     "knowledgeBase": "知识库",

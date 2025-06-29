@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 import ProcessedPaymentModal from '@/components/payment/paymentProcessed';
 import PaymentSuccessModal from '@/components/payment/paymentSuccees';
+import { fetchSubscription } from '@/lib/redux/features/subscriptionSlice';
 
 export default function PaymentSuccess() {
   const router = useRouter();
@@ -32,8 +33,11 @@ export default function PaymentSuccess() {
   } = useSelector(state => state.payment);
 
   // Format amount helper
-  const formatAmount = (amount) => {
-    return `$${(amount / 100).toFixed(2)}`;
+  const formatAmount = (amount, currency = 'MYR') => {
+    return new Intl.NumberFormat('ms-MY', {
+      style: 'currency',
+      currency: currency,
+    }).format((amount || 0) / 100);
   };
 
   // Copy to clipboard helper
@@ -87,7 +91,8 @@ export default function PaymentSuccess() {
             planName: orderDetails.planName,
             amount: orderDetails.amount,
             orderId: orderDetails.orderId,
-            userId: orderDetails.userId
+            userId: orderDetails.userId,
+            currency: 'MYR'
           }
         }),
       });
@@ -104,10 +109,35 @@ export default function PaymentSuccess() {
   // Update user subscription
   const updateUserSubscription = async (userId, planId) => {
     try {
-      // Get current date for start_date
-      const startDate = new Date().toISOString();
+      // Deactivate any existing active subscriptions for the user (case-insensitive)
+      const { data: activeSubscriptions, error: findError } = await supabase
+        .from('user_subscription_plan')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'ACTIVE');
+
+      if (findError) {
+        console.error('Error finding active subscriptions to deactivate:', findError);
+        throw findError;
+      }
+
+      if (activeSubscriptions && activeSubscriptions.length > 0) {
+        const idsToDeactivate = activeSubscriptions.map(sub => sub.id);
+        const { error: updateError } = await supabase
+          .from('user_subscription_plan')
+          .update({ 
+            status: 'DEACTIVATED',
+            updated_at: new Date().toISOString() 
+          })
+          .in('id', idsToDeactivate);
+        
+        if (updateError) {
+          console.error('Error deactivating old subscriptions:', updateError);
+          throw updateError;
+        }
+      }
       
-      // Get plan details
+      // Get the details of the new plan
       const { data: planData, error: planError } = await supabase
         .from('subscription_plan')
         .select('billing_interval, type')
@@ -130,34 +160,6 @@ export default function PaymentSuccess() {
         } else {
           // For NULL or undefined billing_interval, keep end date as null
           endDate = null;
-        }
-      }
-      
-      // First, find all active subscription plans for this user (both paid and free)
-      const { data: activeSubscriptions, error: activeSubError } = await supabase
-        .from('user_subscription_plan')
-        .select('id, plan_id, status')
-        .eq('user_id', userId)
-        .or('status.eq.ACTIVE,status.eq.active')
-        .order('created_at', { ascending: false });
-      
-      if (activeSubError) throw activeSubError;
-      
-      const now = new Date().toISOString();
-      
-      // Deactivate ALL active subscription plans
-      if (activeSubscriptions && activeSubscriptions.length > 0) {
-        
-        for (const subscription of activeSubscriptions) {
-          // Deactivate each active subscription plan
-          await supabase
-            .from('user_subscription_plan')
-            .update({
-              status: 'DEACTIVATED',
-              updated_at: now
-            })
-            .eq('id', subscription.id);
-            
         }
       }
       
@@ -201,12 +203,12 @@ export default function PaymentSuccess() {
           user_id: userId,
           plan_id: planId,
           status: 'ACTIVE',
-          start_date: startDate,
+          start_date: new Date().toISOString(),
           end_date: endDate,  // Can be null
         auto_renew: planData.type !== 'FREE', // Enable auto-renew for paid plans by default
         ...currentUsage, // Spread the current usage values
-          created_at: now,
-          updated_at: now
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
         
       const result = await supabase
@@ -214,6 +216,9 @@ export default function PaymentSuccess() {
           .insert(newData);
       
       if (result.error) throw result.error;
+      
+      // After successfully updating the subscription in the DB, refresh Redux state
+      await dispatch(fetchSubscription(userId));
       
       return true;
     } catch (error) {
@@ -225,11 +230,17 @@ export default function PaymentSuccess() {
   // Check if payment has been processed
   const checkPaymentProcessed = async (paymentIntentId) => {
     try {
+      // Make sure paymentIntentId is a string
+      if (!paymentIntentId || typeof paymentIntentId !== 'string') {
+        console.error('Invalid paymentIntentId format:', paymentIntentId);
+        return false;
+      }
+      
       const { data, error } = await supabase
         .from('payment')
         .select('is_processed, stripe_payment_id')
         .eq('stripe_payment_id', paymentIntentId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data?.is_processed || false;
@@ -242,6 +253,12 @@ export default function PaymentSuccess() {
   // Update payment processed status
   const updatePaymentProcessed = async (paymentIntentId) => {
     try {
+      // Make sure paymentIntentId is a string
+      if (!paymentIntentId || typeof paymentIntentId !== 'string') {
+        console.error('Invalid paymentIntentId format:', paymentIntentId);
+        return false;
+      }
+      
       const { error } = await supabase
         .from('payment')
         .update({ 
@@ -259,275 +276,215 @@ export default function PaymentSuccess() {
   };
 
   // Create payment record
-  const createPaymentRecord = async (paymentData) => {
+  const createPaymentRecord = async (paymentData, sessionData = null) => {
     try {
+      const isAlipay = sessionData && sessionData.payment_method_types.includes('alipay');
+      const metadata = paymentData?.metadata || sessionData?.metadata || {};
       
-      // Get orderId from the metadata
-      const orderId = paymentData.metadata?.orderId || metadata?.orderId;
+      // Try to find orderId in different potential locations
+      const orderId = metadata?.orderId || 
+                      paymentData?.metadata?.orderId || 
+                      sessionData?.metadata?.orderId ||
+                      metadata?.order_id || 
+                      paymentData?.metadata?.order_id || 
+                      sessionData?.metadata?.order_id || 
+                      // If no order ID found, generate a new UUID
+                      uuidv4();
 
-      if (!orderId) {
-        throw new Error('No order ID found in payment metadata');
-      }
-      
-      // Build payment record data
-      const paymentRecord = {
-        user_id: paymentData.metadata?.userId || paymentData.userId,
-        order_id: orderId,
-        amount: paymentData.amount / 100, // Stripe amount is in cents, convert to dollars
-        currency: paymentData.currency || 'USD',
-        payment_method: paymentData.metadata?.payment_method || 'stripe',
-        status: paymentData.status === 'succeeded' ? 'COMPLETED' : 
-                paymentData.status === 'processing' ? 'PENDING' : 'FAILED',
-        transaction_id: paymentData.id,
-        stripe_payment_id: paymentData.id,
-        discount_amount: paymentData.metadata?.discount ? parseFloat(paymentData.metadata.discount) : 0,
-        applied_promo_code: paymentData.metadata?.promoCode || null,
-        metadata: {
-          planId: paymentData.metadata?.planId,
-          planName: paymentData.metadata?.planName,
-        },
-        is_processed: false, // Initially set to false
-      };
-      
-      // Insert payment record and return created record
-      const { data, error } = await supabase
-        .from('payment')
-        .insert(paymentRecord)
-        .select('*')  // Add this to get the inserted record
-        .single();    // Add this to get a single record
-        
-      if (error) throw error;
-      
-      
-      return data;
-    } catch (err) {
-      console.error('Error creating payment record:', err);
-      return null;
-    }
-  };
+      // Log the found orderId for debugging purposes
+      console.log('Using order ID:', orderId, 'Source:', 
+        metadata?.orderId ? 'metadata.orderId' : 
+        paymentData?.metadata?.orderId ? 'paymentData.metadata.orderId' : 
+        sessionData?.metadata?.orderId ? 'sessionData.metadata.orderId' : 
+        metadata?.order_id ? 'metadata.order_id' : 
+        paymentData?.metadata?.order_id ? 'paymentData.metadata.order_id' : 
+        sessionData?.metadata?.order_id ? 'sessionData.metadata.order_id' : 
+        'newly generated UUID');
 
-  // Create payment record for Alipay
-  const createAlipayPaymentRecord = async (paymentData) => {
-    try {
-      
-      // 从元数据中获取订单ID
-      const orderId = paymentData.metadata?.orderId || metadata?.orderId;
-      
-      if (!orderId) {
-        throw new Error('No order ID found in payment metadata');
-      }
-      
-      // 确定支付状态 - 支付宝可能返回不同的成功状态
-      let paymentStatus = 'FAILED';
-      const successStatuses = ['paid', 'complete', 'succeeded', 'completed'];
-      const pendingStatuses = ['processing', 'pending'];
-      
-      if (successStatuses.includes(paymentData.status?.toLowerCase())) {
-        paymentStatus = 'COMPLETED';
-      } else if (pendingStatuses.includes(paymentData.status?.toLowerCase())) {
-        paymentStatus = 'PENDING';
-      }
-      
-      // 构建支付记录数据
+      const status = (paymentData?.status === 'succeeded' || sessionData?.payment_status === 'paid')
+        ? 'COMPLETED'
+        : (paymentData?.status === 'processing' ? 'PENDING' : 'FAILED');
+
       const paymentRecord = {
-        user_id: paymentData.metadata?.userId,
+        user_id: metadata?.userId,
         order_id: orderId,
-        amount: paymentData.amount / 100, // 转换为美元
-        currency: paymentData.currency || 'USD',
-        payment_method: 'alipay',
-        status: paymentStatus,
-        transaction_id: paymentData.id,
-        stripe_payment_id: paymentData.id,
-        discount_amount: paymentData.metadata?.discount ? parseFloat(paymentData.metadata.discount) : 0,
-        applied_promo_code: paymentData.metadata?.promoCode || null,
+        amount: (paymentData?.amount || sessionData?.amount_total) / 100,
+        currency: paymentData?.currency || sessionData?.currency || 'MYR',
+        payment_method: metadata?.payment_method || (isAlipay ? 'alipay' : 'card'),
+        status: status,
+        transaction_id: paymentData?.id || sessionData?.payment_intent?.id || sessionData.id,
+        stripe_payment_id: paymentData?.id || sessionData?.payment_intent?.id || sessionData.id,
+        discount_amount: metadata?.discount ? parseFloat(metadata.discount) : 0,
+        applied_promo_code: metadata?.promoCode || null,
         metadata: {
-          planId: paymentData.metadata?.planId,
-          planName: paymentData.metadata?.planName,
-          originalCurrency: paymentData.originalCurrency || 'CNY',
-          originalAmount: paymentData.originalAmount || paymentData.amount,
-          exchangeRate: paymentData.metadata?.exchangeRate || '7.2'
+          planId: metadata?.planId,
+          planName: metadata?.planName,
         },
-        is_processed: false, // 初始设置为false
+        is_processed: false,
       };
-      
-      // 插入支付记录并返回创建的记录
+
       const { data, error } = await supabase
         .from('payment')
         .insert(paymentRecord)
         .select('*')
         .single();
-        
-      if (error) throw error;
-            
+
+      if (error) {
+        // Log the detailed error from Supabase
+        console.error('Supabase error creating payment record:', error);
+        throw error;
+      }
+      
       return data;
     } catch (err) {
-      console.error('Error creating Alipay payment record:', err);
-      return null;
+      console.error('Error creating payment record:', err.message);
+      throw err; // Re-throw the error to be caught by the caller
     }
   };
 
+  // 获取当前语言
+  const locale = searchParams.get('locale') || 'en'; // 如果没有语言参数，默认使用英文
+  
+  // 修改跳转路径，包含语言
+  const getLocalizedPath = (path) => {
+    return `/${locale}${path}`;
+  };
+
+  // Initial setup on component mount
   useEffect(() => {
     const initializePaymentSuccess = async () => {
+      setLoading(true);
+      const sessionId = searchParams.get('session_id');
+      const paymentIntentId = searchParams.get('payment_intent');
+
       try {
-        // 检查URL参数
-        const paymentIntent = searchParams.get('payment_intent');
-        const sessionId = searchParams.get('session_id');
-        
-        // 使用URL中的会话ID或Redux中存储的会话ID
-        const activeSessionId = sessionId || storedSessionId;
-        
-        // 如果有会话ID（支付宝支付通常会返回会话ID）
-        if (activeSessionId) {
-          await processPaymentWithSession(activeSessionId);
-          return;
-        }
-        
-        // 如果直接有支付意图ID（信用卡支付通常会返回支付意图ID）
-        if (paymentIntent) {
-          await processPaymentWithIntent(paymentIntent);
-          return;
-        }
-        
-        // 如果两者都没有，重定向到首页
-        if (!activeSessionId && !paymentIntent) {
-          console.error('No payment_intent or session_id found');
+        if (sessionId) {
+          await processPaymentWithSession(sessionId);
+        } else if (paymentIntentId) {
+          await processPaymentWithIntent(paymentIntentId);
+        } else {
           toast.error('Payment verification failed', {
-            description: 'Missing payment information. Please try again.'
+            description: 'No payment identifier found.'
           });
-          router.push('/');
-          return;
         }
-      } catch (err) {
-        console.error('Error initializing payment success:', err);
-        toast.error('Payment processing error', {
-          description: err.message || 'An unexpected error occurred'
-        });
-        router.push('/payment-error');
+        
+        // 检查是否为套餐升级付款，如果是则添加5秒后自动跳转
+        if (metadata?.upgradeType === 'immediate' || sessionDetails?.metadata?.upgradeType === 'immediate') {
+          // 显示倒计时提示
+          setShowProcessedModal(true);
+          
+          // 启动倒计时
+          const timer = setInterval(() => {
+            setCountdown(prev => {
+              if (prev <= 1) {
+                clearInterval(timer);
+                // 倒计时结束后跳转
+                router.push(getLocalizedPath('/settings/subscription'));
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+          
+          // 清理定时器
+          return () => clearInterval(timer);
+        }
+      } catch (error) {
+        console.error('Initialization error on payment success page:', error);
+        // Error toast is handled in the processing functions
       } finally {
         setLoading(false);
       }
     };
 
-    // Process payment with session ID
-    const processPaymentWithSession = async (sessionId) => {
-      try {
-        // Fetch session details from Stripe
-        const sessionResult = await dispatch(fetchSessionDetails(sessionId)).unwrap();
-        
-        // 支付宝支付可能没有 payment_intent，但仍然可以是成功的
-        // 检查支付状态是否表示成功
-        const isSuccessfulPayment = ['paid', 'complete', 'completed'].includes(sessionResult.payment_status?.toLowerCase());
-        
-        if (!sessionResult.payment_intent && !isSuccessfulPayment) {
-          throw new Error('No payment intent found in session and payment is not successful');
-        }
-        
-        // 如果有支付意图ID，检查是否已处理
-        if (sessionResult.payment_intent) {
-          // Check if payment is already processed
-          const isProcessed = await checkPaymentProcessed(sessionResult.payment_intent);
-          if (isProcessed) {
-            handleAlreadyProcessedPayment();
-            return;
-          }
-          
-          // 如果有支付意图ID，尝试处理支付
-          await processPaymentWithIntent(sessionResult.payment_intent);
-        }
-        
-        // Update metadata from session if available
-        if (sessionResult.metadata) {
-          // 处理Alipay特有的元数据
-          const orderId = sessionResult.metadata.orderId || uuidv4();
-          const planId = sessionResult.metadata.planId;
-          const userId = sessionResult.metadata.userId;
-          const planName = sessionResult.metadata.planName;
-          const promoCode = sessionResult.metadata.promoCode || null;
-          const discount = sessionResult.metadata.discount ? parseFloat(sessionResult.metadata.discount) : 0;
-          
-          // 检查是否是支付宝支付（通过货币判断）
-          const isAlipay = sessionResult.currency === 'cny';
-          
-          // 如果是CNY，需要转换回USD（假设汇率是7.2，与创建会话时一致）
-          let amount = sessionResult.amount_total / 100; // 转换为元
-          if (isAlipay) {
-            // 从CNY转回USD
-            const exchangeRate = 7.2;
-            amount = amount / exchangeRate;
-          }
-          
-          // 更新Redux中的元数据
-          dispatch(setPaymentMetadata({
-            ...sessionResult.metadata,
-            orderId: orderId,
-            amount: amount,
-            currency: isAlipay ? 'USD' : sessionResult.currency
-          }));
-          
-          // 如果会话中有用户ID和计划ID，但processPaymentWithIntent没有处理（例如支付宝支付可能没有常规的payment_intent），
-          // 或者支付已成功但没有处理，在这里直接处理订阅更新和支付记录
-          if ((userId && planId && (!paymentDetails || isSuccessfulPayment))) {
-            
-            // 获取用户邮箱
-            const email = await fetchUserEmail(userId);
-            
-            // 更新用户订阅
-            await updateUserSubscription(userId, planId);
-            
-            // 创建支付记录
-            const paymentRecord = await createAlipayPaymentRecord({
-              id: sessionResult.payment_intent || `alipay_session_${sessionId}`,
-              status: sessionResult.payment_status || 'paid', // 如果没有状态，默认为paid
-              amount: amount * 100, // 转回分
-              currency: 'USD', // 存储为USD
-              originalCurrency: 'CNY',
-              originalAmount: sessionResult.amount_total,
-              metadata: {
-                userId: userId,
-                planId: planId,
-                planName: planName,
-                orderId: orderId,
-                promoCode: promoCode,
-                discount: discount,
-                payment_method: 'alipay'
-              }
-            });
-            
-            // 更新支付处理状态
-            if (paymentRecord && sessionResult.payment_intent) {
-              await updatePaymentProcessed(sessionResult.payment_intent);
-            }
-            
-            // 发送确认邮件
-            if (email) {
-              await sendEmail(email, {
-                id: orderId,
-                orderId: orderId,
-                planName: planName,
-                amount: amount,
-                userId: userId
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error processing payment with session:', error);
-        toast.error('Payment verification failed', {
-          description: error.message || 'Failed to verify your payment'
-        });
-      }
-    };
+    initializePaymentSuccess();
+  }, [searchParams]);
 
-    // Process payment with payment intent
-    const processPaymentWithIntent = async (paymentIntentId) => {
-      // Check if payment is already processed
+  // 添加倒计时提示组件渲染逻辑
+  useEffect(() => {
+    if (showProcessedModal && countdown === 0) {
+      router.push(getLocalizedPath('/settings/subscription'));
+    }
+  }, [countdown, showProcessedModal, router]);
+
+  // Process payment with session ID
+  const processPaymentWithSession = async (sessionId) => {
+    try {
+      if (!sessionId || typeof sessionId !== 'string') {
+        throw new Error('Invalid session ID format');
+      }
+      
+      const sessionResult = await dispatch(fetchSessionDetails(sessionId)).unwrap();
+      const paymentIntentId = sessionResult.payment_intent?.id || sessionResult.payment_intent;
+      const isSuccessfulPayment = ['paid', 'complete', 'completed'].includes(sessionResult.payment_status?.toLowerCase());
+
+      if (sessionResult.metadata) {
+        dispatch(setPaymentMetadata({
+            ...sessionResult.metadata,
+            orderId: sessionResult.metadata.orderId,
+            amount: sessionResult.amount_total
+        }));
+      }
+
+      if (!paymentIntentId && !isSuccessfulPayment) {
+        throw new Error('Payment was not successful and no payment intent was found.');
+      }
+      
+      if (paymentIntentId) {
+        const isProcessed = await checkPaymentProcessed(paymentIntentId);
+        if (isProcessed) {
+          handleAlreadyProcessedPayment();
+          return;
+        }
+      }
+
+      // Create payment record using the session data
+      const paymentRecord = await createPaymentRecord(null, sessionResult);
+      
+      if (paymentRecord) {
+        const finalPaymentIntentId = paymentRecord.transaction_id;
+        await updatePaymentProcessed(finalPaymentIntentId);
+        dispatch(fetchPaymentStatus.fulfilled(paymentRecord, 'payment/fetchPaymentStatus', finalPaymentIntentId));
+
+        if (paymentRecord.user_id) {
+          const email = await fetchUserEmail(paymentRecord.user_id);
+          if (paymentRecord.metadata?.planId) {
+            await updateUserSubscription(paymentRecord.user_id, paymentRecord.metadata.planId);
+          }
+          if (email) {
+            await sendEmail(email, {
+              orderId: paymentRecord.order_id,
+              planName: paymentRecord.metadata.planName,
+              amount: paymentRecord.amount,
+              userId: paymentRecord.user_id
+            });
+          }
+        }
+      } else {
+        throw new Error('Failed to create payment record from session.');
+      }
+    } catch (error) {
+      console.error('Error processing payment with session:', error);
+      toast.error('Payment verification failed', {
+        description: error.message || 'Failed to verify your payment.'
+      });
+      throw error; // Re-throw to be caught by the initializer
+    }
+  };
+
+  // Process payment with payment intent
+  const processPaymentWithIntent = async (paymentIntentId) => {
+    try {
+      if (!paymentIntentId || typeof paymentIntentId !== 'string') {
+        throw new Error('Invalid payment ID format');
+      }
+      
       const isProcessed = await checkPaymentProcessed(paymentIntentId);
       if (isProcessed) {
         handleAlreadyProcessedPayment();
         return;
       }
       
-      // Fetch payment status from Stripe
       const result = await dispatch(fetchPaymentStatus(paymentIntentId)).unwrap();
       
       if (result.metadata) {
@@ -538,7 +495,6 @@ export default function PaymentSuccess() {
         }));
       }
 
-      // Handle successful payment logic
       if (result.metadata?.userId) {
         const email = await fetchUserEmail(result.metadata.userId);
         
@@ -546,13 +502,10 @@ export default function PaymentSuccess() {
           await updateUserSubscription(result.metadata.userId, result.metadata.planId);
         }
         
-        const paymentRecord = await createPaymentRecord({
-          ...result,
-          userId: result.metadata.userId
-        });
+        // Pass the payment intent data to create the record
+        const paymentRecord = await createPaymentRecord(result);
 
         if (paymentRecord) {
-          // Update payment processed status
           await updatePaymentProcessed(paymentIntentId);
           dispatch(fetchPaymentStatus.fulfilled(paymentRecord, 'payment/fetchPaymentStatus', paymentRecord.id));
         }
@@ -562,50 +515,54 @@ export default function PaymentSuccess() {
             id: result.metadata.orderId,
             orderId: result.metadata.orderId,
             planName: result.metadata.planName,
-            amount: result.amount,
+            amount: result.amount / 100,
             userId: result.metadata.userId
           });
         }
       }
-    };
+    } catch (error) {
+       console.error('Error processing payment with intent:', error);
+       toast.error('Payment processing failed', {
+         description: error.message || 'An unexpected error occurred.'
+       });
+       throw error; // Re-throw to be caught by the initializer
+    }
+  };
 
-    // Handle already processed payments
-    const handleAlreadyProcessedPayment = () => {
-      setShowProcessedModal(true);
-      
-      let count = 3;
+  // Handle already processed payments
+  const handleAlreadyProcessedPayment = () => {
+    setShowProcessedModal(true);
+    
+    let count = 3;
+    setCountdown(count);
+    
+    const toastId = toast.warning(
+      "Payment Already Processed", 
+      {
+        description: `This payment has already been processed. Redirecting to dashboard in ${count} seconds...`,
+        duration: 3000,
+      }
+    );
+    
+    const interval = setInterval(() => {
+      count--;
       setCountdown(count);
       
-      const toastId = toast.warning(
-        "Payment Already Processed", 
-        {
-          description: `This payment has already been processed. Redirecting to dashboard in ${count} seconds...`,
-          duration: 3000,
-        }
-      );
-      
-      const interval = setInterval(() => {
-        count--;
-        setCountdown(count);
-        
-        if (count > 0) {
-          toast.warning(
-            "Payment Already Processed",
-            {
-              id: toastId,
-              description: `This payment has already been processed. Redirecting to dashboard in ${count} seconds...`,
-              duration: 1000,
-            }
-          );
-        } else {
-          clearInterval(interval);
-          router.push('/dashboard');
-        }
-      }, 1000);
-    };
-
-    initializePaymentSuccess();
-  }, [dispatch, searchParams, storedSessionId, router]);
+      if (count > 0) {
+        toast.warning(
+          "Payment Already Processed",
+          {
+            id: toastId,
+            description: `This payment has already been processed. Redirecting to dashboard in ${count} seconds...`,
+            duration: 1000,
+          }
+        );
+      } else {
+        clearInterval(interval);
+        router.push('/dashboard');
+      }
+    }, 1000);
+  };
 
   if (loading) {
     return (
@@ -663,20 +620,63 @@ export default function PaymentSuccess() {
   }
 
   return (
-    <>
-      {showProcessedModal ? (
-        <ProcessedPaymentModal countdown={countdown} />
+    <div className="max-w-md mx-auto mt-16 p-4">
+      {loading ? (
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verifying your payment...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center space-y-4">
+          <div className="bg-red-100 p-4 rounded-md text-red-700">
+            <h3 className="font-medium">Payment Error</h3>
+            <p className="mt-2 text-sm">{error}</p>
+          </div>
+          <Link href="/payment" className="mt-6 inline-block text-indigo-600 hover:text-indigo-800">
+            Return to Payment Page
+          </Link>
+        </div>
+      ) : showProcessedModal ? (
+        // 套餐升级成功倒计时页面
+        <div className="text-center space-y-4 bg-white p-6 rounded-lg shadow-md">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+            <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Plan Upgraded Successfully!</h2>
+          <p className="text-green-600 font-medium">
+            Your subscription has been updated to {metadata?.planName || sessionDetails?.metadata?.planName}
+          </p>
+          <div className="my-4 p-3 bg-blue-50 rounded-md">
+            <p>Redirecting to subscription page in <span className="font-bold">{countdown}</span> seconds...</p>
+          </div>
+          <div className="mt-4">
+            <button 
+              onClick={() => router.push('/settings/subscription')}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
+            >
+              Go to Subscription Page Now
+            </button>
+          </div>
+        </div>
       ) : (
-        <PaymentSuccessModal
-          metadata={metadata}
-          userEmail={userEmail}
-          formatAmount={formatAmount}
-          formatOrderId={formatOrderId}
-          isOrderIdExpanded={isOrderIdExpanded}
-          setIsOrderIdExpanded={setIsOrderIdExpanded}
-          copyToClipboard={copyToClipboard}
-        />
+        <>
+          {paymentDetails || metadata ? (
+            <PaymentSuccessModal 
+              metadata={metadata}
+              userEmail={userEmail}
+              formatAmount={formatAmount}
+              formatOrderId={formatOrderId}
+              isOrderIdExpanded={isOrderIdExpanded}
+              setIsOrderIdExpanded={setIsOrderIdExpanded}
+              copyToClipboard={copyToClipboard}
+            />
+          ) : (
+            <ProcessedPaymentModal />
+          )}
+        </>
       )}
-    </>
+    </div>
   );
 }
