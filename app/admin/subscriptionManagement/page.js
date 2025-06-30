@@ -2323,6 +2323,15 @@ export default function AdminSubscriptions() {
                 toast.error('Please enter a valid price');
                 return;
               }
+              // Validation
+              if (planType === 'FREE' && price !== 0) {
+                toast.error('Free plan must have a price of 0.00');
+                return;
+              }
+              if (planType !== 'FREE' && price === 0) {
+                toast.error('Paid plans must have a price greater than 0.00');
+                return;
+              }
               
               const planData = {
                 name: planName,
@@ -2736,6 +2745,15 @@ export default function AdminSubscriptions() {
               const price = parseFloat(planPrice);
               if (isNaN(price)) {
                 toast.error('Please enter a valid price');
+                return;
+              }
+              // Validation
+              if (planType === 'FREE' && price !== 0) {
+                toast.error('Free plan must have a price of 0.00');
+                return;
+              }
+              if (planType !== 'FREE' && price === 0) {
+                toast.error('Paid plans must have a price greater than 0.00');
                 return;
               }
               

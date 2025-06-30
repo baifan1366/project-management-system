@@ -345,7 +345,7 @@ export default function AdminUserManagement() {
             .select('id')
             .eq('username', newAdminData.username)
             .not('id', 'eq', selectedAdmin.id) // Exclude the current admin from the check
-            .single();
+            .maybeSingle();
           
           if (existingUserByUsername) {
             toast.error('Another admin with this username already exists');
@@ -375,7 +375,7 @@ export default function AdminUserManagement() {
             .select('id')
             .eq('email', newAdminData.email)
             .not('id', 'eq', selectedAdmin.id) // Exclude the current admin from the check
-            .single();
+            .maybeSingle();
           
           if (existingUserByEmail) {
             toast.error('Another admin with this email address already exists');
@@ -557,8 +557,8 @@ export default function AdminUserManagement() {
   const deleteAdmin = async () => {
     try {
       const confirmationValue = deleteConfirmation.trim();
-      const expectedValue = selectedAdmin.username || selectedAdmin.email;
-      
+      const fullNameOrEmail = selectedAdmin.username || selectedAdmin.email;
+      const expectedValue = fullNameOrEmail.length > 15 ? fullNameOrEmail.substring(0, 15) : fullNameOrEmail;
       if (confirmationValue !== expectedValue) {
         toast.error('Confirmation text does not match. Please try again.');
         return;
@@ -920,6 +920,12 @@ export default function AdminUserManagement() {
     return /^[^\s]{2,50}$/.test(name);
   };
 
+  // Add a helper function to truncate text if not already present
+  const truncateText = (text, maxLength = 20) => {
+    if (!text) return '';
+    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -1142,7 +1148,7 @@ export default function AdminUserManagement() {
                                   {admin.full_name || admin.username}
                                 </div>
                                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  @{admin.username}
+                                  @{truncateText(admin.username, 20)}
                                 </div>
                               </div>
                             </div>
@@ -1828,7 +1834,7 @@ export default function AdminUserManagement() {
                     )}
                   </div>
                   <div>
-                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.username || 'Admin'}</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{truncateText(selectedAdmin.username, 20) || 'Admin'}</p>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>{selectedAdmin.email}</p>
                   </div>
                 </div>
@@ -1839,7 +1845,7 @@ export default function AdminUserManagement() {
               
               <div className='p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800'>
                 <p className='text-sm text-yellow-700 dark:text-yellow-300'>
-                  To confirm deletion, please type <strong>{selectedAdmin.username || selectedAdmin.email}</strong> below:
+                  To confirm deletion, please type the admin's username (or the first 15 characters if it is too long) below:
                 </p>
                 <input
                   type='text'
@@ -2116,7 +2122,7 @@ export default function AdminUserManagement() {
               </div>
               <div>
                 <h3 className='text-lg font-medium text-gray-900 dark:text-white'>{selectedAdmin.full_name || selectedAdmin.username}</h3>
-                <p className='text-xs text-gray-500 dark:text-gray-400'>@{selectedAdmin.username}</p>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>@{truncateText(selectedAdmin.username, 20)}</p>
               </div>
               <div className='ml-auto'>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleBadgeStyle(getEffectiveRole(selectedAdmin))}`}>
@@ -2138,7 +2144,7 @@ export default function AdminUserManagement() {
                   </div>
                   <div>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>Username</p>
-                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.username}</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{truncateText(selectedAdmin.username, 20)}</p>
                   </div>
                   <div>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>Full Name</p>
