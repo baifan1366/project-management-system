@@ -1169,6 +1169,9 @@
   "Chat": {
     "title": "Chat",
     "searchPlaceholder": "Search chats",
+    "previousResult": "Previous result",
+    "nextResult": "Next result",
+    "keyboardNavHint": "Use ↑/↓ keys to navigate",
     "subtitle": "Chat with your team members",
     "newChat": "New Chat",
     "newPrivateChat": "New Private Chat",
@@ -1277,7 +1280,8 @@
       "clearAll": "Clear all",
       "searching": "Searching...",
       "matchesFound": "matching message(s)",
-      "resultsFilteredByCleared": "Some results may be filtered by cleared history"
+      "resultsFilteredByCleared": "Some results may be filtered by cleared history",
+      "resultCount": "{current} / {total}"
     },
     "confirm": "Confirm",
     "confirmDelete": "Delete Message",

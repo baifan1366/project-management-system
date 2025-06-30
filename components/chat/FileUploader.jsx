@@ -21,6 +21,7 @@ export default function FileUploader({
   onClose = () => {}, // 关闭回调
   isPending = false, // 等待状态
   buttonClassName = "", // 按钮样式类
+  initialFiles = [], // 初始文件列表，用于粘贴的图片
   children // 子元素，用于自定义按钮内容
 }) {
   const t = useTranslations('FileUploader');
@@ -34,6 +35,14 @@ export default function FileUploader({
   const [previewFile, setPreviewFile] = useState(null);
   const [showDialog, setShowDialog] = useState(false); // 新增状态控制对话框显示
   const { user: currentUser } = useGetUser();
+
+  // 处理初始文件
+  useEffect(() => {
+    if (initialFiles && initialFiles.length > 0) {
+      setFiles(initialFiles);
+      setShowDialog(true); // 自动显示对话框
+    }
+  }, [initialFiles]);
 
   // 处理文件选择
   const handleFileSelect = (e) => {

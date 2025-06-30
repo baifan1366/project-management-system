@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getSubscriptionLimit, trackSubscriptionUsage } from '@/lib/subscriptionService';
 import { useDispatch } from 'react-redux';
 import { limitExceeded } from '@/lib/redux/features/subscriptionSlice';
+import { debounce } from 'lodash';
 
 const PenguinIcon = () => (
   <div className="relative w-full h-full flex items-center justify-center">
@@ -200,12 +201,13 @@ export default function AIChatBot() {
     };
   }, []);
 
-  const handleSubmit = async (e) => {
+  // Modified handleSubmit to be memoized with useCallback for debouncing
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
     if (!input.trim() || !currentUser) return;
     
-    // 检查订阅限制
+    // Check subscription limit
     const limitCheck = await getSubscriptionLimit(currentUser.id, 'ai_chat');
     if (!limitCheck.allowed) {
       dispatch(limitExceeded({
@@ -215,73 +217,62 @@ export default function AIChatBot() {
       return;
     }
 
-    // 验证字数限制
+    // Validate character limit
     if (input.trim().length > 1000) {
       toast.error(t('errors.messageTooLong'));
       return;
     }
     
-    // 添加用户消息
+    // Add user message
     const userMessage = {
       role: 'user',
       content: input.trim(),
       timestamp: new Date().toISOString(),
-      user: currentUser || { name: t('user') } // 确保即使没有currentUser也有默认值
+      user: currentUser || { name: t('user') }
     };
     
-    // 立即显示用户消息
+    // Immediately display user message
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
     
-    // 确保消息显示后再执行下一步操作
-    // 强制React渲染更新
+    // Ensure message is displayed before proceeding
     await new Promise(resolve => setTimeout(resolve, 0));
-    // 滚动到底部
+    // Scroll to bottom
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     
     try {
-      // 首先检查是否需要创建新的AI会话
+      // Check if a new AI session needs to be created
       let currentSessionId = null;
       
-      // 无论是否有 aiSession，都强制创建新会话 - 确保点击 New Chat 后真正创建新会话
       if (!currentSession || !aiSession) {
-        // 创建新的AI会话
-        
         try {
-          // 使用 true 参数强制创建新会话，而不是复用现有会话
           const newSession = await createAIChatSession(true);
           if (newSession) {
-            
             setAiSession(newSession);
-            setCurrentSession(newSession); // 同时更新currentSession
+            setCurrentSession(newSession);
             currentSessionId = newSession.id;
           } else {
-            throw new Error('创建新会话失败');
+            throw new Error('Failed to create new session');
           }
         } catch (error) {
-          console.error('创建AI会话失败:', error);
-          // 如果创建失败，终止消息发送
+          console.error('Failed to create AI session:', error);
           setLoading(false);
-          // 显示错误消息
           setMessages(prev => [...prev, {
             role: 'assistant',
-            content: '创建新会话失败，请稍后再试',
+            content: 'Failed to create new session, please try again later',
             timestamp: new Date().toISOString()
           }]);
           return;
         }
       } else {
-        // 使用现有会话
-        
         currentSessionId = aiSession.id;
       }
       
-      // 发送消息到AI获取响应 - 现在用流式方式处理
+      // Send message to AI to get response
       const response = await sendMessageToAI(input.trim(), messages);
       
-      // 不需要再添加AI回复，因为在流式处理中已经添加了
-      // 但我们需要保存到数据库
+      // Save to database
       const aiMessage = {
         role: 'assistant',
         content: response.content,
@@ -289,12 +280,10 @@ export default function AIChatBot() {
         session_id: currentSessionId
       };
       
-      // 保存消息到数据库
-      
       await saveAIChatMessage({...userMessage, session_id: currentSessionId});
       await saveAIChatMessage(aiMessage);
 
-      // 追踪订阅用量
+      // Track subscription usage
       await trackSubscriptionUsage({
         userId: currentUser.id,
         actionType: 'ai_chat',
@@ -303,16 +292,14 @@ export default function AIChatBot() {
       });
     } catch (error) {
       console.error(t('aiResponseError'), error);
-      // 添加错误消息
       const errorMessage = {
         role: 'assistant',
-        content: t('errorMessage') || '发生错误，请稍后再试',
+        content: t('errorMessage') || 'An error occurred, please try again later',
         timestamp: new Date().toISOString()
       };
       
       setMessages(prev => [...prev, errorMessage]);
       
-      // 保存错误消息到数据库
       if (aiSession) {
         await saveAIChatMessage({...errorMessage, session_id: aiSession.id});
       } else {
@@ -321,7 +308,15 @@ export default function AIChatBot() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [input, currentUser, messages, currentSession, aiSession, t, sendMessageToAI, saveAIChatMessage, createAIChatSession, dispatch, setCurrentSession]);
+
+  // Create a debounced version of the submit handler
+  const debouncedSubmit = useCallback(
+    debounce((e) => {
+      handleSubmit(e);
+    }, 500, { leading: true, trailing: false }),
+    [handleSubmit]
+  );
 
   // 发送消息到AI
   const sendMessageToAI = async (userInput, messageHistory) => {
@@ -530,7 +525,7 @@ export default function AIChatBot() {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex items-end gap-2">
+          <form onSubmit={debouncedSubmit} className="flex items-end gap-2">
             <div className="flex-1 bg-accent rounded-lg">
               <div className="px-3 pb-2 pt-2 relative">
                 <textarea
@@ -539,7 +534,7 @@ export default function AIChatBot() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSubmit(e);
+                      debouncedSubmit(e);
                     }
                   }}
                   placeholder={t('inputPlaceholder')}
