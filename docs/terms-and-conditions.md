@@ -19,16 +19,52 @@ You are required to create an account to access and use certain features. You ar
 ---
 
 ## 2. Subscription Plans
-Team Sync offers three subscription tiers:
-- **Free**: Basic features with limited storage and project access.
-- **Pro**: Paid monthly or annually with extended features.
-- **Enterprise**: Custom plans tailored for large organizations.
+Team Sync provides several product‑specific subscription plans:
+Each plan is offered in three tiers:
+**Free**: 
+• Calendar – Uses a calendar view to plan, schedule, and track tasks by date.
+• Posts – Publish and manage project-related announcements.
+• Files – Upload, organize, and share documents.
 
-### Payments
-Paid plans are billed in advance and are non-refundable except as required by law.
+**Pro**: 
+• Timeline – Visualize tasks along a simple project timeline.
+• Note – Central knowledge-base for notes and documentation.
+• Kanban – Status-based board for task tracking.
 
-### Renewal and Cancellation
-Subscriptions renew automatically unless canceled before the end of the billing cycle. You can cancel anytime via your account settings.
+**Enterprise**:
+• Workflow – Map tasks through structured progress stages.
+• Agile – Board tailored for iterative agile cycles.
+• Gantt – Full gantt chart with timelines and dependencies.
+
+*Feature sets can vary slightly between product lines; see in-app pricing pages for exact inclusions.
+
+### Usage Limits
+Each plan and tier comes with its own set of usage limits, including:
+-Max Projects
+-Max Teams
+-Max Members per Team
+-Max AI Chats
+-Max AI Tasks
+-Max AI Workflows
+
+### Billing Cycle
+The Free tier plan has no billing interval and is completely free to use.
+
+Pro and Enterprise tiers may be offered with:
+• No billing interval (e.g., trial or custom license),
+• A monthly billing cycle, or
+• A yearly billing cycle.
+
+The billing cycle depends on the specific plan configuration selected or arranged during sign-up or purchase.
+
+You can view or change your billing cycle (where applicable) under Account Settings → Subscription.
+
+### Refund Policy
+Only your most recent payment is refundable, and only when you submit a request via the “Refund” form on the Contact Us page (the form appears if you have an eligible transaction). Earlier charges are non‑refundable.
+
+### 2.4 Automatic Renewal
+-Auto‑renew applies only when a default credit‑card payment method is saved.
+-Without a default card on file, the subscription simply expires unless renewed manually.
 
 ---
 
@@ -91,6 +127,6 @@ We reserve the right to modify these Terms at any time. If we make significant c
 If you have any questions about these Terms, please contact us at:
 
 **Team Sync Support**  
-Email: teamsync1366@gmail.coom
+Email: teamsync1366@gmail.com
 
 ---

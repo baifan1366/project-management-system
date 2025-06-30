@@ -477,7 +477,7 @@ export default function AdminSubscriptions() {
   
   // Format storage size for display
   const formatStorage = (bytes) => {
-    if (bytes === -1) return 'Unlimited';
+    if (bytes === 0) return 'Unlimited';
     
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     if (bytes === 0) return '0 Byte';
@@ -699,7 +699,7 @@ export default function AdminSubscriptions() {
   // Calculate remaining usage based on plan limits and current usage
   const calculateRemainingUsage = (current, max) => {
     // If max is -1, it means unlimited
-    if (max === -1) return "∞";
+    if (max === 0) return "∞";
     return max - current;
   };
 
@@ -1751,7 +1751,7 @@ export default function AdminSubscriptions() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_projects} / {subscription.plan?.max_projects === 0 || subscription.plan?.max_projects === -1 ? '∞' : subscription.plan?.max_projects}
+                                    {subscription.current_projects} / {subscription.plan?.max_projects === 0? '∞' : subscription.plan?.max_projects}
                                   </span>
                                   <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                     <div 
@@ -1762,7 +1762,7 @@ export default function AdminSubscriptions() {
                                           ? 'bg-yellow-500' 
                                           : 'bg-green-500'
                                       }`} 
-                                      style={{ width: subscription.plan?.max_projects === 0 || subscription.plan?.max_projects === -1 ? '0%' : `${Math.min(100, (subscription.current_projects / subscription.plan?.max_projects * 100))}%` }}
+                                      style={{ width: subscription.plan?.max_projects === 0 ? '0%' : `${Math.min(100, (subscription.current_projects / subscription.plan?.max_projects * 100))}%` }}
                                     />
                                   </div>
                                 </div>
@@ -1770,7 +1770,7 @@ export default function AdminSubscriptions() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_members} / {subscription.plan?.max_members === 0 || subscription.plan?.max_members === -1 ? '∞' : subscription.plan?.max_members}
+                                    {subscription.current_members} / {subscription.plan?.max_members === 0? '∞' : subscription.plan?.max_members}
                                   </span>
                                   <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                     <div 
@@ -1781,7 +1781,7 @@ export default function AdminSubscriptions() {
                                           ? 'bg-yellow-500' 
                                           : 'bg-green-500'
                                       }`} 
-                                      style={{ width: subscription.plan?.max_members === 0 || subscription.plan?.max_members === -1 ? '0%' : `${Math.min(100, (subscription.current_members / subscription.plan?.max_members * 100))}%` }}
+                                      style={{ width: subscription.plan?.max_members === 0? '0%' : `${Math.min(100, (subscription.current_members / subscription.plan?.max_members * 100))}%` }}
                                     />
                                   </div>
                                 </div>
@@ -1790,7 +1790,7 @@ export default function AdminSubscriptions() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_ai_chat || 0} / {subscription.plan?.max_ai_chat === 0 || subscription.plan?.max_ai_chat === -1 ? '∞' : subscription.plan?.max_ai_chat}
+                                    {subscription.current_ai_chat || 0} / {subscription.plan?.max_ai_chat === 0? '∞' : subscription.plan?.max_ai_chat}
                                   </span>
                                   <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                     <div 
@@ -1801,7 +1801,7 @@ export default function AdminSubscriptions() {
                                           ? 'bg-yellow-500' 
                                           : 'bg-green-500'
                                       }`} 
-                                      style={{ width: subscription.plan?.max_ai_chat === 0 || subscription.plan?.max_ai_chat === -1 ? '0%' : `${Math.min(100, ((subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat * 100))}%` }}
+                                      style={{ width: subscription.plan?.max_ai_chat === 0 ? '0%' : `${Math.min(100, ((subscription.current_ai_chat || 0) / subscription.plan?.max_ai_chat * 100))}%` }}
                                     />
                                   </div>
                                 </div>
@@ -1810,7 +1810,7 @@ export default function AdminSubscriptions() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_ai_task || 0} / {subscription.plan?.max_ai_task === 0 || subscription.plan?.max_ai_task === -1 ? '∞' : subscription.plan?.max_ai_task}
+                                    {subscription.current_ai_task || 0} / {subscription.plan?.max_ai_task === 0? '∞' : subscription.plan?.max_ai_task}
                                   </span>
                                   <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                     <div 
@@ -1821,7 +1821,7 @@ export default function AdminSubscriptions() {
                                           ? 'bg-yellow-500' 
                                           : 'bg-green-500'
                                       }`} 
-                                      style={{ width: subscription.plan?.max_ai_task === 0 || subscription.plan?.max_ai_task === -1 ? '0%' : `${Math.min(100, ((subscription.current_ai_task || 0) / subscription.plan?.max_ai_task * 100))}%` }}
+                                      style={{ width: subscription.plan?.max_ai_task === 0? '0%' : `${Math.min(100, ((subscription.current_ai_task || 0) / subscription.plan?.max_ai_task * 100))}%` }}
                                     />
                                   </div>
                                 </div>
@@ -1830,7 +1830,7 @@ export default function AdminSubscriptions() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900 dark:text-white flex flex-col">
                                   <span className="mb-1">
-                                    {subscription.current_ai_workflow || 0} / {subscription.plan?.max_ai_workflow === 0 || subscription.plan?.max_ai_workflow === -1 ? '∞' : subscription.plan?.max_ai_workflow}
+                                    {subscription.current_ai_workflow || 0} / {subscription.plan?.max_ai_workflow === 0 ? '∞' : subscription.plan?.max_ai_workflow}
                                   </span>
                                   <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                     <div 
@@ -1841,7 +1841,7 @@ export default function AdminSubscriptions() {
                                           ? 'bg-yellow-500' 
                                           : 'bg-green-500'
                                       }`} 
-                                      style={{ width: subscription.plan?.max_ai_workflow === 0 || subscription.plan?.max_ai_workflow === -1 ? '0%' : `${Math.min(100, ((subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow * 100))}%` }}
+                                      style={{ width: subscription.plan?.max_ai_workflow === 0? '0%' : `${Math.min(100, ((subscription.current_ai_workflow || 0) / subscription.plan?.max_ai_workflow * 100))}%` }}
                                     />
                                   </div>
                                 </div>
@@ -2553,12 +2553,12 @@ export default function AdminSubscriptions() {
                       id='add-max-projects'
                       name='max_projects'
                       required
-                      min='-1'
+                      min='0'
                       value={planMaxProjects}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter max projects (-1 for unlimited)'
+                      placeholder='Enter max projects (0 for unlimited)'
                       onChange={(e) => setPlanMaxProjects(e.target.value)}
                     />
                   </div>
@@ -2577,7 +2577,7 @@ export default function AdminSubscriptions() {
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter storage limit in GB'
+                      placeholder='Enter storage limit in GB (0 for unlimited)'
                       onChange={(e) => setPlanMaxStorage(e.target.value)}
                     />
                   </div>
@@ -2591,12 +2591,12 @@ export default function AdminSubscriptions() {
                       id='add-max-ai-chat'
                       name='max_ai_chat'
                       required
-                      min='-1'
+                      min='0'
                       value={planMaxAiChat}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter max AI chat messages (-1 for unlimited)'
+                      placeholder='Enter max AI chat messages (0 for unlimited)'
                       onChange={(e) => setPlanMaxAiChat(e.target.value)}
                     />
                   </div>
@@ -2610,12 +2610,12 @@ export default function AdminSubscriptions() {
                       id='add-max-ai-task'
                       name='max_ai_task'
                       required
-                      min='-1'
+                      min='0'
                       value={planMaxAiTask}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter max AI tasks (-1 for unlimited)'
+                      placeholder='Enter max AI tasks (0 for unlimited)'
                       onChange={(e) => setPlanMaxAiTask(e.target.value)}
                     />
                   </div>
@@ -2629,12 +2629,12 @@ export default function AdminSubscriptions() {
                       id='add-max-ai-workflow'
                       name='max_ai_workflow'
                       required
-                      min='-1'
+                      min='0'  
                       value={planMaxAiWorkflow}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter max AI workflows (-1 for unlimited)'
+                      placeholder='Enter max AI workflows (0 for unlimited)'
                       onChange={(e) => setPlanMaxAiWorkflow(e.target.value)}
                     />
                   </div>
@@ -2969,12 +2969,12 @@ export default function AdminSubscriptions() {
                       id='edit-max-projects'
                       name='max_projects'
                       required
-                      min='-1'
+                      min='0'
                       value={planMaxProjects}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter max projects (-1 for unlimited)'
+                      placeholder='Enter max projects (0 for unlimited)'
                       onChange={(e) => setPlanMaxProjects(e.target.value)}
                     />
                   </div>
@@ -2993,7 +2993,7 @@ export default function AdminSubscriptions() {
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter storage limit in GB'
+                      placeholder='Enter storage limit in GB (0 for unlimited)'
                       onChange={(e) => setPlanMaxStorage(e.target.value)}
                     />
                   </div>
@@ -3007,12 +3007,12 @@ export default function AdminSubscriptions() {
                       id='edit-max-ai-chat'
                       name='max_ai_chat'
                       required
-                      min='-1'
+                      min='0'
                       value={planMaxAiChat}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter max AI chat messages (-1 for unlimited)'
+                      placeholder='Enter max AI chat messages (0 for unlimited)'
                       onChange={(e) => setPlanMaxAiChat(e.target.value)}
                     />
                   </div>
@@ -3026,12 +3026,12 @@ export default function AdminSubscriptions() {
                       id='edit-max-ai-task'
                       name='max_ai_task'
                       required
-                      min='-1'
+                      min='0'
                       value={planMaxAiTask}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter max AI tasks (-1 for unlimited)'
+                      placeholder='Enter max AI tasks (0 for unlimited)'
                       onChange={(e) => setPlanMaxAiTask(e.target.value)}
                     />
                   </div>
@@ -3045,12 +3045,12 @@ export default function AdminSubscriptions() {
                       id='edit-max-ai-workflow'
                       name='max_ai_workflow'
                       required
-                      min='-1'
+                      min='0'
                       value={planMaxAiWorkflow}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
                         focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter max AI workflows (-1 for unlimited)'
+                      placeholder='Enter max AI workflows (0 for unlimited)'
                       onChange={(e) => setPlanMaxAiWorkflow(e.target.value)}
                     />
                   </div>

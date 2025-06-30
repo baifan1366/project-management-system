@@ -655,11 +655,11 @@ export default function AdminUserManagement() {
   const getRoleBadgeStyle = (role) => {
     switch (role) {
       case 'SUPER_ADMIN':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100';
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-800/30 dark:text-purple-300';
       case 'ADMIN':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/30 dark:text-gray-300';
     }
   };
   
@@ -974,7 +974,7 @@ export default function AdminUserManagement() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((row) => (
-                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-750">
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse mr-3"></div>
@@ -1009,11 +1009,11 @@ export default function AdminUserManagement() {
             </div>
             
             {/* Pagination Skeleton */}
-            <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+            <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
               <div className="flex-1 flex justify-between items-center">
-                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
               </div>
             </div>
           </div>
@@ -1121,7 +1121,7 @@ export default function AdminUserManagement() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {currentAdmins.length > 0 ? (
                       currentAdmins.map((admin) => (
-                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
+                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="w-8 h-8 rounded-full flex items-center justify-center mr-3 overflow-hidden">
@@ -1159,11 +1159,11 @@ export default function AdminUserManagement() {
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             {admin.is_active ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300">
                                 Active
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-300">
                                 Inactive
                               </span>
                             )}
@@ -1225,7 +1225,7 @@ export default function AdminUserManagement() {
                       disabled={currentPage === 1}
                       className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
                         currentPage === 1
-                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-800 cursor-not-allowed'
                           : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
                       }`}
                     >
@@ -1239,7 +1239,7 @@ export default function AdminUserManagement() {
                       disabled={currentPage === totalPages}
                       className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
                         currentPage === totalPages
-                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-800 cursor-not-allowed'
                           : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
                       }`}
                     >

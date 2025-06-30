@@ -661,7 +661,7 @@ export default function ContactUs(){
                         <p>
                         <strong>Support:</strong>{' '}
                         <a href="#" className="text-pink-500 hover:underline">
-                            support@teamsync.com
+                        teamsync1366@gmail.com
                         </a>
                         <br />
                         Reach out for assistance with technical or account-related issues.
@@ -670,38 +670,22 @@ export default function ContactUs(){
                         <p>
                         <strong>Sales:</strong>{' '}
                         <a href="#" className="text-pink-500 hover:underline">
-                            hello@teamsync.com
+                        teamsync1366@gmail.com
                         </a>
                         <br />
                         Connect with our team for inquiries about plans or partnerships.
-                        </p>
-                        
-                        <p>
-                        <strong>Feedback:</strong>{' '}
-                        <a href="/feedback" className="text-pink-500 hover:underline">
-                            Share your thoughts
-                        </a>
-                        <br />
-                        We value your input to help improve Taskade.
                         </p>
                     </div>
                 </div>
         
                 {/* Office locations */}
                 <div className="mt-16">
-                    <h2 className="text-2xl font-bold mb-6">Office Locations</h2>
+                    <h2 className="text-2xl font-bold mb-6">Office Location</h2>
                     
                     <div className="space-y-6">
                         <div>
-                        <h3 className="font-bold mb-1">San Francisco Office</h3>
-                        <p>1160 Battery Street East, Suite 100</p>
-                        <p>San Francisco, California 94111, USA</p>
-                        </div>
-                        
-                        <div>
-                        <h3 className="font-bold mb-1">Singapore Office</h3>
-                        <p>73A Ayer Rajah Crescent</p>
-                        <p>Singapore 139957, Singapore</p>
+                        <h3 className="font-bold mb-1">Multimedia University, Melaka</h3>
+                        <p>Siti Hasmah Digital Library, Learning Point</p>
                         </div>
                     </div>
                 </div>
@@ -710,14 +694,9 @@ export default function ContactUs(){
                 <div className="mt-16">
                     <h2 className="text-2xl font-bold mb-6">Enterprise Support</h2>
                     
-                    <p className="mb-2">Phone: (415) 888-9177</p>
+                    <p className="mb-2">Phone: +60 11-1065 3966 (Mr. She) | +60 11-5581 9008 (Mr. Tan) | +60 11-6520 0275 (Ms. Chong)</p>
+
                     <p className="mb-4">Phone support is exclusively available for enterprise customers.</p>
-                    <Link 
-                        href="/contact-sales" 
-                        className="text-pink-500 hover:underline"
-                    >
-                        Contact Sales
-                    </Link> to explore the Enterprise plan and schedule a call with our team.
                 </div>
             </div>
         </div>
