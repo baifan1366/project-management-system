@@ -759,7 +759,7 @@
       "MENTION": "Mentioned you",
       "ADDED_TO_CHAT": "Added to chat",
       "MEETING_INVITE": "Meeting invitation",
-      "TEAM_ANNOUNCEMENT": "Team announcement", 
+      "TEAM_ANNOUNCEMENT": "Team announcement",
       "SYSTEM": "System notification",
       "task": "Task",
       "meeting": "Meeting",
@@ -1214,9 +1214,12 @@
     "teamNameRequired": "Please enter a team name",
     "duplicateTeamName": "Team name already exists, please use a different name"
   },
-      "Chat": {
+  "Chat": {
     "title": "Chat",
     "searchPlaceholder": "Search chats",
+    "previousResult": "Previous result",
+    "nextResult": "Next result",
+    "keyboardNavHint": "Use ↑/↓ keys to navigate",
     "subtitle": "Chat with your team members",
     "newChat": "New Chat",
     "newPrivateChat": "New Private Chat",
@@ -1325,7 +1328,8 @@
       "clearAll": "Clear all",
       "searching": "Searching...",
       "matchesFound": "matching message(s)",
-      "resultsFilteredByCleared": "Some results may be filtered by cleared history"
+      "resultsFilteredByCleared": "Some results may be filtered by cleared history",
+      "resultCount": "{current} / {total}"
     },
     "confirm": "Confirm",
     "confirmDelete": "Delete Message",
@@ -1464,7 +1468,7 @@
     "email": "Email",
     "permissions": "Permissions",
     "copyLink": "Copy Link",
-    "editor": "Editor",
+    "editor": "Member",
     "teamMembers": "Team Members",
     "owner": "Owner",
     "invitationDescription": "Invite user to this team.",
@@ -1693,9 +1697,9 @@
     "deleteTask": "Delete Task",
     "calendarRefreshed": "Calendar refreshed",
     "titleTooShort": "Title must be at least 2 characters.",
-    "titleTooLong": "Title cannot exceed 100 characters.",
+    "titleTooLong": "Title cannot exceed 50 characters.",
     "descriptionTooShort": "Description must be at least 10 characters.",
-    "descriptionTooLong": "Description cannot exceed 1000 characters",
+    "descriptionTooLong": "Description cannot exceed 100 characters",
     "dueDateBeforeStartDate": "Due Date cannot earlier than Start Date",
     "formHasErrors": "Form has error. Please try again.",
     "updateTask": "Update",
@@ -2034,15 +2038,15 @@
       }
     },
     "emailVerification": {
-        "title": "Email Verification",
-        "loading": "Verifying your email...",
-        "redirecting": "Redirecting you to login page...",
-        "backToLogin": "Back to login",
-        "spam": "If you didn't request this verification, please contact support.",
-        "resend": "Resend verification code",
-        "resending": "Resending...",
-        "resendSuccess": "Verification code resent successfully",
-        "resendFailed": "Failed to resend verification code"
+      "title": "Email Verification",
+      "loading": "Verifying your email...",
+      "redirecting": "Redirecting you to login page...",
+      "backToLogin": "Back to login",
+      "spam": "If you didn't request this verification, please contact support.",
+      "resend": "Resend verification code",
+      "resending": "Resending...",
+      "resendSuccess": "Verification code resent successfully",
+      "resendFailed": "Failed to resend verification code"
     },
     "signup": {
       "title": "Sign up",
@@ -2325,7 +2329,7 @@
     "loadingError": "Loading error",
     "noTeamMemberFound": "No team members found",
     "OWNER": "Owner",
-    "CAN_EDIT": "Editor",
+    "CAN_EDIT": "Member",
     "CAN_VIEW": "Viewer",
     "titleLengthError": "Title must be between 2 and 50 characters",
     "edit": "Edit",

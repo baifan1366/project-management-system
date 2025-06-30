@@ -129,7 +129,7 @@ export default function CalendarTools({
     if (trimmedTitle.length < 2 && trimmedTitle.length > 0) {
       setErrors(prev => ({ ...prev, title: true }))
       setErrorMessages(prev => ({ ...prev, title: t('titleTooShort') }))
-    } else if (trimmedTitle.length > 100) {
+    } else if (trimmedTitle.length > 50) {
       setErrors(prev => ({ ...prev, title: true }))
       setErrorMessages(prev => ({ ...prev, title: t('titleTooLong') }))
     } else {
@@ -141,7 +141,7 @@ export default function CalendarTools({
     if (description.trim().length > 0 && description.trim().length < 10) {
       setErrors(prev => ({ ...prev, description: true }))
       setErrorMessages(prev => ({ ...prev, description: t('descriptionTooShort') }))
-    } else if (description.trim().length > 1000) {
+    } else if (description.trim().length > 100) {
       setErrors(prev => ({ ...prev, description: true }))
       setErrorMessages(prev => ({ ...prev, description: t('descriptionTooLong') }))
     } else {
@@ -162,8 +162,8 @@ export default function CalendarTools({
 
   // 检查表单是否有效
   const isFormValid = () => {
-    const isTitleValid = title.trim().length >= 2 && title.trim().length <= 100
-    const isDescriptionValid = description.trim().length === 0 || (description.trim().length >= 10 && description.trim().length <= 1000)
+    const isTitleValid = title.trim().length >= 2 && title.trim().length <= 50
+    const isDescriptionValid = description.trim().length === 0 || (description.trim().length >= 10 && description.trim().length <= 100)
     const isDatesValid = !isBefore(dueDate, startDate) // 只检查dueDate是否早于startDate
     const isSectionSelected = !!selectedSection
     
@@ -308,6 +308,8 @@ export default function CalendarTools({
                   placeholder={t('taskTitlePlaceholder')}
                   className={cn(errors.title && "border-red-500")}
                   required
+                  maxLength={50}
+                  autoFocus
                 />
                 <div className="flex justify-between items-center">
                   {errors.title ? (
@@ -319,7 +321,7 @@ export default function CalendarTools({
                     <span className="text-xs text-muted-foreground opacity-0"></span>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {title.trim().length}/100
+                    {title.trim().length}/50
                   </span>
                 </div>
               </div>
@@ -357,6 +359,7 @@ export default function CalendarTools({
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={t('taskDescriptionPlaceholder')}
                   className={cn("min-h-24", errors.description && "border-red-500")}
+                  maxLength={100}
                 />
                 <div className="flex justify-between items-center">
                   {errors.description ? (
@@ -368,7 +371,7 @@ export default function CalendarTools({
                     <span className="text-xs text-muted-foreground opacity-0"></span>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {description.trim().length}/1000
+                    {description.trim().length}/100
                   </span>
                 </div>
               </div>

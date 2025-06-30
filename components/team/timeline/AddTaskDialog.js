@@ -324,7 +324,7 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
                       aria-label={t('taskName')}
                       className="border-gray-300"
                       minLength={2}
-                      maxLength={100}
+                      maxLength={50}
                       onChange={(e) => {
                         field.onChange(e);
                       }}
@@ -332,7 +332,7 @@ export default function AddTaskDialog({ teamId, taskColor, showTaskForm, setShow
                   </FormControl>  
                   <FormMessage className="flex justify-end">
                     <span className="text-gray-500 text-xs ml-2">
-                      {field.value ? `${field.value.trim().length}/100` : "0/100"}
+                      {field.value ? `${field.value.trim().length}/50` : "0/50"}
                     </span>
                   </FormMessage>                
                 </FormItem>

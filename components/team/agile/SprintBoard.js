@@ -2210,7 +2210,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
               </div>
             </div>
           ) : (
-            <ScrollArea className="h-[60vh] w-full">
+            <ScrollArea className="h-[60vh] w-full overflow-x-auto">
               <Table className="w-full">
                 <TableHeader>
                   <TableRow>

@@ -382,7 +382,8 @@
         "operationLimited": "操作受限",
         "createProjectLimited": "项目创建受限",
         "inviteMemberLimited": "成员邀请受限",
-        "createTeamLimited": "团队创建受限"
+        "createTeamLimited": "团队创建受限",
+        "aiChatLimited": "已达到AI聊天次数限制"
       }
     }
   },
@@ -1294,7 +1295,7 @@
     "email": "邮箱",
     "permissions": "权限",
     "copyLink": "复制链接",
-    "editor": "编辑者",
+    "editor": "成员",
     "teamMembers": "团队成员",
     "owner": "所有者",
     "invitationDescription": "邀请用户加入此团队。",
@@ -1519,9 +1520,9 @@
     "deleteTask": "删除任务",
     "calendarRefreshed": "日历已刷新",
     "titleTooShort": "标题必须至少有2个字符。",
-    "titleTooLong": "标题不能超过100个字符。",
+    "titleTooLong": "标题不能超过50个字符。",
     "descriptionTooShort": "描述必须至少有10个字符。",
-    "descriptionTooLong": "描述不能超过1000个字符",
+    "descriptionTooLong": "描述不能超过100个字符",
     "dueDateBeforeStartDate": "结束日期不能早于开始日期",
     "formHasErrors": "表单有错误。请重试。",
     "updateTask": "更新",
@@ -1773,10 +1774,12 @@
     "tipDetailsForProject": "你可以这样说：\"添加5个高优先级任务：首页设计、用户登录功能、数据库设计...\" 或 \"邀请 team@example.com 加入团队\""
   },
   "auth": {
+    "title": "认证",
     "login": {
       "title": "登录",
       "subtitle": "欢迎回来！",
       "button": "登录",
+      "success": "成功",
       "loading": "登录中...",
       "forgotPassword": "忘记密码？",
       "noAccount": "没有账号？",
@@ -1825,6 +1828,15 @@
       "subtitle": "请输入你注册时使用的邮箱以接收重置指令。",
       "emailPlaceholder": "邮箱地址",
       "button": "重置密码",
+      "twoFactorAuth": "两步验证",
+      "enterCode": "请输入验证码以继续",
+      "verificationMethod": "验证方式",
+      "authenticatorApp": "验证器应用",
+      "email": "电子邮件",
+      "enterTotpCode": "输入验证器应用中的6位数验证码",
+      "enterEmailCode": "输入发送到您邮箱的验证码",
+      "digitCode": "6位数验证码",
+      "verificationCode": "验证码",
       "sending": "发送中...",
       "emailSent": "重置链接已发送",
       "checkInbox": "请检查你的邮箱以获取密码重置链接。",
@@ -1852,7 +1864,17 @@
       "login": "登录",
       "tokenExpired": "你的密码重置令牌已过期",
       "verifying": "验证令牌...",
-      "refreshing": "刷新令牌..."
+      "refreshing": "刷新令牌...",
+      "resendIn": "重新发送倒计时",
+      "resendCode": "重新发送验证码",
+      "cancel": "取消",
+      "verify": "验证",
+      "codeSent": "验证码已发送到您的电子邮箱",
+      "totpCodeError": "请输入验证器应用中的有效6位数验证码",
+      "emailCodeError": "请输入从电子邮件收到的验证码",
+      "verificationSuccess": "验证成功",
+      "havingTrouble": "遇到问题？",
+      "contactSupport": "联系客服"
     }
   },
   "notificationType": {
@@ -2035,6 +2057,7 @@
     "sendEmail": "发送邮件"
   },
   "TeamOverview": {
+    "CAN_EDIT": "成员",
     "titleLengthError": "标题必须介于2到50个字符之间",
     "edit": "编辑",
     "cancel": "取消",
@@ -2818,36 +2841,6 @@
     "userProfile": "用户资料",
     "notFound": "用户未找到",
     "accountSettings": "账户设置"
-  },
-  "auth": {
-    "title": "认证",
-    "login": {
-      "title": "登录",
-      "button": "登录",
-      "success": "成功",
-      "loading": "登录中...",
-      "twoFactorAuth": "两步验证",
-      "enterCode": "请输入验证码以继续",
-      "verificationMethod": "验证方式",
-      "authenticatorApp": "验证器应用",
-      "email": "电子邮件",
-      "enterTotpCode": "输入验证器应用中的6位数验证码",
-      "enterEmailCode": "输入发送到您邮箱的验证码",
-      "digitCode": "6位数验证码",
-      "verificationCode": "验证码",
-      "sending": "发送中...",
-      "resendIn": "重新发送倒计时",
-      "resendCode": "重新发送验证码",
-      "cancel": "取消",
-      "verifying": "验证中...",
-      "verify": "验证",
-      "codeSent": "验证码已发送到您的电子邮箱",
-      "totpCodeError": "请输入验证器应用中的有效6位数验证码",
-      "emailCodeError": "请输入从电子邮件收到的验证码",
-      "verificationSuccess": "验证成功",
-      "havingTrouble": "遇到问题？",
-      "contactSupport": "联系客服"
-    }
   },
   "TermsAndConditions": {
     "title": "条款和条件",

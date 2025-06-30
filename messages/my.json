@@ -78,7 +78,7 @@
   },
   "common": {
     "processing": "Memproses...",
-    "saving": "Menyimpan...",  
+    "saving": "Menyimpan...",
     "save": "Simpan",
     "cancel": "Batal",
     "delete": "Padam",
@@ -368,17 +368,13 @@
       "limits": {
         "back": "Kembali",
         "subscriptionLimit": "Had Langganan",
-        "currentUsage": "Penggunaan semasa: {current} / {limit}",
+        "currentUsage": "Penggunaan Semasa: {current}/{limit}",
         "upgradeSubscription": "Naik Taraf Langganan",
         "operationLimited": "Operasi Terhad",
         "createProjectLimited": "Had Penciptaan Projek Tercapai",
         "inviteMemberLimited": "Had Jemputan Ahli Tercapai",
         "createTeamLimited": "Had Penciptaan Pasukan Tercapai",
-        "aiChatLimited": "Had Sembang AI Tercapai",
-        "operationLimited": "Operasi Terhad",
-        "subscriptionLimit": "Had Langganan",
-        "currentUsage": "Penggunaan Semasa: {current}/{limit}",
-        "upgradeSubscription": "Naik Taraf Langganan"
+        "aiChatLimited": "Had Sembang AI Tercapai"
       }
     }
   },
@@ -597,7 +593,7 @@
       "workspace": "Ruang Kerja"
     },
     "dueDate": {
-      "label": "TARIKH AKHIR", 
+      "label": "TARIKH AKHIR",
       "createdBy": "Dicipta oleh saya"
     },
     "newTask": {
@@ -1195,7 +1191,7 @@
     "allHiddenChats": "Semua Chat Tersembunyi",
     "show": "Tampilkan",
     "hide": "Sembunyikan",
-     "errors": {
+    "errors": {
       "deleteFailed": "Gagal padam chat",
       "hideFailed": "Gagal menyembunyikan chat",
       "notLoggedIn": "Anda perlu log masuk",
@@ -1238,7 +1234,7 @@
     "hoursAgo": "{hours} jam yang lalu",
     "justNow": "Just now",
     "minutesAgo": "{minutes} minutes ago",
-    "daysAgo": "{days} hari yang lalu", 
+    "daysAgo": "{days} hari yang lalu",
     "previousMessages": "Menunjukkan {count} mesej terakhir",
     "mentionSystem": {
       "userMention": "Pengguna menyebut",
@@ -1288,7 +1284,7 @@
     "email": "Email",
     "permissions": "Permissions",
     "copyLink": "Copy Link",
-    "editor": "Editor",
+    "editor": "Member",
     "teamMembers": "Team Members",
     "owner": "Owner",
     "invitationDescription": "Invite user to this team.",
@@ -1514,9 +1510,9 @@
     "deleteTask": "Delete Task",
     "calendarRefreshed": "Calendar refreshed",
     "titleTooShort": "Title must be at least 2 characters.",
-    "titleTooLong": "Title cannot exceed 100 characters.",
+    "titleTooLong": "Title cannot exceed 50 characters.",
     "descriptionTooShort": "Description must be at least 10 characters.",
-    "descriptionTooLong": "Description cannot exceed 1000 characters",
+    "descriptionTooLong": "Description cannot exceed 100 characters",
     "dueDateBeforeStartDate": "Due Date cannot earlier than Start Date",
     "formHasErrors": "Form has error. Please try again.",
     "updateTask": "Update",
@@ -1626,7 +1622,7 @@
     "tagAdded": "Tag added",
     "tagAddedDescription": "Successfully added tag \"{tag}\"",
     "tagAddFailed": "Failed to add tag",
-    "tagAddFailedDescription": "Failed to add tag \"{tag}\""  
+    "tagAddFailedDescription": "Failed to add tag \"{tag}\""
   },
   "notificationCenter": {
     "title": "Notification Center",
@@ -2035,6 +2031,7 @@
     "sendEmail": "Send Email"
   },
   "TeamOverview": {
+    "CAN_EDIT": "Member",
     "titleLengthError": "Title must be between 2 and 50 characters",
     "edit": "Edit",
     "cancel": "Cancel",

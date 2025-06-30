@@ -173,6 +173,7 @@ export default function CreatePageButton({ teamId }) {
                 placeholder={t('pageTitle')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                maxLength={50}
               />
             </div>
             
@@ -182,6 +183,7 @@ export default function CreatePageButton({ teamId }) {
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={6}
+                maxLength={100}
               />
             </div>
           </div>
