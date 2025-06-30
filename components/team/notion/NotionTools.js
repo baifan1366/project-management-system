@@ -590,7 +590,7 @@ export default function NotionTools({
                 onChange={(e) => setContent(e.target.value)}
                 placeholder={t('contentPlaceholder')}
                 className="col-span-3 min-h-40"
-                maxLength={10000}
+                maxLength={100}
               />
             </div>
           </div>

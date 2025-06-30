@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
 import { fetchTaskById, updateTask } from '@/lib/redux/features/taskSlice';
 import TagLabelManager from './TagLabelManager';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * 检查字段类型并返回类型常量
@@ -993,9 +994,16 @@ function MultipleUsers({ userIds }) {
           </h4>
           <div className="max-h-60 overflow-y-auto">
             {isLoading && userIds.length > users.length ? (
-              <div className="flex items-center justify-center py-2">
-                <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                <span className="ml-2 text-sm text-muted-foreground">{t('loading') || '加载中'}</span>
+              <div className="space-y-2 py-2">
+                {Array(Math.min(3, userIds.length - users.length)).fill(0).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <div className="space-y-1 flex-1">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : null}
             
@@ -1011,7 +1019,7 @@ function MultipleUsers({ userIds }) {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
-                  <span className="font-medium text-sm">{user?.name || '未知用户'}</span>
+                  <span className="font-medium text-sm truncate max-w-[20%]">{user?.name || '未知用户'}</span>
                   <span className="text-xs text-muted-foreground">{user?.email || (userIds[idx] ? `ID: ${userIds[idx].substring(0, 8)}...` : '未知ID')}</span>
                 </div>
               </div>
@@ -1471,9 +1479,28 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-            <span className="ml-2 text-sm text-muted-foreground">{t('loading') || '加载中...'}</span>
+          <div className="flex flex-col gap-2 py-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
           </div>
         ) : error ? (
           <div className="text-center py-2 text-sm text-destructive">
@@ -1599,9 +1626,28 @@ export function AssigneeManager({ teamId, taskId }) {
   return (
     <div className="flex flex-col gap-2">
       {isLoading ? (
-        <div className="flex items-center justify-center py-2">
-          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-          <span className="ml-2 text-sm text-muted-foreground">{t('loading') || '加载中...'}</span>
+        <div className="flex flex-col gap-2 py-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          </div>
         </div>
       ) : (
         <>
@@ -2491,6 +2537,7 @@ export function renderSingleSelectCell(value, options = [], onChange, onCreateOp
                       value={editingOption.label}
                       onChange={(e) => setEditingOption({...editingOption, label: e.target.value})}
                       className="w-full p-2 border rounded"
+                      maxLength={15}
                     />
                   </div>
                   <div>
@@ -3092,6 +3139,7 @@ export function renderMultiSelectCell(value, options = [], onChange, onCreateOpt
                       value={editingOption.label}
                       onChange={(e) => setEditingOption({...editingOption, label: e.target.value})}
                       className="w-full p-2 border rounded"
+                      maxLength={15}
                     />
                   </div>
                   <div>
@@ -4201,6 +4249,7 @@ export function SingleSelectManager({
                   onChange={(e) => setNewOption({...newOption, label: e.target.value})}
                   className="w-full p-2 border rounded-md focus:ring-1 focus:outline-none text-sm"
                   placeholder={t('enterOptionName') || '输入选项名称'}
+                  maxLength={15}
                 />
               </div>
               <div>
@@ -4265,6 +4314,7 @@ export function SingleSelectManager({
                   onChange={(e) => setEditingOption({...editingOption, label: e.target.value})}
                   className="w-full p-2 border rounded-md focus:ring-1 focus:outline-none text-sm"
                   placeholder={t('enterOptionName') || '输入选项名称'}
+                  maxLength={15}
                 />
               </div>
               <div>

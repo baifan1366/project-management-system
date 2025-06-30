@@ -212,6 +212,7 @@ function TaskListContent() {
                       onChange={handleSectionNameChange}
                       onKeyDown={handleCreateSection}
                       className="h-8 border-transparent"
+                      maxLength={50}
                     />
                   </div>
                 ) : (

@@ -137,7 +137,7 @@ export default function EditTaskDialog({
     if (trimmedName.length < 2 && trimmedName.length > 0) {
       setErrors(prev => ({ ...prev, name: true }))
       setErrorMessages(prev => ({ ...prev, name: t('nameTooShort') }))
-    } else if (trimmedName.length > 100) {
+    } else if (trimmedName.length > 50) {
       setErrors(prev => ({ ...prev, name: true }))
       setErrorMessages(prev => ({ ...prev, name: t('nameTooLong') }))
     } else {
@@ -149,7 +149,7 @@ export default function EditTaskDialog({
     if (description.trim().length > 0 && description.trim().length < 10) {
       setErrors(prev => ({ ...prev, description: true }))
       setErrorMessages(prev => ({ ...prev, description: t('descriptionTooShort') }))
-    } else if (description.trim().length > 1000) {
+    } else if (description.trim().length > 100) {
       setErrors(prev => ({ ...prev, description: true }))
       setErrorMessages(prev => ({ ...prev, description: t('descriptionTooLong') }))
     } else {
@@ -170,8 +170,8 @@ export default function EditTaskDialog({
   
   // 检查表单是否有效
   const isFormValid = () => {
-    const isNameValid = name.trim().length >= 2 && name.trim().length <= 100
-    const isDescriptionValid = description.trim().length === 0 || (description.trim().length >= 10 && description.trim().length <= 1000)
+    const isNameValid = name.trim().length >= 2 && name.trim().length <= 50
+    const isDescriptionValid = description.trim().length === 0 || (description.trim().length >= 10 && description.trim().length <= 100)
     const isDatesValid = !isBefore(dueDate, startDate) // 只检查dueDate是否早于startDate
     
     return isNameValid && isDescriptionValid && isDatesValid
@@ -339,6 +339,7 @@ export default function EditTaskDialog({
                   className={cn(errors.name && "border-red-500")}
                   required
                   disabled={isReadOnly}
+                  maxLength={50}
                 />
                 <div className="flex justify-between items-center">
                   {errors.name && !isReadOnly ? (
@@ -347,10 +348,10 @@ export default function EditTaskDialog({
                       {errorMessages.name}
                     </p>
                   ) : (
-                    <span className="text-xs text-muted-foreground opacity-0">占位</span>
+                    <span className="text-xs text-muted-foreground opacity-0"></span>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {name.trim().length}/100
+                    {name.trim().length}/50
                   </span>
                 </div>
               </div>
@@ -371,6 +372,7 @@ export default function EditTaskDialog({
                     errors.description && "border-red-500"
                   )}
                   disabled={isReadOnly}
+                  maxLength={100}
                 />
                 <div className="flex justify-between items-center">
                   {errors.description && !isReadOnly ? (
@@ -379,10 +381,10 @@ export default function EditTaskDialog({
                       {errorMessages.description}
                     </p>
                   ) : (
-                    <span className="text-xs text-muted-foreground opacity-0">占位</span>
+                    <span className="text-xs text-muted-foreground opacity-0"></span>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {description.trim().length}/1000
+                    {description.trim().length}/100
                   </span>
                 </div>
               </div>

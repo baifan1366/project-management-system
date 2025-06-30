@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // 角色对应的中文名称
 const roleLabels = {
   'OWNER': 'Owner',
-  'CAN_EDIT': 'Editor',
+  'CAN_EDIT': 'Member',
   'CAN_CHECK': 'Checker',
   'CAN_VIEW': 'Viewer'
 };
