@@ -884,29 +884,20 @@ function PeopleDisplay({ userId }) {
           <AvatarImage src={userInfo.avatar} />
           <AvatarFallback className="bg-primary/10 text-primary font-medium">{userInfo.initial || <User size={14} />}</AvatarFallback>
         </Avatar>
-        <span className="text-sm font-medium group-hover:text-primary transition-colors truncate">{userInfo.name}</span>
+        <span className="text-sm font-medium group-hover:text-primary transition-colors break-words max-w-[150px]">{userInfo.name}</span>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start">
+      <PopoverContent className="h-auto p-0" align="start">
         <div className="flex flex-col">
-          <div className="bg-primary/5 p-4 flex items-start gap-4 border-b">
+          <div className="bg-primary/5 p-2 flex items-start gap-2">
             <Avatar className="h-14 w-14">
-            <AvatarImage src={userInfo.avatar} />
+              <AvatarImage src={userInfo.avatar} />
               <AvatarFallback className="bg-primary/10 text-primary font-medium text-lg">{userInfo.initial || <User size={24} />}</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-              <span className="font-medium text-base">{userInfo.name}</span>
-            <span className="text-sm text-muted-foreground">{userInfo.email}</span>
-            {userInfo.title && (
-                <span className="text-xs text-muted-foreground mt-1 bg-muted px-2 py-0.5 rounded-full w-fit">{userInfo.title}</span>
-            )}
-          </div>
-          </div>
-          {userInfo.department && (
-            <div className="px-4 py-2 text-sm">
-              <span className="text-muted-foreground">部门: </span>
-              <span>{userInfo.department}</span>
+            </Avatar>
+            <div className="flex flex-col p-2">
+              <span className="font-medium text-sm break-words max-w-[90%]">{userInfo.name}</span>
+              <span className="text-sm text-muted-foreground break-words max-w-[90%]">{userInfo.email}</span>
             </div>
-          )}
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -975,7 +966,7 @@ function MultipleUsers({ userIds }) {
           </div>
           
           {/* 用户数量文本 */}
-          <span className="text-sm font-medium">
+          <span className="text-sm font-medium break-words max-w-[150px]">
             {userIds.length > 1 ? 
               `${userIds.length} ${t('users') || '用户'}` : 
               (users[0]?.name || users[0]?.email || '用户')}
@@ -1019,8 +1010,8 @@ function MultipleUsers({ userIds }) {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
-                  <span className="font-medium text-sm truncate max-w-[20%]">{user?.name || '未知用户'}</span>
-                  <span className="text-xs text-muted-foreground">{user?.email || (userIds[idx] ? `ID: ${userIds[idx].substring(0, 8)}...` : '未知ID')}</span>
+                  <span className="font-medium text-sm break-words">{user?.name || '未知用户'}</span>
+                  <span className="text-xs text-muted-foreground break-words">{user?.email || (userIds[idx] ? `ID: ${userIds[idx].substring(0, 8)}...` : '未知ID')}</span>
                 </div>
               </div>
             ))}
@@ -1032,8 +1023,8 @@ function MultipleUsers({ userIds }) {
                   <AvatarFallback className="bg-muted/60"><User size={14} /></AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
-                  <span className="font-medium text-sm">{t('unknown_user') || '未知用户'}</span>
-                  <span className="text-xs text-muted-foreground">ID: {id ? id.substring(0, 8) : '未知'}...</span>
+                  <span className="font-medium text-sm break-words">{t('unknown_user') || '未知用户'}</span>
+                  <span className="text-xs text-muted-foreground break-words">ID: {id ? id.substring(0, 8) : '未知'}...</span>
                 </div>
               </div>
             ))}
@@ -1533,8 +1524,8 @@ function AddUserToAssignee({ teamId, taskId, onAdded }) {
                     )}
                   </Avatar>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium">{member.name || member.user_id}</span>
-                    <span className="text-xs text-muted-foreground">{member.email || `ID: ${member.user_id.substring(0, 8)}...`}</span>
+                    <span className="text-sm font-medium break-words">{member.name || member.user_id}</span>
+                    <span className="text-xs text-muted-foreground break-words">{member.email || `ID: ${member.user_id.substring(0, 8)}...`}</span>
                   </div>
                   {isAssigned ? (
                     <CheckCheck size={16} className="ml-auto text-muted-foreground" />

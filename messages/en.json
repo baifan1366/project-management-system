@@ -2775,6 +2775,7 @@
     "closePreview": "Close Preview"
   },
   "PostsView": {
+    "attachments": "Attachments",
     "postTitleRequired": "Post title is required",
     "uploadingFiles": "Uploading files...",
     "selectPostFirst": "Please select a post first",

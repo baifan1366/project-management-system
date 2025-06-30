@@ -77,6 +77,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
   const [allSections, setAllSections] = useState([]);
   const [loadingAllTasks, setLoadingAllTasks] = useState(false);
   const [userCache, setUserCache] = useState({});
+  const [statusOptions, setStatusOptions] = useState([]);
   
   // 新增编辑任务相关状态
   const [isEditTaskDialogOpen, setIsEditTaskDialogOpen] = useState(false);
@@ -426,7 +427,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
   
   // 修改获取状态颜色的逻辑，直接从标签数据中提取
   const parseStatusFromLabel = (status, teamLabel) => {
-    if (!status || !teamLabel) return { label: status, value: status, color: '#6b7280' };
+    if (!status || !teamLabel) return { label: status, value: status, color: status };
     
     try {
       // 尝试解析JSON字符串
@@ -470,14 +471,14 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
       return {
         label: status,
         value: status,
-        color: '#6b7280'
+        color: status
       };
     } catch (error) {
       console.error('解析状态标签错误:', error);
       return {
         label: status,
         value: status,
-        color: '#6b7280'
+        color: status
       };
     }
   };
@@ -873,21 +874,28 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
         } else if (typeof statusValue === 'string' && statusValue.includes('"value"')) {
           // 已经是JSON字符串格式
           updatedTagValues[statusTagId] = statusValue;
-        } else {
-          // 纯文本状态，需要创建状态对象
-          const defaultColor = '#6b7280';
-          const statusObject = {
-            label: statusValue,
-            value: statusValue,
-            color: defaultColor
-          };
-          updatedTagValues[statusTagId] = JSON.stringify(statusObject);
+        } else if (typeof statusValue === 'string') {
+          // 从状态选项中查找对应的状态对象以获取正确的颜色
+          const statusOption = statusOptions.find(opt => opt.value === statusValue);
+          if (statusOption) {
+            // 使用找到的状态选项，包括其颜色
+            updatedTagValues[statusTagId] = JSON.stringify(statusOption);
+          } else {
+            // 如果找不到匹配的选项，使用默认颜色
+            const defaultColor = '#6b7280';
+            const statusObject = {
+              label: statusValue,
+              value: statusValue,
+              color: defaultColor
+            };
+            updatedTagValues[statusTagId] = JSON.stringify(statusObject);
+          }
         }
       }
       
       // 更新分配人
       if (editTaskData.assignee !== taskToEdit.tag_values?.['2']) {
-        const assigneeValue = editTaskData.assignee === 'none' ? null : editTaskData.assignee;
+        const assigneeValue = editTaskData.assignee === 'none' ? [] : [editTaskData.assignee];
         updatedTagValues['2'] = assigneeValue;
       }
       
@@ -999,8 +1007,8 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
     try {
       setLoading(true);
       
-      // 如果值是"none"，将其转换为null或空值
-      const assigneeValue = userId === 'none' ? null : userId;
+      // 如果值是"none"，将其转换为空数组
+      const assigneeValue = userId === 'none' ? [] : [userId];
       
       // 查找要更新的任务
       const task = sprintTasks.find(t => t.id === taskId);
@@ -1015,7 +1023,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
       const updatedTaskData = {
         tag_values: {
           ...(task.tag_values || {}),
-          '2': assigneeValue // 使用tag id 2来保存assignee值
+          '2': assigneeValue // 使用数组格式保存assignee值
         }
       };
       
@@ -1074,9 +1082,9 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
       toast.success(t('taskAssigneeUpdated'));
       
       // 如果设置了新的用户ID，触发获取用户信息
-      if (assigneeValue) {
+      if (assigneeValue.length > 0) {
         setTimeout(() => {
-          fetchMemberInfo(assigneeValue);
+          fetchMemberInfo(assigneeValue[0]);
         }, 0);
       }
     } catch (error) {
@@ -1091,7 +1099,28 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
   const getMemberInfo = (userId) => {
     if (!userId) return null;
     
-    // 检查是否为多个ID（逗号分隔）
+    // 检查是否为数组格式
+    if (Array.isArray(userId)) {
+      if (userId.length === 0) return null;
+      
+      // 对于数组格式，获取每个用户的信息并组合
+      const usersList = userId.map(id => {
+        // 为每个ID获取用户信息
+        const userInfo = users?.find(u => u.id === id.toString()) || 
+                    userCache[id.toString()] || 
+                    agileMembers.find(member => member.user_id === id.toString());
+        return userInfo || { id: id.toString(), name: 'Loading...' };
+      });
+      
+      return {
+        id: userId.join(','),
+        users: usersList,
+        isMultiple: true,
+        count: usersList.length
+      };
+    }
+    
+    // 检查是否为多个ID（逗号分隔）- 兼容旧格式
     if (typeof userId === 'string' && userId.includes(',')) {
       // 对于多个ID，获取每个用户的信息并组合
       const userIds = userId.split(',').filter(id => id.trim());
@@ -1135,6 +1164,17 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
   // 单独的函数用于请求用户数据，避免在渲染时调用
   const fetchMemberInfo = (userId) => {
     if (!userId) return;
+    
+    // 处理数组格式
+    if (Array.isArray(userId)) {
+      userId.forEach(id => {
+        if (id && id.toString().trim()) {
+          // 递归调用但传入单个ID
+          fetchMemberInfo(id.toString().trim());
+        }
+      });
+      return;
+    }
     
     // 确保userId是字符串类型
     const id = String(userId);
@@ -1347,8 +1387,19 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
     const taskName = getTaskName(task);
     const taskDescription = getTaskDescription(task);
     
-    // 获取任务分配人 - 从tag_values['2']获取
-    const assigneeValue = task.tag_values && task.tag_values['2'] ? task.tag_values['2'] : 'none';
+    // 获取任务分配人 - 从tag_values['2']获取，支持数组格式
+    let assigneeValue = 'none';
+    if (task.tag_values && task.tag_values['2']) {
+      if (Array.isArray(task.tag_values['2']) && task.tag_values['2'].length > 0) {
+        // 从数组中获取第一个值
+        assigneeValue = task.tag_values['2'][0];
+      } else {
+        // 兼容旧格式
+        assigneeValue = task.tag_values['2'];
+      }
+    } else if (task.assignee) {
+      assigneeValue = task.assignee;
+    }
     
     // 获取任务状态 - 从标签系统获取
     let taskStatus = ''; // 默认状态为空
@@ -1426,11 +1477,21 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
   const handleEditFormChange = (field, value) => {
     // 特殊处理status字段
     if (field === 'status') {
-      // 直接存储传入的值，可能是状态对象或字符串
-      setEditTaskData(prev => ({
-        ...prev,
-        [field]: value
-      }));
+      // 检查value是否是对象，可能是状态选项中的一个
+      const statusOption = statusOptions.find(opt => opt.value === value);
+      if (statusOption) {
+        // 如果找到对应的状态选项，使用完整对象
+        setEditTaskData(prev => ({
+          ...prev,
+          [field]: statusOption
+        }));
+      } else {
+        // 如果未找到，直接存储值
+        setEditTaskData(prev => ({
+          ...prev,
+          [field]: value
+        }));
+      }
     } else {
       // 其他字段正常处理
       setEditTaskData(prev => ({
@@ -1541,13 +1602,13 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
       const taskDescription = getTaskDescription(task);
             
       return (
-        <div key={task.id} className="p-3 mb-2 bg-white rounded-md shadow-sm border">
+        <div key={task.id} className="p-3 mb-2 bg-muted-background rounded-md shadow-sm border">
           <div className="flex justify-between">
-            <div className="font-medium">{taskName}</div>
+            <div className="font-medium truncate max-w-[80%]" title={taskName}>{taskName}</div>
             <Button 
               variant="ghost" 
               size="sm" 
-              className="h-6 w-6 p-0"
+              className="h-6 w-6 p-0 flex-shrink-0"
               onClick={() => openEditTaskDialog(task)}
             >
               <Pen className="h-3 w-3" />
@@ -1555,21 +1616,21 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
           </div>
           
           <div className="mt-2">
-            <div className="text-sm text-gray-600">
-              {taskDescription?.length > 80 
-                ? `${taskDescription.substring(0, 80)}...` 
-                : taskDescription || t('noDescription')}
+            <div className="text-sm text-gray-600 truncate" title={taskDescription}>
+              {taskDescription || t('noDescription')}
             </div>
             
             <div className="mt-2 flex justify-between items-center">
               <Select 
-                value={task.assignee || 'none'} 
+                value={task.tag_values && task.tag_values['2'] ? 
+                  (Array.isArray(task.tag_values['2']) && task.tag_values['2'].length > 0 ? task.tag_values['2'][0] : task.tag_values['2']) 
+                  : (task.assignee || 'none')} 
                 onValueChange={(value) => updateTaskAssignee(task.id, value)}
                 disabled={loading}
               >
                 <SelectTrigger className="w-full h-8 text-xs">
                   <SelectValue placeholder={t('assignTo')}>
-                    {task.assignee ? getUserDisplayName(task) : t('unassigned')}
+                    {task.assignee || (task.tag_values && task.tag_values['2']) ? getUserDisplayName(task) : t('unassigned')}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -1583,7 +1644,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
               </Select>
               
               {(task.assignee || (task.tag_values && task.tag_values['2'])) && (
-                <Avatar className="w-6 h-6">
+                <Avatar className="w-6 h-6 flex-shrink-0">
                   <AvatarImage src={getMemberInfo(task.tag_values && task.tag_values['2'] ? task.tag_values['2'] : task.assignee)?.avatar} />
                   <AvatarFallback className={getMemberInfo(task.tag_values && task.tag_values['2'] ? task.tag_values['2'] : task.assignee)?.isMultiple ? 'bg-blue-500 text-white text-[10px]' : ''}>
                     {getUserInitial(task)}
@@ -1595,11 +1656,11 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
           
           {/* 状态操作按钮 */}
           <div className="mt-3 flex justify-end space-x-2">
-            {(task.status === 'todo' || !task.status) && (
+            {selectedType === 'PENDING' && (task.status === 'todo' || !task.status) && (
               <Button 
                 size="sm" 
                 variant={themeColor} 
-                className="text-xs" 
+                className="text-xs flex-shrink-0" 
                 onClick={() => updateTaskStatus(task.id, 'in_progress')}
                 disabled={loading}
               >
@@ -1608,11 +1669,11 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
               </Button>
             )}
             
-            {task.status === 'in_progress' && (
+            {selectedType === 'PENDING' && task.status === 'in_progress' && (
               <Button 
                 size="sm" 
                 variant={themeColor} 
-                className="text-xs" 
+                className="text-xs flex-shrink-0" 
                 onClick={() => updateTaskStatus(task.id, 'done')}
                 disabled={loading}
               >
@@ -2001,14 +2062,34 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
     }
   };
 
+  // 从Redux获取标签数据
+  const { label: teamLabel, status: labelStatus } = useSelector(state => 
+    state.teamLabels || {}
+  );
+
+  // 当组件加载时获取团队标签数据
+  useEffect(() => {
+    if (teamId) {
+      dispatch(getLabelByTeamId(teamId));
+    }
+  }, [dispatch, teamId]);
+  
+  // 当团队标签数据加载完成后，提取SINGLE-SELECT选项
+  useEffect(() => {
+    if (labelStatus === 'succeeded' && teamLabel) {
+      const options = extractSingleSelectOptions(teamLabel);
+      setStatusOptions(options);
+    }
+  }, [teamLabel, labelStatus]);
+
   return (
     <Card className="">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>
           {t('sprintBoard')}
         </CardTitle>
-        {/* 只有当前用户是团队创建者才显示"查看所有任务"按钮 */}
-        {isTeamCreator && (
+        {/* 只有当前用户是团队创建者并且Sprint类型是PLANNING才显示"查看所有任务"按钮 */}
+        {isTeamCreator && selectedType === 'PLANNING' && (
           <Button 
             size="sm" 
             variant={themeColor} 
@@ -2039,7 +2120,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
               </h3>
               <div className="min-h-[300px] space-y-2">
                 {[1, 2, 3].map((_, i) => (
-                  <div key={`todo-${i}`} className="p-3 mb-2 bg-white rounded-md shadow-sm border">
+                  <div key={`todo-${i}`} className="p-3 mb-2 bg-muted-background rounded-md shadow-sm border">
                     <div className="flex justify-between">
                       <Skeleton className="h-5 w-3/4" />
                       <Skeleton className="h-5 w-6" />
@@ -2067,7 +2148,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
               </h3>
               <div className="min-h-[300px] space-y-2">
                 {[1, 2, 3].map((_, i) => (
-                  <div key={`progress-${i}`} className="p-3 mb-2 bg-white rounded-md shadow-sm border">
+                  <div key={`progress-${i}`} className="p-3 mb-2 bg-muted-background rounded-md shadow-sm border">
                     <div className="flex justify-between">
                       <Skeleton className="h-5 w-3/4" />
                       <Skeleton className="h-5 w-6" />
@@ -2095,7 +2176,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
               </h3>
               <div className="min-h-[300px] space-y-2">
                 {[1, 2, 3].map((_, i) => (
-                  <div key={`done-${i}`} className="p-3 mb-2 bg-white rounded-md shadow-sm border">
+                  <div key={`done-${i}`} className="p-3 mb-2 bg-muted-background rounded-md shadow-sm border">
                     <div className="flex justify-between">
                       <Skeleton className="h-5 w-3/4" />
                       <Skeleton className="h-5 w-6" />
@@ -2211,22 +2292,22 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
             </div>
           ) : (
             <ScrollArea className="h-[60vh] w-full overflow-x-auto">
-              <Table className="w-full">
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead onClick={() => requestSort('name')} className="cursor-pointer w-[15%]">
+                    <TableHead onClick={() => requestSort('name')} className="cursor-pointer w-[15%] truncate">
                       {t('name')} {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </TableHead>
-                    <TableHead onClick={() => requestSort('startDate')} className="cursor-pointer w-[20%]">
+                    <TableHead onClick={() => requestSort('startDate')} className="cursor-pointer w-[20%] truncate">
                       {t('startDate')} {sortConfig.key === 'startDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </TableHead>
-                    <TableHead onClick={() => requestSort('status')} className="cursor-pointer w-[10%]">
+                    <TableHead onClick={() => requestSort('status')} className="cursor-pointer w-[10%] truncate">
                       {t('status')} {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </TableHead>    
-                    <TableHead onClick={() => requestSort('description')} className="cursor-pointer w-[30%]">
+                    <TableHead onClick={() => requestSort('description')} className="cursor-pointer w-[30%] truncate">
                       {t('description')} {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </TableHead>                  
-                    <TableHead onClick={() => requestSort('assignee')} className="cursor-pointer w-[15%]">
+                    <TableHead onClick={() => requestSort('assignee')} className="cursor-pointer w-[15%] truncate">
                       {t('assignee')} {sortConfig.key === 'assignee' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </TableHead>
                     <TableHead className="w-[10%]">{t('actions')}</TableHead>
@@ -2235,23 +2316,23 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
                 <TableBody>
                   {getSortedTasks(teamTasks).map(task => (
                     <TableRow key={task.id}>
-                      <TableCell className="max-w-[15%] truncate">{getTaskName(task)}</TableCell>
-                      <TableCell className="max-w-[20%]">{getTaskStartDate(task)}</TableCell>
+                      <TableCell className="max-w-[15%] truncate" title={getTaskName(task)}>{getTaskName(task)}</TableCell>
+                      <TableCell className="max-w-[20%] truncate" title={getTaskStartDate(task)}>{getTaskStartDate(task)}</TableCell>
                       <TableCell className="max-w-[10%]">
                         {renderStatusOptions(task)}
                       </TableCell>      
-                      <TableCell className="max-w-[30%] whitespace-normal break-words">
+                      <TableCell className="max-w-[30%] truncate" title={getTaskDescription(task)}>
                         {getTaskDescription(task)}
                       </TableCell>                  
                       <TableCell className="max-w-[15%]">
                         {task.assignee || (task.tag_values && task.tag_values['2']) ? (
                           <div className="flex items-center">
-                            <Avatar className="w-6 h-6 mr-2">
+                            <Avatar className="w-6 h-6 mr-2 flex-shrink-0">
                               <AvatarFallback className={getMemberInfo(task.tag_values && task.tag_values['2'] ? task.tag_values['2'] : task.assignee)?.isMultiple ? 'bg-blue-500 text-white text-[10px]' : ''}>
                                 {getUserInitial(task)}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="truncate max-w-[150px]" title={getUserDisplayName(task)}>
+                            <span className="truncate max-w-[100px]" title={getUserDisplayName(task)}>
                               {getUserDisplayName(task)}
                             </span>
                           </div>
@@ -2266,7 +2347,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
                               <Button 
                                 size="sm" 
                                 variant="ghost" 
-                                className="h-8 w-8 p-0"
+                                className="h-8 w-8 p-0 flex-shrink-0"
                                 onClick={() => removeTaskFromSprintBoard(task)}
                                 title={t('removeFromSprint')}
                               >
@@ -2276,7 +2357,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
                               <Button 
                                 size="sm" 
                                 variant="ghost" 
-                                className="h-8 w-8 p-0"
+                                className="h-8 w-8 p-0 flex-shrink-0"
                                 onClick={() => addTaskToSprintBoard(task)}
                                 title={t('addToSprint')}
                               >
@@ -2287,7 +2368,7 @@ const SprintBoard = ({ sprint, tasks, teamId, themeColor, agileMembers = [], sel
                           <Button 
                             size="sm" 
                             variant="ghost" 
-                            className="h-8 w-8 p-0"
+                            className="h-8 w-8 p-0 flex-shrink-0"
                             onClick={() => openEditTaskDialog(task)}
                             title={t('editTask')}
                           >

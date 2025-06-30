@@ -202,7 +202,7 @@ const StatusSelect = ({ teamId, value, onChange }) => {
     if (status) {
       setSelectedStatus(status);
       if (onChange) {
-        onChange(status.value);
+        onChange(status);
       }
     } else if (statusValue === 'create_new') {
       setIsCreating(true);
