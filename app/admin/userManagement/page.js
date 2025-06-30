@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck, FaSort } from 'react-icons/fa';
+import { FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserLock, FaUserCheck, FaSort, FaCopy } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 import { toast } from 'sonner';
@@ -54,6 +54,83 @@ const validatePhone = (phone) => {
   }
   
   return { valid: true, message: '' };
+};
+
+// Add a comprehensive email validation function
+const validateEmail = (email) => {
+  // Check if email is empty
+  if (!email || email.trim() === '') {
+    return { valid: false, message: 'Email is required.' };
+  }
+  
+  // Basic format validation
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(email)) {
+    return { valid: false, message: 'Please enter a valid email address.' };
+  }
+  
+  // Get domain part
+  const domainPart = email.split('@')[1];
+  
+  // Check for common invalid domains
+  const invalidDomains = ['example.com', 'test.com', 'localhost', 'domain.com'];
+  if (invalidDomains.includes(domainPart.toLowerCase())) {
+    return { valid: false, message: 'Please use a real email domain.' };
+  }
+  
+  // Check for excessive repetition of characters in domain
+  const repeatedCharsMatch = domainPart.match(/(.)\1{5,}/);
+  if (repeatedCharsMatch) {
+    return { valid: false, message: 'Invalid email domain: excessive character repetition.' };
+  }
+  
+  // Check domain part length constraints
+  if (domainPart.length > 253) {
+    return { valid: false, message: 'Email domain is too long.' };
+  }
+  
+  // Check each domain part length
+  const domainParts = domainPart.split('.');
+  if (domainParts.some(part => part.length > 63)) {
+    return { valid: false, message: 'Invalid email domain structure.' };
+  }
+  
+  // Check top-level domain (TLD)
+  const tld = domainParts[domainParts.length - 1];
+  if (tld.length < 2) {
+    return { valid: false, message: 'Invalid top-level domain.' };
+  }
+  
+  // Check for suspicious TLDs or invalid TLDs
+  const validTLDs = ['com', 'org', 'net', 'edu', 'gov', 'mil', 'io', 'co', 'uk', 'ca', 'au', 'de', 'jp', 'fr', 'it', 'ru', 'br', 'in', 'info', 'biz', 'me', 'tv', 'cc', 'ws', 'name', 'mobi', 'asia'];
+  if (!validTLDs.includes(tld.toLowerCase()) && tld.length < 3) {
+    return { valid: false, message: 'Invalid or suspicious top-level domain.' };
+  }
+  
+  // Check for consecutive dots
+  if (domainPart.includes('..')) {
+    return { valid: false, message: 'Invalid email domain: consecutive dots are not allowed.' };
+  }
+  
+  // Check for hyphens at the beginning or end of domain parts
+  if (domainParts.some(part => part.startsWith('-') || part.endsWith('-'))) {
+    return { valid: false, message: 'Invalid email domain: hyphens cannot be at the start or end of a domain part.' };
+  }
+  
+  // All checks passed
+  return { valid: true, message: '' };
+};
+
+// Helper function to truncate text and add ellipsis
+const truncateText = (text, maxLength = 20) => {
+  if (!text) return '';
+  return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+};
+
+// Add this function for full name validation (copied from adminManagement)
+const validateFullName = (name) => {
+  // 2-50 chars, no spaces, not empty, can have special chars
+  return /^[^\s]{2,50}$/.test(name);
 };
 
 export default function UserManagement() {
@@ -239,6 +316,13 @@ export default function UserManagement() {
       // Store original user data for activity logging
       const originalUserData = { ...selectedUser };
       
+      // Validate email format first
+      const emailValidation = validateEmail(userData.email);
+      if (!emailValidation.valid) {
+        toast.error(emailValidation.message);
+        return;
+      }
+      
       // Check if email is being changed
       if (userData.email && userData.email !== originalUserData.email) {
         // Check if the new email already exists for a different user
@@ -396,7 +480,8 @@ export default function UserManagement() {
       setProcessing(true);
       const confirmationInput = document.getElementById('delete-confirmation');
       const confirmationValue = confirmationInput.value.trim();
-      const expectedValue = selectedUser.name || selectedUser.email;
+      const fullNameOrEmail = selectedUser.name || selectedUser.email;
+      const expectedValue = fullNameOrEmail.length > 15 ? fullNameOrEmail.substring(0, 15) : fullNameOrEmail;
       
       if (confirmationValue !== expectedValue) {
         toast.error('Confirmation text does not match. Please try again.');
@@ -473,7 +558,14 @@ export default function UserManagement() {
     try {
       setProcessing(true);
       
-      // First, check if email already exists
+      // Validate email format first
+      const emailValidation = validateEmail(userData.email);
+      if (!emailValidation.valid) {
+        toast.error(emailValidation.message);
+        return;
+      }
+      
+      // Then check if email already exists
       const { data: existingUsers, error: checkError } = await supabase
         .from('user')
         .select('id')
@@ -627,6 +719,23 @@ export default function UserManagement() {
     }
   };
   
+  // Copy full name to clipboard and show toast
+  const handleCopyName = (name) => {
+    if (!name) return;
+    navigator.clipboard.writeText(name).then(() => {
+      toast.success('Full name copied to clipboard!');
+    }).catch(() => {
+      toast.error('Failed to copy name.');
+    });
+  };
+  
+  useEffect(() => {
+    if (isModalOpen && modalType === 'delete' && selectedUser) {
+      const expectedValue = selectedUser.name || selectedUser.email;
+      console.log('Delete confirmation expected value:', expectedValue);
+    }
+  }, [isModalOpen, modalType, selectedUser]);
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -713,11 +822,11 @@ export default function UserManagement() {
             </div>
             
             {/* Pagination Skeleton */}
-            <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+            <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
               <div className="flex-1 flex justify-between items-center">
-                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
               </div>
             </div>
           </div>
@@ -822,8 +931,8 @@ export default function UserManagement() {
                             {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
                           </div>
                           <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {user.name || 'Unnamed User'}
+                            <div className="text-sm font-medium text-gray-900 dark:text-white" title={user.name || 'Unnamed User'}>
+                              {truncateText(user.name, 20) || 'Unnamed User'}
                             </div>
                             {user.phone && (
                               <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -838,12 +947,12 @@ export default function UserManagement() {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         {user.email_verified ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300">
                             <FaUserCheck className="mr-1" />
                             Verified
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-300">
                             <FaUserLock className="mr-1" />
                             Unverified
                           </span>
@@ -887,14 +996,14 @@ export default function UserManagement() {
           
           {/* Pagination */}
           {filteredUsers.length > usersPerPage && (
-            <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+            <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
               <div className="flex-1 flex justify-between items-center">
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
                   className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
                     currentPage === 1
-                      ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                      ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -908,7 +1017,7 @@ export default function UserManagement() {
                   disabled={currentPage === totalPages}
                   className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
                     currentPage === totalPages
-                      ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                      ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-800 cursor-not-allowed'
                       : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -948,13 +1057,15 @@ export default function UserManagement() {
               if (!name || name.trim() === '') {
                 setNameError('Full name is required.');
                 hasError = true;
+              } else if (name.length > 50) {
+                setNameError('Full name must be maximum 50 characters.');
+                hasError = true;
               }
               
-              if (!email || email.trim() === '') {
-                setEmailError('Email is required.');
-                hasError = true;
-              } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                setEmailError('Please enter a valid email address.');
+              // Use the validateEmail function
+              const emailValidation = validateEmail(email);
+              if (!emailValidation.valid) {
+                setEmailError(emailValidation.message);
                 hasError = true;
               }
               
@@ -999,10 +1110,13 @@ export default function UserManagement() {
                     onChange={(e) => {
                       setName(e.target.value);
                       setNameError('');
+                      if (e.target.value.length > 50 || e.target.value.length < 1) {
+                        setNameError('Full name must be 1-50 characters.');
+                      }
                     }}
                     onBlur={(e) => {
-                      if (!e.target.value || e.target.value.trim() === '') {
-                        setNameError('Full name is required.');
+                      if (!e.target.value || e.target.value.trim() === '' || e.target.value.length > 50 || e.target.value.length < 1) {
+                        setNameError('Full name must be 1-50 characters.');
                       }
                     }}
                   />
@@ -1026,12 +1140,20 @@ export default function UserManagement() {
                     onChange={(e) => {
                       setEmail(e.target.value);
                       setEmailError('');
+                      
+                      // Validate email as user types
+                      if (e.target.value && e.target.value.trim() !== '') {
+                        const validation = validateEmail(e.target.value);
+                        if (!validation.valid) {
+                          setEmailError(validation.message);
+                        }
+                      }
                     }}
                     onBlur={(e) => {
-                      if (!e.target.value || e.target.value.trim() === '') {
-                        setEmailError('Email is required.');
-                      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
-                        setEmailError('Please enter a valid email address.');
+                      // Use validateEmail function
+                      const validation = validateEmail(e.target.value);
+                      if (!validation.valid) {
+                        setEmailError(validation.message);
                       }
                     }}
                   />
@@ -1123,13 +1245,15 @@ export default function UserManagement() {
               if (!name || name.trim() === '') {
                 setNameError('Full name is required.');
                 hasError = true;
+              } else if (name.length > 50) {
+                setNameError('Full name must be maximum 50 characters.');
+                hasError = true;
               }
               
-              if (!email || email.trim() === '') {
-                setEmailError('Email is required.');
-                hasError = true;
-              } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                setEmailError('Please enter a valid email address.');
+              // Use the validateEmail function
+              const emailValidation = validateEmail(email);
+              if (!emailValidation.valid) {
+                setEmailError(emailValidation.message);
                 hasError = true;
               }
               
@@ -1175,10 +1299,13 @@ export default function UserManagement() {
                     onChange={(e) => {
                       setName(e.target.value);
                       setNameError('');
+                      if (e.target.value.length > 50 || e.target.value.length < 1) {
+                        setNameError('Full name must be 1-50 characters.');
+                      }
                     }}
                     onBlur={(e) => {
-                      if (!e.target.value || e.target.value.trim() === '') {
-                        setNameError('Full name is required.');
+                      if (!e.target.value || e.target.value.trim() === '' || e.target.value.length > 50 || e.target.value.length < 1) {
+                        setNameError('Full name must be 1-50 characters.');
                       }
                     }}
                   />
@@ -1202,12 +1329,20 @@ export default function UserManagement() {
                     onChange={(e) => {
                       setEmail(e.target.value);
                       setEmailError('');
+                      
+                      // Validate email as user types
+                      if (e.target.value && e.target.value.trim() !== '') {
+                        const validation = validateEmail(e.target.value);
+                        if (!validation.valid) {
+                          setEmailError(validation.message);
+                        }
+                      }
                     }}
                     onBlur={(e) => {
-                      if (!e.target.value || e.target.value.trim() === '') {
-                        setEmailError('Email is required.');
-                      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
-                        setEmailError('Please enter a valid email address.');
+                      // Use validateEmail function
+                      const validation = validateEmail(e.target.value);
+                      if (!validation.valid) {
+                        setEmailError(validation.message);
                       }
                     }}
                   />
@@ -1380,7 +1515,9 @@ export default function UserManagement() {
                     {selectedUser.name?.charAt(0).toUpperCase() || selectedUser.email?.charAt(0).toUpperCase() || 'U'}
                   </div>
                   <div>
-                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedUser.name || 'Unnamed User'}</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white' title={selectedUser.name || 'Unnamed User'}>
+                      {truncateText(selectedUser.name, 20) || 'Unnamed User'}
+                    </p>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>{selectedUser.email}</p>
                   </div>
                 </div>
@@ -1391,7 +1528,7 @@ export default function UserManagement() {
               
               <div className='p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800'>
                 <p className='text-sm text-yellow-700 dark:text-yellow-300'>
-                  To confirm deletion, please type <strong>{selectedUser.name || selectedUser.email}</strong> below:
+                  To confirm deletion, please type the user's name (or the first 15 characters if it is too long) below:
                 </p>
                 <input
                   type='text'
@@ -1456,17 +1593,29 @@ export default function UserManagement() {
                   {selectedUser.name?.charAt(0).toUpperCase() || selectedUser.email?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <div>
-                  <h3 className='text-lg font-medium text-gray-900 dark:text-white'>{selectedUser.name || 'Unnamed User'}</h3>
+                  <h3 className='text-lg font-medium text-gray-900 dark:text-white' title={selectedUser.name || 'Unnamed User'}>
+                    {truncateText(selectedUser.name, 20) || 'Unnamed User'}
+                    {selectedUser.name && (
+                      <button
+                        type='button'
+                        className='ml-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700'
+                        onClick={() => handleCopyName(selectedUser.name)}
+                        title='Copy full name'
+                      >
+                        <FaCopy className='inline-block text-gray-500 dark:text-gray-300' />
+                      </button>
+                    )}
+                  </h3>
                   <p className='text-sm text-gray-500 dark:text-gray-400'>{selectedUser.email}</p>
                 </div>
                 <div className='ml-auto'>
                   {selectedUser.email_verified ? (
-                    <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-200'>
+                    <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300'>
                       <FaUserCheck className='mr-1' />
                       Verified
                     </span>
                   ) : (
-                    <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-200'>
+                    <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-300'>
                       <FaUserLock className='mr-1' />
                       Unverified
                     </span>
@@ -1485,7 +1634,9 @@ export default function UserManagement() {
                     </div>
                     <div>
                       <p className='text-xs text-gray-500 dark:text-gray-400'>Name</p>
-                      <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedUser.name || 'Not provided'}</p>
+                      <p className='text-sm font-medium text-gray-900 dark:text-white' title={selectedUser.name || 'Not provided'}>
+                        {truncateText(selectedUser.name, 20) || 'Not provided'}
+                      </p>
                     </div>
                     <div>
                       <p className='text-xs text-gray-500 dark:text-gray-400'>Email</p>

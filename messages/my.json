@@ -7,12 +7,60 @@
     "projectName": "Team Sync",
     "dashboard": "Papan Pemuka",
     "projects": "Projek",
-    "tasks": "Tugasan",
+    "tasks": "Tugas",
     "features": "Ciri-ciri",
     "pricing": "Harga",
     "contact": "Hubungi Kami",
     "login": "Log Masuk",
-    "signup": "Daftar"
+    "signup": "Daftar",
+    "terms": "Terma & Syarat",
+    "about": "Tentang Kami"
+  },
+  "AboutUs": {
+    "title": "Tentang Team Sync",
+    "mission": {
+      "title": "Misi Kami",
+      "description1": "Di Team Sync, misi kami adalah untuk mengubah cara pasukan bekerjasama, berkomunikasi, dan menyelesaikan projek. Kami percaya bahawa apabila pasukan bekerja dalam harmoni, mereka mencapai hasil yang luar biasa.",
+      "description2": "Platform kami direka untuk menghapuskan geseran dalam pengurusan projek, mewujudkan pengalaman yang lancar yang membolehkan pasukan fokus pada perkara yang paling penting: mencipta nilai dan memberikan kecemerlangan."
+    },
+    "story": {
+      "title": "Cerita Kami",
+      "description1": "Team Sync dilahirkan di dewan pembelajaran Universiti Multimedia, Melaka. Apa yang bermula sebagai projek pelajar dengan cepat berkembang menjadi sesuatu yang lebih besar apabila kami menyedari cabaran universal yang dihadapi oleh pasukan dalam pengurusan projek.",
+      "description2": "Diasaskan oleh sekumpulan pelajar yang bersemangat dengan kepakaran pelbagai dalam pembangunan perisian, reka bentuk, dan perniagaan, Team Sync telah berkembang dari alat pengurusan tugas yang mudah menjadi ekosistem pengurusan projek yang komprehensif yang melayani pasukan dari pelbagai saiz di pelbagai industri."
+    },
+    "values": {
+      "title": "Nilai-Nilai Kami",
+      "innovation": {
+        "title": "Inovasi",
+        "description": "Kami sentiasa menolak sempadan untuk mencipta alat yang membuat kerja lebih intuitif dan cekap."
+      },
+      "collaboration": {
+        "title": "Kerjasama",
+        "description": "Kami percaya pada kekuatan kerja berpasukan dan mereka bentuk platform kami untuk meningkatkan cara orang bekerja bersama."
+      },
+      "simplicity": {
+        "title": "Kesederhanaan",
+        "description": "Kami berusaha untuk menjadikan proses kompleks mudah, memberi tumpuan kepada pengalaman pengguna dan reka bentuk intuitif."
+      },
+      "reliability": {
+        "title": "Kebolehpercayaan",
+        "description": "Kami membina sistem yang boleh anda harapkan, dengan keselamatan dan kestabilan sebagai keutamaan."
+      }
+    },
+    "team": {
+      "title": "Pasukan Kami",
+      "description": "Kenali individu-individu bersemangat di sebalik Team Sync yang berdedikasi untuk menjadikan pengurusan projek lebih cekap, kolaboratif, dan menyeronokkan."
+    },
+    "contact": {
+      "title": "Hubungi Kami",
+      "description": "Ada soalan tentang Team Sync? Kami ingin mendengar daripada anda!",
+      "button": "Hubungi Kami"
+    },
+    "location": {
+      "title": "Lokasi Kami",
+      "university": "Universiti Multimedia, Melaka",
+      "address": "Perpustakaan Digital Siti Hasmah, Learning Point"
+    }
   },
   "nav": {
     "home": "Laman Utama",
@@ -2754,5 +2802,46 @@
     "sessionExpiresIn": "Session expires in",
     "pleaseCompletePayment": "Please complete your payment",
     "pleaseCompletePaymentNow": "Please complete your payment now"
+  },
+  "TermsAndConditions": {
+    "title": "Terma dan Syarat",
+    "lastUpdated": "Kemas kini terakhir",
+    "welcome": "Selamat datang ke Team Sync!",
+    "introduction": "Terma dan Syarat ini (\"Terma\", \"Perjanjian\") mengawal akses dan penggunaan anda terhadap aplikasi web Team Sync (\"Perkhidmatan\", \"Aplikasi\"), yang dikendalikan oleh Team Sync (\"kami\", \"kita\"). Dengan membuat akaun atau menggunakan mana-mana bahagian Perkhidmatan, anda bersetuju untuk terikat dengan Terma ini.",
+    "disagreement": "Jika anda tidak bersetuju dengan Terma ini, jangan gunakan Perkhidmatan ini.",
+    "sections": {
+      "accountRegistration": "Pendaftaran Akaun",
+      "subscriptionPlans": "Pelan Langganan",
+      "userGeneratedContent": "Kandungan Dijana Pengguna",
+      "acceptableUse": "Penggunaan yang Diterima",
+      "privacy": "Privasi",
+      "intellectualProperty": "Harta Intelek",
+      "limitationOfLiability": "Had Liabiliti",
+      "termination": "Penamatan",
+      "governingLaw": "Undang-undang Pentadbiran",
+      "changesToTerms": "Perubahan pada Terma",
+      "contactUs": "Hubungi Kami"
+    },
+    "plans": {
+      "free": "Percuma",
+      "pro": "Pro",
+      "enterprise": "Perusahaan"
+    },
+    "features": {
+      "calendar": "Kalendar – Menggunakan paparan kalendar untuk merancang, menjadualkan, dan menjejak tugas mengikut tarikh.",
+      "posts": "Siaran – Terbitkan dan urus pengumuman berkaitan projek.",
+      "files": "Fail – Muat naik, susun, dan kongsi dokumen.",
+      "timeline": "Garis Masa – Visualisasikan tugas sepanjang garis masa projek yang ringkas.",
+      "note": "Nota – Pangkalan pengetahuan pusat untuk nota dan dokumentasi.",
+      "kanban": "Kanban – Papan berasaskan status untuk penjejakan tugas.",
+      "workflow": "Aliran Kerja – Petakan tugas melalui peringkat kemajuan berstruktur.",
+      "agile": "Agile – Papan yang disesuaikan untuk kitaran tangkas berulang.",
+      "gantt": "Gantt – Carta gantt lengkap dengan garis masa dan kebergantungan."
+    },
+    "usageLimits": "Had Penggunaan",
+    "billingCycle": "Kitaran Pengebilan",
+    "refundPolicy": "Dasar Bayaran Balik",
+    "automaticRenewal": "Pembaharuan Automatik",
+    "support": "Sokongan Team Sync"
   }
 }

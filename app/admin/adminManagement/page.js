@@ -345,7 +345,7 @@ export default function AdminUserManagement() {
             .select('id')
             .eq('username', newAdminData.username)
             .not('id', 'eq', selectedAdmin.id) // Exclude the current admin from the check
-            .single();
+            .maybeSingle();
           
           if (existingUserByUsername) {
             toast.error('Another admin with this username already exists');
@@ -375,7 +375,7 @@ export default function AdminUserManagement() {
             .select('id')
             .eq('email', newAdminData.email)
             .not('id', 'eq', selectedAdmin.id) // Exclude the current admin from the check
-            .single();
+            .maybeSingle();
           
           if (existingUserByEmail) {
             toast.error('Another admin with this email address already exists');
@@ -557,8 +557,8 @@ export default function AdminUserManagement() {
   const deleteAdmin = async () => {
     try {
       const confirmationValue = deleteConfirmation.trim();
-      const expectedValue = selectedAdmin.username || selectedAdmin.email;
-      
+      const fullNameOrEmail = selectedAdmin.username || selectedAdmin.email;
+      const expectedValue = fullNameOrEmail.length > 15 ? fullNameOrEmail.substring(0, 15) : fullNameOrEmail;
       if (confirmationValue !== expectedValue) {
         toast.error('Confirmation text does not match. Please try again.');
         return;
@@ -655,11 +655,11 @@ export default function AdminUserManagement() {
   const getRoleBadgeStyle = (role) => {
     switch (role) {
       case 'SUPER_ADMIN':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100';
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-800/30 dark:text-purple-300';
       case 'ADMIN':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/30 dark:text-gray-300';
     }
   };
   
@@ -920,6 +920,12 @@ export default function AdminUserManagement() {
     return /^[^\s]{2,50}$/.test(name);
   };
 
+  // Add a helper function to truncate text if not already present
+  const truncateText = (text, maxLength = 20) => {
+    if (!text) return '';
+    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -974,7 +980,7 @@ export default function AdminUserManagement() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((row) => (
-                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-750">
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse mr-3"></div>
@@ -1009,11 +1015,11 @@ export default function AdminUserManagement() {
             </div>
             
             {/* Pagination Skeleton */}
-            <div className="bg-gray-50 dark:bg-gray-750 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+            <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
               <div className="flex-1 flex justify-between items-center">
-                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                <div className="h-8 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
               </div>
             </div>
           </div>
@@ -1121,7 +1127,7 @@ export default function AdminUserManagement() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {currentAdmins.length > 0 ? (
                       currentAdmins.map((admin) => (
-                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
+                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="w-8 h-8 rounded-full flex items-center justify-center mr-3 overflow-hidden">
@@ -1142,7 +1148,7 @@ export default function AdminUserManagement() {
                                   {admin.full_name || admin.username}
                                 </div>
                                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  @{admin.username}
+                                  @{truncateText(admin.username, 20)}
                                 </div>
                               </div>
                             </div>
@@ -1159,11 +1165,11 @@ export default function AdminUserManagement() {
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             {admin.is_active ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300">
                                 Active
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-300">
                                 Inactive
                               </span>
                             )}
@@ -1225,7 +1231,7 @@ export default function AdminUserManagement() {
                       disabled={currentPage === 1}
                       className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
                         currentPage === 1
-                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-800 cursor-not-allowed'
                           : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
                       }`}
                     >
@@ -1239,7 +1245,7 @@ export default function AdminUserManagement() {
                       disabled={currentPage === totalPages}
                       className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
                         currentPage === totalPages
-                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700 cursor-not-allowed'
+                          ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-800 cursor-not-allowed'
                           : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
                       }`}
                     >
@@ -1828,7 +1834,7 @@ export default function AdminUserManagement() {
                     )}
                   </div>
                   <div>
-                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.username || 'Admin'}</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{truncateText(selectedAdmin.username, 20) || 'Admin'}</p>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>{selectedAdmin.email}</p>
                   </div>
                 </div>
@@ -1839,7 +1845,7 @@ export default function AdminUserManagement() {
               
               <div className='p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800'>
                 <p className='text-sm text-yellow-700 dark:text-yellow-300'>
-                  To confirm deletion, please type <strong>{selectedAdmin.username || selectedAdmin.email}</strong> below:
+                  To confirm deletion, please type the admin's username (or the first 15 characters if it is too long) below:
                 </p>
                 <input
                   type='text'
@@ -2116,7 +2122,7 @@ export default function AdminUserManagement() {
               </div>
               <div>
                 <h3 className='text-lg font-medium text-gray-900 dark:text-white'>{selectedAdmin.full_name || selectedAdmin.username}</h3>
-                <p className='text-xs text-gray-500 dark:text-gray-400'>@{selectedAdmin.username}</p>
+                <p className='text-xs text-gray-500 dark:text-gray-400'>@{truncateText(selectedAdmin.username, 20)}</p>
               </div>
               <div className='ml-auto'>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleBadgeStyle(getEffectiveRole(selectedAdmin))}`}>
@@ -2138,7 +2144,7 @@ export default function AdminUserManagement() {
                   </div>
                   <div>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>Username</p>
-                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{selectedAdmin.username}</p>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white'>{truncateText(selectedAdmin.username, 20)}</p>
                   </div>
                   <div>
                     <p className='text-xs text-gray-500 dark:text-gray-400'>Full Name</p>

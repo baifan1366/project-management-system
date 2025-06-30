@@ -12,7 +12,55 @@
     "pricing": "价格",
     "contact": "联系我们",
     "login": "登录",
-    "signup": "注册"
+    "signup": "注册",
+    "terms": "条款和条件",
+    "about": "关于我们"
+  },
+  "AboutUs": {
+    "title": "关于团队同步",
+    "mission": {
+      "title": "我们的使命",
+      "description1": "在团队同步，我们的使命是改变团队协作、沟通和完成项目的方式。我们相信，当团队协调一致地工作时，他们能够取得非凡的成果。",
+      "description2": "我们的平台旨在消除项目管理中的摩擦，创造一个无缝的体验，使团队能够专注于最重要的事情：创造价值和追求卓越。"
+    },
+    "story": {
+      "title": "我们的故事",
+      "description1": "团队同步诞生于马来西亚多媒体大学马六甲分校的学习大厅。当我们意识到团队在项目管理中面临的普遍挑战时，最初的学生项目很快发展成为更大的事业。",
+      "description2": "由一群在软件开发、设计和商业领域拥有不同专业知识的热情学生创立，团队同步已从简单的任务管理工具发展成为一个全面的项目管理生态系统，为各行各业的各种规模的团队提供服务。"
+    },
+    "values": {
+      "title": "我们的价值观",
+      "innovation": {
+        "title": "创新",
+        "description": "我们不断突破界限，创造使工作更直观、更高效的工具。"
+      },
+      "collaboration": {
+        "title": "协作",
+        "description": "我们相信团队合作的力量，并设计我们的平台来增强人们的协作方式。"
+      },
+      "simplicity": {
+        "title": "简洁",
+        "description": "我们努力使复杂的过程变得简单，专注于用户体验和直观设计。"
+      },
+      "reliability": {
+        "title": "可靠性",
+        "description": "我们构建您可以依赖的系统，将安全性和稳定性作为首要任务。"
+      }
+    },
+    "team": {
+      "title": "我们的团队",
+      "description": "认识团队同步背后的热情个体，他们致力于使项目管理更高效、更协作、更愉快。"
+    },
+    "contact": {
+      "title": "联系我们",
+      "description": "对团队同步有疑问？我们很乐意听取您的意见！",
+      "button": "联系我们"
+    },
+    "location": {
+      "title": "我们的位置",
+      "university": "马来西亚多媒体大学，马六甲",
+      "address": "Siti Hasmah数字图书馆，学习点"
+    }
   },
   "nav": {
     "home": "首页",
@@ -2793,5 +2841,46 @@
     "userProfile": "用户资料",
     "notFound": "用户未找到",
     "accountSettings": "账户设置"
+  },
+  "TermsAndConditions": {
+    "title": "条款和条件",
+    "lastUpdated": "最后更新",
+    "welcome": "欢迎使用 Team Sync！",
+    "introduction": "这些条款和条件（\"条款\"，\"协议\"）规定了您访问和使用 Team Sync 网络应用程序（\"服务\"，\"应用\"）的条件，该应用由 Team Sync（\"我们\"，\"我们的\"）运营。通过创建账户或使用本服务的任何部分，您同意受这些条款的约束。",
+    "disagreement": "如果您不同意这些条款，请不要使用本服务。",
+    "sections": {
+      "accountRegistration": "账户注册",
+      "subscriptionPlans": "订阅计划",
+      "userGeneratedContent": "用户生成内容",
+      "acceptableUse": "可接受使用",
+      "privacy": "隐私",
+      "intellectualProperty": "知识产权",
+      "limitationOfLiability": "责任限制",
+      "termination": "终止",
+      "governingLaw": "适用法律",
+      "changesToTerms": "条款变更",
+      "contactUs": "联系我们"
+    },
+    "plans": {
+      "free": "免费版",
+      "pro": "专业版",
+      "enterprise": "企业版"
+    },
+    "features": {
+      "calendar": "日历 – 使用日历视图计划、安排和按日期跟踪任务。",
+      "posts": "帖子 – 发布和管理与项目相关的公告。",
+      "files": "文件 – 上传、组织和共享文档。",
+      "timeline": "时间线 – 沿着简单的项目时间线可视化任务。",
+      "note": "笔记 – 笔记和文档的中央知识库。",
+      "kanban": "看板 – 基于状态的任务跟踪板。",
+      "workflow": "工作流 – 通过结构化进度阶段映射任务。",
+      "agile": "敏捷 – 为迭代敏捷周期量身定制的看板。",
+      "gantt": "甘特图 – 具有时间线和依赖关系的完整甘特图。"
+    },
+    "usageLimits": "使用限制",
+    "billingCycle": "计费周期",
+    "refundPolicy": "退款政策",
+    "automaticRenewal": "自动续订",
+    "support": "Team Sync 支持"
   }
 }
