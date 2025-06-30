@@ -19,6 +19,7 @@ export default function SearchInput({ query, setQuery, onSearch }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('search.placeholder')}
+          maxLength={70}
           className="w-full p-4 pl-12 pr-14 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
         />
         <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">

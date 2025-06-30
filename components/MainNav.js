@@ -146,6 +146,7 @@ function QuickSearch({ open, onOpenChange }) {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('search.placeholder')}
+          maxLength={35}
           className="w-full p-1.5 pl-7 pr-10 text-xs rounded-md border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
         />
         <div className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">

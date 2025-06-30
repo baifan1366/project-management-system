@@ -81,7 +81,12 @@
       "question": "Question",
       "questionDesc": "Do you want to save your current changes?"
     },
-    "tryAgain": "Please try again later"
+    "tryAgain": "Please try again later",
+    "priority": "Priority",
+    "priority_low": "Low",
+    "priority_medium": "Medium",
+    "priority_high": "High",
+    "priority_urgent": "Urgent"
   },
   "profile": {
     "title": "Settings",
@@ -607,6 +612,7 @@
     "noDueDate": "No due date",
     "description": "Description",
     "reference": "Ref",
+    "taskNotFound": "Task not found",
     "errors": {
       "loadingFailed": "Failed to load tasks"
     },
@@ -615,6 +621,7 @@
       "createdBy": "Created by me"
     },
     "status": {
+      "all": "All",
       "label": "Status",
       "todo": "To Do",
       "in_progress": "In Progress",
@@ -631,7 +638,8 @@
     "assignedTo": {
       "label": "ASSIGNED TO",
       "me": "Me",
-      "unassigned": "Unassigned"
+      "unassigned": "Unassigned",
+      "showReferenceTasks": "Me"
     },
     "workspaceTeams": {
       "label": "WORKSPACE & TEAMS",
