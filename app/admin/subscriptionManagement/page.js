@@ -4310,8 +4310,20 @@ export default function AdminSubscriptions() {
                 &times;
               </button>
             </div>
-            
             <div className='space-y-4'>
+              {/* User count warning */}
+              {typeof isPlanToDelete?.active_users === 'number' && (
+                <div className={`p-4 rounded-lg border flex items-center space-x-2 ${isPlanToDelete.active_users > 0 ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800' : 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'}`}>
+                  <span className={`text-xl ${isPlanToDelete.active_users > 0 ? 'text-yellow-500' : 'text-green-500'}`}>
+                    <FaUsers />
+                  </span>
+                  <span className={`text-sm ${isPlanToDelete.active_users > 0 ? 'text-yellow-700 dark:text-yellow-300' : 'text-green-700 dark:text-green-300'}`}>
+                    {isPlanToDelete.active_users > 0
+                      ? `There are currently ${isPlanToDelete.active_users} user(s) subscribed to this plan.`
+                      : 'No users are currently subscribed to this plan.'}
+                  </span>
+                </div>
+              )}
               <div className='flex items-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800'>
                 <div className='flex-shrink-0 mr-3 text-red-500 dark:text-red-400'>
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -4325,7 +4337,6 @@ export default function AdminSubscriptions() {
                   </p>
                 </div>
               </div>
-
               <div className='p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800'>
                 <p className='text-sm text-yellow-700 dark:text-yellow-300'>
                   To confirm deletion, please type <strong>{isPlanToDelete?.name}</strong> below:
@@ -4341,7 +4352,6 @@ export default function AdminSubscriptions() {
                 />
               </div>
             </div>
-            
             <div className='mt-6 flex justify-end space-x-3'>
               <button
                 type='button'
@@ -4352,7 +4362,6 @@ export default function AdminSubscriptions() {
               >
                 Cancel
               </button>
-              
               <button
                 type='button'
                 onClick={deleteSubscriptionPlan}

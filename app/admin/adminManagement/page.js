@@ -8,6 +8,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { checkAdminSession } from '@/lib/redux/features/adminSlice';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 import { toast } from 'sonner';
+import bcrypt from 'bcryptjs';
 
 
 export default function AdminUserManagement() {
@@ -391,8 +392,10 @@ export default function AdminUserManagement() {
         filteredAdminData.email = newAdminData.email;
       }
       
+      // Only hash and update password if a new password is provided
       if (newAdminData.password_hash && newAdminData.password_hash.trim() !== '') {
-        filteredAdminData.password_hash = newAdminData.password_hash;
+        const salt = await bcrypt.genSalt(10);
+        filteredAdminData.password_hash = await bcrypt.hash(newAdminData.password_hash, salt);
       }
       
       // Always update the updated_at timestamp
@@ -488,6 +491,13 @@ export default function AdminUserManagement() {
         return;
       }
       
+      // Hash the password before saving
+      let password_hash = null;
+      if (adminUserData.password_hash) {
+        const salt = await bcrypt.genSalt(10);
+        password_hash = await bcrypt.hash(adminUserData.password_hash, salt);
+      }
+      
       // Continue with creating the admin user
       const { data, error } = await supabase
         .from('admin_user')
@@ -495,7 +505,7 @@ export default function AdminUserManagement() {
           username: adminUserData.username,
           full_name: adminUserData.full_name,
           email: adminUserData.email,
-          password_hash: adminUserData.password_hash,
+          password_hash: password_hash,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
