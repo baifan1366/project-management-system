@@ -1656,6 +1656,7 @@ export default function ChatPage() {
                           onChange={(e) => setEditedName(e.target.value)}
                           onKeyDown={handleNameEditKeyDown}
                           onBlur={handleSaveNameEdit}
+                          maxLength={30}
                           autoFocus
                           className="text-base font-medium bg-accent/50 px-2 py-1 rounded border border-input focus:border-primary focus:outline-none"
                         />

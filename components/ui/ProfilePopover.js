@@ -76,7 +76,7 @@ export function ProfilePopover({ onClose }) {
               )}
               <div>
                 <h4 className="font-medium text-sm max-w-[90%] break-words">{user.name}</h4>
-                <p className="text-sm text-muted-foreground max-w-[95%] break-words">{user.email}</p>
+                <p className="text-sm text-muted-foreground max-w-[100%] break-words">{user.email}</p>
               </div>
             </div>
           </div>

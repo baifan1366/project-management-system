@@ -12,6 +12,9 @@ export default function TaskAssistantPage() {
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  const [inputText, setInputText] = useState('');
+  const [isOverLimit, setIsOverLimit] = useState(false);
+  const MAX_CHARS = 1000;
   const { user, error, isLoading } = useGetUser();
   
   useEffect(() => {
@@ -26,6 +29,11 @@ export default function TaskAssistantPage() {
       }
     }
   }, [user, isLoading, error]);
+  
+  const handleInputChange = (text) => {
+    setInputText(text);
+    setIsOverLimit(text.length > MAX_CHARS);
+  };
   
   if (loading || isLoading) {
     return (
@@ -104,7 +112,22 @@ export default function TaskAssistantPage() {
           </p>
         </div>
         
-        <TaskManagerAgent userId={userId} />
+        <TaskManagerAgent 
+          userId={userId} 
+          onInputChange={handleInputChange}
+          maxCharacters={MAX_CHARS}
+        />
+        
+        <div className="flex justify-between items-center px-4 mt-2">
+          <div className={`text-sm ${isOverLimit ? 'text-red-500 font-medium' : 'text-gray-500'}`}>
+            {inputText.length} / {MAX_CHARS}
+          </div>
+          {isOverLimit && (
+            <div className="text-sm text-red-500 font-medium">
+              {t('errors.characterLimit', { defaultValue: 'Character limit exceeded' })}
+            </div>
+          )}
+        </div>
         
         <div className="rounded-lg border bg-card p-6 text-sm shadow-md">
           <h3 className="font-medium mb-2">{t('search.examples')}:</h3>
