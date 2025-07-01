@@ -103,7 +103,16 @@ export function ChatDialogProvider({ children }) {
             // 获取会话信息
             const { data: sessionData } = await supabase
               .from('chat_session')
-              .select('*')
+              .select(`*,
+                participants:chat_participant(
+                  user:user_id (
+                    id,
+                    name,
+                    avatar_url,
+                    email,
+                    is_online
+                  )
+                )`)
               .eq('id', payload.new.session_id)
               .single();
 
@@ -132,15 +141,50 @@ export function ChatDialogProvider({ children }) {
                 return prev;
               }
               
+              // 判断是否为私聊，以及获取对话用户信息
+              let chatUser;
+              let chatSessionName = sessionData.name;
+              
+              if (sessionData.type === 'PRIVATE') {
+                // 私聊，找到对方用户
+                const otherParticipant = sessionData.participants.find(
+                  p => p.user?.id !== currentUser?.id
+                );
+                
+                if (otherParticipant && otherParticipant.user) {
+                  chatUser = {
+                    id: otherParticipant.user.id,
+                    name: otherParticipant.user.name,
+                    avatar_url: otherParticipant.user.avatar_url || otherParticipant.user.name.charAt(0),
+                    email: otherParticipant.user.email,
+                    online: otherParticipant.user.is_online || false
+                  };
+                  // 私聊不需要sessionName
+                  chatSessionName = null;
+                } else {
+                  // 如果找不到对方用户，使用发送者信息（临时方案）
+                  chatUser = {
+                    name: senderData.name,
+                    avatar_url: senderData.avatar_url || senderData.name.charAt(0),
+                    online: true,
+                    id: senderData.id
+                  };
+                }
+              } else {
+                // 群聊，使用发送者信息
+                chatUser = {
+                  name: senderData.name,
+                  avatar_url: senderData.avatar_url || senderData.name.charAt(0),
+                  online: true,
+                  id: senderData.id
+                };
+              }
+              
               // 如果是新对话框，添加到数组末尾
               const newDialog = {
                 sessionId: payload.new.session_id,
-                user: {
-                  name: senderData.name,
-                  avatar_url: senderData.avatar_url || senderData.name.charAt(0),
-                  online: true
-                },
-                sessionName: sessionData.name,
+                user: chatUser,
+                sessionName: chatSessionName,
                 isOpen: true,
                 isMinimized: false
               };
@@ -214,6 +258,13 @@ export function ChatDialogProvider({ children }) {
           isMinimized: false
         };
       } else {
+        // 确保提供的用户不是当前用户（针对私聊修复）
+        // 对于私聊，user应该是对方的信息，而不是当前用户的信息
+        if (!sessionName && user.id === currentUser.id) {
+          console.error('Private chat dialog: Cannot use current user as the dialog user');
+          return prev; // 不创建对话框，因为数据无效
+        }
+        
         // 添加新的对话框
         const newDialog = {
           sessionId,

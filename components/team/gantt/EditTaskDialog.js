@@ -154,7 +154,7 @@ export default function EditTaskDialog({
     const section = form.getValues('section');
     
     // 任务名称检查 (2-100字符)
-    const isTaskNameValid = taskName.trim().length >= 2 && taskName.trim().length <= 100;
+    const isTaskNameValid = taskName.trim().length >= 2 && taskName.trim().length <= 50;
     
     // 开始日期检查 (不能早于当前日期)
     let isStartDateValid = true;
@@ -420,7 +420,7 @@ export default function EditTaskDialog({
                       aria-label={t('taskName')}
                       className="border-gray-300"
                       minLength={2}
-                      maxLength={100}
+                      maxLength={50}
                       onChange={(e) => {
                         field.onChange(e);
                       }}
@@ -429,7 +429,7 @@ export default function EditTaskDialog({
                   </FormControl>
                   <FormMessage className="flex justify-end">
                     <span className="text-gray-500 text-xs ml-2">
-                      {field.value ? `${field.value.trim().length}/100` : "0/100"}
+                      {field.value ? `${field.value.trim().length}/50` : "0/50"}
                     </span>
                   </FormMessage>
                 </FormItem>

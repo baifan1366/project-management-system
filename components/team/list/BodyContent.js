@@ -71,7 +71,7 @@ import {
   SingleSelectManager
 } from './TagConfig';
 
-export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading, validationErrors, handleDeleteTask) {
+export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskEditComplete, handleKeyDown, externalEditingTask, externalEditingTaskValues, externalIsLoading, validationErrors, handleDeleteTask, projectThemeColor) {
   const t = useTranslations('CreateTask');
   const tConfirm = useTranslations('confirmation');
   const dispatch = useDispatch();
@@ -612,6 +612,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                   }
                   e.stopPropagation(); // 防止键盘事件冒泡到拖拽处理
                 }}
+                maxLength={50}
                 autoFocus
                 className="bg-transparent border rounded px-1 focus:outline-none focus:ring-1 focus:ring-primary"
                 onClick={(e) => e.stopPropagation()}
@@ -891,6 +892,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                             onDeleteOption={(optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)}
                                             teamId={teamId}
                                             tagId={tagId}
+                                            projectThemeColor={projectThemeColor}
                                           />
                                         );
                                       } else if (isMultiSelectColumn(tag) || (tagObj && isMultiSelectType(tagObj))) {
@@ -1281,6 +1283,7 @@ export function useBodyContent(handleAddTask, handleTaskValueChange, handleTaskE
                                               onDeleteOption={(optionToDelete) => handleDeleteOption(task.id, tagId, optionToDelete)}
                                               teamId={teamId}
                                               tagId={tagId}
+                                              projectThemeColor={projectThemeColor}
                                             />
                                           </div>
                                         );

@@ -121,21 +121,7 @@ export default function AdminLoginPage() {
             </div>
 
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="remember-me" className="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                  Remember me
-                </label>
-              </div>
 
-              <Link href={`/admin/forgot-password`} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                Forgot password?
-              </Link>
             </div>
 
             {error && (

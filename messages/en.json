@@ -12,7 +12,55 @@
     "pricing": "Pricing",
     "contact": "Contact Us",
     "login": "Login",
-    "signup": "Sign Up"
+    "signup": "Sign Up",
+    "terms": "Terms & Conditions",
+    "about": "About Us"
+  },
+  "AboutUs": {
+    "title": "About Team Sync",
+    "mission": {
+      "title": "Our Mission",
+      "description1": "At Team Sync, we're on a mission to transform how teams collaborate, communicate, and complete projects. We believe that when teams work in harmony, they achieve extraordinary results.",
+      "description2": "Our platform is designed to eliminate the friction in project management, creating a seamless experience that empowers teams to focus on what matters most: creating value and delivering excellence."
+    },
+    "story": {
+      "title": "Our Story",
+      "description1": "Team Sync was born in the learning halls of Multimedia University, Melaka. What started as a student project quickly evolved into something much bigger when we realized the universal challenges teams face in project management.",
+      "description2": "Founded by a group of passionate students with diverse expertise in software development, design, and business, Team Sync has grown from a simple task management tool into a comprehensive project management ecosystem that serves teams of all sizes across various industries."
+    },
+    "values": {
+      "title": "Our Values",
+      "innovation": {
+        "title": "Innovation",
+        "description": "We constantly push boundaries to create tools that make work more intuitive and efficient."
+      },
+      "collaboration": {
+        "title": "Collaboration",
+        "description": "We believe in the power of teamwork and design our platform to enhance how people work together."
+      },
+      "simplicity": {
+        "title": "Simplicity",
+        "description": "We strive to make complex processes simple, focusing on user experience and intuitive design."
+      },
+      "reliability": {
+        "title": "Reliability",
+        "description": "We build systems you can count on, with security and stability as top priorities."
+      }
+    },
+    "team": {
+      "title": "Our Team",
+      "description": "Meet the passionate individuals behind Team Sync who are dedicated to making project management more efficient, collaborative, and enjoyable."
+    },
+    "contact": {
+      "title": "Get in Touch",
+      "description": "Have questions about Team Sync? We'd love to hear from you!",
+      "button": "Contact Us"
+    },
+    "location": {
+      "title": "Our Location",
+      "university": "Multimedia University, Melaka",
+      "address": "Siti Hasmah Digital Library, Learning Point"
+    }
   },
   "nav": {
     "home": "Home",
@@ -81,7 +129,12 @@
       "question": "Question",
       "questionDesc": "Do you want to save your current changes?"
     },
-    "tryAgain": "Please try again later"
+    "tryAgain": "Please try again later",
+    "priority": "Priority",
+    "priority_low": "Low",
+    "priority_medium": "Medium",
+    "priority_high": "High",
+    "priority_urgent": "Urgent"
   },
   "profile": {
     "title": "Settings",
@@ -405,7 +458,7 @@
     "you": "You",
     "role": {
       "owner": "Owner",
-      "can_edit": "Editor",
+      "can_edit": "Member",
       "can_check": "Checker",
       "can_view": "Viewer"
     },
@@ -607,6 +660,7 @@
     "noDueDate": "No due date",
     "description": "Description",
     "reference": "Ref",
+    "taskNotFound": "Task not found",
     "errors": {
       "loadingFailed": "Failed to load tasks"
     },
@@ -615,6 +669,7 @@
       "createdBy": "Created by me"
     },
     "status": {
+      "all": "All",
       "label": "Status",
       "todo": "To Do",
       "in_progress": "In Progress",
@@ -631,7 +686,8 @@
     "assignedTo": {
       "label": "ASSIGNED TO",
       "me": "Me",
-      "unassigned": "Unassigned"
+      "unassigned": "Unassigned",
+      "showReferenceTasks": "Me"
     },
     "workspaceTeams": {
       "label": "WORKSPACE & TEAMS",
@@ -711,7 +767,7 @@
       "MENTION": "Mentioned you",
       "ADDED_TO_CHAT": "Added to chat",
       "MEETING_INVITE": "Meeting invitation",
-      "TEAM_ANNOUNCEMENT": "Team announcement", 
+      "TEAM_ANNOUNCEMENT": "Team announcement",
       "SYSTEM": "System notification",
       "task": "Task",
       "meeting": "Meeting",
@@ -1420,7 +1476,7 @@
     "email": "Email",
     "permissions": "Permissions",
     "copyLink": "Copy Link",
-    "editor": "Editor",
+    "editor": "Member",
     "teamMembers": "Team Members",
     "owner": "Owner",
     "invitationDescription": "Invite user to this team.",
@@ -1649,9 +1705,9 @@
     "deleteTask": "Delete Task",
     "calendarRefreshed": "Calendar refreshed",
     "titleTooShort": "Title must be at least 2 characters.",
-    "titleTooLong": "Title cannot exceed 100 characters.",
+    "titleTooLong": "Title cannot exceed 50 characters.",
     "descriptionTooShort": "Description must be at least 10 characters.",
-    "descriptionTooLong": "Description cannot exceed 1000 characters",
+    "descriptionTooLong": "Description cannot exceed 100 characters",
     "dueDateBeforeStartDate": "Due Date cannot earlier than Start Date",
     "formHasErrors": "Form has error. Please try again.",
     "updateTask": "Update",
@@ -1727,7 +1783,8 @@
     "shareWith": "Share With",
     "personalEvent": "Personal Event",
     "googleEvent": "Google Event",
-    "taskEvent": "Task Event"
+    "taskEvent": "Task Event",
+    "noChats": "No chat available"
   },
   "CreateTag": {
     "tagDeleted": "Tag deleted",
@@ -1990,15 +2047,15 @@
       }
     },
     "emailVerification": {
-        "title": "Email Verification",
-        "loading": "Verifying your email...",
-        "redirecting": "Redirecting you to login page...",
-        "backToLogin": "Back to login",
-        "spam": "If you didn't request this verification, please contact support.",
-        "resend": "Resend verification code",
-        "resending": "Resending...",
-        "resendSuccess": "Verification code resent successfully",
-        "resendFailed": "Failed to resend verification code"
+      "title": "Email Verification",
+      "loading": "Verifying your email...",
+      "redirecting": "Redirecting you to login page...",
+      "backToLogin": "Back to login",
+      "spam": "If you didn't request this verification, please contact support.",
+      "resend": "Resend verification code",
+      "resending": "Resending...",
+      "resendSuccess": "Verification code resent successfully",
+      "resendFailed": "Failed to resend verification code"
     },
     "signup": {
       "title": "Sign up",
@@ -2281,7 +2338,7 @@
     "loadingError": "Loading error",
     "noTeamMemberFound": "No team members found",
     "OWNER": "Owner",
-    "CAN_EDIT": "Editor",
+    "CAN_EDIT": "Member",
     "CAN_VIEW": "Viewer",
     "titleLengthError": "Title must be between 2 and 50 characters",
     "edit": "Edit",
@@ -2775,6 +2832,7 @@
     "closePreview": "Close Preview"
   },
   "PostsView": {
+    "attachments": "Attachments",
     "postTitleRequired": "Post title is required",
     "uploadingFiles": "Uploading files...",
     "selectPostFirst": "Please select a post first",
@@ -3249,5 +3307,46 @@
     "userProfile": "User Profile",
     "notFound": "User not found",
     "accountSettings": "Account Settings"
+  },
+  "TermsAndConditions": {
+    "title": "Terms and Conditions",
+    "lastUpdated": "Last updated",
+    "welcome": "Welcome to Team Sync!",
+    "introduction": "These Terms and Conditions (\"Terms\", \"Agreement\") govern your access to and use of the Team Sync web application (\"Service\", \"App\"), operated by Team Sync (\"we\", \"our\", or \"us\"). By creating an account or using any part of the Service, you agree to be bound by these Terms.",
+    "disagreement": "If you do not agree to these Terms, do not use the Service.",
+    "sections": {
+      "accountRegistration": "Account Registration",
+      "subscriptionPlans": "Subscription Plans",
+      "userGeneratedContent": "User-Generated Content",
+      "acceptableUse": "Acceptable Use",
+      "privacy": "Privacy",
+      "intellectualProperty": "Intellectual Property",
+      "limitationOfLiability": "Limitation of Liability",
+      "termination": "Termination",
+      "governingLaw": "Governing Law",
+      "changesToTerms": "Changes to Terms",
+      "contactUs": "Contact Us"
+    },
+    "plans": {
+      "free": "Free",
+      "pro": "Pro",
+      "enterprise": "Enterprise"
+    },
+    "features": {
+      "calendar": "Calendar – Uses a calendar view to plan, schedule, and track tasks by date.",
+      "posts": "Posts – Publish and manage project-related announcements.",
+      "files": "Files – Upload, organize, and share documents.",
+      "timeline": "Timeline – Visualize tasks along a simple project timeline.",
+      "note": "Note – Central knowledge-base for notes and documentation.",
+      "kanban": "Kanban – Status-based board for task tracking.",
+      "workflow": "Workflow – Map tasks through structured progress stages.",
+      "agile": "Agile – Board tailored for iterative agile cycles.",
+      "gantt": "Gantt – Full gantt chart with timelines and dependencies."
+    },
+    "usageLimits": "Usage Limits",
+    "billingCycle": "Billing Cycle",
+    "refundPolicy": "Refund Policy",
+    "automaticRenewal": "Automatic Renewal",
+    "support": "Team Sync Support"
   }
 }

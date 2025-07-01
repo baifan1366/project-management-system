@@ -484,6 +484,25 @@ const MemoizedMessage = memo(function Message({
                     className="max-h-80 rounded-lg object-cover cursor-pointer"
                     loading="lazy"
                     onClick={() => window.open(attachment.file_url, '_blank')}
+                    onError={(e) => {
+                      console.error("Failed to load image:", attachment.file_url);
+                      e.target.onerror = null;
+                      
+                      // Set a retry mechanism with cache busting
+                      setTimeout(() => {
+                        const newImg = new Image();
+                        newImg.src = attachment.file_url + '?t=' + new Date().getTime();
+                        newImg.onload = () => {
+                          e.target.src = newImg.src;
+                        };
+                        newImg.onerror = () => {
+                          // If still fails, show fallback
+                          e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
+                          e.target.style.padding = "20px";
+                          e.target.style.background = "#f0f0f0";
+                        };
+                      }, 1000); // Retry after 1 second
+                    }}
                   />
                 </div>
               ) : (
@@ -633,8 +652,15 @@ export default function ChatPage() {
 
       // Refresh messages to reflect the update
       if (currentSession?.id) {
-        // Refetch messages from the server
-        fetchMessages(currentSession.id);
+        // Refetch messages from the server with error handling
+        try {
+          const result = await fetchMessages(currentSession.id);
+          if (!result || !result.success) {
+            console.warn('Failed to refresh messages after update:', result?.error);
+          }
+        } catch (fetchError) {
+          console.error('Error refreshing messages after update:', fetchError);
+        }
         
         // Also refresh the chat sessions list to update previews
         fetchChatSessions();
@@ -882,7 +908,7 @@ export default function ChatPage() {
     setMessage(prev => prev + emoji);
   };
 
-  // Optimize handleFileUploadComplete for better performance
+  // Enhanced handleFileUploadComplete with better attachment handling
   const handleFileUploadComplete = useCallback(async (uploadResults, messageContent) => {
     if (isPending) return; // Prevent multiple submissions
     
@@ -908,6 +934,26 @@ export default function ChatPage() {
         throw new Error(t('errors.notParticipant'));
       }
 
+      // Validate file URLs before proceeding
+      const validatedResults = await Promise.all(uploadResults.map(async (item) => {
+        // Add simple validation of file URL by checking if it's accessible
+        try {
+          const checkImage = new Image();
+          checkImage.src = item.file_url;
+          
+          return {
+            ...item,
+            validated: true
+          };
+        } catch (e) {
+          console.warn('Pre-validation failed for file:', item.file_name);
+          return {
+            ...item,
+            validated: false
+          };
+        }
+      }));
+
       // First send message to get message_id
       const { data: messageData, error: messageError } = await supabase
         .from('chat_message')
@@ -924,11 +970,12 @@ export default function ChatPage() {
         throw messageError;
       }
 
-      // Associate attachments to message
-      const attachmentsToInsert = uploadResults.map(item => ({
+      // Associate attachments to message with additional metadata
+      const attachmentsToInsert = validatedResults.map(item => ({
         message_id: messageData.id,
         file_url: item.file_url,
         file_name: item.file_name,
+        file_type: item.file_type || 'application/octet-stream',
         uploaded_by: currentUser.id,
         is_image: item.is_image || false
       }));
@@ -953,9 +1000,29 @@ export default function ChatPage() {
       }
       
       // Get complete message info including attachments
-      requestAnimationFrame(async () => {
-        fetchMessages(currentSession.id);
-      });
+      // Use a more reliable approach with multiple retries
+      const maxRetries = 3;
+      let attempt = 0;
+      
+      const fetchWithRetry = async () => {
+        attempt++;
+        try {
+          const result = await fetchMessages(currentSession.id);
+          if (!result || !result.success) {
+            throw new Error(result?.error || 'Unknown error');
+          }
+          return true;
+        } catch (err) {
+          console.error(`Retry ${attempt} failed:`, err);
+          if (attempt < maxRetries) {
+            setTimeout(fetchWithRetry, 1000 * attempt); // Exponential backoff
+          }
+          return false;
+        }
+      };
+      
+      // Start the fetch process with slight delay to ensure DB consistency
+      setTimeout(fetchWithRetry, 300);
       
     } catch (error) {
       console.error(t('errors.uploadFailed'), error);

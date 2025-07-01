@@ -23,10 +23,9 @@ const TagLabelManager = ({
   teamId, 
   selectionMode = false,
   selectedValue = null,
-  onSelect = () => {}
+  onSelect = () => {},
+  projectThemeColor
 }) => {
-  
-  
   const dispatch = useDispatch();
   const t = useTranslations('Team');
   const { confirm } = useConfirm();
@@ -54,9 +53,6 @@ const TagLabelManager = ({
   
   // 当组件加载时获取团队标签数据
   useEffect(() => {
-    
-    
-    
     if (teamId) {
       
       dispatch(getLabelByTeamId(teamId));
@@ -329,7 +325,7 @@ const TagLabelManager = ({
           {/* 只在管理模式下显示添加按钮 - 选择模式下在底部显示 */}
           {!selectionMode && !isCreating && !isEditing && (
             <Button
-              variant="outline"
+              variant={projectThemeColor}
               size="sm"
               onClick={() => {
                 setIsCreating(true);
@@ -374,6 +370,7 @@ const TagLabelManager = ({
                   onChange={(e) => setNewOption({...newOption, label: e.target.value})}
                   className="w-full p-2 border rounded-md focus:ring-1 focus:outline-none text-sm"
                   placeholder={t('enterOptionName')}
+                  maxLength={15}
                 />
               </div>
               <div>
@@ -398,6 +395,7 @@ const TagLabelManager = ({
               <div className="flex justify-end pt-2">
                 <Button
                   size="sm"
+                  variant={projectThemeColor}
                   onClick={handleCreateOption}
                   disabled={loading || !newOption.label.trim()}
                   className="h-8"
@@ -438,6 +436,7 @@ const TagLabelManager = ({
                   onChange={(e) => setEditingOption({...editingOption, label: e.target.value})}
                   className="w-full p-2 border rounded-md focus:ring-1 focus:outline-none text-sm"
                   placeholder={t('enterOptionName') || '输入选项名称'}
+                  maxLength={15}
                 />
               </div>
               <div>
@@ -465,6 +464,7 @@ const TagLabelManager = ({
                   onClick={handleUpdateOption}
                   disabled={loading || !editingOption?.label?.trim()}
                   className="h-8"
+                  variant={projectThemeColor}
                 >
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-background border-t-primary rounded-full animate-spin mr-1" />
@@ -544,7 +544,7 @@ const TagLabelManager = ({
         {selectionMode && !isCreating && !isEditing && (
           <div className="mt-3">
             <Button
-              variant="outline"
+              variant={projectThemeColor}
               size="sm"
               onClick={() => {
                 setIsCreating(true);

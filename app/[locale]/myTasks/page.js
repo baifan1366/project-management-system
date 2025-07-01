@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { 
-  Clock, Calendar, PlusCircle, Filter, SortAsc, 
+  Clock, Calendar, PlusCircle, Filter, 
   Search, CheckCircle, Circle, Info
 } from 'lucide-react';
-import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,8 +37,8 @@ export default function MyTasksPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [selectedType, setSelectedType] = useState('upcoming');
-  const [selectedAssignee, setSelectedAssignee] = useState('me');
-  const [selectedWorkspace, setSelectedWorkspace] = useState('workspace');
+  const [showReferenceTasks, setShowReferenceTasks] = useState(true);
+  const [selectedPriority, setSelectedPriority] = useState('all');
   const { user } = useGetUser();
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState(null);
@@ -48,6 +47,7 @@ export default function MyTasksPage() {
   const [showTaskDetailsDialog, setShowTaskDetailsDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
   const [hoveredTaskId, setHoveredTaskId] = useState(null);
+  const [updatingTaskIds, setUpdatingTaskIds] = useState([]);
   
   // Use our custom hook for task context
   const { 
@@ -177,9 +177,12 @@ export default function MyTasksPage() {
   }, []);
 
   // 使用Supabase获取用户任务数据
-  const fetchMyTasks = async (userId) => {
+  const fetchMyTasks = async (userId, skipGlobalLoading = false) => {
     try {
-      setStatus('loading');
+      // Only show global loading if not updating specific tasks and not explicitly skipping
+      if (updatingTaskIds.length === 0 && !skipGlobalLoading) {
+        setStatus('loading');
+      }
       
       // 获取mytasks表中的当前用户的任务
       const { data: userMyTasks, error: myTasksError } = await supabase
@@ -259,6 +262,9 @@ export default function MyTasksPage() {
   // 使用Supabase更新任务状态
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
+      // Add task to the updating list
+      setUpdatingTaskIds(prev => [...prev, taskId]);
+      
       // Check if this is a standalone task (with local- prefix)
       if (String(taskId).startsWith('local-')) {
         // Extract the actual mytasks ID from the local ID (remove the "local-" prefix)
@@ -303,10 +309,78 @@ export default function MyTasksPage() {
         }
       }
       
-      // 重新获取更新后的数据
-      fetchMyTasks(user.id);
+      // 重新获取更新后的数据 - use skipGlobalLoading to avoid global loading state
+      await fetchMyTasks(user.id, true);
+      
+      // Remove task from the updating list after fetching completes
+      setUpdatingTaskIds(prev => prev.filter(id => id !== taskId));
     } catch (err) {
       console.error('Error updating task status:', err);
+      // Remove task from updating list on error
+      setUpdatingTaskIds(prev => prev.filter(id => id !== taskId));
+      // 显示错误通知或处理错误
+    }
+  };
+
+  // 使用Supabase更新任务优先级
+  const updateTaskPriority = async (taskId, newPriority) => {
+    try {
+      // Add task to the updating list
+      setUpdatingTaskIds(prev => [...prev, taskId]);
+      
+      // Check if this is a standalone task (with local- prefix)
+      if (String(taskId).startsWith('local-')) {
+        // Extract the actual mytasks ID from the local ID (remove the "local-" prefix)
+        const myTaskId = String(taskId).replace('local-', '');
+        
+        // Update the standalone mytasks record directly
+        const { error } = await supabase
+          .from('mytasks')
+          .update({ 
+            priority: newPriority,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', myTaskId);
+          
+        if (error) throw error;
+      } else {
+        // This is a regular task with a valid task_id reference
+        const myTask = myTasks.find(mt => mt.task_id === taskId);
+        
+        if (myTask) {
+          // 更新现有记录
+          const { error } = await supabase
+            .from('mytasks')
+            .update({ 
+              priority: newPriority,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', myTask.id);
+            
+          if (error) throw error;
+        } else {
+          // 任务不存在于mytasks表，创建新记录
+          const { error } = await supabase
+            .from('mytasks')
+            .insert({
+              task_id: taskId,
+              user_id: user.id,
+              priority: newPriority
+            });
+            
+          if (error) throw error;
+        }
+      }
+      
+      // 重新获取更新后的数据 - use skipGlobalLoading to avoid full page reload
+      await fetchMyTasks(user.id, true);
+      
+      // Remove task from the updating list after fetching completes
+      setUpdatingTaskIds(prev => prev.filter(id => id !== taskId));
+    } catch (err) {
+      console.error('Error updating task priority:', err);
+      // Remove task from updating list on error
+      setUpdatingTaskIds(prev => prev.filter(id => id !== taskId));
       // 显示错误通知或处理错误
     }
   };
@@ -360,27 +434,22 @@ export default function MyTasksPage() {
       });
     }
     
-    // 按分配给我过滤 - 我们这里不需要额外过滤，因为所有任务都是当前用户的
+    // 按是否显示引用任务过滤
+    if (!showReferenceTasks) {
+      filtered = filtered.filter(task => task.is_standalone);
+    }
     
-    // 按工作空间/团队过滤
-    if (selectedWorkspace !== 'all') {
-      switch (selectedWorkspace) {
-        case 'workspace':
-          // 过滤个人工作区任务（没有关联task_id的是个人任务）
-          filtered = filtered.filter(task => task.is_standalone);
-          break;
-        case 'shared':
-          // 过滤共享任务（有关联task_id的是共享任务）
-          filtered = filtered.filter(task => !task.is_standalone);
-          break;
-        default:
-          break;
-      }
+    // 按优先级过滤
+    if (selectedPriority !== 'all') {
+      filtered = filtered.filter(task => {
+        const priority = getTaskPriority(task) || task.priority || 'LOW';
+        return priority === selectedPriority;
+      });
     }
     
     // 设置筛选后的任务
     setFilteredTasks(filtered);
-  }, [tasks, searchQuery, selectedType, selectedAssignee, selectedWorkspace]);
+  }, [tasks, searchQuery, selectedType, showReferenceTasks, selectedPriority, getTaskPriority]);
 
   // 任务数据处理和分列
   useEffect(() => {
@@ -548,20 +617,18 @@ export default function MyTasksPage() {
         }).length;
       }
       
-      if (value === 'workspace' || value === 'shared' || value === 'all') {
-        if (value === 'workspace') {
-          return tasks.filter(task => task.is_standalone).length;
-        }
-        if (value === 'shared') {
-          return tasks.filter(task => !task.is_standalone).length;
-        }
+      if (value === 'referenceTasks') {
+        return tasks.filter(task => !task.is_standalone).length; // 返回引用任务的数量
+      }
+      
+      if (value === 'LOW' || value === 'MEDIUM' || value === 'HIGH' || value === 'URGENT' || value === 'all') {
         if (value === 'all') {
           return tasks.length;
         }
-      }
-      
-      if (value === 'me') {
-        return tasks.length; // 所有任务都是分配给当前用户的
+        return tasks.filter(task => {
+          const priority = getTaskPriority(task) || task.priority || 'LOW';
+          return priority === value;
+        }).length;
       }
       
       if (value === 'createdBy') {
@@ -787,6 +854,11 @@ export default function MyTasksPage() {
     }
   };
 
+  // 处理任务优先级更新
+  const handlePriorityChange = (taskId, newPriority) => {
+    updateTaskPriority(taskId, newPriority);
+  };
+
   // 渲染加载状态
   if (status === 'loading') {
     return (
@@ -799,7 +871,7 @@ export default function MyTasksPage() {
           </div>
         </div>
         
-        <div className="flex gap-4 h-[calc(100vh-120px)]">
+        <div className="flex gap-4 h-[calc(100vh-105px)]">
           {/* Skeleton for left filter panel */}
           <div className="w-64 bg-background border rounded-md p-4">
             <Skeleton className="h-8 w-full mb-4" />
@@ -909,6 +981,7 @@ export default function MyTasksPage() {
               placeholder={t_tasks('searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              maxLength={30}
             />
           </div>
           <Button onClick={handleCreateTask}>
@@ -941,27 +1014,9 @@ export default function MyTasksPage() {
         onSuccess={handleTaskUpdate}
       />
 
-      <div className="flex gap-4 h-[calc(100vh-120px)]">
+      <div className="flex gap-4 h-[calc(100vh-105px)]">
         {/* 左侧过滤器面板 */}
         <div className="w-64 bg-background border rounded-md p-4">
-          {/* 清除过滤器按钮 */}
-          {(selectedType !== 'upcoming' || selectedAssignee !== 'me' || 
-            selectedWorkspace !== 'workspace' || searchQuery) && (
-            <Button 
-              variant="ghost" 
-              className="mb-4 text-xs w-full justify-start text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setSelectedType('upcoming');
-                setSelectedAssignee('me');
-                setSelectedWorkspace('workspace');
-                setSearchQuery('');
-              }}
-            >
-              <Filter className="h-3.5 w-3.5 mr-2 rotate-0 scale-100" />
-              {t_common('clearFilters')}
-            </Button>
-          )}
-
           {/* TYPE 过滤器 */}
           <div className="mb-5">
             <h3 className="text-xs text-muted-foreground mb-2">{t_tasks('type.label')}</h3>
@@ -971,25 +1026,54 @@ export default function MyTasksPage() {
             {renderFilterItem(t_tasks('type.noDate'), 'noDate', selectedType, setSelectedType)}
           </div>
 
-          {/* ASSIGNED TO 过滤器 - 移除 unassigned 选项 */}
+          {/* TASK TYPE 过滤器 */}
           <div className="mb-5">
             <h3 className="text-xs text-muted-foreground mb-2">{t_tasks('assignedTo.label')}</h3>
-            {renderFilterItem(t_tasks('assignedTo.me'), 'me', selectedAssignee, setSelectedAssignee)}
+            <div 
+              onClick={() => setShowReferenceTasks(!showReferenceTasks)}
+              className="flex items-center justify-between cursor-pointer p-2 rounded-md hover:bg-accent/10"
+            >
+              <div className="flex items-center gap-2">
+                {showReferenceTasks ? 
+                  <CheckCircle className="h-4 w-4" /> : 
+                  <Circle className="h-4 w-4" />
+                }
+                <span className={showReferenceTasks ? 'font-medium' : ''}>{t_tasks('assignedTo.showReferenceTasks')}</span>
+              </div>
+              <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded-full bg-muted">
+                {tasks ? tasks.filter(task => !task.is_standalone).length : 0}
+              </span>
+            </div>
           </div>
-
-          {/* WORKSPACE & TEAMS 过滤器 */}
+          
+          {/* PRIORITY 过滤器 */}
           <div className="mb-5">
-            <h3 className="text-xs text-muted-foreground mb-2">{t_tasks('workspaceTeams.label')}</h3>
-            {renderFilterItem(t_tasks('workspaceTeams.all'), 'all', selectedWorkspace, setSelectedWorkspace)}
-            {renderFilterItem(t_tasks('workspaceTeams.shared'), 'shared', selectedWorkspace, setSelectedWorkspace)}
-            {renderFilterItem(t_tasks('workspaceTeams.workspace'), 'workspace', selectedWorkspace, setSelectedWorkspace)}
+            <h3 className="text-xs text-muted-foreground mb-2">{t_common('priority')}</h3>
+            {renderFilterItem(t_common('all'), 'all', selectedPriority, setSelectedPriority)}
+            {renderFilterItem(t_common('priority_low'), 'LOW', selectedPriority, setSelectedPriority)}
+            {renderFilterItem(t_common('priority_medium'), 'MEDIUM', selectedPriority, setSelectedPriority)}
+            {renderFilterItem(t_common('priority_high'), 'HIGH', selectedPriority, setSelectedPriority)}
+            {renderFilterItem(t_common('priority_urgent'), 'URGENT', selectedPriority, setSelectedPriority)}
           </div>
 
-          {/* DUE DATE 过滤器 */}
-          {/* <div className="mb-5">
-            <h3 className="text-xs text-muted-foreground mb-2">{t_tasks('dueDate.label')}</h3>
-            {renderFilterItem(t_tasks('dueDate.createdBy'), 'createdBy', '', () => {})}
-          </div> */}
+          {/* 清除过滤器按钮 - 移动到容器底部 */}
+          {(selectedType !== 'upcoming' || !showReferenceTasks || 
+            selectedPriority !== 'all' || searchQuery) && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="mt-2 text-xs w-full"
+              onClick={() => {
+                setSelectedType('upcoming');
+                setShowReferenceTasks(true);
+                setSelectedPriority('all');
+                setSearchQuery('');
+              }}
+            >
+              <Filter className="h-3.5 w-3.5 mr-2 rotate-0 scale-100" />
+              {t_common('clearFilters')}
+            </Button>
+          )}
         </div>
 
         {/* 右侧任务看板 */}
@@ -1033,50 +1117,94 @@ export default function MyTasksPage() {
                                   }`}
                                   onClick={() => handleTaskClick(task)}
                                 >
-                                  <div className="mb-2 flex justify-between">
-                                    <h3 className="font-medium text-sm">
-                                      {getTaskTitle(task) || t_tasks('noTitle')}
-                                    </h3>
-                                    <Badge 
-                                      variant={getPriorityVariant(getTaskPriority(task))}
-                                      className={getPriorityVariant(getTaskPriority(task)) === 'yellow' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
-                                    >
-                                      {(getTaskPriority(task) || 'LOW')}
-                                    </Badge>
-                                  </div>
-                                  {getTaskDescription(task) && (
-                                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                                      {getTaskDescription(task)}
-                                    </p>
+                                  {updatingTaskIds.includes(task.id) ? (
+                                    // Show skeleton loading for this specific task
+                                    <div>
+                                      <div className="mb-2 flex justify-between">
+                                        <Skeleton className="h-5 w-32" />
+                                        <Skeleton className="h-5 w-16 rounded-full" />
+                                      </div>
+                                      <Skeleton className="h-4 w-full mb-2" />
+                                      <Skeleton className="h-4 w-3/4 mb-4" />
+                                      <div className="flex items-center justify-between">
+                                        <Skeleton className="h-4 w-20" />
+                                        <div className="flex items-center gap-2">
+                                          <Skeleton className="h-4 w-16" />
+                                          <Skeleton className="h-4 w-16" />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    // Normal task display
+                                    <>
+                                      <div className="mb-2 flex justify-between">
+                                        <h3 className="font-medium text-sm">
+                                          {getTaskTitle(task) || t_tasks('noTitle')}
+                                        </h3>
+                                        <div className="relative group">
+                                          <Badge 
+                                            variant={getPriorityVariant(getTaskPriority(task))}
+                                            className={`${getPriorityVariant(getTaskPriority(task)) === 'yellow' ? 'bg-yellow-500 hover:bg-yellow-600' : ''} cursor-pointer`}
+                                            onClick={(e) => {
+                                              e.stopPropagation(); // Prevent triggering task click
+                                              // Toggle priority dropdown menu
+                                            }}
+                                          >
+                                            {getTaskPriority(task) || 'LOW'}
+                                          </Badge>
+                                          <div className="absolute right-0 mt-1 hidden group-hover:block z-10">
+                                            <div className="bg-card border rounded-md shadow-md py-1 min-w-[100px]">
+                                              {['URGENT', 'HIGH', 'MEDIUM', 'LOW'].map(priority => (
+                                                <div 
+                                                  key={priority}
+                                                  className={`px-3 py-1.5 text-xs cursor-pointer hover:bg-accent/50 ${(getTaskPriority(task) || 'LOW') === priority ? 'bg-accent/20 font-medium' : ''}`}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation(); // Prevent triggering task click
+                                                    handlePriorityChange(task.id, priority);
+                                                  }}
+                                                >
+                                                  {priority}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      {getTaskDescription(task) && (
+                                        <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                                          {getTaskDescription(task)}
+                                        </p>
+                                      )}
+                                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                        <div className="flex items-center gap-2">
+                                          {getTaskProjectId(task) && (
+                                            <div className="text-xs">
+                                              #{getTaskProjectId(task)}
+                                            </div>
+                                          )}
+                                          {renderTaskReference(task)}
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          {task.expected_start_time && (
+                                            <div className="flex items-center gap-1">
+                                              <Clock className="w-3 h-3" />
+                                              <span>
+                                                {formatDateToUserTimezone(task.expected_start_time)}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {task.expected_completion_date && (
+                                            <div className="flex items-center gap-1">
+                                              <Calendar className="w-3 h-3" />
+                                              <span>
+                                                {formatDateToUserTimezone(task.expected_completion_date)}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </>
                                   )}
-                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                    <div className="flex items-center gap-2">
-                                      {getTaskProjectId(task) && (
-                                        <div className="text-xs">
-                                          #{getTaskProjectId(task)}
-                                        </div>
-                                      )}
-                                      {renderTaskReference(task)}
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      {task.expected_start_time && (
-                                        <div className="flex items-center gap-1">
-                                          <Clock className="w-3 h-3" />
-                                          <span>
-                                            {formatDateToUserTimezone(task.expected_start_time)}
-                                          </span>
-                                        </div>
-                                      )}
-                                      {task.expected_completion_date && (
-                                        <div className="flex items-center gap-1">
-                                          <Calendar className="w-3 h-3" />
-                                          <span>
-                                            {formatDateToUserTimezone(task.expected_completion_date)}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
                                 </div>
                               )}
                             </Draggable>

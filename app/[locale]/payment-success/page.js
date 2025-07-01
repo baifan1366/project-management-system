@@ -320,7 +320,7 @@ export default function PaymentSuccess() {
           planId: metadata?.planId,
           planName: metadata?.planName,
         },
-        is_processed: false,
+        is_processed: false, 
       };
 
       const { data, error } = await supabase

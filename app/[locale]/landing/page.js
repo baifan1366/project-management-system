@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import { supabase } from '@/lib/supabase';
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 
 // Dynamically import ReactPlayer to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
@@ -18,6 +20,8 @@ export default function LandingPage() {
   const footerRef = useRef(null);
   const cardsRef = useRef([]);
   const [activeCard, setActiveCard] = useState(1);  // Track active card index
+  const params = useParams();
+  const locale = params.locale || 'en';
   
   useEffect(() => {
     fetchLandingPageContent();
@@ -719,7 +723,7 @@ export default function LandingPage() {
                 <p className="text-gray-400 text-sm mb-4 md:mb-0">© 2025 Team Sync Project Management System. All rights reserved.</p>
                 <div className="flex space-x-6">
                   <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Privacy Policy</a>
-                  <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Terms of Service</a>
+                  <Link href={`/${locale}/terms-and-conditions`} className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Terms of Service</Link>
                   <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Cookie Policy</a>
                 </div>
               </div>

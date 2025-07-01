@@ -53,6 +53,12 @@ export default function AdminSidebar({ activePage, adminData, onLogout }) {
     }
   ];
   
+  // Add truncateText helper if not present
+  const truncateText = (text, maxLength = 20) => {
+    if (!text) return '';
+    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+  };
+  
   return (
     <div className="w-64 bg-slate-800 dark:bg-gray-800 text-white fixed h-screen overflow-y-auto z-10">
       <div className="p-4 flex items-center">
@@ -125,7 +131,7 @@ export default function AdminSidebar({ activePage, adminData, onLogout }) {
               {adminData.username?.charAt(0).toUpperCase() || 'A'}
             </div>
             <div>
-              <p className="text-sm font-medium text-white">{adminData.full_name || adminData.username}</p>
+              <p className="text-sm font-medium text-white">{adminData.full_name || truncateText(adminData.username, 20)}</p>
               <p className="text-xs text-slate-200 dark:text-gray-400">{adminData.role}</p>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { FaUser, FaEnvelope, FaLock, FaTimes, FaPencilAlt, FaCamera } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import bcrypt from 'bcryptjs';
 
 /**
  * Modal component for displaying admin profile information with inline editing capability
@@ -25,6 +26,9 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
   });
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const [currentPasswordVerified, setCurrentPasswordVerified] = useState(false);
+  const [currentPasswordError, setCurrentPasswordError] = useState('');
+  const [currentPasswordChecking, setCurrentPasswordChecking] = useState(false);
   
   // Update form data when adminData changes
   useEffect(() => {
@@ -39,6 +43,20 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
       });
     }
   }, [adminData]);
+  
+  useEffect(() => {
+    if (!isOpen) {
+      setCurrentPasswordVerified(false);
+      setCurrentPasswordError('');
+      setCurrentPasswordChecking(false);
+      setFormData(prev => ({
+        ...prev,
+        current_password: '',
+        new_password: '',
+        confirm_password: ''
+      }));
+    }
+  }, [isOpen]);
   
   if (!isOpen) return null;
   
@@ -158,13 +176,11 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
   
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     // Validate passwords match if changing password
     if (formData.new_password && formData.new_password !== formData.confirm_password) {
       toast.error('New passwords do not match');
       return;
     }
-    
     toast.promise(
       async () => {
         // Update admin profile
@@ -173,27 +189,39 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
           email: formData.email,
           username: formData.username,
         };
-        
         // Handle password update if provided
         if (formData.new_password && formData.current_password) {
-          // Here you would implement password verification and update
-          // This is just a placeholder - actual implementation would verify current password
-          // updateData.password_hash = await hashPassword(formData.new_password);
+          // 1. 获取当前管理员的 password_hash
+          const { data: adminRecord, error: fetchError } = await supabase
+            .from('admin_user')
+            .select('password_hash')
+            .eq('id', adminData.id)
+            .single();
+          if (fetchError || !adminRecord) {
+            throw new Error('Failed to verify current password. Please try again.');
+          }
+          // 2. 验证 current_password
+          const isMatch = await bcrypt.compare(formData.current_password, adminRecord.password_hash);
+          if (!isMatch) {
+            throw new Error('Current password is incorrect.');
+          }
+          // 3. Hash the new password before saving
+          const salt = await bcrypt.genSalt(10);
+          updateData.password_hash = await bcrypt.hash(formData.new_password, salt);
         }
-        
         const { error } = await supabase
           .from('admin_user')
           .update(updateData)
           .eq('id', adminData.id);
-          
         if (error) throw new Error(getErrorMessage(error));
-        
         // Update parent component
         if (onProfileUpdate) {
           onProfileUpdate({ ...adminData, ...updateData });
         }
-        
         setEditField(null);
+        setCurrentPasswordVerified(false);
+        setCurrentPasswordError('');
+        setCurrentPasswordChecking(false);
         return updateData;
       },
       {
@@ -206,6 +234,12 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
 
   const toggleEditField = (field) => {
     setEditField(editField === field ? null : field);
+  };
+  
+  // Add truncateText helper if not present
+  const truncateText = (text, maxLength = 20) => {
+    if (!text) return '';
+    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   };
   
   return (
@@ -356,7 +390,7 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
                   />
                 ) : (
                   <div className="text-base font-medium text-gray-900 dark:text-white mt-1">
-                    {formData.username}
+                    {truncateText(formData.username, 20)}
                   </div>
                 )}
               </div>
@@ -376,37 +410,85 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
                 
                 {editField === 'password' ? (
                   <div className="mt-2 space-y-2">
-                    <input
-                      type="password"
-                      name="current_password"
-                      placeholder="Current Password"
-                      value={formData.current_password}
-                      onChange={handleChange}
-                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
-                    />
-                    <input
-                      type="password"
-                      name="new_password"
-                      placeholder="New Password"
-                      value={formData.new_password}
-                      onChange={handleChange}
-                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
-                    />
-                    <input
-                      type="password"
-                      name="confirm_password"
-                      placeholder="Confirm New Password"
-                      value={formData.confirm_password}
-                      onChange={handleChange}
-                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSubmit}
-                      className="mt-2 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-3 py-1 bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none"
-                    >
-                      Update Password
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="password"
+                        name="current_password"
+                        placeholder="Current Password"
+                        value={formData.current_password}
+                        onChange={e => {
+                          handleChange(e);
+                          setCurrentPasswordVerified(false);
+                          setCurrentPasswordError('');
+                        }}
+                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
+                        disabled={currentPasswordVerified}
+                      />
+                      <button
+                        type="button"
+                        disabled={currentPasswordVerified || currentPasswordChecking || !formData.current_password}
+                        className={`px-2 py-1 rounded text-xs font-medium ${currentPasswordVerified ? 'bg-green-500 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'} ${currentPasswordChecking ? 'opacity-50' : ''}`}
+                        onClick={async () => {
+                          setCurrentPasswordChecking(true);
+                          setCurrentPasswordError('');
+                          try {
+                            const { data: adminRecord, error: fetchError } = await supabase
+                              .from('admin_user')
+                              .select('password_hash')
+                              .eq('id', adminData.id)
+                              .single();
+                            if (fetchError || !adminRecord) {
+                              setCurrentPasswordError('Failed to verify password.');
+                              setCurrentPasswordVerified(false);
+                            } else {
+                              const isMatch = await bcrypt.compare(formData.current_password, adminRecord.password_hash);
+                              if (isMatch) {
+                                setCurrentPasswordVerified(true);
+                                setCurrentPasswordError('');
+                              } else {
+                                setCurrentPasswordVerified(false);
+                                setCurrentPasswordError('Current password is incorrect.');
+                              }
+                            }
+                          } catch (err) {
+                            setCurrentPasswordError('Verification failed.');
+                            setCurrentPasswordVerified(false);
+                          } finally {
+                            setCurrentPasswordChecking(false);
+                          }
+                        }}
+                      >
+                        {currentPasswordVerified ? 'Verified' : (currentPasswordChecking ? 'Verifying...' : 'Verify')}
+                      </button>
+                    </div>
+                    {currentPasswordError && <p className="text-xs text-red-600 mt-1">{currentPasswordError}</p>}
+                    {currentPasswordVerified && (
+                      <>
+                        <input
+                          type="password"
+                          name="new_password"
+                          placeholder="New Password"
+                          value={formData.new_password}
+                          onChange={handleChange}
+                          className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
+                        />
+                        <input
+                          type="password"
+                          name="confirm_password"
+                          placeholder="Confirm New Password"
+                          value={formData.confirm_password}
+                          onChange={handleChange}
+                          className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSubmit}
+                          className="mt-2 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-3 py-1 bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none"
+                        >
+                          Update Password
+                        </button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="text-base font-medium text-gray-900 dark:text-white mt-1">
@@ -429,7 +511,18 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
             )}
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                onClose();
+                setCurrentPasswordVerified(false);
+                setCurrentPasswordError('');
+                setCurrentPasswordChecking(false);
+                setFormData(prev => ({
+                  ...prev,
+                  current_password: '',
+                  new_password: '',
+                  confirm_password: ''
+                }));
+              }}
               className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-1 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none"
             >
               Close

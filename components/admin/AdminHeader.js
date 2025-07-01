@@ -49,6 +49,12 @@ const AdminHeader = ({
     }
   };
 
+  // Add truncateText helper if not present
+  const truncateText = (text, maxLength = 20) => {
+    if (!text) return '';
+    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+  };
+
   return (
     <header className="bg-white dark:bg-gray-800 shadow">
       <div className="max-w-8xl mx-auto px-2 sm:px-4 lg:px-">
@@ -97,7 +103,7 @@ const AdminHeader = ({
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{localAdminData?.username}</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{truncateText(localAdminData?.username, 20)}</p>
                 </div>
               </div>
             )}

@@ -26,6 +26,7 @@ import { useConfirm } from '@/hooks/use-confirm'
 import ShareFile from './ShareFile'
 import GridView from './GridView'
 import { createSection } from '@/lib/redux/features/sectionSlice';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // 文件项组件 - 移除DnD包装
 const FileItem = ({ file, handleSelectFile, selectedFiles, openFileMenu, navigateToFolder, moveFileToParentFolder, currentPath, openFilePreview, downloadFile, onDragStart, onDragOver, onDragLeave, onDrop, handleDeleteSelected, confirmAndDeleteFiles, confirm, openShareFile }) => {
@@ -1328,7 +1329,7 @@ export default function TaskFile({ taskId, teamId }) {
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
-                    {t('loading')}
+                    <Skeleton className="w-full h-full" />
                   </TableCell>
                 </TableRow>
               ) : filteredFiles.length > 0 ? (
@@ -1409,9 +1410,9 @@ export default function TaskFile({ taskId, teamId }) {
               onChange={(e) => setNewFolderName(e.target.value)}
               className="col-span-3"
               minLength={2}
-              maxLength={100}
+              maxLength={50}
             />
-            <span className="text-xs text-gray-500 text-right">{newFolderName.trim().length}/100</span>
+            <span className="text-xs text-gray-500 text-right">{newFolderName.trim().length}/50</span>
           </div>
           <DialogFooter>
             <Button 

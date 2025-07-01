@@ -622,7 +622,7 @@ export default function Announcements({ projectId, teamId }) {
               <span>
                 {getUserName(selectedAnnouncement?.created_by)} • {formatDate(selectedAnnouncement?.created_at)}
               </span>
-              {hasEditPermission && !isEditing && (
+              {/* {hasEditPermission && !isEditing && (
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -638,7 +638,7 @@ export default function Announcements({ projectId, teamId }) {
                   <Eye className="h-4 w-4" />
                   {t('viewOnly')}
                 </div>
-              )}
+              )} */}
               
             </DialogDescription>
           </DialogHeader>

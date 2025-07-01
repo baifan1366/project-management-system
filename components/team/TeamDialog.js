@@ -416,11 +416,11 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                               <div className="flex items-center">
                                 {field.value === 'invite_only' && <Lock className="w-4 h-4 mr-2 text-gray-500" />}
                                 {field.value === 'can_edit' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
-                                {field.value === 'can_view' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
+                                {/* {field.value === 'can_view' && <Eye className="w-4 h-4 mr-2 text-gray-500" />} */}
                                 <span>
                                   {field.value === 'invite_only' && t('inviteOnly')}
                                   {field.value === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName: project?.project_name || t('thisProject') })}
-                                  {field.value === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project?.project_name || t('thisProject') })}
+                                  {/* {field.value === 'can_view' && t('everyoneAt{projectName}CanView', { projectName: project?.project_name || t('thisProject') })} */}
                                 </span>
                               </div>
                             </div>
@@ -453,7 +453,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                           </div>
                         </div>
                       </SelectItem>
-                      <SelectItem value="can_view" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                      {/* <SelectItem value="can_view" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
                         <div className="flex items-center w-full">
                           <Eye className="w-5 h-5 mr-3 text-gray-500" />
                           <div className="flex-1">
@@ -463,7 +463,7 @@ export default function CreateTeamDialog({ isOpen, onClose, projectId }) {
                             </div>
                           </div>
                         </div>
-                      </SelectItem>
+                      </SelectItem> */}
                     </SelectContent>
                   </Select>
                   <div className="flex justify-end mt-1 min-h-[20px]">
