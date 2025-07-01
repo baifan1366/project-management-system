@@ -818,7 +818,8 @@
     "noTeamsInProject": "This project has no associated teams",
     "multipleTeamsFound": "Multiple teams were found for this project",
     "deleteFailed": "Failed to delete message",
-    "teamIdRequired": "Team ID is required"
+    "teamIdRequired": "Team ID is required",
+    "characterLimit": "Character limit exceeded (1000 max)"
   },
   "Pricing": {
     "title": "Plans and Pricing",
@@ -2152,6 +2153,7 @@
   },
   "AI_Workflow": {
     "title": "AI Workflow",
+    "openInNewWindow": "Open in new window",
     "description": "Create and manage automated AI workflows",
     "myWorkflows": "My Workflows",
     "newWorkflow": "New",
@@ -2325,7 +2327,9 @@
     "emailsSent": "Sent {count} emails successfully",
     "cancelGeneration": "Cancel Generation",
     "cancelGenerationTitle": "Cancel Generation?",
-    "cancelGenerationDesc": "Are you sure you want to cancel the content generation?"
+    "promptTemplateHelp": "Define the template that will be used by the AI model. Use curly braces with variable names to reference input variables that users will provide when running the workflow.",
+    "inputVariablesHelp": "Define input fields that users will fill out when running the workflow. These variables can be referenced in your prompt template using curly brace syntax.",
+    "inputFieldHelp": "Enter a value for {field}. This will be used in the workflow to generate content based on your prompt template."
   },
   "TeamOverview": {
     "updateSuccess": "Announcement updated successfully",

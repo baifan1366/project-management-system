@@ -17,7 +17,7 @@ import { useGetUser } from '@/lib/hooks/useGetUser';
 export default function ProfilePage() {
   const t = useTranslations('profile');
   const dispatch = useDispatch();
-  const { user, isLoading: userLoading } = useGetUser();
+  const { user, isLoading: userLoading, refreshUser } = useGetUser();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -369,6 +369,10 @@ export default function ProfilePage() {
           [provider === 'google' ? 'googleConnected' : 'githubConnected']: true,
           [provider === 'google' ? 'googleProviderId' : 'githubProviderId']: providerId
         }));
+        
+        // Refresh user data without cache
+        await refreshUser();
+        
         toast.success(t('providerConnected', { provider }));
       } else {
         throw new Error(resultAction.error);
@@ -403,6 +407,10 @@ export default function ProfilePage() {
           [provider === 'google' ? 'googleConnected' : 'githubConnected']: false,
           [provider === 'google' ? 'googleProviderId' : 'githubProviderId']: ''
         }));
+        
+        // Refresh user data without cache
+        await refreshUser();
+        
         toast.success(t('providerDisconnected', { provider }));
       } else {
         throw new Error(resultAction.error);
@@ -422,11 +430,16 @@ export default function ProfilePage() {
     const authCompleted = urlParams.get('auth') === 'success';
     const provider = urlParams.get('provider');
     
-    if (authCompleted && provider === 'google' && user?.google_provider_id) {
-      // After Google auth is completed, need to check calendar scope
-      checkCalendarScope();
+    if (authCompleted) {
+      // Refresh user data without cache after auth completion
+      refreshUser();
+      
+      // After Google auth is completed, also check calendar scope
+      if (provider === 'google' && user?.google_provider_id) {
+        checkCalendarScope();
+      }
     }
-  }, [user, checkCalendarScope]);
+  }, [user, checkCalendarScope, refreshUser]);
 
   return (
     <div className="space-y-4">

@@ -42,8 +42,25 @@ import {
   BookOpen,
   X,
   Loader2,
-  ArrowRight
+  ArrowRight,
+  ExternalLink,
+  Maximize2,
+  Minimize2,
+  Move,
+  Square,
+  HelpCircle
 } from 'lucide-react';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -154,10 +171,335 @@ const debounce = (func, wait) => {
   };
 };
 
+// Create a draggable, resizable panel component
+const DraggablePanel = ({ 
+  isOpen, 
+  onClose, 
+  title, 
+  children, 
+  initialWidth = 800, 
+  initialHeight = 650,
+  initialPosition = { x: 100, y: 100 }
+}) => {
+  const [position, setPosition] = useState(initialPosition);
+  const [size, setSize] = useState({ width: initialWidth, height: initialHeight });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const panelRef = useRef(null);
+  const resizeStartSize = useRef({ width: 0, height: 0 });
+  const resizeStartPos = useRef({ x: 0, y: 0 });
+  
+  // Handle dragging
+  const handleDragStart = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartPos.current = { 
+      x: e.clientX - position.x, 
+      y: e.clientY - position.y 
+    };
+  };
+  
+  const handleDrag = useCallback((e) => {
+    if (!isDragging) return;
+    
+    const newX = e.clientX - dragStartPos.current.x;
+    const newY = e.clientY - dragStartPos.current.y;
+    
+    // Ensure the panel stays within viewport bounds
+    setPosition({ 
+      x: Math.max(0, Math.min(newX, window.innerWidth - 200)), 
+      y: Math.max(0, Math.min(newY, window.innerHeight - 40))
+    });
+  }, [isDragging]);
+  
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+  
+  // Handle resizing
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    resizeStartSize.current = { ...size };
+    resizeStartPos.current = { x: e.clientX, y: e.clientY };
+  };
+  
+  const handleResize = useCallback((e) => {
+    if (!isResizing) return;
+    
+    const deltaX = e.clientX - resizeStartPos.current.x;
+    const deltaY = e.clientY - resizeStartPos.current.y;
+    
+    setSize({
+      width: Math.max(400, resizeStartSize.current.width + deltaX),
+      height: Math.max(300, resizeStartSize.current.height + deltaY)
+    });
+  }, [isResizing]);
+  
+  const handleResizeEnd = () => {
+    setIsResizing(false);
+  };
+  
+  // Add/remove event listeners
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleDrag);
+      document.addEventListener('mouseup', handleDragEnd);
+    } else {
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', handleDragEnd);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', handleDragEnd);
+    };
+  }, [isDragging, handleDrag]);
+  
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResize);
+      document.addEventListener('mouseup', handleResizeEnd);
+    } else {
+      document.removeEventListener('mousemove', handleResize);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleResize);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, [isResizing, handleResize]);
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div 
+      ref={panelRef}
+      className="fixed z-50 flex flex-col shadow-lg rounded-lg bg-white dark:bg-[#282828] border border-gray-200 dark:border-[#333333] overflow-hidden"
+      style={{ 
+        left: `${position.x}px`, 
+        top: `${position.y}px`,
+        width: minimized ? 'auto' : `${size.width}px`,
+        height: minimized ? 'auto' : `${size.height}px`
+      }}
+    >
+      <div 
+        className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-[#333333] bg-gray-50 dark:bg-[#323232] cursor-move"
+        onMouseDown={handleDragStart}
+      >
+        <div className="flex items-center">
+          <Move className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
+          <h3 className="font-medium text-sm dark:text-gray-200">{title}</h3>
+        </div>
+        <div className="flex items-center space-x-1">
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            className="h-6 w-6"
+            onClick={() => setMinimized(!minimized)}
+          >
+            {minimized ? <Square className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
+          </Button>
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            className="h-6 w-6 hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+            onClick={onClose}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+      
+      {!minimized && (
+        <>
+          <div className="flex-grow overflow-auto">
+            {children}
+          </div>
+          
+          <div 
+            className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize"
+            onMouseDown={handleResizeStart}
+          >
+            <div className="absolute bottom-1 right-1 w-3 h-3 border-b-2 border-r-2 border-gray-400 dark:border-gray-600" />
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// Create a tab system component for the panels
+const TabSystem = ({ tabs, activeTab, onTabChange, onClose }) => {
+  // Handle drag and drop for tabs
+  const [draggingTab, setDraggingTab] = useState(null);
+  
+  const handleDragStart = (e, tabId) => {
+    setDraggingTab(tabId);
+    e.dataTransfer.setData('text/plain', tabId);
+    // Use a transparent drag image
+    const dragImg = document.createElement('div');
+    dragImg.style.opacity = '0';
+    document.body.appendChild(dragImg);
+    e.dataTransfer.setDragImage(dragImg, 0, 0);
+    document.body.removeChild(dragImg);
+  };
+  
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+  
+  const handleDrop = (e, targetTabId) => {
+    e.preventDefault();
+    if (draggingTab && draggingTab !== targetTabId) {
+      // Implement tab reordering logic if needed
+      console.log(`Reordering tabs: ${draggingTab} to position of ${targetTabId}`);
+    }
+    setDraggingTab(null);
+  };
+  
+  return (
+    <div className="fixed bottom-0 left-0 z-40 flex flex-wrap items-end space-x-1 p-1">
+      {tabs.map((tab) => (
+        <div 
+          key={tab.id}
+          className={`flex items-center px-3 py-1 rounded-t-lg cursor-pointer border border-b-0 ${
+            activeTab === tab.id 
+              ? 'bg-white dark:bg-[#282828] shadow-md z-10' 
+              : 'bg-gray-100 dark:bg-[#333333] hover:bg-gray-200 dark:hover:bg-[#3a3a3a]'
+          } border-gray-200 dark:border-[#444444] text-sm transition-all duration-150`}
+          onClick={() => onTabChange(tab.id)}
+          draggable
+          onDragStart={(e) => handleDragStart(e, tab.id)}
+          onDragOver={handleDragOver}
+          onDrop={(e) => handleDrop(e, tab.id)}
+        >
+          <tab.icon className="h-3.5 w-3.5 mr-2 text-gray-500 dark:text-gray-400" />
+          <span className={activeTab === tab.id ? 'font-medium dark:text-gray-200' : 'text-gray-600 dark:text-gray-400'}>
+            {tab.title}
+          </span>
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            className="h-4 w-4 ml-2 hover:bg-gray-200 dark:hover:bg-[#444444] rounded-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose(tab.id);
+            }}
+          >
+            <X className="h-2 w-2" />
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// VideoTutorial component
+const VideoTutorial = ({ onClose, t }) => {
+  const videoUrl = "https://xvvuzblglnbbsrmzgexp.supabase.co/storage/v1/object/public/workflow-files//workflowVideo.mp4";
+  const [isLoading, setIsLoading] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
+  
+  // Add fade-in animation
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+  
+  const openInNewTab = () => {
+    window.open(videoUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <div 
+      className={`fixed bottom-4 left-4 z-50 w-72 bg-white dark:bg-[#282828] rounded-lg shadow-xl border border-gray-200 dark:border-[#333333] overflow-hidden transition-all duration-500 hover:shadow-2xl ${
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+      }`}
+    >
+      <div className="relative group">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-[#333333]">
+            <Loader2 className="h-8 w-8 animate-spin text-[#39ac91]" />
+          </div>
+        )}
+        <video 
+          src={videoUrl}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="w-full h-auto cursor-pointer"
+          onClick={openInNewTab}
+          onLoadedData={() => setIsLoading(false)}
+          title="Click to open video in new tab"
+        />
+        {/* Play button overlay */}
+        <div 
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          aria-hidden="true"
+        >
+          <div className="bg-black/30 rounded-full p-2 opacity-70">
+            <PlayCircle className="h-10 w-10 text-white" />
+          </div>
+        </div>
+        <div className="absolute top-2 right-2">
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            className="h-6 w-6 bg-black/30 text-white hover:bg-black/50 rounded-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" onClick={openInNewTab}>
+          <div className="bg-black/50 p-2 rounded-full">
+            <ExternalLink className="h-8 w-8 text-white" />
+          </div>
+        </div>
+      </div>
+      
+      <div className="p-3 bg-gradient-to-r from-[#39ac91] to-[#2d8a73] text-white">
+        <h3 className="font-medium text-sm mb-1">{t('title') || 'Introducing Workflow Builder'}</h3>
+        <p className="text-xs opacity-90 mb-2">{t('description') || 'Create and automate workflows with AI processing'}</p>
+        <div className="flex flex-col space-y-2">
+          <Button 
+            size="sm" 
+            className="w-full bg-white text-[#39ac91] hover:bg-gray-100 font-medium"
+            onClick={onClose}
+          >
+            {t('run') || 'Try it out'}
+          </Button>
+          <a 
+            href={videoUrl} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-xs text-center text-white/80 hover:text-white underline"
+          >
+            {t('openInNewWindow') || 'Open video in new window'}
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function AIWorkflow() {
   const t = useTranslations('AI_Workflow');
   const { confirm } = useConfirm();
   const dispatch = useDispatch();
+  
+  // State to control video tutorial visibility
+  const [showTutorial, setShowTutorial] = useState(false);
   
   // User state
   const [userId, setUserId] = useState(null);
@@ -166,15 +508,30 @@ export default function AIWorkflow() {
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
   const [isConfigCollapsed, setIsConfigCollapsed] = useState(false);
   
+  // State for resizable panel
+  const [configWidth, setConfigWidth] = useState(33); // 33% by default (1/3 of the grid)
+  const [isDragging, setIsDragging] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  
   // State for workflow
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
   const [currentWorkflow, setCurrentWorkflow] = useState(null);
   const [workflowName, setWorkflowName] = useState('New Workflow');
+  const [workflowNameError, setWorkflowNameError] = useState(false);
   const [workflowDescription, setWorkflowDescription] = useState('');
   const [workflowType, setWorkflowType] = useState('document_generation');
   const [workflowPrompt, setWorkflowPrompt] = useState('');
+  const [promptCharCount, setPromptCharCount] = useState(0);
+  const [isPromptOverLimit, setIsPromptOverLimit] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [inputFieldErrors, setInputFieldErrors] = useState({});
+  
+  // Constants for validation
+  const MAX_WORKFLOW_NAME_LENGTH = 30;
+  const MAX_PROMPT_LENGTH = 1000;
+  const MAX_INPUT_NAME_LENGTH = 20;
+  const MAX_NUMBER_LENGTH = 10;
   
   // State for saving/loading workflows
   const [isLoading, setIsLoading] = useState(false);
@@ -336,8 +693,34 @@ export default function AIWorkflow() {
       return;
     }
     
+    if (workflowNameError || workflowName.length > MAX_WORKFLOW_NAME_LENGTH) {
+      toast.error('Workflow name cannot exceed ' + MAX_WORKFLOW_NAME_LENGTH + ' characters');
+      return;
+    }
+    
     if (!workflowType || !workflowPrompt) {
       toast.error(t('missingRequiredFields'));
+      return;
+    }
+    
+    if (isPromptOverLimit || workflowPrompt.length > MAX_PROMPT_LENGTH) {
+      toast.error('Prompt template cannot exceed ' + MAX_PROMPT_LENGTH + ' characters');
+      return;
+    }
+    
+    // Check for input field name errors
+    const hasNameErrors = Object.values(inputFieldErrors).some(error => error !== null && error !== undefined);
+    if (hasNameErrors) {
+      toast.error('Please fix all input variable name errors before saving');
+      return;
+    }
+    
+    // Validate input field names
+    const nameErrors = inputFields.some((field, index) => 
+      field.name && field.name.length > MAX_INPUT_NAME_LENGTH
+    );
+    if (nameErrors) {
+      toast.error('Input variable names cannot exceed ' + MAX_INPUT_NAME_LENGTH + ' characters');
       return;
     }
     
@@ -1278,8 +1661,134 @@ export default function AIWorkflow() {
     }
   };
   
+  // Handle resizing of the config panel
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleResizeEnd = () => {
+    setIsDragging(false);
+  };
+
+  const handleResize = useCallback((e) => {
+    if (!isDragging) return;
+    
+    // Get grid container width
+    const gridContainer = document.querySelector('.workflow-grid-container');
+    if (!gridContainer) return;
+    
+    const containerWidth = gridContainer.offsetWidth;
+    const mouseX = e.clientX;
+    const containerRect = gridContainer.getBoundingClientRect();
+    const relativeX = mouseX - containerRect.left;
+    
+    // Calculate new width as percentage
+    let newWidth = (relativeX / containerWidth) * 100;
+    
+    // Limit the width between 20% and 70%
+    newWidth = Math.max(20, Math.min(70, newWidth));
+    
+    setConfigWidth(newWidth);
+  }, [isDragging]);
+
+  // Add/remove event listeners for resizing
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleResize);
+      document.addEventListener('mouseup', handleResizeEnd);
+    } else {
+      document.removeEventListener('mousemove', handleResize);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleResize);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, [isDragging, handleResize]);
+  
+  // State for draggable panels
+  const [panels, setPanels] = useState([]);
+  const [activePanel, setActivePanel] = useState(null);
+  
+  // Function to open a new panel
+  const openPanel = (panelType) => {
+    const panelId = `panel-${Date.now()}`;
+    
+    let panelConfig = {
+      id: panelId,
+      type: panelType,
+      position: { x: 100 + (panels.length * 30), y: 100 + (panels.length * 20) }
+    };
+    
+    // Configure based on panel type
+    switch (panelType) {
+      case 'workflow-config':
+        panelConfig = {
+          ...panelConfig,
+          title: t('workflowConfiguration') || 'Workflow Configuration',
+          icon: Settings
+        };
+        break;
+      default:
+        break;
+    }
+    
+    setPanels([...panels, panelConfig]);
+    setActivePanel(panelId);
+  };
+  
+  // Close a panel
+  const closePanel = (panelId) => {
+    setPanels(panels.filter(panel => panel.id !== panelId));
+    if (activePanel === panelId) {
+      setActivePanel(panels.length > 1 ? panels[0].id : null);
+    }
+  };
+  
+  // Activate a panel
+  const activatePanel = (panelId) => {
+    setActivePanel(panelId);
+  };
+  
+  // Replace showConfigModal with openPanel for workflow configuration
+  const handleOpenWorkflowConfig = () => {
+    // Look for existing workflow config panel
+    const existingPanel = panels.find(panel => panel.type === 'workflow-config');
+    if (existingPanel) {
+      // Activate existing panel
+      setActivePanel(existingPanel.id);
+    } else {
+      // Open new panel
+      openPanel('workflow-config');
+    }
+    
+    // Auto-collapse the sidebar configuration panel
+    if (!isConfigCollapsed) {
+      setIsConfigCollapsed(true);
+    }
+  };
+  
+  // Check if user has seen the tutorial before
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem('hasSeenWorkflowTutorial');
+    if (!hasSeenTutorial) {
+      setShowTutorial(true);
+    }
+  }, []);
+  
+  // Handle closing the tutorial
+  const closeTutorial = () => {
+    setShowTutorial(false);
+    localStorage.setItem('hasSeenWorkflowTutorial', 'true');
+  };
+  
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f5] dark:bg-[#000000]">
+      {/* Video Tutorial */}
+      {showTutorial && <VideoTutorial onClose={closeTutorial} t={t} />}
+      
       <div className="grid grid-cols-12 gap-4 p-4 h-full">
         {/* Left panel - Workflow List */}
         <div className={`${isPanelCollapsed ? 'col-span-1' : 'col-span-3'} bg-white dark:bg-[#282828] rounded-lg shadow-sm border border-gray-100 dark:border-[#333333] overflow-hidden transition-all duration-300`}>
@@ -1361,13 +1870,36 @@ export default function AIWorkflow() {
         <div className={`${isPanelCollapsed ? 'col-span-11' : 'col-span-9'} h-auto bg-white dark:bg-[#282828] rounded-lg shadow-sm border border-gray-100 dark:border-[#333333] overflow-hidden transition-all duration-300`}>
           <div className="border-b border-gray-100 dark:border-[#383838] p-4 flex justify-between items-center">
             <div>
-              <input
-                type="text"
-                value={workflowName}
-                onChange={(e) => setWorkflowName(e.target.value)}
-                className="text-lg font-semibold bg-transparent border-b-2 border-transparent hover:border-gray-200 dark:hover:border-[#444444] focus:border-[#39ac91] dark:focus:border-[#39ac91] focus:outline-none focus:ring-0 w-full dark:text-gray-200 dark:placeholder-gray-500 transition-colors duration-200"
-                placeholder="Enter Workflow Name"
-              />
+              <div className="flex items-center">
+                <div className="relative flex-grow">
+                  <input
+                    type="text"
+                    value={workflowName}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setWorkflowName(newValue);
+                      setWorkflowNameError(newValue.length > MAX_WORKFLOW_NAME_LENGTH);
+                    }}
+                    maxLength={MAX_WORKFLOW_NAME_LENGTH + 5}
+                    className={`text-lg font-semibold bg-transparent border-b-2 ${
+                      workflowNameError ? 'border-red-500 dark:border-red-500' : 'border-transparent hover:border-gray-200 dark:hover:border-[#444444] focus:border-[#39ac91] dark:focus:border-[#39ac91]'
+                    } focus:outline-none focus:ring-0 w-full dark:text-gray-200 dark:placeholder-gray-500 transition-colors duration-200`}
+                    placeholder="Enter Workflow Name"
+                  />
+                  {workflowName.length > 25 && (
+                    <div className={`text-xs absolute right-0 -bottom-5 ${
+                      workflowNameError ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {workflowName.length}/{MAX_WORKFLOW_NAME_LENGTH}
+                    </div>
+                  )}
+                </div>
+                {workflowNameError && (
+                  <div className="text-xs text-red-500 ml-3 whitespace-nowrap">
+                    Name must not exceed {MAX_WORKFLOW_NAME_LENGTH} characters
+                  </div>
+                )}
+              </div>
               <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                 <Select value={workflowType} onValueChange={setWorkflowType}>
                   <SelectTrigger className="h-7 w-auto border-none focus:ring-0 dark:bg-transparent dark:text-gray-300">
@@ -1407,21 +1939,45 @@ export default function AIWorkflow() {
             </div>
           </div>
           
-          <div className="p-4 grid grid-cols-3 gap-4 h-5/6">
+          <div className="p-4 flex h-5/6 workflow-grid-container relative">
             {/* Workflow Configuration */}
-            <div className={`space-y-4 transition-all duration-300 ${isConfigCollapsed ? 'col-span-0 hidden' : 'col-span-1'}`}>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium dark:text-gray-300">{t('workflowConfiguration') || 'Workflow Configuration'}</h3>
-                <Button 
-                  onClick={toggleConfig} 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-6 w-6 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333333]"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
+            <div 
+              className={`space-y-4 transition-all duration-300 overflow-auto ${
+                isConfigCollapsed ? 'w-10 flex-shrink-0' : ''
+              }`}
+              style={{ 
+                width: isConfigCollapsed ? '40px' : `${configWidth}%`,
+                minWidth: isConfigCollapsed ? '40px' : '250px',
+                maxWidth: isConfigCollapsed ? '40px' : '70%'
+              }}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className={`text-base font-medium dark:text-gray-300 ${isConfigCollapsed ? 'hidden' : 'block'}`}>{t('workflowConfiguration') || 'Workflow Configuration'}</h3>
+                <div className="flex">
+                  {!isConfigCollapsed && (
+                    <Button 
+                      onClick={handleOpenWorkflowConfig} 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-6 w-6 mr-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333333]"
+                      title={t('openInNewWindow') || 'Open in New Window'}
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button 
+                    onClick={toggleConfig} 
+                    size="icon" 
+                    variant="ghost" 
+                    className={`${isConfigCollapsed ? 'ml-1' : ''} h-6 w-6 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333333]`}
+                  >
+                    {isConfigCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-              <div>
+              
+              {/* Rest of the config sections with their conditional hiding */}
+              <div className={isConfigCollapsed ? 'hidden' : 'block'}>
                 <Label className="dark:text-gray-300">{t('workflowDescription')}</Label>
                 <Textarea
                   value={workflowDescription}
@@ -1431,8 +1987,23 @@ export default function AIWorkflow() {
                 />
               </div>
               
-              <div>
-                <Label className="dark:text-gray-300">{t('promptTemplate')}</Label>
+              {/* Rest of the existing config sections */}
+              <div className={isConfigCollapsed ? 'hidden' : 'block'}>
+                <div className="flex items-center mb-1">
+                  <Label className="dark:text-gray-300">{t('promptTemplate')}</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" className="p-0 h-6 w-6 ml-1">
+                          <HelpCircle className="h-3 w-3 text-gray-400" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[300px] p-3">
+                        <p className="text-xs">{t('promptTemplateHelp') || 'Define the template that will be used by the AI model. Use {{variable_name}} to reference input variables in your prompt.'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {promptTemplates.map((template) => (
                     <button
@@ -1448,23 +2019,57 @@ export default function AIWorkflow() {
                     </button>
                   ))}
                 </div>
-                <Textarea
-                  value={workflowPrompt}
-                  onChange={(e) => {
-                    setWorkflowPrompt(e.target.value);
-                    setSelectedTemplate('');
-                  }}
-                  placeholder="Generate based on {{topic}}"
-                  className="h-40 font-mono text-sm dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {t('variablePlaceholder', { variableSyntax: '{{variable_name}}' })}
-                </p>
+                <div className="relative">
+                  <Textarea
+                    value={workflowPrompt}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setWorkflowPrompt(newValue);
+                      setSelectedTemplate('');
+                      setPromptCharCount(newValue.length);
+                      setIsPromptOverLimit(newValue.length > MAX_PROMPT_LENGTH);
+                    }}
+                    placeholder="Generate based on {{topic}}"
+                    maxLength={MAX_PROMPT_LENGTH + 50}
+                    className={`h-28 font-mono text-sm ${
+                      isPromptOverLimit ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                    } dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500`}
+                  />
+                  <div className={`flex justify-between items-center mt-1`}>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('variablePlaceholder', { variableSyntax: '{{variable_name}}' })}
+                    </p>
+                    <div className={`text-xs ${
+                      isPromptOverLimit ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {promptCharCount}/{MAX_PROMPT_LENGTH}
+                    </div>
+                  </div>
+                  {isPromptOverLimit && (
+                    <div className="text-xs text-red-500 mt-1">
+                      Prompt exceeds maximum of {MAX_PROMPT_LENGTH} characters
+                    </div>
+                  )}
+                </div>
               </div>
               
-              <div>
+              <div className={isConfigCollapsed ? 'hidden' : 'block'}>
                 <div className="flex justify-between items-center mb-2">
-                  <Label className="dark:text-gray-300">{t('inputVariables')}</Label>
+                  <div className="flex items-center">
+                    <Label className="dark:text-gray-300">{t('inputVariables')}</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" className="p-0 h-6 w-6 ml-1">
+                            <HelpCircle className="h-3 w-3 text-gray-400" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[300px] p-3">
+                          <p className="text-xs">{t('inputVariablesHelp') || 'Define input fields that users will fill out when running the workflow. These variables can be referenced in your prompt template using {{variable_name}} syntax.'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <Button 
                     onClick={addInputField} 
                     size="sm" 
@@ -1480,12 +2085,32 @@ export default function AIWorkflow() {
                   <div className="space-y-2">
                     {inputFields.map((field, index) => (
                       <div key={index} className="flex items-center space-x-2">
-                        <Input
-                          value={field.name}
-                          onChange={(e) => updateInputField(index, 'name', e.target.value)}
-                          placeholder="Variable name"
-                          className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
-                        />
+                        <div className="relative w-1/3">
+                          <Input
+                            value={field.name}
+                            onChange={(e) => {
+                              const newValue = e.target.value;
+                              updateInputField(index, 'name', newValue);
+                              
+                              // Update errors state
+                              setInputFieldErrors(prev => ({
+                                ...prev,
+                                [`name_${index}`]: newValue.length > MAX_INPUT_NAME_LENGTH ? 
+                                  `Cannot exceed ${MAX_INPUT_NAME_LENGTH} chars` : null
+                              }));
+                            }}
+                            maxLength={MAX_INPUT_NAME_LENGTH + 5}
+                            placeholder="Variable name"
+                            className={`w-full dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 ${
+                              inputFieldErrors[`name_${index}`] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                            }`}
+                          />
+                          {inputFieldErrors[`name_${index}`] && (
+                            <div className="text-xs text-red-500 absolute left-0 -bottom-5 truncate max-w-full">
+                              {inputFieldErrors[`name_${index}`]}
+                            </div>
+                          )}
+                        </div>
                         <Input
                           value={field.label}
                           onChange={(e) => updateInputField(index, 'label', e.target.value)}
@@ -1520,20 +2145,24 @@ export default function AIWorkflow() {
               </div>
             </div>
             
+            {/* Resize handle */}
+            {!isConfigCollapsed && (
+              <div 
+                className="w-1 hover:w-2 bg-gray-200 dark:bg-[#383838] hover:bg-gray-300 dark:hover:bg-[#444444] cursor-col-resize transition-all flex items-center justify-center mx-1"
+                onMouseDown={handleResizeStart}
+              >
+                <div className="h-8 w-1 bg-gray-300 dark:bg-[#444444] rounded-full"></div>
+              </div>
+            )}
+            
             {/* Workflow Flow Editor */}
-            <div className={`border rounded-md overflow-hidden ${isConfigCollapsed ? 'col-span-3' : 'col-span-2'} h-full dark:border-[#444444] transition-all duration-300`}>
-              {isConfigCollapsed && (
-                <div className="absolute left-4 top-4 z-10">
-                  <Button 
-                    onClick={toggleConfig} 
-                    size="icon" 
-                    variant="outline" 
-                    className="h-8 w-8 bg-white/90 dark:bg-[#333333]/90 dark:border-[#444444] dark:text-gray-300"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+            <div 
+              className="border rounded-md overflow-hidden h-full dark:border-[#444444] transition-all duration-300 flex-grow"
+              style={{ 
+                width: isConfigCollapsed ? 'calc(100% - 42px)' : `calc(100% - ${configWidth}% - 10px)` 
+              }}
+            >
+              {/* ReactFlow component */}
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -2105,6 +2734,197 @@ export default function AIWorkflow() {
           </Card>
         </div>
       )}
+      
+      {/* Render all panels */}
+      {panels.map(panel => {
+        // Only render active panel for performance
+        if (panel.id !== activePanel && panels.length > 1) return null;
+        
+        return (
+          <DraggablePanel
+            key={panel.id}
+            isOpen={true}
+            onClose={() => closePanel(panel.id)}
+            title={panel.title}
+            initialPosition={panel.position}
+            initialWidth={750}
+            initialHeight={650}
+          >
+            {panel.type === 'workflow-config' && (
+              <div className="p-6 h-full overflow-y-auto">
+                <div className="space-y-6">
+                  <div>
+                    <Label className="text-base dark:text-gray-300 mb-2 block">{t('workflowDescription')}</Label>
+                    <Textarea
+                      value={workflowDescription}
+                      onChange={(e) => setWorkflowDescription(e.target.value)}
+                      placeholder="Describe what this workflow does"
+                      className="resize-none h-20 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 w-full"
+                    />
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <Label className="text-base dark:text-gray-300">{t('promptTemplate')}</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" className="p-0 h-6 w-6 ml-2">
+                              <HelpCircle className="h-4 w-4 text-gray-400" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[300px] p-3">
+                            <p className="text-sm">{t('promptTemplateHelp') || 'Define the template that will be used by the AI model. Use {{variable_name}} to reference input variables in your prompt.'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {promptTemplates.map((template) => (
+                        <button
+                          key={template.id}
+                          onClick={() => setPromptTemplate(template.id)}
+                          className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                            selectedTemplate === template.id
+                              ? 'bg-[#39ac91] text-white dark:bg-[#39ac91] dark:text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-[#333333] dark:text-gray-300 dark:hover:bg-[#444444]'
+                          }`}
+                        >
+                          {template.name}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="relative">
+                      <Textarea
+                        value={workflowPrompt}
+                        onChange={(e) => {
+                          const newValue = e.target.value;
+                          setWorkflowPrompt(newValue);
+                          setSelectedTemplate('');
+                          setPromptCharCount(newValue.length);
+                          setIsPromptOverLimit(newValue.length > MAX_PROMPT_LENGTH);
+                        }}
+                        placeholder="Generate based on {{topic}}"
+                        maxLength={MAX_PROMPT_LENGTH + 50}
+                        className={`h-40 font-mono text-sm ${
+                          isPromptOverLimit ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                        } dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 w-full`}
+                      />
+                      <div className={`flex justify-between items-center mt-1`}>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {t('variablePlaceholder', { variableSyntax: '{{variable_name}}' })}
+                        </p>
+                        <div className={`text-xs ${
+                          isPromptOverLimit ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'
+                        }`}>
+                          {promptCharCount}/{MAX_PROMPT_LENGTH}
+                        </div>
+                      </div>
+                      {isPromptOverLimit && (
+                        <div className="text-xs text-red-500 mt-1">
+                          Prompt exceeds maximum of {MAX_PROMPT_LENGTH} characters
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <Label className="text-base dark:text-gray-300">{t('inputVariables')}</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" className="p-0 h-6 w-6 ml-2">
+                              <HelpCircle className="h-4 w-4 text-gray-400" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[350px] p-3">
+                            <p className="text-sm">{t('inputVariablesHelp') || 'Define input fields that users will fill out when running the workflow. These variables can be referenced in your prompt template using {{variable_name}} syntax.'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <div className="flex-grow"></div>
+                      <Button 
+                        onClick={addInputField} 
+                        size="sm"
+                        variant="outline"
+                        className="dark:bg-[#333333] dark:text-gray-300 dark:border-[#444444] dark:hover:bg-[#444444]"
+                      >
+                        <PlusCircle className="h-3 w-3 mr-1" />
+                        {t('addInput')}
+                      </Button>
+                    </div>
+                    
+                    <div className="border rounded-md dark:border-[#444444] max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-[#444444] scrollbar-track-transparent p-4">
+                      <div className="space-y-4">
+                        {inputFields.map((field, index) => (
+                          <div key={index} className="flex items-center space-x-3">
+                            <div className="relative w-1/3">
+                              <Input
+                                value={field.name}
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  updateInputField(index, 'name', newValue);
+                                  
+                                  // Update errors state
+                                  setInputFieldErrors(prev => ({
+                                    ...prev,
+                                    [`name_${index}`]: newValue.length > MAX_INPUT_NAME_LENGTH ? 
+                                      `Cannot exceed ${MAX_INPUT_NAME_LENGTH} chars` : null
+                                  }));
+                                }}
+                                maxLength={MAX_INPUT_NAME_LENGTH + 5}
+                                placeholder="Variable name"
+                                className={`w-full dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 ${
+                                  inputFieldErrors[`name_${index}`] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                                }`}
+                              />
+                              {inputFieldErrors[`name_${index}`] && (
+                                <div className="text-xs text-red-500 absolute left-0 -bottom-5 truncate max-w-full">
+                                  {inputFieldErrors[`name_${index}`]}
+                                </div>
+                              )}
+                            </div>
+                            <Input
+                              value={field.label}
+                              onChange={(e) => updateInputField(index, 'label', e.target.value)}
+                              placeholder="Display label"
+                              className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
+                            />
+                            <Select
+                              value={field.type}
+                              onValueChange={(value) => updateInputField(index, 'type', value)}
+                            >
+                              <SelectTrigger className="w-1/4 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent className="dark:bg-[#333333] dark:border-[#444444]">
+                                <SelectItem value="text" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text</SelectItem>
+                                <SelectItem value="textarea" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text Area</SelectItem>
+                                <SelectItem value="number" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Number</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              onClick={() => removeInputField(index)}
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-[#333333] dark:hover:text-red-400"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DraggablePanel>
+        );
+      })}
+      
+      {/* Remove Chrome-like tabs at the bottom */}
     </div>
   );
 }
