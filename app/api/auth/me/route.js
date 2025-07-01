@@ -5,8 +5,12 @@ import { cookies } from 'next/headers';
 export async function GET(request) {
   const startTime = Date.now();
   try {
+    // Check if no cache parameter is present
+    const { searchParams } = new URL(request.url);
+    const noCache = searchParams.get('nocache') === 'true';
+    
     // Get user data from either authorization header or cookie
-    const userData = await getCurrentUser();
+    const userData = await getCurrentUser(noCache);
     
     // Check if token exists but is invalid
     const cookieStore = await cookies();
