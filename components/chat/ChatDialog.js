@@ -266,24 +266,13 @@ export default function ChatDialog({
     []
   );
   
-  // Handle message input change with debounce
+  // Handle message input change with IME support
   const handleMessageChange = useCallback((e) => {
-    // For immediate UI feedback, we can directly set the input value
-    // but use the debounced version for state updates
-    e.persist(); // Keep the event around for the debounced function
+    // Simply update the state directly, let React handle the input naturally
+    // This approach works better with IME input methods
     const value = e.target.value;
-    
-    // Use requestAnimationFrame to schedule the update in the next frame
-    // This helps prevent blocking the main thread
-    requestAnimationFrame(() => {
-      // Update the input value directly for immediate feedback if ref is available
-      if (textareaRef.current) {
-        textareaRef.current.value = value;
-      }
-      // Use debounced version for state update
-      debouncedSetMessage(value);
-    });
-  }, [debouncedSetMessage, textareaRef]);
+    setMessage(value);
+  }, []);
 
   // Fetch session messages
   useEffect(() => {
@@ -723,7 +712,8 @@ export default function ChatDialog({
                   value={message}
                   onChange={handleMessageChange}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    // Only handle Enter if not in IME composition and not pressing shift
+                    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       handleSendMessage(e);
                     }
@@ -731,6 +721,7 @@ export default function ChatDialog({
                   placeholder="Type a message here..."
                   className="w-full bg-transparent border-0 focus:ring-0 resize-none text-sm py-1 max-h-32 placeholder:text-muted-foreground"
                   rows={1}
+                  style={{ overflowY: 'auto' }}
                 />
               </div>
               <div className="flex items-center gap-2">

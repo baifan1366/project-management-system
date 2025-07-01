@@ -580,78 +580,120 @@ export function ChatProvider({ children }) {
     }
   };
 
-  // 获取会话消息
+  // 获取会话消息 - 增强版本，添加重试机制和更好的错误处理
   const fetchMessages = async (sessionId) => {
-    if (!authSession) return;
-    
-    // 先检查用户是否有权访问此会话
-    const { data: participant, error: participantError } = await supabase
-      .from('chat_participant')
-      .select('*')
-      .eq('session_id', sessionId)
-      .eq('user_id', authSession.id)
-      .single();
+    if (!authSession) {
+      console.error('Cannot fetch messages: User not logged in');
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    try {
+      // 先检查用户是否有权访问此会话
+      const { data: participant, error: participantError } = await supabase
+        .from('chat_participant')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('user_id', authSession.id)
+        .single();
+        
+      if (participantError || !participant) {
+        console.error('无权访问此会话的消息', participantError);
+        return { success: false, error: 'Access denied' };
+      }
+
+      // 清空消息状态以避免显示旧消息
+      setMessages([]);
+
+      // 获取所有消息，添加错误重试机制
+      const fetchWithRetry = async (retries = 3) => {
+        try {
+          const { data, error } = await supabase
+            .from('chat_message')
+            .select(`
+              *,
+              user:user_id (
+                id,
+                name,
+                avatar_url,
+                email
+              ),
+              attachments:chat_attachment (
+                id,
+                file_url,
+                file_name,
+                file_type,
+                is_image
+              ),
+              replied_message:reply_to_message_id (
+                id,
+                content,
+                mentions,
+                user:user_id (
+                  id,
+                  name,
+                  avatar_url,
+                  email
+                )
+              )
+            `)
+            .eq('session_id', sessionId)
+            .order('created_at', { ascending: true });
+
+          if (error) {
+            throw error;
+          }
+          
+          return { data, success: true };
+        } catch (error) {
+          if (retries > 0) {
+            // Exponential backoff
+            const delay = 500 * Math.pow(2, 3 - retries);
+            console.log(`Retrying fetchMessages in ${delay}ms, attempts left: ${retries}`);
+            
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return fetchWithRetry(retries - 1);
+          }
+          
+          throw error;
+        }
+      };
       
-    if (participantError || !participant) {
-      console.error('无权访问此会话的消息', participantError);
-      return;
-    }
+      const { data, success } = await fetchWithRetry();
+      
+      if (!success || !data) {
+        throw new Error('Failed to fetch messages after retries');
+      }
 
-    // 清空消息状态以避免显示旧消息
-    setMessages([]);
+      // Process messages before setting state
+      const processedMessages = data.map(msg => {
+        // Make sure all required fields exist
+        if (!msg.attachments) msg.attachments = [];
+        
+        // Process avatars and check for missing fields
+        return {
+          ...msg,
+          user: msg.user ? processAvatarUrl(msg.user) : { id: msg.user_id, name: 'Unknown User' },
+          replied_message: msg.replied_message ? {
+            ...msg.replied_message,
+            user: msg.replied_message.user ? processAvatarUrl(msg.replied_message.user) : null
+          } : null
+        };
+      });
 
-    // 获取所有消息
-    const { data, error } = await supabase
-      .from('chat_message')
-      .select(`
-        *,
-        user:user_id (
-          id,
-          name,
-          avatar_url,
-          email
-        ),
-        attachments:chat_attachment (
-          id,
-          file_url,
-          file_name,
-          is_image
-        ),
-        replied_message:reply_to_message_id (
-          id,
-          content,
-          mentions,
-          user:user_id (
-            id,
-            name,
-            avatar_url,
-            email
-          )
-        )
-      `)
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
+      // Set messages
+      setMessages(processedMessages);
+      
+      // 标记消息为已读
+      await markMessagesAsRead(sessionId, authSession.id);
+      
+      // 更新未读消息计数
+      await updateUnreadCount(sessionId);
+      
+      return { success: true };
+    } catch (error) {
       console.error('Error fetching messages:', error);
-      return;
+      return { success: false, error: error.message || 'Unknown error' };
     }
-
-    // Set all messages with proper avatar processing
-    setMessages(data.map(msg => ({
-      ...msg,
-      user: processAvatarUrl(msg.user),
-      replied_message: msg.replied_message ? {
-        ...msg.replied_message,
-        user: processAvatarUrl(msg.replied_message.user)
-      } : null
-    })));
-    
-    // 标记消息为已读
-    markMessagesAsRead(sessionId, authSession.id);
-    
-    // 更新未读消息计数
-    updateUnreadCount(sessionId);
   };
 
   // 更新特定会话的未读消息计数

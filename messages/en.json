@@ -1735,7 +1735,8 @@
     "shareWith": "Share With",
     "personalEvent": "Personal Event",
     "googleEvent": "Google Event",
-    "taskEvent": "Task Event"
+    "taskEvent": "Task Event",
+    "noChats": "No chat available"
   },
   "CreateTag": {
     "tagDeleted": "Tag deleted",
