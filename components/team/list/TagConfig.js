@@ -2298,6 +2298,7 @@ export function renderSingleSelectCell(value, options = [], onChange, onCreateOp
         onCreateOption={onCreateOption}
         onEditOption={onEditOption}
         onDeleteOption={onDeleteOption}
+        projectThemeColor={projectThemeColor}
       />
     );
   }
@@ -2378,10 +2379,10 @@ export function renderSingleSelectCell(value, options = [], onChange, onCreateOp
                 className="w-3 h-3 rounded-full flex-shrink-0" 
                 style={{ backgroundColor: selectedOption.color || '#e5e5e5' }}
               ></div>
-              <span className="text-sm truncate">{selectedOption.label}</span>
+              <span className="text-sm truncate max-w-[80%]">{selectedOption.label}</span>
             </div>
           ) : (
-            <span className="text-sm text-muted-foreground">{t('selectOption')}</span>
+            <span className="text-sm text-muted-foreground truncate max-w-[80%]">{t('selectOption')}</span>
           )}
         </div>
       </PopoverTrigger>
@@ -2415,7 +2416,7 @@ export function renderSingleSelectCell(value, options = [], onChange, onCreateOp
                       className="w-3 h-3 rounded-full" 
                       style={{ backgroundColor: option.color || '#e5e5e5' }}
                     ></div>
-                    <span className="text-sm">{option.label}</span>
+                    <span className="text-sm truncate max-w-[80%]">{option.label}</span>
                   </div>
                   
                   {/* 选项编辑按钮 */}
@@ -2462,6 +2463,7 @@ export function renderSingleSelectCell(value, options = [], onChange, onCreateOp
                     onChange={(e) => setNewOption({...newOption, label: e.target.value})}
                     placeholder={t('newOptionName')}
                     className="w-full p-2 border rounded text-sm"
+                    maxLength={15}
                   />
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
@@ -2494,6 +2496,7 @@ export function renderSingleSelectCell(value, options = [], onChange, onCreateOp
                     </Button>
                     <Button
                       size="sm"
+                      variant={projectThemeColor}
                       onClick={handleCreateOption}
                       disabled={!newOption.label.trim()}
                     >
@@ -2503,7 +2506,7 @@ export function renderSingleSelectCell(value, options = [], onChange, onCreateOp
                 </div>
               ) : (
                 <Button
-                  variant="outline"
+                  variant={projectThemeColor}
                   size="sm"
                   className="w-full"
                   onClick={() => setIsCreating(true)}
@@ -2558,6 +2561,7 @@ export function renderSingleSelectCell(value, options = [], onChange, onCreateOp
                       {t('cancel')}
                     </Button>
                     <Button
+                      variant={projectThemeColor}
                       onClick={handleEditOption}
                       disabled={!editingOption.label.trim()}
                     >
@@ -2947,7 +2951,7 @@ export function renderMultiSelectCell(value, options = [], onChange, onCreateOpt
               ))}
             </div>
           ) : (
-            <span className="text-sm text-muted-foreground">{t('selectOptions')}</span>
+            <span className="text-sm text-muted-foreground truncate max-w-[80%]">{t('selectOptions')}</span>
           )}
         </div>
       </PopoverTrigger>
@@ -3015,7 +3019,7 @@ export function renderMultiSelectCell(value, options = [], onChange, onCreateOpt
                           className="w-3 h-3 rounded-full flex-shrink-0" 
                           style={{ backgroundColor: option.color || '#e5e5e5' }}
                         ></div>
-                        <span className="text-sm">{option.label}</span>
+                        <span className="text-sm truncate max-w-[80%]">{option.label}</span>
                       </div>
                       
                       {/* 选项编辑按钮 */}
@@ -4458,7 +4462,8 @@ export function EnhancedSingleSelect({
   disabled = false,
   onCreateOption: externalCreateOption,
   onEditOption: externalEditOption,
-  onDeleteOption: externalDeleteOption
+  onDeleteOption: externalDeleteOption,
+  projectThemeColor
 }) {
   const t = useTranslations('Team');
   const [open, setOpen] = useState(false);
@@ -4499,10 +4504,10 @@ export function EnhancedSingleSelect({
                 className="w-3 h-3 rounded-full flex-shrink-0" 
                 style={{ backgroundColor: selectedOption.color || '#e5e5e5' }}
               ></div>
-              <span className="text-sm truncate">{selectedOption.label}</span>
+              <span className="text-sm truncate max-w-[70%]">{selectedOption.label}</span>
             </div>
           ) : (
-            <span className="text-sm text-muted-foreground">{t('selectOption') || '选择选项'}</span>
+            <span className="text-sm text-muted-foreground truncate max-w-[80%]">{t('selectOption') || '选择选项'}</span>
           )}
           {!disabled && (
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-muted-foreground">
@@ -4517,6 +4522,7 @@ export function EnhancedSingleSelect({
           selectedValue={selectedOption}
           onSelect={handleSelectOption}
           selectionMode={true}
+          projectThemeColor={projectThemeColor}
         />
       </PopoverContent>
     </Popover>

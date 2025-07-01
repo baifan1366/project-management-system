@@ -458,7 +458,7 @@
     "you": "You",
     "role": {
       "owner": "Owner",
-      "can_edit": "Editor",
+      "can_edit": "Member",
       "can_check": "Checker",
       "can_view": "Viewer"
     },
