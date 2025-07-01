@@ -315,7 +315,7 @@ export default function InvitationDialog({ open, onClose }) {
                   className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
-              <Select value={permission} onValueChange={setPermission}>
+              {/* <Select value={permission} onValueChange={setPermission}>
                 <SelectTrigger className="border-0 focus:ring-0 focus:ring-offset-0 w-[120px]">
                   <SelectValue placeholder={t('selectPermission')}>
                     {permission && (
@@ -351,7 +351,7 @@ export default function InvitationDialog({ open, onClose }) {
                     </div>
                   </SelectItem>
                 </SelectContent>
-              </Select>
+              </Select> */}
             </div>
             <Button 
               type="submit" 

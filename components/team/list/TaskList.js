@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { DragDropContext } from '@hello-pangea/dnd';
 import {
@@ -22,7 +23,7 @@ import { useBodyContent } from './BodyContent';
 import { useDndTools } from './DndTools';
 import HandleTask from './HandleTask';
 
-function TaskListContent() {
+function TaskListContent({ projectThemeColor }) {
   const t = useTranslations('CreateTask');
   const dispatch = useDispatch();
   const { user } = useGetUser();
@@ -87,7 +88,8 @@ function TaskListContent() {
     editingTaskValues,
     isTaskLoading,
     validationErrors,
-    handleDeleteTask
+    handleDeleteTask,
+    projectThemeColor
   );
   
   // 拖拽相关功能
@@ -212,6 +214,7 @@ function TaskListContent() {
                       onChange={handleSectionNameChange}
                       onKeyDown={handleCreateSection}
                       className="h-8 border-transparent"
+                      maxLength={50}
                     />
                   </div>
                 ) : (
@@ -234,13 +237,26 @@ function TaskListContent() {
 }
 
 export default function TaskList({ projectId, teamId, teamCFId }) {
+  const [projectThemeColor, setProjectThemeColor] = useState('#ffffff');
+  const project = useSelector(state => 
+    state.projects.projects.find(p => String(p.id) === String(projectId))
+  );
+  
+  useEffect(() => {
+    if (project?.theme_color) {
+      setProjectThemeColor(project.theme_color);
+    }
+  }, [project]);
+  
   return (
     <TableProvider 
       teamId={teamId} 
       projectId={projectId} 
       teamCFId={teamCFId}
     >
-      <TaskListContent />
+      <TaskListContent 
+        projectThemeColor={projectThemeColor}
+      />
     </TableProvider>
   );
 }

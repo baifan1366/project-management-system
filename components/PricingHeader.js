@@ -1,6 +1,4 @@
 import { useTranslations } from 'next-intl';
-import LanguageSwitcher from './LanguageSwitcher';
-import { ThemeToggle } from './ui/ThemeToggle';
 import Link from 'next/link';
 import { Button } from './ui/button';
 import { ChevronDown, Menu, User } from 'lucide-react';
@@ -34,7 +32,9 @@ export function PricingHeader() {
   const navItems = [
     { href: '/landing', label: t('features') },
     { href: '/pricing', label: t('pricing') },
+    { href: '/aboutUs', label: t('about') },
     { href: '/contactUs', label: t('contact') },
+    { href: '/terms-and-conditions', label: t('terms') },
   ];
 
   return (
@@ -42,7 +42,7 @@ export function PricingHeader() {
       <div className="px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
         {/* Logo and Brand */}
         <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/landing" className="flex items-center space-x-2">
             <Image
               src={LogoImage}
               alt="Logo"
@@ -96,12 +96,6 @@ export function PricingHeader() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Language and Theme */}
-          <div className="flex items-center gap-2">
-            <LanguageSwitcher />
-            <ThemeToggle />
-          </div>
 
           {/* Auth Buttons or User Profile */}
           {!user && !isLoading ? (

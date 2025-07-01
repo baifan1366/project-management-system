@@ -1051,12 +1051,12 @@ const SprintPlanning = ({
                 }}
                 placeholder={t('setASprintGoal')}
                 className={formErrors.goal ? "border-red-500" : ""}
-                maxLength={1000}
+                maxLength={100}
               />
               <div className="flex justify-between">
                 {formErrors.goal && <p className="text-red-500 text-xs">{formErrors.goal}</p>}
                 <p/>
-                <p className="text-xs text-muted-foreground">{newSprint.goal ? newSprint.goal.trim().length : 0}/1000</p>
+                <p className="text-xs text-muted-foreground">{newSprint.goal ? newSprint.goal.trim().length : 0}/100</p>
               </div>
             </div>
           </div>

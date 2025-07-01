@@ -1411,7 +1411,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                                   }}
                                                   onClick={(e) => e.stopPropagation()}
                                                   minLength={2}                                                  
-                                                  maxLength={100}
+                                                  maxLength={50}
                                                   data-task-id={task.id}
                                                 />
                                               ) : newTaskId === task.id ? (
@@ -1432,7 +1432,7 @@ export default function TaskKanban({ projectId, teamId, teamCFId }) {
                                                   }}
                                                   onClick={(e) => e.stopPropagation()}
                                                   minLength={2}                                                  
-                                                  maxLength={100}
+                                                  maxLength={50}
                                                   data-new-task-id={task.id}
                                                 />
                                               ) : (                                                  

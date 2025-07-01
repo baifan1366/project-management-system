@@ -44,6 +44,44 @@ const refundReasons = [
     { id: 6, name: 'Other' }
 ];
 
+// Add validation helpers
+const validateEmail = (email) => {
+    // Use the comprehensive email validation from userManagement
+    if (!email || email.trim() === '') {
+        return { valid: false, message: 'Email is required.' };
+    }
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+        return { valid: false, message: 'Please enter a valid email address.' };
+    }
+    const domainPart = email.split('@')[1];
+    const invalidDomains = ['example.com', 'test.com', 'localhost', 'domain.com'];
+    if (invalidDomains.includes(domainPart?.toLowerCase())) {
+        return { valid: false, message: 'Please use a real email domain.' };
+    }
+    if (domainPart && domainPart.includes('..')) {
+        return { valid: false, message: 'Invalid email domain: consecutive dots are not allowed.' };
+    }
+    if (domainPart && domainPart.split('.').some(part => part.length > 63)) {
+        return { valid: false, message: 'Invalid email domain structure.' };
+    }
+    return { valid: true, message: '' };
+};
+const validateName = (name) => {
+    if (!name) return { valid: false, message: 'This field is required.' };
+    if (name.length > 25) return { valid: false, message: 'Must be 25 characters or less.' };
+    if (!/^[A-Za-z\s]+$/.test(name)) return { valid: false, message: 'Only letters and spaces allowed.' };
+    return { valid: true, message: '' };
+};
+const validateMessage = (msg) => {
+    if (!msg || msg.length < 20) return { valid: false, message: 'Message must be at least 20 characters.' };
+    return { valid: true, message: '' };
+};
+const validateDetails = (msg) => {
+    if (!msg || msg.length < 20) return { valid: false, message: 'Details must be at least 20 characters.' };
+    return { valid: true, message: '' };
+};
+
 export default function ContactUs(){
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -76,7 +114,13 @@ export default function ContactUs(){
     const [messageSent, setMessageSent] = useState(false);
     const [selectedRefundReason, setSelectedRefundReason] = useState('');
     const [refundDetails, setRefundDetails] = useState('');
-    
+    // Add error states
+    const [emailError, setEmailError] = useState('');
+    const [messageError, setMessageError] = useState('');
+    const [firstNameError, setFirstNameError] = useState('');
+    const [lastNameError, setLastNameError] = useState('');
+    const [detailsError, setDetailsError] = useState('');
+
     // Effect to handle form type changes while preserving email
     useEffect(() => {
         // Reset form fields except email when form type changes
@@ -183,6 +227,45 @@ export default function ContactUs(){
         event.preventDefault();
         setLoading(true);
         setErrorMessage('');
+        // Validate all fields before submit
+        let hasError = false;
+        // Email
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.valid) {
+            setEmailError(emailValidation.message);
+            hasError = true;
+        } else {
+            setEmailError('');
+        }
+        // Message (general)
+        if (selectedOption === 'general') {
+            const msgValidation = validateMessage(message);
+            if (!msgValidation.valid) {
+                setMessageError(msgValidation.message);
+                hasError = true;
+            } else {
+                setMessageError('');
+            }
+        }
+        // Enterprise
+        if (selectedOption === 'enterprise') {
+            const fn = validateName(firstName);
+            if (!fn.valid) { setFirstNameError(fn.message); hasError = true; } else { setFirstNameError(''); }
+            const ln = validateName(lastName);
+            if (!ln.valid) { setLastNameError(ln.message); hasError = true; } else { setLastNameError(''); }
+            const emailV = validateEmail(email);
+            if (!emailV.valid) { setEmailError(emailV.message); hasError = true; } else { setEmailError(''); }
+        }
+        // Refund
+        if (selectedOption === 'refund') {
+            const fn = validateName(firstName);
+            if (!fn.valid) { setFirstNameError(fn.message); hasError = true; } else { setFirstNameError(''); }
+            const ln = validateName(lastName);
+            if (!ln.valid) { setLastNameError(ln.message); hasError = true; } else { setLastNameError(''); }
+            const detailsV = validateDetails(refundDetails);
+            if (!detailsV.valid) { setDetailsError(detailsV.message); hasError = true; } else { setDetailsError(''); }
+        }
+        if (hasError) { setLoading(false); return; }
 
         try {
             // Prepare data based on form type
@@ -387,13 +470,19 @@ export default function ContactUs(){
                         <input
                         type="email"
                         id="email"
-                        value={email} onChange={(e)=>{
-                            setEmail(e.target.value)
+                        value={email}
+                        onChange={(e)=>{
+                            setEmail(e.target.value);
+                            setEmailError('');
                         }}
-                        className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
-                        required
+                        onBlur={(e)=>{
+                            const v = validateEmail(e.target.value);
+                            setEmailError(v.valid ? '' : v.message);
+                        }}
+                        className={`w-full p-3 bg-gray-900 border ${emailError ? 'border-red-500' : 'border-gray-700'} rounded`}
                         placeholder="Who should we contact?"
                         />
+                        {emailError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{emailError}</p>}
                     </div>
             
                     <div>
@@ -402,10 +491,14 @@ export default function ContactUs(){
                         id="message"
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        className="w-full p-3 bg-gray-900 border border-gray-700 rounded h-32"
-                        required
+                        onBlur={(e) => {
+                            const v = validateMessage(e.target.value);
+                            setMessageError(v.valid ? '' : v.message);
+                        }}
+                        className={`w-full p-3 bg-gray-900 border ${messageError ? 'border-red-500' : 'border-gray-700'} rounded h-32`}
                         placeholder="What would you like to discuss?"
                         />
+                        {messageError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{messageError}</p>}
                     </div>
             
                     <button
@@ -431,9 +524,13 @@ export default function ContactUs(){
                         id="firstName"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
-                        className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
-                        required
+                        onBlur={(e) => {
+                            const v = validateName(e.target.value);
+                            setFirstNameError(v.valid ? '' : v.message);
+                        }}
+                        className={`w-full p-3 bg-gray-900 border ${firstNameError ? 'border-red-500' : 'border-gray-700'} rounded`}
                         />
+                        {firstNameError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{firstNameError}</p>}
                     </div>
                     <div>
                         <label htmlFor="" className="block mb-2">Last Name</label>
@@ -442,9 +539,13 @@ export default function ContactUs(){
                         id="lastName"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
-                        className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
-                        required
+                        onBlur={(e) => {
+                            const v = validateName(e.target.value);
+                            setLastNameError(v.valid ? '' : v.message);
+                        }}
+                        className={`w-full p-3 bg-gray-900 border ${lastNameError ? 'border-red-500' : 'border-gray-700'} rounded`}
                         />
+                        {lastNameError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{lastNameError}</p>}
                     </div>
                     <div>
                         <label htmlFor="email" className="block mb-2">Email</label>
@@ -453,11 +554,16 @@ export default function ContactUs(){
                         id="email"
                         value={email}
                         onChange={(e)=>{
-                            setEmail(e.target.value)
+                            setEmail(e.target.value);
+                            setEmailError('');
                         }}
-                        className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
-                        required
+                        onBlur={(e)=>{
+                            const v = validateEmail(e.target.value);
+                            setEmailError(v.valid ? '' : v.message);
+                        }}
+                        className={`w-full p-3 bg-gray-900 border ${emailError ? 'border-red-500' : 'border-gray-700'} rounded`}
                         />
+                        {emailError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{emailError}</p>}
                     </div>
                     <div>
                         <label htmlFor="" className="block mb-2">Company Name</label>
@@ -467,7 +573,6 @@ export default function ContactUs(){
                             value={companyName}
                             onChange={(e) => setCompanyName(e.target.value)}
                             className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
-                            required
                             />
                     </div>
 
@@ -557,9 +662,13 @@ export default function ContactUs(){
                                 id="firstName"
                                 value={firstName}
                                 onChange={(e) => setFirstName(e.target.value)}
-                                className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
-                                required
+                                onBlur={(e) => {
+                                    const v = validateName(e.target.value);
+                                    setFirstNameError(v.valid ? '' : v.message);
+                                }}
+                                className={`w-full p-3 bg-gray-900 border ${firstNameError ? 'border-red-500' : 'border-gray-700'} rounded`}
                             />
+                            {firstNameError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{firstNameError}</p>}
                         </div>
                         
                         <div>
@@ -569,9 +678,13 @@ export default function ContactUs(){
                                 id="lastName"
                                 value={lastName}
                                 onChange={(e) => setLastName(e.target.value)}
-                                className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
-                                required
+                                onBlur={(e) => {
+                                    const v = validateName(e.target.value);
+                                    setLastNameError(v.valid ? '' : v.message);
+                                }}
+                                className={`w-full p-3 bg-gray-900 border ${lastNameError ? 'border-red-500' : 'border-gray-700'} rounded`}
                             />
+                            {lastNameError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{lastNameError}</p>}
                         </div>
                     </div>
                     
@@ -582,7 +695,6 @@ export default function ContactUs(){
                         id="accountEmail"
                         value={accountEmail}
                         className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
-                        required
                         disabled
                         />
                         <p className="text-xs text-gray-400 mt-1">This email is associated with your account and cannot be changed.</p>
@@ -637,10 +749,14 @@ export default function ContactUs(){
                             id="refundDetails"
                             value={refundDetails}
                             onChange={(e) => setRefundDetails(e.target.value)}
-                        className="w-full p-3 bg-gray-900 border border-gray-700 rounded h-32"
-                        required
+                            onBlur={(e) => {
+                                const v = validateDetails(e.target.value);
+                                setDetailsError(v.valid ? '' : v.message);
+                            }}
+                            className={`w-full p-3 bg-gray-900 border ${detailsError ? 'border-red-500' : 'border-gray-700'} rounded h-32`}
                             placeholder="Please provide additional details about your refund request"
                         />
+                        {detailsError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{detailsError}</p>}
                     </div>
 
                     <button
@@ -661,7 +777,7 @@ export default function ContactUs(){
                         <p>
                         <strong>Support:</strong>{' '}
                         <a href="#" className="text-pink-500 hover:underline">
-                            support@teamsync.com
+                        teamsync1366@gmail.com
                         </a>
                         <br />
                         Reach out for assistance with technical or account-related issues.
@@ -670,38 +786,22 @@ export default function ContactUs(){
                         <p>
                         <strong>Sales:</strong>{' '}
                         <a href="#" className="text-pink-500 hover:underline">
-                            hello@teamsync.com
+                        teamsync1366@gmail.com
                         </a>
                         <br />
                         Connect with our team for inquiries about plans or partnerships.
-                        </p>
-                        
-                        <p>
-                        <strong>Feedback:</strong>{' '}
-                        <a href="/feedback" className="text-pink-500 hover:underline">
-                            Share your thoughts
-                        </a>
-                        <br />
-                        We value your input to help improve Taskade.
                         </p>
                     </div>
                 </div>
         
                 {/* Office locations */}
                 <div className="mt-16">
-                    <h2 className="text-2xl font-bold mb-6">Office Locations</h2>
+                    <h2 className="text-2xl font-bold mb-6">Office Location</h2>
                     
                     <div className="space-y-6">
                         <div>
-                        <h3 className="font-bold mb-1">San Francisco Office</h3>
-                        <p>1160 Battery Street East, Suite 100</p>
-                        <p>San Francisco, California 94111, USA</p>
-                        </div>
-                        
-                        <div>
-                        <h3 className="font-bold mb-1">Singapore Office</h3>
-                        <p>73A Ayer Rajah Crescent</p>
-                        <p>Singapore 139957, Singapore</p>
+                        <h3 className="font-bold mb-1">Multimedia University, Melaka</h3>
+                        <p>Siti Hasmah Digital Library, Learning Point</p>
                         </div>
                     </div>
                 </div>
@@ -710,14 +810,9 @@ export default function ContactUs(){
                 <div className="mt-16">
                     <h2 className="text-2xl font-bold mb-6">Enterprise Support</h2>
                     
-                    <p className="mb-2">Phone: (415) 888-9177</p>
+                    <p className="mb-2">Phone: +60 11-1065 3966 (Mr. She) | +60 11-5581 9008 (Mr. Tan) | +60 11-6520 0275 (Ms. Chong)</p>
+
                     <p className="mb-4">Phone support is exclusively available for enterprise customers.</p>
-                    <Link 
-                        href="/contact-sales" 
-                        className="text-pink-500 hover:underline"
-                    >
-                        Contact Sales
-                    </Link> to explore the Enterprise plan and schedule a call with our team.
                 </div>
             </div>
         </div>

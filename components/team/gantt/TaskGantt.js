@@ -471,6 +471,9 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey, add
     gantt.templates.task_color = () => taskColorCode;
     gantt.templates.progress_color = () => taskColorCode;
     
+    // 设置任务文本颜色
+    // gantt.templates.task_text_color = () => "#ffffff"; // 白色文本，使其在深色任务栏上清晰可见
+    
     // 设置链接颜色
     gantt.templates.link_color = () => taskColorCode;
     gantt.templates.link_arrow_color = () => taskColorCode;
@@ -636,6 +639,7 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey, add
     ganttObj.templates.progress_color = () => taskColorCode;
     ganttObj.templates.link_color = () => taskColorCode;
     ganttObj.templates.link_arrow_color = () => taskColorCode;
+    // ganttObj.templates.task_text_color = () => "#ffffff"; // 添加任务文本颜色设置
     
     // 当任务数据或缩放级别更新时，更新Gantt图表
     if (ganttTasks.length > 0) {
@@ -741,6 +745,16 @@ export default function TaskGantt({ projectId, teamId, teamCFId, refreshKey, add
           /* 周号单元格样式 */
           .gantt_scale_cell:first-child {
             font-weight: 600;
+          }
+
+          /* 网格区域文本颜色 */
+          .gantt_grid_data .gantt_cell {
+            color: hsl(var(--foreground)) !important;
+          }
+          
+          /* 网格标题文本颜色 */
+          .gantt_grid_head_cell {
+            color: hsl(var(--foreground)) !important;
           }
         `
       }} />
