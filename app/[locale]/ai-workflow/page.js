@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useConfirm } from '@/hooks/use-confirm';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,7 +33,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
-  Menu,
+  Clock,
   CheckCircle,
   MessageSquare,
   Mail,
@@ -495,6 +496,7 @@ const VideoTutorial = ({ onClose, t }) => {
 
 export default function AIWorkflow() {
   const t = useTranslations('AI_Workflow');
+  const router = useRouter();
   const { confirm } = useConfirm();
   const dispatch = useDispatch();
   
@@ -520,6 +522,8 @@ export default function AIWorkflow() {
   const [workflowName, setWorkflowName] = useState('New Workflow');
   const [workflowNameError, setWorkflowNameError] = useState(false);
   const [workflowDescription, setWorkflowDescription] = useState('');
+  const [descriptionCharCount, setDescriptionCharCount] = useState(0);
+  const [isDescriptionOverLimit, setIsDescriptionOverLimit] = useState(false);
   const [workflowType, setWorkflowType] = useState('document_generation');
   const [workflowPrompt, setWorkflowPrompt] = useState('');
   const [promptCharCount, setPromptCharCount] = useState(0);
@@ -529,6 +533,7 @@ export default function AIWorkflow() {
   
   // Constants for validation
   const MAX_WORKFLOW_NAME_LENGTH = 30;
+  const MAX_DESCRIPTION_LENGTH = 100;
   const MAX_PROMPT_LENGTH = 1000;
   const MAX_INPUT_NAME_LENGTH = 20;
   const MAX_NUMBER_LENGTH = 10;
@@ -647,6 +652,23 @@ export default function AIWorkflow() {
     [setEdges]
   );
   
+  // Check if workflow is ready to run
+  const isWorkflowRunnable = () => {
+    // Check for basic workflow requirements
+    if (!currentWorkflow) return false;
+    if (isExecuting) return false;
+    if (!workflowName.trim() || workflowNameError) return false;
+    if (!workflowPrompt.trim() || isPromptOverLimit) return false;
+    if (inputFields.length === 0) return false;
+    
+    // Check for any invalid input fields
+    const hasInvalidInputFields = Object.values(inputFieldErrors).some(error => error !== null && error !== undefined);
+    if (hasInvalidInputFields) return false;
+    
+    // All checks passed
+    return true;
+  };
+  
   // Handle node input changes (for model selection, etc.)
   const handleNodeInputChange = useCallback((nodeId, fieldName, value) => {
     setNodes(prevNodes => 
@@ -695,6 +717,11 @@ export default function AIWorkflow() {
     
     if (workflowNameError || workflowName.length > MAX_WORKFLOW_NAME_LENGTH) {
       toast.error('Workflow name cannot exceed ' + MAX_WORKFLOW_NAME_LENGTH + ' characters');
+      return;
+    }
+    
+    if (isDescriptionOverLimit || workflowDescription.length > MAX_DESCRIPTION_LENGTH) {
+      toast.error('Workflow description cannot exceed ' + MAX_DESCRIPTION_LENGTH + ' characters');
       return;
     }
     
@@ -1001,8 +1028,13 @@ export default function AIWorkflow() {
   const setPromptTemplate = (templateId) => {
     const template = promptTemplates.find(t => t.id === templateId);
     if (template) {
-      setWorkflowPrompt(template.template);
+      const newPrompt = template.template;
+      setWorkflowPrompt(newPrompt);
       setSelectedTemplate(templateId);
+      
+      // Update character count and check length limit
+      setPromptCharCount(newPrompt.length);
+      setIsPromptOverLimit(newPrompt.length > MAX_PROMPT_LENGTH);
     }
   };
 
@@ -1025,8 +1057,8 @@ export default function AIWorkflow() {
   
   // Show execution form
   const handleShowExecutionForm = () => {
-    if (!currentWorkflow) {
-      toast.error('Please save the workflow before executing');
+    if (!isWorkflowRunnable()) {
+      toast.error(t('cannotRunWorkflow') || 'Cannot run workflow. Please check requirements.');
       return;
     }
     
@@ -1476,8 +1508,34 @@ export default function AIWorkflow() {
     ]);
   };
 
+  // Extract variables from prompt template
+  const extractVariablesFromPrompt = (promptText) => {
+    const variablePattern = /{{(.*?)}}/g;
+    const matches = [];
+    let match;
+    
+    while ((match = variablePattern.exec(promptText)) !== null) {
+      matches.push(match[1].trim());
+    }
+    
+    return matches;
+  };
+  
   // Remove an input field
   const removeInputField = (index) => {
+    const fieldToRemove = inputFields[index];
+    
+    // Check if the variable is used in the prompt template
+    const usedVariables = extractVariablesFromPrompt(workflowPrompt);
+    
+    if (usedVariables.includes(fieldToRemove.name)) {
+      toast.error(
+        t('cannotDeleteUsedVariable', { variable: fieldToRemove.name }) || 
+        `Cannot delete variable "${fieldToRemove.name}" as it is used in the prompt template.`
+      );
+      return;
+    }
+    
     setInputFields(inputFields.filter((_, i) => i !== index));
   };
 
@@ -1919,23 +1977,74 @@ export default function AIWorkflow() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <Button 
-                onClick={saveWorkflow} 
-                disabled={isSaving}
-                className="bg-[#ff6d5a] hover:bg-[#ff5c46] text-white dark:bg-[#ff6d5a] dark:hover:bg-[#ff5c46] dark:text-white"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {t('save')}
-              </Button>
-              <Button 
-                onClick={handleShowExecutionForm} 
-                disabled={isExecuting || !currentWorkflow}
-                variant="default"
-                className="bg-[#39ac91] hover:bg-[#33a085] text-white dark:bg-[#39ac91] dark:hover:bg-[#33a085] dark:text-white"
-              >
-                <PlayCircle className="h-4 w-4 mr-2" />
-                {t('run')}
-              </Button>
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={saveWorkflow} 
+                  disabled={isSaving}
+                  className="bg-[#ff6d5a] hover:bg-[#ff5c46] text-white dark:bg-[#ff6d5a] dark:hover:bg-[#ff5c46] dark:text-white"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {t('save')}
+                </Button>
+                <Button 
+                  onClick={() => router.push('/ai-workflow/history')}
+                  variant="outline"
+                  className="border-gray-300 dark:border-gray-600"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  {t('history') || 'History'}
+                </Button>
+              </div>
+              <TooltipProvider>
+                <Tooltip>
+                                      <TooltipTrigger asChild>
+                      <div>
+                        <Button 
+                          onClick={handleShowExecutionForm} 
+                          disabled={isExecuting || !isWorkflowRunnable()}
+                          variant="default"
+                          className="bg-[#39ac91] hover:bg-[#33a085] text-white dark:bg-[#39ac91] dark:hover:bg-[#33a085] dark:text-white"
+                        >
+                          <PlayCircle className="h-4 w-4 mr-2" />
+                          {t('run')}
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                  {!isWorkflowRunnable() && (
+                    <TooltipContent side="bottom" align="center" className="max-w-[300px]">
+                      <div className="p-2">
+                        <h4 className="font-medium text-sm mb-2">{t('runRequirements') || 'Requirements to run workflow:'}</h4>
+                        <ul className="space-y-1 text-xs">
+                          <li className="flex items-center">
+                            <span className={`mr-2 ${currentWorkflow ? 'text-green-500' : 'text-gray-400'}`}>
+                              {currentWorkflow ? '✓' : '○'}
+                            </span>
+                            {t('saveWorkflowFirst') || 'Save the workflow first'}
+                          </li>
+                          <li className="flex items-center">
+                            <span className={`mr-2 ${workflowName.trim().length > 0 && !workflowNameError ? 'text-green-500' : 'text-gray-400'}`}>
+                              {workflowName.trim().length > 0 && !workflowNameError ? '✓' : '○'}
+                            </span>
+                            {t('validName') || 'Valid workflow name'}
+                          </li>
+                          <li className="flex items-center">
+                            <span className={`mr-2 ${workflowPrompt.trim().length > 0 && !isPromptOverLimit ? 'text-green-500' : 'text-gray-400'}`}>
+                              {workflowPrompt.trim().length > 0 && !isPromptOverLimit ? '✓' : '○'}
+                            </span>
+                            {t('validPrompt') || 'Valid prompt template'}
+                          </li>
+                          <li className="flex items-center">
+                            <span className={`mr-2 ${inputFields.length > 0 ? 'text-green-500' : 'text-gray-400'}`}>
+                              {inputFields.length > 0 ? '✓' : '○'}
+                            </span>
+                            {t('atLeastOneInput') || 'At least one input field'}
+                          </li>
+                        </ul>
+                      </div>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
           
@@ -1979,18 +2088,37 @@ export default function AIWorkflow() {
               {/* Rest of the config sections with their conditional hiding */}
               <div className={isConfigCollapsed ? 'hidden' : 'block'}>
                 <Label className="dark:text-gray-300">{t('workflowDescription')}</Label>
-                <Textarea
-                  value={workflowDescription}
-                  onChange={(e) => setWorkflowDescription(e.target.value)}
-                  placeholder="Describe what this workflow does"
-                  className="resize-none h-20 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
-                />
+                <div className="relative">
+                  <Textarea
+                    value={workflowDescription}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setWorkflowDescription(newValue);
+                      setDescriptionCharCount(newValue.length);
+                      setIsDescriptionOverLimit(newValue.length > MAX_DESCRIPTION_LENGTH);
+                    }}
+                    maxLength={MAX_DESCRIPTION_LENGTH + 10}
+                    placeholder="Describe what this workflow does"
+                    className={`resize-none h-20 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 focus:ring-2 focus:ring-offset-0 focus:ring-offset-transparent ${
+                      isDescriptionOverLimit ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'focus:border-[#39ac91] focus:ring-[#39ac91]/20'
+                    }`}
+                  />
+                  <div className={`flex justify-end items-center mt-1`}>
+                    <div className={`text-xs ${
+                      isDescriptionOverLimit ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {descriptionCharCount}/{MAX_DESCRIPTION_LENGTH}
+                    </div>
+                  </div>
+                </div>
               </div>
               
               {/* Rest of the existing config sections */}
               <div className={isConfigCollapsed ? 'hidden' : 'block'}>
                 <div className="flex items-center mb-1">
-                  <Label className="dark:text-gray-300">{t('promptTemplate')}</Label>
+                  <Label className="dark:text-gray-300">
+                    {t('promptTemplate')} <span className="text-red-500 ml-0.5">*</span>
+                  </Label>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -2032,8 +2160,8 @@ export default function AIWorkflow() {
                     placeholder="Generate based on {{topic}}"
                     maxLength={MAX_PROMPT_LENGTH + 50}
                     className={`h-28 font-mono text-sm ${
-                      isPromptOverLimit ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                    } dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500`}
+                      isPromptOverLimit ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'focus:border-[#39ac91] focus:ring-[#39ac91]/20'
+                    } dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 focus:ring-2 focus:ring-offset-0 focus:ring-offset-transparent`}
                   />
                   <div className={`flex justify-between items-center mt-1`}>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -2082,65 +2210,104 @@ export default function AIWorkflow() {
                 </div>
                 
                 <div className="border rounded-md dark:border-[#444444] max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-[#444444] scrollbar-track-transparent p-2">
-                  <div className="space-y-2">
-                    {inputFields.map((field, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <div className="relative w-1/3">
-                          <Input
-                            value={field.name}
-                            onChange={(e) => {
-                              const newValue = e.target.value;
-                              updateInputField(index, 'name', newValue);
+                                      <div className="space-y-2">
+                      {inputFields.map((field, index) => {
+                        // Check if this variable is used in the prompt
+                        const usedVariables = extractVariablesFromPrompt(workflowPrompt);
+                        const isUsedInPrompt = usedVariables.includes(field.name);
+                        
+                        return (
+                          <div key={index} className={`flex items-center space-x-2 ${isUsedInPrompt ? 'bg-blue-50/50 dark:bg-blue-900/10 rounded-md p-1' : ''}`}>
+                            <div className="relative w-1/3">
+                              <Input
+                                value={field.name}
+                                onChange={(e) => {
+                                  const oldName = field.name;
+                                  const newValue = e.target.value;
+                                  
+                                  // Check if old name was in prompt and update it
+                                  if (usedVariables.includes(oldName)) {
+                                    const newPrompt = workflowPrompt.replaceAll(
+                                      `{{${oldName}}}`, 
+                                      `{{${newValue}}}`
+                                    );
+                                    setWorkflowPrompt(newPrompt);
+                                  }
+                                  
+                                  updateInputField(index, 'name', newValue);
+                                  
+                                  // Update errors state
+                                  setInputFieldErrors(prev => ({
+                                    ...prev,
+                                    [`name_${index}`]: newValue.length > MAX_INPUT_NAME_LENGTH ? 
+                                      `Cannot exceed ${MAX_INPUT_NAME_LENGTH} chars` : null
+                                  }));
+                                }}
+                                maxLength={MAX_INPUT_NAME_LENGTH + 5}
+                                placeholder="Variable name"
+                                className={`w-full dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 ${
+                                  inputFieldErrors[`name_${index}`] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                                } ${isUsedInPrompt ? 'border-blue-300 dark:border-blue-600' : ''}`}
+                              />
+                              {inputFieldErrors[`name_${index}`] && (
+                                <div className="text-xs text-red-500 absolute left-0 -bottom-5 truncate max-w-full">
+                                  {inputFieldErrors[`name_${index}`]}
+                                </div>
+                              )}
                               
-                              // Update errors state
-                              setInputFieldErrors(prev => ({
-                                ...prev,
-                                [`name_${index}`]: newValue.length > MAX_INPUT_NAME_LENGTH ? 
-                                  `Cannot exceed ${MAX_INPUT_NAME_LENGTH} chars` : null
-                              }));
-                            }}
-                            maxLength={MAX_INPUT_NAME_LENGTH + 5}
-                            placeholder="Variable name"
-                            className={`w-full dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 ${
-                              inputFieldErrors[`name_${index}`] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                            }`}
-                          />
-                          {inputFieldErrors[`name_${index}`] && (
-                            <div className="text-xs text-red-500 absolute left-0 -bottom-5 truncate max-w-full">
-                              {inputFieldErrors[`name_${index}`]}
                             </div>
-                          )}
-                        </div>
-                        <Input
-                          value={field.label}
-                          onChange={(e) => updateInputField(index, 'label', e.target.value)}
-                          placeholder="Display label"
-                          className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
-                        />
-                        <Select
-                          value={field.type}
-                          onValueChange={(value) => updateInputField(index, 'type', value)}
-                        >
-                          <SelectTrigger className="w-1/4 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
-                            <SelectValue placeholder="Type" />
-                          </SelectTrigger>
-                          <SelectContent className="dark:bg-[#333333] dark:border-[#444444]">
-                            <SelectItem value="text" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text</SelectItem>
-                            <SelectItem value="textarea" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text Area</SelectItem>
-                            <SelectItem value="number" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Number</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          onClick={() => removeInputField(index)}
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-[#333333] dark:hover:text-red-400"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                            <Input
+                              value={field.label}
+                              onChange={(e) => updateInputField(index, 'label', e.target.value)}
+                              placeholder="Display label"
+                              className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
+                            />
+                            <Select
+                              value={field.type}
+                              onValueChange={(value) => updateInputField(index, 'type', value)}
+                            >
+                              <SelectTrigger className="w-1/4 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent className="dark:bg-[#333333] dark:border-[#444444]">
+                                <SelectItem value="text" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text</SelectItem>
+                                <SelectItem value="textarea" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text Area</SelectItem>
+                                <SelectItem value="number" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Number</SelectItem>
+                              </SelectContent>
+                            </Select>
+                                                          {isUsedInPrompt ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8 text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                      >
+                                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">
+                                          i
+                                        </div>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-xs">{t('usedInPrompt') || 'This variable is used in the prompt template'}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <Button
+                                  onClick={() => removeInputField(index)}
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-[#333333] dark:hover:text-red-400"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                          </div>
+                        );
+                      })}
+                    </div>
                 </div>
               </div>
             </div>
@@ -2755,17 +2922,36 @@ export default function AIWorkflow() {
                 <div className="space-y-6">
                   <div>
                     <Label className="text-base dark:text-gray-300 mb-2 block">{t('workflowDescription')}</Label>
-                    <Textarea
-                      value={workflowDescription}
-                      onChange={(e) => setWorkflowDescription(e.target.value)}
-                      placeholder="Describe what this workflow does"
-                      className="resize-none h-20 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 w-full"
-                    />
+                    <div className="relative">
+                      <Textarea
+                        value={workflowDescription}
+                        onChange={(e) => {
+                          const newValue = e.target.value;
+                          setWorkflowDescription(newValue);
+                          setDescriptionCharCount(newValue.length);
+                          setIsDescriptionOverLimit(newValue.length > MAX_DESCRIPTION_LENGTH);
+                        }}
+                        maxLength={MAX_DESCRIPTION_LENGTH + 10}
+                        placeholder="Describe what this workflow does"
+                        className={`resize-none h-20 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 w-full focus:ring-2 focus:ring-offset-0 focus:ring-offset-transparent ${
+                          isDescriptionOverLimit ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'focus:border-[#39ac91] focus:ring-[#39ac91]/20'
+                        }`}
+                      />
+                      <div className={`flex justify-end items-center mt-1`}>
+                        <div className={`text-xs ${
+                          isDescriptionOverLimit ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'
+                        }`}>
+                          {descriptionCharCount}/{MAX_DESCRIPTION_LENGTH}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   
                   <div>
                     <div className="flex items-center mb-2">
-                      <Label className="text-base dark:text-gray-300">{t('promptTemplate')}</Label>
+                      <Label className="text-base dark:text-gray-300">
+                        {t('promptTemplate')} <span className="text-red-500 ml-0.5">*</span>
+                      </Label>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -2807,8 +2993,8 @@ export default function AIWorkflow() {
                         placeholder="Generate based on {{topic}}"
                         maxLength={MAX_PROMPT_LENGTH + 50}
                         className={`h-40 font-mono text-sm ${
-                          isPromptOverLimit ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                        } dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 w-full`}
+                          isPromptOverLimit ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'focus:border-[#39ac91] focus:ring-[#39ac91]/20'
+                        } dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 w-full focus:ring-2 focus:ring-offset-0 focus:ring-offset-transparent`}
                       />
                       <div className={`flex justify-between items-center mt-1`}>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -2857,63 +3043,102 @@ export default function AIWorkflow() {
                     
                     <div className="border rounded-md dark:border-[#444444] max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-[#444444] scrollbar-track-transparent p-4">
                       <div className="space-y-4">
-                        {inputFields.map((field, index) => (
-                          <div key={index} className="flex items-center space-x-3">
-                            <div className="relative w-1/3">
+                        {inputFields.map((field, index) => {
+                          // Check if this variable is used in the prompt
+                          const usedVariables = extractVariablesFromPrompt(workflowPrompt);
+                          const isUsedInPrompt = usedVariables.includes(field.name);
+                          
+                          return (
+                            <div key={index} className={`flex items-center space-x-3 ${isUsedInPrompt ? 'bg-blue-50/50 dark:bg-blue-900/10 rounded-md p-2' : ''}`}>
+                              <div className="relative w-1/3">
+                                <Input
+                                  value={field.name}
+                                  onChange={(e) => {
+                                    const oldName = field.name;
+                                    const newValue = e.target.value;
+                                    
+                                    // Check if old name was in prompt and update it
+                                    if (usedVariables.includes(oldName)) {
+                                      const newPrompt = workflowPrompt.replaceAll(
+                                        `{{${oldName}}}`, 
+                                        `{{${newValue}}}`
+                                      );
+                                      setWorkflowPrompt(newPrompt);
+                                    }
+                                    
+                                    updateInputField(index, 'name', newValue);
+                                    
+                                    // Update errors state
+                                    setInputFieldErrors(prev => ({
+                                      ...prev,
+                                      [`name_${index}`]: newValue.length > MAX_INPUT_NAME_LENGTH ? 
+                                        `Cannot exceed ${MAX_INPUT_NAME_LENGTH} chars` : null
+                                    }));
+                                  }}
+                                  maxLength={MAX_INPUT_NAME_LENGTH + 5}
+                                  placeholder="Variable name"
+                                  className={`w-full dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 ${
+                                    inputFieldErrors[`name_${index}`] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                                  } ${isUsedInPrompt ? 'border-blue-300 dark:border-blue-600' : ''}`}
+                                />
+                                {inputFieldErrors[`name_${index}`] && (
+                                  <div className="text-xs text-red-500 absolute left-0 -bottom-5 truncate max-w-full">
+                                    {inputFieldErrors[`name_${index}`]}
+                                  </div>
+                                )}
+
+                              </div>
                               <Input
-                                value={field.name}
-                                onChange={(e) => {
-                                  const newValue = e.target.value;
-                                  updateInputField(index, 'name', newValue);
-                                  
-                                  // Update errors state
-                                  setInputFieldErrors(prev => ({
-                                    ...prev,
-                                    [`name_${index}`]: newValue.length > MAX_INPUT_NAME_LENGTH ? 
-                                      `Cannot exceed ${MAX_INPUT_NAME_LENGTH} chars` : null
-                                  }));
-                                }}
-                                maxLength={MAX_INPUT_NAME_LENGTH + 5}
-                                placeholder="Variable name"
-                                className={`w-full dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 ${
-                                  inputFieldErrors[`name_${index}`] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                                }`}
+                                value={field.label}
+                                onChange={(e) => updateInputField(index, 'label', e.target.value)}
+                                placeholder="Display label"
+                                className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
                               />
-                              {inputFieldErrors[`name_${index}`] && (
-                                <div className="text-xs text-red-500 absolute left-0 -bottom-5 truncate max-w-full">
-                                  {inputFieldErrors[`name_${index}`]}
-                                </div>
+                              <Select
+                                value={field.type}
+                                onValueChange={(value) => updateInputField(index, 'type', value)}
+                              >
+                                <SelectTrigger className="w-1/4 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
+                                  <SelectValue placeholder="Type" />
+                                </SelectTrigger>
+                                <SelectContent className="dark:bg-[#333333] dark:border-[#444444]">
+                                  <SelectItem value="text" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text</SelectItem>
+                                  <SelectItem value="textarea" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text Area</SelectItem>
+                                  <SelectItem value="number" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Number</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {isUsedInPrompt ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8 text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                      >
+                                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">
+                                          i
+                                        </div>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-xs">{t('usedInPrompt') || 'This variable is used in the prompt template'}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <Button
+                                  onClick={() => removeInputField(index)}
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-[#333333] dark:hover:text-red-400"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               )}
                             </div>
-                            <Input
-                              value={field.label}
-                              onChange={(e) => updateInputField(index, 'label', e.target.value)}
-                              placeholder="Display label"
-                              className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
-                            />
-                            <Select
-                              value={field.type}
-                              onValueChange={(value) => updateInputField(index, 'type', value)}
-                            >
-                              <SelectTrigger className="w-1/4 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200">
-                                <SelectValue placeholder="Type" />
-                              </SelectTrigger>
-                              <SelectContent className="dark:bg-[#333333] dark:border-[#444444]">
-                                <SelectItem value="text" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text</SelectItem>
-                                <SelectItem value="textarea" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Text Area</SelectItem>
-                                <SelectItem value="number" className="dark:text-gray-300 dark:focus:bg-[#444444] dark:data-[highlighted]:bg-[#444444]">Number</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              onClick={() => removeInputField(index)}
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-[#333333] dark:hover:text-red-400"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
