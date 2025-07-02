@@ -211,6 +211,34 @@ function confirm({
   };
 }
 
+// Add a Promise-based confirm function
+function confirmAsync({
+  title,
+  description,
+  variant = "info",
+  confirmText,
+  cancelText
+}) {
+  return new Promise((resolve) => {
+    const id = genId();
+    
+    dispatch({
+      type: "ADD_CONFIRM",
+      confirm: {
+        id,
+        title,
+        description,
+        variant,
+        confirmText,
+        cancelText,
+        onConfirm: () => resolve(true),
+        onCancel: () => resolve(false),
+        open: true,
+      },
+    });
+  });
+}
+
 export function useConfirm() {
   const [state, setState] = React.useState(memoryState);
 
@@ -227,6 +255,7 @@ export function useConfirm() {
   return {
     ...state,
     confirm,
+    confirmAsync,
     dismiss: (confirmId) => dispatch({ type: "DISMISS_CONFIRM", confirmId }),
   };
 }

@@ -9,7 +9,6 @@ import {
     ReactFlow, 
     Controls, 
     Background, 
-    MiniMap,
     addEdge,
     applyEdgeChanges,
     applyNodeChanges,
@@ -51,11 +50,7 @@ import {
   Square,
   HelpCircle
 } from 'lucide-react';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+
 import {
   Tooltip,
   TooltipContent,
@@ -71,9 +66,7 @@ import {
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
-  SelectValue,
-  SelectGroup,
-  SelectLabel
+  SelectValue
 } from '@/components/ui/select';
 import {
   DropdownMenu,
@@ -497,7 +490,7 @@ const VideoTutorial = ({ onClose, t }) => {
 export default function AIWorkflow() {
   const t = useTranslations('AI_Workflow');
   const router = useRouter();
-  const { confirm } = useConfirm();
+  const { confirm, confirmAsync } = useConfirm();
   const dispatch = useDispatch();
   
   // State to control video tutorial visibility
@@ -978,27 +971,48 @@ export default function AIWorkflow() {
   
   // Delete a workflow
   const deleteWorkflow = async (workflowId) => {
+    if (!workflowId) {
+      console.error('Cannot delete workflow: workflowId is not provided');
+      toast.error('Invalid workflow ID');
+      return;
+    }
+
     if (!userId) {
       console.error('Cannot delete workflow: userId is not set');
       toast.error('User not authenticated');
       return;
     }
     
-    const confirmed = await confirm({
+    console.log(`Attempting to delete workflow: ${workflowId} for user: ${userId}`);
+    
+    const confirmed = await confirmAsync({
       title: t('deleteConfirm'),
-      description: t('deleteConfirmDesc')
+      description: t('deleteConfirmDesc'),
+      variant: 'warning'
     });
     
-    if (!confirmed) return;
+    if (!confirmed) {
+      console.log('Workflow deletion canceled by user');
+      return;
+    }
     
     try {
       setIsLoading(true);
       const response = await fetch(`/api/ai/workflow-agent/workflows?id=${workflowId}&userId=${userId}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: workflowId,
+          userId
+        }),
       });
       
       if (!response.ok) {
-        throw new Error('Failed to delete workflow');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Delete workflow error:', errorData);
+        throw new Error(errorData.error || 'Failed to delete workflow');
       }
       
       toast.success(t('workflowDeleted'));
@@ -1016,9 +1030,10 @@ export default function AIWorkflow() {
       
       // Refresh the workflows list
       fetchUserWorkflows();
+      console.log(`Successfully deleted workflow: ${workflowId}`);
     } catch (error) {
       console.error('Error deleting workflow:', error);
-      toast.error('Failed to delete workflow');
+      toast.error(`Failed to delete workflow: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
