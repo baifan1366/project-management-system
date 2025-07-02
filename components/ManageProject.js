@@ -237,7 +237,7 @@ const ManageProject = ({ isOpen, onClose, projectId, activeTab = "general", setA
     Object.entries(teamMembersObj).forEach(([teamId, members]) => {      
       // 确保类型一致进行比较（将两者都转换为字符串）
       const team = teams.find(t => String(t.id) === String(teamId));
-      const teamName = team ? team.name : `团队 ${teamId}`;
+      const teamName = team ? team.name : `Team ${teamId}`;
       
       members.forEach(member => {
         const userId = member.user_id;
