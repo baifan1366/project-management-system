@@ -440,72 +440,13 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
             {String(teamUser.user.id) === String(userId) ? (
               <span className="text-sm text-muted-foreground mr-2">
                 {currentRole === 'OWNER' ? t('owner') : 
-                 currentRole === 'CAN_VIEW' ? t('viewer') :
+                //  currentRole === 'CAN_VIEW' ? t('viewer') :
                  currentRole === 'CAN_EDIT' ? t('editor') :
                  currentRole === 'OWNER' && " (" + t('me') + ")"
                 }
               </span>
             ) : (
-              /* 其他所有成员，所有者可以编辑 */
-              <>
-                {isCurrentUserOwner() ? (
-                  <Select 
-                    value={currentRole}
-                    onValueChange={(value) => handlePendingRoleChange(teamUser.user.id, value)}
-                    disabled={status === 'loading' || saving}
-                  >
-                    <SelectTrigger className="w-[130px] h-8 border-border focus:ring-0 focus:ring-offset-0">
-                      <SelectValue>
-                        {currentRole && (
-                          <div className="flex items-center">
-                            {currentRole === 'CAN_VIEW' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
-                            {currentRole === 'CAN_EDIT' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
-                            <span className="truncate">
-                              {currentRole === 'CAN_VIEW' && t('viewer')}
-                              {currentRole === 'CAN_EDIT' && t('editor')}
-                            </span>
-                          </div>
-                        )}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CAN_EDIT">
-                        <div className="flex items-center w-full">
-                          <Pencil className="w-5 h-5 mr-3 text-gray-500" />
-                          <div className="flex-1">
-                            <div className="font-medium">{t('editor')}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {t('editorDescription')}
-                            </div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="CAN_VIEW">
-                        <div className="flex items-center w-full">
-                          <Eye className="w-5 h-5 mr-3 text-gray-500" />
-                          <div className="flex-1">
-                            <div className="font-medium">{t('viewer')}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {t('viewerDescription')}
-                            </div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                      {/* 转移所有者选项不再需要，因为可以直接设置为所有者 */}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  // 非所有者只能查看角色，不能修改
-                  <span className="text-sm text-muted-foreground mr-2 flex items-center">
-                    {currentRole === 'CAN_VIEW' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
-                    {currentRole === 'CAN_EDIT' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
-                    {currentRole === 'OWNER' && <Lock className="w-4 h-4 mr-2 text-orange-500" />}
-                    {currentRole === 'CAN_VIEW' && t('viewer')}
-                    {currentRole === 'CAN_EDIT' && t('editor')}
-                    {currentRole === 'OWNER' && t('owner')}
-                  </span>
-                )}
-              </>
+              <div/>
             )}
             
             {/* 所有者可以移除其他成员（包括其他所有者），但不能移除自己 */}
@@ -648,11 +589,11 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                               <div className="flex items-center">
                                 {teamAccess === 'invite_only' && <Lock className="w-4 h-4 mr-2 text-gray-500" />}
                                 {teamAccess === 'can_edit' && <Pencil className="w-4 h-4 mr-2 text-gray-500" />}
-                                {teamAccess === 'can_view' && <Eye className="w-4 h-4 mr-2 text-gray-500" />}
+                                {/* {teamAccess === 'can_view' && <Eye className="w-4 h-4 mr-2 text-gray-500" />} */}
                                 <span>
                                   {teamAccess === 'invite_only' && t('inviteOnly')}
                                   {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName })}
-                                  {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })}
+                                  {/* {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })} */}
                                 </span>
                               </div>
                             </div>
@@ -684,7 +625,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                             </div>
                           </div>
                         </SelectItem>
-                        <SelectItem value="can_view" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
+                        {/* <SelectItem value="can_view" className="relative flex items-center py-3 px-3 hover:bg-gray-100 dark:hover:bg-accent">
                           <div className="flex items-center w-full">
                             <Eye className="w-5 h-5 mr-3 text-gray-500" />
                             <div className="flex-1">
@@ -694,7 +635,7 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                               </div>
                             </div>
                           </div>
-                        </SelectItem>
+                        </SelectItem> */}
                       </SelectContent>
                     </Select>
                   ) : (
@@ -702,11 +643,11 @@ const EditTeamDialog = ({ open, onClose, team, activeTab, onSuccess, projectId }
                       <div className="flex items-center">
                         {teamAccess === 'invite_only' && <Lock className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
                         {teamAccess === 'can_edit' && <Pencil className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
-                        {teamAccess === 'can_view' && <Eye className="w-4 h-4 mr-2 text-gray-500 text-sm" />}
+                        {/* {teamAccess === 'can_view' && <Eye className="w-4 h-4 mr-2 text-gray-500 text-sm" />} */}
                         <span>
                           {teamAccess === 'invite_only' && t('inviteOnly')}
                           {teamAccess === 'can_edit' && t('everyoneAt{projectName}CanEdit', { projectName })}
-                          {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })}
+                          {/* {teamAccess === 'can_view' && t('everyoneAt{projectName}CanView', { projectName })} */}
                         </span>
                       </div>
                     </div>
