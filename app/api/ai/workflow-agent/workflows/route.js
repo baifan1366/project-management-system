@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createWorkflow, updateWorkflow, getUserWorkflows, getWorkflow } from '../../../../[locale]/ai-workflow/workflow-service';
+import { supabase } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // 60 second timeout (max for hobby plan)
@@ -119,20 +120,61 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const url = new URL(request.url);
-    const userId = url.searchParams.get('userId');
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized: userId is required' }, { status: 401 });
-    }
-    
+    let userId = url.searchParams.get('userId');
     const id = url.searchParams.get('id');
+    
+    // Try to get userId and id from request body if not in URL
+    if (!userId || !id) {
+      try {
+        const body = await request.json();
+        userId = userId || body.userId;
+        
+        if (!userId) {
+          return NextResponse.json({ error: 'Unauthorized: userId is required' }, { status: 401 });
+        }
+      } catch (err) {
+        // No body or invalid JSON
+        if (!userId) {
+          return NextResponse.json({ error: 'Unauthorized: userId is required' }, { status: 401 });
+        }
+      }
+    }
     
     if (!id) {
       return NextResponse.json({ error: 'Workflow ID is required' }, { status: 400 });
     }
     
-    // This is a soft delete, updating the is_deleted flag
-    const result = await updateWorkflow(id, { is_deleted: true }, userId);
+    // First, verify ownership by getting the workflow
+    const { data: workflow, error: fetchError } = await supabase
+      .from('workflows')
+      .select('created_by')
+      .eq('id', id)
+      .single();
+      
+    if (fetchError) {
+      console.error('Error fetching workflow:', fetchError);
+      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    }
+    
+    if (!workflow) {
+      return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
+    }
+    
+    // Verify ownership
+    if (workflow.created_by !== userId) {
+      return NextResponse.json({ error: 'Permission denied: You do not own this workflow' }, { status: 403 });
+    }
+    
+    // Perform hard delete
+    const { error: deleteError } = await supabase
+      .from('workflows')
+      .delete()
+      .eq('id', id);
+    
+    if (deleteError) {
+      console.error('Error deleting workflow:', deleteError);
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
     
     return NextResponse.json({ success: true, id });
   } catch (error) {

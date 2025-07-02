@@ -301,6 +301,7 @@ async function getWorkflow(workflowId) {
     .from('workflows')
     .select('*')
     .eq('id', workflowId)
+    .eq('is_deleted', false) // Only get non-deleted workflows
     .single();
     
   if (error) throw new Error(`Failed to fetch workflow: ${error.message}`);
@@ -1743,6 +1744,7 @@ async function getUserWorkflows(userId) {
     .from('workflows')
     .select('*')
     .or(`created_by.eq.${userId},is_public.eq.true`)
+    .eq('is_deleted', false) // Only get non-deleted workflows
     .order('created_at', { ascending: false });
     
   if (error) throw new Error(`Failed to fetch workflows: ${error.message}`);
