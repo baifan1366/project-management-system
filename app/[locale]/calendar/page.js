@@ -97,7 +97,6 @@ export default function CalendarPage() {
   useEffect(() => {
     async function checkGoogleConnection() {
       try {
-        
         // 使用自定义hook获取用户信息
         if (!currentUser) {
           setIsGoogleConnected(false);
@@ -105,9 +104,9 @@ export default function CalendarPage() {
           return;
         }
         
-        // 使用google_provider_id检查是否连接了Google，而不是provider字段
+        // 使用google_provider_id检查是否连接了Google
         if (currentUser?.google_provider_id) {
-          // 从用户元数据中获取 tokens，而不是从 supabase session 中获取
+          // 从用户元数据中获取 tokens
           const response = await fetch('/api/users/tokens?provider=google');
           if (!response.ok) {
             console.error('获取Google令牌失败');
@@ -120,8 +119,10 @@ export default function CalendarPage() {
           const refreshToken = tokens.refresh_token;
           
           if (accessToken || refreshToken) {
+            // 假设令牌存在就表示已连接 - 简化认证流程
+            setIsGoogleConnected(true);
             
-            // 尝试调用API验证令牌有效性
+            // 仍然验证令牌有效性，但不阻止日历显示
             try {
               const testResponse = await fetch(`/api/check-calendar-scope`, {
                 method: 'POST',
@@ -137,21 +138,13 @@ export default function CalendarPage() {
               
               const testData = await testResponse.json();
               
-              // 更新连接状态
-              if (testData.hasCalendarScope) {
-                setIsGoogleConnected(true);
-              } else {
-                toast.error(t('googleAuthExpired'), {
-                  action: {
-                    label: t('goToSettings'),
-                    onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
-                  }
-                });
-                setIsGoogleConnected(false);
+              // 只在令牌无效时显示错误
+              if (!testData.hasCalendarScope) {
+                console.warn('日历权限可能已过期或不完整');
               }
             } catch (error) {
               console.error('验证Google令牌失败:', error);
-              setIsGoogleConnected(false);
+              // 不改变连接状态，仍然尝试加载日历
             }
           } else {
             setIsGoogleConnected(false);
@@ -163,9 +156,7 @@ export default function CalendarPage() {
         console.error('检查Google连接时出错:', error);
         setIsGoogleConnected(false);
       } finally {
-        // 在完成Google连接检查后，初始加载状态由数据加载函数管理
-        // 不需要在这里直接设置isLoading，而是通过后续的数据加载来处理
-        // 仅当没有数据加载函数被触发时才直接设置isLoading为false
+        // 在完成Google连接检查后，更新加载状态
         if (!isLoadingGoogle && !isLoadingPersonal) {
           setIsLoading(false);
         }
@@ -478,25 +469,24 @@ export default function CalendarPage() {
   };
 
   const handleConnectGoogle = async () => {
-    try {
-      // 总是请求日历权限
-      // 显示正在连接的通知
-      const toastId = toast.loading(t('connectingGoogle') || 'Connecting to Google...');
-      
-      // 使用我们的自定义Google OAuth端点，而不是supabase
-      window.location.href = `/api/auth/google?redirectTo=${encodeURIComponent(window.location.pathname)}`;
-      
-      // OAuth流程会自动重定向，不需要处理成功情况
-    } catch (err) {
-      console.error(t('connectGoogleFailed'), err);
-      toast.error(t('connectGoogleFailed'), {
-        action: {
-          label: t('goToSettings'),
-          onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
-        }
-      });
-    }
-  };
+  try {
+    // 显示正在连接的通知
+    const toastId = toast.loading(t('connectingGoogle') || 'Connecting to Google...');
+    
+    // 在一个步骤中请求所有权限，包括Google日历权限
+    window.location.href = `/api/auth/google?redirectTo=${encodeURIComponent(window.location.pathname)}&requestCalendarAccess=true`;
+    
+    // OAuth流程会自动重定向，不需要处理成功情况
+  } catch (err) {
+    console.error(t('connectGoogleFailed'), err);
+    toast.error(t('connectGoogleFailed'), {
+      action: {
+        label: t('goToSettings'),
+        onClick: () => window.location.href = `/${window.location.pathname.split('/')[1]}/settings`
+      }
+    });
+  }
+};
 
   const handleOpenCreateEvent = (date = new Date()) => {
     // Check if the selected date is before today

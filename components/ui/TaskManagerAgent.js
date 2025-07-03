@@ -13,10 +13,11 @@ import Image from 'next/image';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default function TaskManagerAgent({ userId, projectId }) {
+export default function TaskManagerAgent({ userId, projectId, onInputChange, maxCharacters = 1000 }) {
   const [instruction, setInstruction] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const [isOverLimit, setIsOverLimit] = useState(false);
   
   // 使用ref替代state存储导航信息，避免渲染期间更新state
   const navigationRef = useRef({ 
@@ -408,14 +409,27 @@ export default function TaskManagerAgent({ userId, projectId }) {
                   t('pengy.promptForProject') : 
                   t('pengy.prompt') || "Describe a new project and tasks to create..."}
                 value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-                className="min-h-[120px] pr-10"
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setInstruction(newValue);
+                  setIsOverLimit(newValue.length > maxCharacters);
+                  if (onInputChange) {
+                    onInputChange(newValue);
+                  }
+                }}
+                className={`min-h-[120px] pr-10 ${isOverLimit ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                maxLength={maxCharacters + 10} // Add a small buffer
               />
+              {isOverLimit && (
+                <div className="mt-1 text-sm text-red-500 font-medium">
+                  {t('errors.characterLimit', { defaultValue: 'Character limit exceeded' })}
+                </div>
+              )}
               <MessageSquare className="absolute right-3 bottom-3 h-5 w-5 text-muted-foreground" />
             </div>
             <Button 
               type="submit" 
-                  disabled={isLoading || isStreaming || !instruction.trim() || !userId}
+                  disabled={isLoading || isStreaming || !instruction.trim() || !userId || isOverLimit || instruction.length > maxCharacters}
               className="w-full"
             >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

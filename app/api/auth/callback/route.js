@@ -502,7 +502,7 @@ export async function GET(request) {
       const token = await generateTokenForUser(userId);
       
       // Set auth cookie - cookies() 需要改用独立的cookieOperation变量
-      const cookieOperation = cookies();
+      const cookieOperation = await cookies();
       await cookieOperation.set('auth_token', token, {
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production',

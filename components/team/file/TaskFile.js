@@ -1329,10 +1329,7 @@ export default function TaskFile({ taskId, teamId }) {
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
-                    <Skeleton className="h-4 w-4" />
-                    <Skeleton className="h-4 w-4" />
-                    <Skeleton className="h-4 w-4" />
-                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="w-full h-full" />
                   </TableCell>
                 </TableRow>
               ) : filteredFiles.length > 0 ? (

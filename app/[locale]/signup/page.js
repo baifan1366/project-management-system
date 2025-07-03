@@ -479,7 +479,7 @@ export default function SignupPage() {
 
           <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
             {t('signup.agree')}{' '}
-            <Link href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">
+            <Link href="/terms-and-conditions" className="text-blue-600 dark:text-blue-400 hover:underline">
               {t('signup.termsOfService')}
             </Link>
           </p>

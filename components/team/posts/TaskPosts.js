@@ -32,6 +32,90 @@ import AttachFile from './AttachFile';
 import { File, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
+// 添加PostAttachments组件
+const PostAttachments = ({ post }) => {
+  const t = useTranslations('PostsView');
+  const [attachments, setAttachments] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // 获取帖子的附件
+  useEffect(() => {
+    const getAttachments = async () => {
+      if (!post.attachment_id || !Array.isArray(post.attachment_id) || post.attachment_id.length === 0) {
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        // 获取附件详情
+        const { data, error } = await supabase
+          .from('attachment')
+          .select('*')
+          .in('id', post.attachment_id);
+        
+        if (error) throw error;
+        setAttachments(data || []);
+      } catch (error) {
+        console.error("Error loading attachments for post:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    getAttachments();
+  }, [post.id, post.attachment_id]);
+  
+  if (loading) {
+    return (
+      <div className="mt-2 flex items-center text-xs text-[#605E5C] dark:text-[#C8C6C4]">
+        <Paperclip className="h-3 w-3 mr-1" />
+        <span>{t('loadingAttachments') || '正在加载附件...'}</span>
+      </div>
+    );
+  }
+  
+  if (!attachments || attachments.length === 0) {
+    return null;
+  }
+  
+  return (
+    <div className="mt-2 border-t pt-2 border-[#E1DFDD] dark:border-[#3B3A39]">
+      <div className="flex items-center text-xs font-medium mb-1">
+        <Paperclip className="h-3 w-3 mr-1 text-[#605E5C] dark:text-[#C8C6C4]" />
+        <span className="text-[#605E5C] dark:text-[#C8C6C4]">
+          {t('attachments') || '附件'} ({attachments.length})
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {attachments.map((file) => (
+          <a
+            key={file.id}
+            href={file.file_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center bg-accent/50 dark:bg-accent/20 rounded-md px-2 py-1 text-xs hover:bg-accent/70 dark:hover:bg-accent/30 transition-colors"
+          >
+            {file.file_type?.startsWith('image/') ? (
+              <img 
+                src={file.file_url} 
+                alt={file.file_name}
+                className="w-4 h-4 object-cover rounded mr-1"
+              />
+            ) : file.file_type?.includes('pdf') ? (
+              <File className="w-3 h-3 text-red-500 mr-1" />
+            ) : file.file_type?.includes('doc') ? (
+              <FileText className="w-3 h-3 text-blue-500 mr-1" />
+            ) : (
+              <File className="w-3 h-3 text-gray-500 mr-1" />
+            )}
+            <span className="truncate max-w-[120px]">{file.file_name}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function TaskPosts({ projectId, teamId, teamCFId }) {
   const t = useTranslations('PostsView');
   const dispatch = useDispatch();
@@ -1544,6 +1628,11 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                     )}
                   </Button>
                 )}
+                
+                {/* 显示附件 */}
+                {post.attachment_id && Array.isArray(post.attachment_id) && post.attachment_id.length > 0 && (
+                  <PostAttachments post={post} />
+                )}
               </CardContent>
               <CardFooter className="pt-2 flex justify-between">
                 <div className="flex space-x-2">
@@ -1779,6 +1868,11 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                           </>
                         )}
                       </Button>
+                    )}
+                    
+                    {/* 显示附件 */}
+                    {post.attachment_id && Array.isArray(post.attachment_id) && post.attachment_id.length > 0 && (
+                      <PostAttachments post={post} />
                     )}
                     
                     <div className="flex justify-start items-center mt-auto pt-3">
@@ -2289,39 +2383,6 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     });
   };
   
-  // 获取帖子附件的函数
-  const fetchPostAttachments = async (postId) => {
-    try {
-      // 首先获取帖子详情，查看attachment_id字段
-      const { data: post, error: postError } = await supabase
-        .from('team_post')
-        .select('attachment_id')
-        .eq('id', postId)
-        .single();
-      
-      if (postError) throw postError;
-      
-      // 如果没有附件，直接返回空数组
-      if (!post.attachment_id || !Array.isArray(post.attachment_id) || post.attachment_id.length === 0) {
-        return [];
-      }
-      
-      // 获取附件详情
-      const { data: attachments, error: attachmentsError } = await supabase
-        .from('attachment')
-        .select('*')
-        .in('id', post.attachment_id);
-      
-      if (attachmentsError) throw attachmentsError;
-      
-      return attachments || [];
-    } catch (error) {
-      console.error("Error fetching post attachments:", error);
-      toast.error(t('errorFetchingAttachments') || '获取附件失败');
-      return [];
-    }
-  };
-  
   // 添加渲染已上传附件的函数
   const renderAttachments = (attachments) => {
     if (!attachments || attachments.length === 0) return null;
@@ -2449,6 +2510,39 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
     } catch (error) {
       console.error("Error restoring attachment:", error);
       toast.error(t('errorRestoringAttachment') || '恢复附件失败');
+    }
+  };
+  
+  // 获取帖子的附件
+  const fetchPostAttachments = async (postId) => {
+    try {
+      // 首先获取帖子详情，查看attachment_id字段
+      const { data: post, error: postError } = await supabase
+        .from('team_post')
+        .select('attachment_id')
+        .eq('id', postId)
+        .single();
+      
+      if (postError) throw postError;
+      
+      // 如果没有附件，直接返回空数组
+      if (!post.attachment_id || !Array.isArray(post.attachment_id) || post.attachment_id.length === 0) {
+        return [];
+      }
+      
+      // 获取附件详情
+      const { data: attachments, error: attachmentsError } = await supabase
+        .from('attachment')
+        .select('*')
+        .in('id', post.attachment_id);
+      
+      if (attachmentsError) throw attachmentsError;
+      
+      return attachments || [];
+    } catch (error) {
+      console.error("Error fetching post attachments:", error);
+      toast.error(t('errorFetchingAttachments') || '获取附件失败');
+      return [];
     }
   };
   
@@ -2581,7 +2675,7 @@ export default function TaskPosts({ projectId, teamId, teamCFId }) {
                             className="border border-[#E1DFDD] text-[#252423] dark:border-[#3B3A39] dark:text-white w-full pr-16"
                             maxLength={50}
                           />
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-[#605E5C] dark:text-[#C8C6C4] bg-background px-1">
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-[#605E5C] dark:text-[#C8C6C4]">
                             <span className="font-medium">
                               {newPostTitle.trim().length}/50
                             </span>

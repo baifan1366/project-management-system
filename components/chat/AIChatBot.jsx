@@ -201,6 +201,111 @@ export default function AIChatBot() {
     };
   }, []);
 
+  // 发送消息到AI
+  const sendMessageToAI = async (userInput, messageHistory) => {
+    try {
+      // 格式化消息历史
+      const formattedMessages = messageHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      // 添加当前的用户消息
+      formattedMessages.push({
+        role: 'user',
+        content: userInput
+      });
+
+      // 创建一个临时的AI消息对象，用于流式更新
+      const tempAiMessage = {
+        role: 'assistant',
+        content: '',
+        timestamp: new Date().toISOString(),
+        isStreaming: true // 添加流式标记
+      };
+      
+      // 先添加一个空消息，后续会更新它
+      setMessages(prev => [...prev, tempAiMessage]);
+
+      // 调用流式API端点
+      const response = await fetch('/api/ai-proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          messages: formattedMessages,
+          language: currentUser?.language || 'en' // 传递用户语言设置
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('请求AI服务失败');
+      }
+
+      // 处理流式响应
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          break;
+        }
+        
+        // 解码收到的数据
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+              
+              // 检查是否为最终消息
+              if (data.content === "[DONE]") {
+                // 使用完整内容更新消息，并移除流式标记
+                if (data.fullContent) {
+                  setMessages(prev => prev.map((msg, idx) => 
+                    idx === prev.length - 1 ? { ...msg, content: data.fullContent, isStreaming: false } : msg
+                  ));
+                  accumulatedContent = data.fullContent;
+                }
+                break;
+              }
+              
+              // 累加内容并更新消息
+              if (data.content) {
+                accumulatedContent += data.content;
+                
+                // 更新消息数组中的最后一条消息
+                setMessages(prev => prev.map((msg, idx) => 
+                  idx === prev.length - 1 ? { ...msg, content: accumulatedContent } : msg
+                ));
+                
+                // 滚动到底部以跟随新内容
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }
+            } catch (e) {
+              console.error('解析流数据出错:', e);
+            }
+          }
+        }
+      }
+      
+      // 返回累积的完整内容
+      return {
+        role: 'assistant',
+        content: accumulatedContent
+      };
+    } catch (error) {
+      console.error(t('aiApiError'), error);
+      throw error;
+    }
+  };
+
   // Modified handleSubmit to be memoized with useCallback for debouncing
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
@@ -308,7 +413,7 @@ export default function AIChatBot() {
     } finally {
       setLoading(false);
     }
-  }, [input, currentUser, messages, currentSession, aiSession, t, sendMessageToAI, saveAIChatMessage, createAIChatSession, dispatch, setCurrentSession]);
+  }, [input, currentUser, messages, currentSession, aiSession, t, saveAIChatMessage, createAIChatSession, dispatch, setCurrentSession]);
 
   // Create a debounced version of the submit handler
   const debouncedSubmit = useCallback(
@@ -317,111 +422,6 @@ export default function AIChatBot() {
     }, 500, { leading: true, trailing: false }),
     [handleSubmit]
   );
-
-  // 发送消息到AI
-  const sendMessageToAI = async (userInput, messageHistory) => {
-    try {
-      // 格式化消息历史
-      const formattedMessages = messageHistory.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-
-      // 添加当前的用户消息
-      formattedMessages.push({
-        role: 'user',
-        content: userInput
-      });
-
-      // 创建一个临时的AI消息对象，用于流式更新
-      const tempAiMessage = {
-        role: 'assistant',
-        content: '',
-        timestamp: new Date().toISOString(),
-        isStreaming: true // 添加流式标记
-      };
-      
-      // 先添加一个空消息，后续会更新它
-      setMessages(prev => [...prev, tempAiMessage]);
-
-      // 调用流式API端点
-      const response = await fetch('/api/ai-proxy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          messages: formattedMessages,
-          language: currentUser?.language || 'en' // 传递用户语言设置
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('请求AI服务失败');
-      }
-
-      // 处理流式响应
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedContent = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) {
-          break;
-        }
-        
-        // 解码收到的数据
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n\n');
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.substring(6));
-              
-              // 检查是否为最终消息
-              if (data.content === "[DONE]") {
-                // 使用完整内容更新消息，并移除流式标记
-                if (data.fullContent) {
-                  setMessages(prev => prev.map((msg, idx) => 
-                    idx === prev.length - 1 ? { ...msg, content: data.fullContent, isStreaming: false } : msg
-                  ));
-                  accumulatedContent = data.fullContent;
-                }
-                break;
-              }
-              
-              // 累加内容并更新消息
-              if (data.content) {
-                accumulatedContent += data.content;
-                
-                // 更新消息数组中的最后一条消息
-                setMessages(prev => prev.map((msg, idx) => 
-                  idx === prev.length - 1 ? { ...msg, content: accumulatedContent } : msg
-                ));
-                
-                // 滚动到底部以跟随新内容
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-              }
-            } catch (e) {
-              console.error('解析流数据出错:', e);
-            }
-          }
-        }
-      }
-      
-      // 返回累积的完整内容
-      return {
-        role: 'assistant',
-        content: accumulatedContent
-      };
-    } catch (error) {
-      console.error(t('aiApiError'), error);
-      throw error;
-    }
-  };
 
   // 清除聊天记录
   const clearChatHistory = async () => {

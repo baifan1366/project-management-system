@@ -301,6 +301,7 @@ async function getWorkflow(workflowId) {
     .from('workflows')
     .select('*')
     .eq('id', workflowId)
+    .eq('is_deleted', false) // Only get non-deleted workflows
     .single();
     
   if (error) throw new Error(`Failed to fetch workflow: ${error.message}`);
@@ -1625,18 +1626,6 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
       }
     }
     
-    // 保存执行记录
-    await saveWorkflowExecution(
-      workflowId, 
-      userId, 
-      models.join(', '), // 使用所有模型ID
-      inputs, 
-      results, 
-      outputFormats,
-      documentUrls,
-      apiResponses
-    );
-    
     // 将API响应添加到结果中，使其在UI中可见
     if (Object.keys(apiResponses).length > 0) {
       results.api_results = {};
@@ -1755,6 +1744,7 @@ async function getUserWorkflows(userId) {
     .from('workflows')
     .select('*')
     .or(`created_by.eq.${userId},is_public.eq.true`)
+    .eq('is_deleted', false) // Only get non-deleted workflows
     .order('created_at', { ascending: false });
     
   if (error) throw new Error(`Failed to fetch workflows: ${error.message}`);
@@ -2211,18 +2201,6 @@ async function streamAIResponses(workflowId, inputs, modelId, userId, writeChunk
       }
     }
     
-    // Save partial execution record for tracking
-    await saveWorkflowExecution(
-      workflowId,
-      userId,
-      models.join(', '),
-      inputs,
-      { status: 'partial', message: 'AI responses generated, awaiting user review' },
-      outputFormats,
-      {},
-      {}
-    );
-    
     // Send final completion message
     await writeChunk({
       type: 'info',
@@ -2464,6 +2442,7 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
         const pptContent = aiResponses.ppt;
         const pptUrl = await generatePPTX(pptContent, userId);
         documentUrls.ppt = pptUrl;
+        documentUrls.pptxUrl = pptUrl; // 添加pptxUrl以确保前端兼容性
         
       } catch (error) {
         console.error('Error generating PowerPoint:', error);

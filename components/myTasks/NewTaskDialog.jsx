@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Calendar as CalendarIcon, Clock } from 'lucide-react';
-import { format, isBefore, startOfToday, isSameDay } from 'date-fns';
+import { format, isBefore, startOfToday, isSameDay, addMinutes, addHours } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -37,20 +37,83 @@ import { toast } from 'sonner';
 export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userId }) {
   const t_tasks = useTranslations('myTasks');
   const t_common = useTranslations('common');
+  const { formatDateToUserTimezone, adjustTimeByOffset } = useUserTimezone();
   
+  // Helper function to convert local date to UTC for storing in database
+  const convertToUTC = (date) => {
+    if (!date) return null;
+    
+    try {
+      // Create a new Date that represents the same date-time in UTC
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const day = date.getDate();
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      
+      // Create date in UTC by using the Date.UTC static method
+      return new Date(Date.UTC(year, month, day, hours, minutes));
+    } catch (error) {
+      console.error('Error converting to UTC:', error);
+      return date;
+    }
+  };
+  
+  // Helper function to format time as HH:MM
+  const formatTimeString = (date) => {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+  
+  // Set default dates and times
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('TODO');
-  const [dueDate, setDueDate] = useState(null);
-  const [startDate, setStartDate] = useState(null);
-  const [startTime, setStartTime] = useState('09:00');
-  const [dueTime, setDueTime] = useState('17:00');
+  const [dueDate, setDueDate] = useState(new Date());
+  const [startDate, setStartDate] = useState(new Date());
+  const [startTime, setStartTime] = useState(() => {
+    const now = new Date();
+    const fiveMinutesLater = addMinutes(now, 5);
+    return formatTimeString(fiveMinutesLater);
+  });
+  const [dueTime, setDueTime] = useState(() => {
+    const now = new Date();
+    const threeHoursLater = addHours(now, 3);
+    return formatTimeString(threeHoursLater);
+  });
   const [priority, setPriority] = useState('MEDIUM');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({
     dateError: '',
     timeError: ''
   });
+
+  // Update due date and time when start date or time changes
+  useEffect(() => {
+    if (startDate) {
+      // Set due date to the same day as start date
+      setDueDate(new Date(startDate));
+      
+      // Parse start time
+      const [startHours, startMinutes] = startTime.split(':').map(Number);
+      
+      // Create a complete date object with start date and time
+      const startDateTime = new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        startDate.getDate(),
+        startHours,
+        startMinutes
+      );
+      
+      // Add 1 hour to get the due time
+      const newDueDateTime = addHours(startDateTime, 1);
+      
+      // Set the new due time
+      setDueTime(formatTimeString(newDueDateTime));
+    }
+  }, [startDate, startTime]);
 
   // Function to disable past dates in calendar
   const disablePastDates = (date) => {
@@ -169,6 +232,8 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
           hours,
           minutes
         );
+        // Explicitly tell the date object this is in local time zone
+        startDateTime = convertToUTC(startDateTime);
       }
       
       if (dueDate) {
@@ -180,13 +245,13 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
           hours,
           minutes
         );
+        // Explicitly tell the date object this is in local time zone
+        dueDateTime = convertToUTC(dueDateTime);
       }
       
-      // Convert to ISO strings for database
+      // Use the UTC date objects directly
       const startDateISO = startDateTime ? startDateTime.toISOString() : null;
       const dueDateISO = dueDateTime ? dueDateTime.toISOString() : null;
-      
-
       
       // Create new task in the mytasks table - directly store dates as ISO strings
       const { data, error } = await supabase
@@ -209,10 +274,18 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
       setDescription('');
       setStatus('TODO');
       setPriority('MEDIUM');
-      setDueDate(null);
-      setStartDate(null);
-      setStartTime('09:00');
-      setDueTime('17:00');
+      setDueDate(new Date());
+      setStartDate(new Date());
+      setStartTime(() => {
+        const now = new Date();
+        const fiveMinutesLater = addMinutes(now, 5);
+        return formatTimeString(fiveMinutesLater);
+      });
+      setDueTime(() => {
+        const now = new Date();
+        const threeHoursLater = addHours(now, 3);
+        return formatTimeString(threeHoursLater);
+      });
       setFormErrors({
         dateError: '',
         timeError: ''

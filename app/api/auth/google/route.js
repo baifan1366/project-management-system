@@ -7,7 +7,7 @@ export async function GET(request) {
     const planId = searchParams.get('plan_id');
     const redirectTo = searchParams.get('redirectTo');
     const calendar = searchParams.get('calendar') === 'true';
-    
+    const requestCalendarAccess = searchParams.get('requestCalendarAccess') === 'true';
     
     
     // Build Google OAuth URL
@@ -31,7 +31,7 @@ export async function GET(request) {
     let scopes = 'email profile';
     
     // If calendar access is requested, add calendar scopes
-    if (calendar || (redirectTo && redirectTo.includes('/calendar'))) {
+    if (calendar || requestCalendarAccess || (redirectTo && redirectTo.includes('/calendar'))) {
       scopes += ' https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
     }
     
