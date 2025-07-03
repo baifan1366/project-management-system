@@ -191,13 +191,16 @@ export async function POST(req) {
           newEndDate.setMonth(newEndDate.getMonth() + 1);
         }
 
-        // Update subscription end date
+        // Update subscription end date and reset AI usage fields
         const { error: updateError } = await supabase
           .from('user_subscription_plan')
           .update({
             end_date: newEndDate.toISOString(),
             last_renewal_attempt: new Date().toISOString(),
-            renewal_failure_count: 0 // Reset failure count
+            renewal_failure_count: 0, // Reset failure count
+            current_ai_chat: 0, // Reset AI chat usage
+            current_ai_task: 0, // Reset AI task usage
+            current_ai_workflow: 0 // Reset AI workflow usage
           })
           .eq('id', currentSubscription.id);
         

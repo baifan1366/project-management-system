@@ -1389,18 +1389,19 @@ export default function UserManagement() {
                         type='radio'
                         name='email_verified'
                         value='true'
-                        defaultChecked={selectedUser.email_verified === true}
+                        checked={isEmailVerified === true}
+                        onChange={() => setIsEmailVerified(true)}
                         className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
                       />
                       <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Verified</span>
                     </label>
-                    
                     <label className='inline-flex items-center'>
                       <input
                         type='radio'
                         name='email_verified'
                         value='false'
-                        defaultChecked={selectedUser.email_verified !== true}
+                        checked={isEmailVerified === false}
+                        onChange={() => setIsEmailVerified(false)}
                         className='h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
                       />
                       <span className='ml-2 text-sm text-gray-700 dark:text-gray-300'>Unverified</span>

@@ -228,15 +228,13 @@ export const UsageStats = () => {
           current_ai_chat,
           current_ai_task,
           current_ai_workflow,
-          current_storage,
           subscription_plan (
             max_projects,
             max_teams,
             max_members,
             max_ai_chat,
             max_ai_task,
-            max_ai_workflow,
-            max_storage
+            max_ai_workflow
           )
         `)
         .eq('user_id', user.id)
