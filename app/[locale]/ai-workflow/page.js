@@ -511,6 +511,8 @@ export default function AIWorkflow() {
   // State for workflow
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
+  const [isNodeDragging, setIsNodeDragging] = useState(false);
+  const [shownErrorMessages, setShownErrorMessages] = useState(new Set());
   const [currentWorkflow, setCurrentWorkflow] = useState(null);
   const [workflowName, setWorkflowName] = useState('New Workflow');
   const [workflowNameError, setWorkflowNameError] = useState(false);
@@ -616,8 +618,23 @@ export default function AIWorkflow() {
   
   // Handle node changes
   const onNodesChange = useCallback(
-    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
-    []
+    (changes) => {
+      // 检查是否有节点正在被拖动
+      const isDragging = changes.some(change => change.type === 'position' && change.dragging === true);
+      
+      // 如果正在拖动中，设置拖动状态
+      if (isDragging) {
+        setIsNodeDragging(true);
+      } 
+      // 如果拖动结束，清除已显示的错误消息集合
+      else if (isNodeDragging) {
+        setIsNodeDragging(false);
+        setShownErrorMessages(new Set());
+      }
+      
+      setNodes((nds) => applyNodeChanges(changes, nds));
+    },
+    [] // 移除依赖项中的isNodeDragging
   );
   
   // Handle edge changes
@@ -626,7 +643,7 @@ export default function AIWorkflow() {
     []
   );
   
-  // Handle adding new edges
+  // 处理添加新的边缘连接
   const onConnect = useCallback(
     (connection) => {
       // 创建一个新的边缘连接，添加动画效果
@@ -640,10 +657,14 @@ export default function AIWorkflow() {
       setEdges((eds) => addEdge(newEdge, eds));
       
       // 提示用户连接已创建
-      toast.success('Node connected successfully');
+      toast.success(t('nodeConnected') || 'Node connected successfully');
     },
-    [setEdges]
+    [setEdges, t]
   );
+  
+  // 添加标志和时间戳，用于跟踪最近添加的节点
+  const [recentlyAddedNode, setRecentlyAddedNode] = useState(null);
+  const [connectionValidationSuppressed, setConnectionValidationSuppressed] = useState(false);
   
   // Check if workflow is ready to run
   const isWorkflowRunnable = () => {
@@ -658,7 +679,147 @@ export default function AIWorkflow() {
     const hasInvalidInputFields = Object.values(inputFieldErrors).some(error => error !== null && error !== undefined);
     if (hasInvalidInputFields) return false;
     
+    // Check node connections
+    const nodeConnectionsValid = validateNodeConnections(true);
+    if (!nodeConnectionsValid) return false;
+    
     // All checks passed
+    return true;
+  };
+  
+  // Validate node connections based on rules
+  const validateNodeConnections = (isFinalCheck = false) => {
+    // 如果验证被抑制且不是最终检查，则直接返回true
+    if (connectionValidationSuppressed && !isFinalCheck) {
+      return true;
+    }
+    
+    // Create a connection map for easy lookup
+    const connectionMap = {};
+    edges.forEach(edge => {
+      if (!connectionMap[edge.target]) {
+        connectionMap[edge.target] = [];
+      }
+      connectionMap[edge.target].push(edge.source);
+    });
+    
+    // Get nodes by type for validation
+    const inputNodes = nodes.filter(node => node.data.nodeType === 'input');
+    const processNodes = nodes.filter(node => node.data.nodeType === 'process');
+    const outputNodes = nodes.filter(node => node.data.nodeType === 'output');
+    
+    // 显示错误消息的辅助函数，防止重复显示
+    const showErrorToast = (errorMessage) => {
+      // 如果节点正在拖动中且该消息已显示过，则不再显示
+      if (isNodeDragging && shownErrorMessages.has(errorMessage)) {
+        return;
+      }
+      
+      // 记录该消息已被显示
+      if (isNodeDragging) {
+        setShownErrorMessages(prev => {
+          const newSet = new Set(prev);
+          newSet.add(errorMessage);
+          return newSet;
+        });
+      }
+      
+      // 显示错误消息
+      toast.error(errorMessage);
+    };
+    
+    // Rule 1: AI processing nodes must connect to input nodes
+    for (const node of processNodes) {
+      const sources = connectionMap[node.id] || [];
+      const isConnectedToInput = sources.some(sourceId => 
+        inputNodes.some(inputNode => inputNode.id === sourceId)
+      );
+      
+      if (!isConnectedToInput) {
+        // 仅在最终检查时或者该节点不是最近添加的节点时显示错误
+        if (isFinalCheck || node.id !== recentlyAddedNode) {
+          showErrorToast(t('aiProcessingConnectionError') || 'AI processing nodes must be connected to input nodes');
+          return false;
+        }
+      }
+    }
+    
+    // Rule 2 & 3: Check JSON/Task nodes and API request nodes
+    for (const node of outputNodes) {
+      // 如果是最近添加的节点且不是最终检查，则跳过验证
+      if (node.id === recentlyAddedNode && !isFinalCheck) {
+        continue;
+      }
+      
+      const sources = connectionMap[node.id] || [];
+      
+      if (node.data.outputType === 'json' || node.data.outputType === 'task') {
+        // JSON and Task nodes must connect to AI process nodes
+        const isConnectedToProcess = sources.some(sourceId => 
+          processNodes.some(processNode => processNode.id === sourceId)
+        );
+        
+        if (!isConnectedToProcess) {
+          const nodeType = node.data.outputType === 'json' ? 'JSON' : 'Task';
+          if (isFinalCheck || node.id !== recentlyAddedNode) {
+            showErrorToast(t('outputNodeConnectionError', { type: nodeType }) || 
+              `${nodeType} nodes must be connected to AI processing nodes`);
+            return false;
+          }
+        }
+      } else if (node.data.outputType === 'api') {
+        // API request nodes must connect to JSON nodes
+        const jsonNodes = outputNodes.filter(n => n.data.outputType === 'json');
+        const isConnectedToJson = sources.some(sourceId => 
+          jsonNodes.some(jsonNode => jsonNode.id === sourceId)
+        );
+        
+        if (!isConnectedToJson) {
+          if (isFinalCheck || node.id !== recentlyAddedNode) {
+            showErrorToast(t('apiConnectionError') || 'API request nodes must be connected to JSON nodes');
+            return false;
+          }
+        }
+      } else if (node.data.outputType === 'document' || node.data.outputType === 'ppt') {
+        // Document and PPT nodes can connect to AI process or API request nodes
+        const apiNodes = outputNodes.filter(n => n.data.outputType === 'api');
+        const isConnectedToProcessOrApi = sources.some(sourceId => 
+          processNodes.some(processNode => processNode.id === sourceId) ||
+          apiNodes.some(apiNode => apiNode.id === sourceId)
+        );
+        
+        if (!isConnectedToProcessOrApi) {
+          const nodeType = node.data.outputType === 'document' ? 'Document' : 'Presentation';
+          if (isFinalCheck || node.id !== recentlyAddedNode) {
+            showErrorToast(t('docPptConnectionError', { type: nodeType }) || 
+              `${nodeType} nodes must be connected to AI processing or API request nodes`);
+            return false;
+          }
+        }
+      } else if (node.data.outputType === 'chat' || node.data.outputType === 'email') {
+        // Chat and Email nodes can connect to document, PPT, API, or AI nodes
+        const docNodes = outputNodes.filter(n => n.data.outputType === 'document');
+        const pptNodes = outputNodes.filter(n => n.data.outputType === 'ppt');
+        const apiNodes = outputNodes.filter(n => n.data.outputType === 'api');
+        
+        const isConnectedToValid = sources.some(sourceId => 
+          processNodes.some(processNode => processNode.id === sourceId) ||
+          docNodes.some(docNode => docNode.id === sourceId) ||
+          pptNodes.some(pptNode => pptNode.id === sourceId) ||
+          apiNodes.some(apiNode => apiNode.id === sourceId)
+        );
+        
+        if (!isConnectedToValid) {
+          const nodeType = node.data.outputType === 'chat' ? 'Chat message' : 'Email';
+          if (isFinalCheck || node.id !== recentlyAddedNode) {
+            showErrorToast(t('chatEmailConnectionError', { type: nodeType }) || 
+              `${nodeType} nodes must be connected to AI processing, Document, Presentation, or API nodes`);
+            return false;
+          }
+        }
+      }
+    }
+    
     return true;
   };
   
@@ -953,6 +1114,22 @@ export default function AIWorkflow() {
           });
           
           setNodes(restoredNodes);
+          
+          // 更新nodeIdRef以避免新节点ID冲突
+          // 查找最大的node_数字格式的ID值
+          let maxNodeNumber = 0;
+          restoredNodes.forEach(node => {
+            if (node.id && node.id.startsWith('node_')) {
+              const idNumber = parseInt(node.id.replace('node_', ''), 10);
+              if (!isNaN(idNumber) && idNumber > maxNodeNumber) {
+                maxNodeNumber = idNumber;
+              }
+            }
+          });
+          
+          // 设置nodeIdRef为最大ID+1，确保下一个节点有唯一ID
+          nodeIdRef.current = maxNodeNumber + 1;
+          console.log(`Updated nodeIdRef to ${nodeIdRef.current} after loading workflow`);
         }
         
         if (workflow.flow_data.edges) {
@@ -1729,7 +1906,19 @@ export default function AIWorkflow() {
     }
     
     if (node) {
+      // 添加节点
       setNodes((nds) => [...nds, node]);
+      
+      // 设置最近添加的节点ID
+      setRecentlyAddedNode(node.id);
+      
+      // 临时抑制连接验证5秒钟，给用户时间连接节点
+      setConnectionValidationSuppressed(true);
+      setTimeout(() => {
+        setConnectionValidationSuppressed(false);
+        setRecentlyAddedNode(null);
+      }, 5000);
+      
       toast.success(`Added ${nodeType} node`);
     }
   };
@@ -2054,7 +2243,23 @@ export default function AIWorkflow() {
                             </span>
                             {t('atLeastOneInput') || 'At least one input field'}
                           </li>
+                          <li className="flex items-center">
+                            <span className={`mr-2 ${validateNodeConnections() ? 'text-green-500' : 'text-gray-400'}`}>
+                              {validateNodeConnections() ? '✓' : '○'}
+                            </span>
+                            {t('validNodeConnections') || 'Valid node connections'}
+                          </li>
                         </ul>
+                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                          <p className="text-xs font-medium mb-1">{t('nodeConnectionRules') || 'Node connection rules:'}</p>
+                          <ul className="space-y-1 text-xs pl-2">
+                            <li>• {t('aiProcessingConnectionRule') || 'AI processing → Input'}</li>
+                            <li>• {t('jsonTaskConnectionRule') || 'JSON/Task → AI processing'}</li>
+                            <li>• {t('apiConnectionRule') || 'API request → JSON'}</li>
+                            <li>• {t('docPptConnectionRule') || 'Document/PPT → AI processing or API'}</li>
+                            <li>• {t('chatEmailConnectionRule') || 'Chat/Email → AI, Document, PPT, or API'}</li>
+                          </ul>
+                        </div>
                       </div>
                     </TooltipContent>
                   )}

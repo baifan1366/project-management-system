@@ -136,6 +136,9 @@ const processMessageWithMentions = (content, msgMentions = null) => {
     return contentPieces;
   }
   
+  // URL detection pattern - matches common URL formats
+  const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+[^\s]*)/g;
+  
   // Fallback to regex-based parsing if no stored mentions data
   // Parse the message content to identify mentions
   // Format: @username for users, #project-name for projects, task title (project) for tasks
@@ -168,8 +171,42 @@ const processMessageWithMentions = (content, msgMentions = null) => {
     lastIndex = index;
   };
   
+  // Find URLs in content first (so mentions within URLs don't get processed separately)
+  processedContent.replace(urlPattern, (match, url1, url2, url3, offset, index) => {
+    // Add text before the URL
+    addTextSegment(processedContent.substring(lastIndex, index), index);
+    
+    // Get the actual matched URL
+    const url = url1 || url2 || url3;
+    
+    // Ensure URL has a protocol for href
+    let href = url;
+    if (!href.startsWith('http://') && !href.startsWith('https://')) {
+      href = 'https://' + href;
+    }
+    
+    // Add the URL as a link component
+    elements.push(
+      <a 
+        key={`url-${index}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:underline break-all"
+      >
+        {url}
+      </a>
+    );
+    
+    lastIndex = index + match.length;
+    return match;
+  });
+  
   // Find user mentions
   processedContent.replace(userPattern, (match, username, index) => {
+    // Check if this index is already processed (part of a URL)
+    if (index < lastIndex) return match;
+    
     // Add text before the mention
     addTextSegment(processedContent.substring(lastIndex, index), index);
     
@@ -189,7 +226,7 @@ const processMessageWithMentions = (content, msgMentions = null) => {
   
   // Find project mentions
   processedContent.replace(projectPattern, (match, projectName, index) => {
-    // Check if this index is already processed (part of a user mention)
+    // Check if this index is already processed (part of a user mention or URL)
     if (index < lastIndex) return match;
     
     // Add text before the mention
