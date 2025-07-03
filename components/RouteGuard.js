@@ -24,7 +24,8 @@ const SPECIAL_PATHS = [
   '/admin/adminLogin',
   '/teamInvitation',
   '/contactUs',
-  '/landing'
+  '/landing',
+  '/aboutUs'
   
 ]; // Special paths that can be accessed even when logged in
 

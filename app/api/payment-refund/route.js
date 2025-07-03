@@ -55,7 +55,6 @@ async function switchUserToFreePlan(userId, currentSubscriptionId) {
       current_ai_chat: currentSubscription?.current_ai_chat || 0,
       current_ai_task: currentSubscription?.current_ai_task || 0,
       current_ai_workflow: currentSubscription?.current_ai_workflow || 0,
-      current_storage: currentSubscription?.current_storage || 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };

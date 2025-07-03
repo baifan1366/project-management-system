@@ -29,10 +29,10 @@ export default function LandingPageSettings() {
   const [featuresCount, setFeaturesCount] = useState(1);
   const [cardsCount, setCardsCount] = useState(1);
   const [isCollapsed, setIsCollapsed] = useState({
-    hero: false,
-    features: false,
-    solutions: false,
-    promoBanner: false
+    hero: true,
+    features: true,
+    solutions: true,
+    promoBanner: true
   });
   const [dragActive, setDragActive] = useState(false);
   
