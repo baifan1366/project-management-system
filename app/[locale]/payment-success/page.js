@@ -182,7 +182,6 @@ export default function PaymentSuccess() {
         current_ai_chat: 0,
         current_ai_task: 0,
         current_ai_workflow: 0,
-        current_storage: 0
       };
       
       // Migrate usage data if available from any recent subscription
@@ -191,10 +190,9 @@ export default function PaymentSuccess() {
           current_projects: mostRecentSubscription.current_projects || 0,
           current_teams: mostRecentSubscription.current_teams || 0,
           current_members: mostRecentSubscription.current_members || 0,
-          current_ai_chat: mostRecentSubscription.current_ai_chat || 0,
-          current_ai_task: mostRecentSubscription.current_ai_task || 0,
-          current_ai_workflow: mostRecentSubscription.current_ai_workflow || 0,
-          current_storage: mostRecentSubscription.current_storage || 0
+          current_ai_chat: 0,
+          current_ai_task: 0,
+          current_ai_workflow: 0,
         };
       }
       
@@ -620,63 +618,44 @@ export default function PaymentSuccess() {
   }
 
   return (
-    <div className="max-w-md mx-auto mt-16 p-4">
-      {loading ? (
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Verifying your payment...</p>
-        </div>
-      ) : error ? (
-        <div className="text-center space-y-4">
-          <div className="bg-red-100 p-4 rounded-md text-red-700">
-            <h3 className="font-medium">Payment Error</h3>
-            <p className="mt-2 text-sm">{error}</p>
+    <div style={{ background: '#f3f4f6', minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, zIndex: 9999 }}>
+      <div className="max-w-md mx-auto mt-16 p-4">
+        {loading ? (
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Verifying your payment...</p>
           </div>
-          <Link href="/payment" className="mt-6 inline-block text-indigo-600 hover:text-indigo-800">
-            Return to Payment Page
-          </Link>
-        </div>
-      ) : showProcessedModal ? (
-        // 套餐升级成功倒计时页面
-        <div className="text-center space-y-4 bg-white p-6 rounded-lg shadow-md">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-            <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+        ) : error ? (
+          <div className="text-center space-y-4">
+            <div className="bg-red-100 p-4 rounded-md text-red-700">
+              <h3 className="font-medium">Payment Error</h3>
+              <p className="mt-2 text-sm">{error}</p>
+            </div>
+            <Link href="/payment" className="mt-6 inline-block text-indigo-600 hover:text-indigo-800">
+              Return to Payment Page
+            </Link>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">Plan Upgraded Successfully!</h2>
-          <p className="text-green-600 font-medium">
-            Your subscription has been updated to {metadata?.planName || sessionDetails?.metadata?.planName}
-          </p>
-          <div className="my-4 p-3 bg-blue-50 rounded-md">
-            <p>Redirecting to subscription page in <span className="font-bold">{countdown}</span> seconds...</p>
-          </div>
-          <div className="mt-4">
-            <button 
-              onClick={() => router.push('/settings/subscription')}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
-            >
-              Go to Subscription Page Now
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {paymentDetails || metadata ? (
-            <PaymentSuccessModal 
-              metadata={metadata}
-              userEmail={userEmail}
-              formatAmount={formatAmount}
-              formatOrderId={formatOrderId}
-              isOrderIdExpanded={isOrderIdExpanded}
-              setIsOrderIdExpanded={setIsOrderIdExpanded}
-              copyToClipboard={copyToClipboard}
-            />
-          ) : (
-            <ProcessedPaymentModal />
-          )}
-        </>
-      )}
+        ) : showProcessedModal ? (
+          // Use only the ProcessedPaymentModal for all success/processed cases
+          <ProcessedPaymentModal countdown={countdown} />
+        ) : (
+          <>
+            {paymentDetails || metadata ? (
+              <PaymentSuccessModal 
+                metadata={metadata}
+                userEmail={userEmail}
+                formatAmount={formatAmount}
+                formatOrderId={formatOrderId}
+                isOrderIdExpanded={isOrderIdExpanded}
+                setIsOrderIdExpanded={setIsOrderIdExpanded}
+                copyToClipboard={copyToClipboard}
+              />
+            ) : (
+              <ProcessedPaymentModal />
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
