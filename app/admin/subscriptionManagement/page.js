@@ -28,7 +28,6 @@ export default function AdminSubscriptions() {
   const [planActiveUsers, setPlanActiveUsers] = useState('');
   const [planMaxMembers, setPlanMaxMembers] = useState('0');
   const [planMaxProjects, setPlanMaxProjects] = useState('0');
-  const [planMaxStorage, setPlanMaxStorage] = useState('0');
   const [planMaxAiChat, setPlanMaxAiChat] = useState('0');
   const [planMaxAiTask, setPlanMaxAiTask] = useState('0');
   const [planMaxAiWorkflow, setPlanMaxAiWorkflow] = useState('0');
@@ -286,10 +285,6 @@ export default function AdminSubscriptions() {
       setPlanMaxAiChat(plan.max_ai_chat || '0');
       setPlanMaxAiTask(plan.max_ai_task || '0');
       setPlanMaxAiWorkflow(plan.max_ai_workflow || '0');
-      setPlanMaxStorage(plan.max_storage || '0');
-      setPlanMaxAiChat(plan.max_ai_chat || '0');
-      setPlanMaxAiTask(plan.max_ai_task || '0');
-      setPlanMaxAiWorkflow(plan.max_ai_workflow || '0');
       setPlanIsActive(plan.is_active ? 'true' : 'false');
       
     } else if(type === 'edit' && code){
@@ -344,7 +339,6 @@ export default function AdminSubscriptions() {
     setPlanMaxAiChat('0');
     setPlanMaxAiTask('0');
     setPlanMaxAiWorkflow('0');
-    setPlanMaxStorage('0');
     setPlanIsActive('true');
     setCurrentModalPage(1);
   };
@@ -473,16 +467,6 @@ export default function AdminSubscriptions() {
     }
     
     return `${formattedStartDate} - ${formattedEndDate}`;
-  };
-  
-  // Format storage size for display
-  const formatStorage = (bytes) => {
-    if (bytes === 0) return 'Unlimited';
-    
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 Byte';
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-    return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
   };
   
   // Add these helper functions for feature management
@@ -1392,7 +1376,6 @@ export default function AdminSubscriptions() {
                               <div>AI Chat: {plan.max_ai_chat === 0 ? 'Unlimited' : plan.max_ai_chat}</div>
                               <div>AI Task: {plan.max_ai_task === 0 ? 'Unlimited' : plan.max_ai_task}</div>
                               <div>AI Workflow: {plan.max_ai_workflow === 0 ? 'Unlimited' : plan.max_ai_workflow}</div>
-                              <div>Storage: {plan.max_storage === 0 ? 'Unlimited' : plan.max_storage} GB</div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -2346,7 +2329,7 @@ export default function AdminSubscriptions() {
                 max_ai_chat: parseInt(planMaxAiChat) || 0,
                 max_ai_task: parseInt(planMaxAiTask) || 0,
                 max_ai_workflow: parseInt(planMaxAiWorkflow) || 0,
-                max_storage: parseInt(planMaxStorage) || 0,
+
                 is_active: planIsActive === 'true',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -2571,26 +2554,7 @@ export default function AdminSubscriptions() {
                       onChange={(e) => setPlanMaxProjects(e.target.value)}
                     />
                   </div>
-                  
-                  <div>
-                    <label htmlFor='add-max-storage' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Max Storage (GB)
-                    </label>
-                    <input
-                      type='number'
-                      id='add-max-storage'
-                      name='max_storage'
-                      required
-                      min='0'
-                      value={planMaxStorage}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter storage limit in GB (0 for unlimited)'
-                      onChange={(e) => setPlanMaxStorage(e.target.value)}
-                    />
-                  </div>
-
+   
                   <div>
                     <label htmlFor='add-max-ai-chat' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                       Max AI Chat Messages
@@ -2770,7 +2734,6 @@ export default function AdminSubscriptions() {
                 max_ai_chat: parseInt(planMaxAiChat),
                 max_ai_task: parseInt(planMaxAiTask),
                 max_ai_workflow: parseInt(planMaxAiWorkflow),
-                max_storage: parseInt(planMaxStorage),
                 is_active: planIsActive === 'true',
                 updated_at: new Date().toISOString()
               };
@@ -2996,26 +2959,7 @@ export default function AdminSubscriptions() {
                       onChange={(e) => setPlanMaxProjects(e.target.value)}
                     />
                   </div>
-                  
-                                    <div>
-                    <label htmlFor='edit-max-storage' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Max Storage (GB)
-                    </label>
-                    <input
-                      type='number'
-                      id='edit-max-storage'
-                      name='max_storage'
-                      required
-                      min='0'
-                      value={planMaxStorage}
-                      className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
-                        placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                        focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      placeholder='Enter storage limit in GB (0 for unlimited)'
-                      onChange={(e) => setPlanMaxStorage(e.target.value)}
-                    />
-                  </div>
-
+                
                   <div>
                     <label htmlFor='edit-max-ai-chat' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                       Max AI Chat Messages

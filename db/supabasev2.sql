@@ -480,7 +480,6 @@ CREATE TABLE "user_subscription_plan" (
   "current_ai_chat" INT DEFAULT 0 NULL,
   "current_ai_task" INT DEFAULT 0 NULL,
   "current_ai_workflow" INT DEFAULT 0 NULL,
-  "current_storage" INT DEFAULT 0 NULL,
   -- 时间戳
   "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP

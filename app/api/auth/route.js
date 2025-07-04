@@ -189,7 +189,7 @@ async function handleLogin(data) {
         const now = new Date();
         const { data: currentUsage } = await supabase
           .from('user_subscription_plan')
-          .select('current_projects, current_teams, current_members, current_ai_chat, current_ai_task, current_ai_workflow, current_storage')
+          .select('current_projects, current_teams, current_members, current_ai_chat, current_ai_task, current_ai_workflow')
           .eq('id', currentPlan.id)
           .single();
           

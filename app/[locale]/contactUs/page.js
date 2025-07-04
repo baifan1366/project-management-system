@@ -170,8 +170,7 @@ export default function ContactUs(){
                                 max_members,
                                 max_ai_chat,
                                 max_ai_task,
-                                max_ai_workflow,
-                                max_storage
+                                max_ai_workflow
                             )
                         `)
                         .eq('user_id', user.id)
