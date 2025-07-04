@@ -193,8 +193,8 @@ export default function AdminAnalytics() {
           {
             label: 'Daily Revenue',
             data: Object.values(dailyRevenue),
-            borderColor: 'rgb(53, 162, 235)',
-            backgroundColor: 'rgba(53, 162, 235, 0.5)',
+            borderColor: '#4f46e5',
+            backgroundColor: 'rgba(79, 70, 229, 0.5)',
             tension: 0.4,
             fill: true
           }
@@ -237,15 +237,15 @@ export default function AdminAnalytics() {
           {
             label: 'New Users',
             data: Object.values(dailySignups),
-            borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+            borderColor: '#4f46e5',
+            backgroundColor: 'rgba(79, 70, 229, 0.5)',
             type: 'line',
             tension: 0.4,
           },
           {
             label: 'Daily Signups',
             data: Object.values(dailySignups),
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            backgroundColor: 'rgba(79, 70, 229, 0.2)',
             type: 'bar'
           }
         ]
@@ -283,7 +283,6 @@ export default function AdminAnalytics() {
         'other': 'rgba(100, 120, 140, 0.7)'
       };
       
-      // Format payment method names for better display
       const formatMethodName = (method) => {
         return method
           .split('_')
@@ -291,7 +290,6 @@ export default function AdminAnalytics() {
           .join(' ');
       };
       
-      // Calculate totals
       let totalTransactions = 0;
       let totalVolume = 0;
       
@@ -360,17 +358,14 @@ export default function AdminAnalytics() {
     }
   };
   
-  // 获取订阅计划分布
   const fetchPlanDistribution = async (startDate, endDate) => {
     try {
-      // First, get all subscription plans to have their details
       const { data: planData, error: planError } = await supabase
         .from('subscription_plan')
         .select('id, name, type, price');
         
       if (planError) throw planError;
       
-      // Create a map of plans by ID for quick lookup
       const plansById = {};
       planData.forEach(plan => {
         plansById[plan.id] = {
@@ -380,7 +375,6 @@ export default function AdminAnalytics() {
         };
       });
       
-      // Now get active subscriptions without grouping
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('user_subscription_plan')
         .select('plan_id')
@@ -391,7 +385,6 @@ export default function AdminAnalytics() {
         
       if (subscriptionError) throw subscriptionError;
       
-      // Process subscription data - count occurrences manually
       let totalSubscribers = 0;
       let totalRevenue = 0;
       
@@ -406,35 +399,29 @@ export default function AdminAnalytics() {
         }
       });
       
-      // Update totals
       setPlanTotals({
         subscribers: totalSubscribers,
         revenue: totalRevenue
       });
       
-      // Convert to array and sort by subscribers
       const planDetailsArray = Object.values(plansById)
         .filter(plan => plan.subscribers > 0)
         .sort((a, b) => b.subscribers - a.subscribers);
       
-      // Set plan details for table display
       setPlanDetails(planDetailsArray);
-      
-      // Prepare chart data
       const labels = planDetailsArray.map(plan => plan.name);
       const subscriberCounts = planDetailsArray.map(plan => plan.subscribers);
       const revenueValues = planDetailsArray.map(plan => plan.revenue);
       
-      // Define colors for plans
       const planColors = [
-        'rgba(255, 159, 64, 0.7)',
-        'rgba(75, 192, 192, 0.7)',
-        'rgba(54, 162, 235, 0.7)',
-        'rgba(153, 102, 255, 0.7)',
-        'rgba(255, 99, 132, 0.7)',
-        'rgba(201, 203, 207, 0.7)',
-        'rgba(255, 205, 86, 0.7)',
-        'rgba(100, 120, 140, 0.7)'
+        'rgba(79, 70, 229, 0.9)',  // indigo-600, 90% opacity
+        'rgba(79, 70, 229, 0.7)',  // indigo-600, 70% opacity
+        'rgba(79, 70, 229, 0.5)',  // indigo-600, 50% opacity
+        'rgba(79, 70, 229, 0.3)',  // indigo-600, 30% opacity
+        'rgba(79, 70, 229, 0.15)', // indigo-600, 15% opacity
+        'rgba(79, 70, 229, 0.1)',  // indigo-600, 10% opacity
+        'rgba(79, 70, 229, 0.05)', // indigo-600, 5% opacity
+        'rgba(79, 70, 229, 0.025)' // indigo-600, 2.5% opacity
       ];
       
       // Ensure we have enough colors
@@ -547,9 +534,9 @@ export default function AdminAnalytics() {
   };
   
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('ms-MY', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'MYR'
     }).format(amount);
   };
   
@@ -674,7 +661,7 @@ export default function AdminAnalytics() {
                     id="period"
                     value={dateRange}
                     onChange={(e) => setDateRange(e.target.value)}
-                    className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full py-2 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-colors duration-200 hover:border-indigo-400 dark:hover:border-indigo-400"
                   >
                     <option value="7">Last 7 Days</option>
                     <option value="30">Last 30 Days</option>
@@ -697,7 +684,6 @@ export default function AdminAnalytics() {
                           <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
                           <div className="h-8 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                         </div>
-                        <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
                       </div>
                       <div className="mt-4">
                         <div className="h-3 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
@@ -706,7 +692,6 @@ export default function AdminAnalytics() {
                   ))}
                 </div>
                 
-                {/* Charts Skeleton - Revenue and User Growth */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                   {[1, 2].map((chart) => (
                     <div key={chart} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
@@ -718,7 +703,6 @@ export default function AdminAnalytics() {
                   ))}
                 </div>
                 
-                {/* Charts Skeleton - Payment Methods and Plan Distribution */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {[1, 2].map((chart) => (
                     <div key={chart} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
@@ -740,9 +724,6 @@ export default function AdminAnalytics() {
                         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
                         <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.totalRevenue)}</p>
                       </div>
-                      <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-500 dark:text-green-300">
-                        <FaMoneyBillWave />
-                      </div>
                     </div>
                     <div className="mt-4">
                       <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -756,9 +737,6 @@ export default function AdminAnalytics() {
                       <div>
                         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Order Value</p>
                         <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(summaryStats.averageOrderValue)}</p>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-500 dark:text-blue-300">
-                        <FaChartLine />
                       </div>
                     </div>
                     <div className="mt-4">
@@ -774,9 +752,6 @@ export default function AdminAnalytics() {
                         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Conversion Rate</p>
                         <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.conversionRate.toFixed(2)}%</p>
                       </div>
-                      <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
-                        <FaUsers />
-                      </div>
                     </div>
                     <div className="mt-4">
                       <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -791,9 +766,6 @@ export default function AdminAnalytics() {
                         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Success Rate</p>
                         <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{summaryStats.successRate.toFixed(2)}%</p>
                       </div>
-                      <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center text-yellow-500 dark:text-yellow-300">
-                        <FaChartBar />
-                      </div>
                     </div>
                     <div className="mt-4">
                       <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -803,7 +775,7 @@ export default function AdminAnalytics() {
                   </div>
                 </div>
                 
-                {/* Charts - Revenue and User Growth */}
+                {/* Line and Bar Charts for Revenue and User Growth */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
                     <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Revenue Trend</h3>
@@ -832,7 +804,7 @@ export default function AdminAnalytics() {
                   </div>
                 </div>
                 
-                {/* Charts - Payment Methods and Plan Distribution */}
+                {/* Pie Charts for Payment Methods and Plan Distribution */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
                     <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Payment Methods</h3>
@@ -854,22 +826,22 @@ export default function AdminAnalytics() {
                             <button
                               type="button"
                               onClick={() => setActivePaymentView('count')}
-                              className={`px-4 py-2 text-sm font-medium ${
-                                activePaymentView === 'count' 
-                                  ? 'bg-blue-600 text-white' 
-                                  : 'bg-white text-gray-700 hover:bg-gray-50'
-                              } border border-gray-200 rounded-l-lg`}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 mr-1 ${
+                                activePaymentView === 'count'
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-white text-indigo-600 border border-indigo-600 hover:bg-indigo-50'
+                              }`}
                             >
                               Transaction Count
                             </button>
                             <button
                               type="button"
                               onClick={() => setActivePaymentView('volume')}
-                              className={`px-4 py-2 text-sm font-medium ${
-                                activePaymentView === 'volume' 
-                                  ? 'bg-blue-600 text-white' 
-                                  : 'bg-white text-gray-700 hover:bg-gray-50'
-                              } border border-gray-200 rounded-r-lg`}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                activePaymentView === 'volume'
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-white text-indigo-600 border border-indigo-600 hover:bg-indigo-50'
+                              }`}
                             >
                               Payment Volume
                             </button>
@@ -926,22 +898,22 @@ export default function AdminAnalytics() {
                             <button
                               type="button"
                               onClick={() => setActivePlanView('count')}
-                              className={`px-4 py-2 text-sm font-medium ${
-                                activePlanView === 'count' 
-                                  ? 'bg-blue-600 text-white' 
-                                  : 'bg-white text-gray-700 hover:bg-gray-50'
-                              } border border-gray-200 rounded-l-lg`}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 mr-1 ${
+                                activePlanView === 'count'
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-white text-indigo-600 border border-indigo-600 hover:bg-indigo-50'
+                              }`}
                             >
                               Subscribers
                             </button>
                             <button
                               type="button"
                               onClick={() => setActivePlanView('revenue')}
-                              className={`px-4 py-2 text-sm font-medium ${
-                                activePlanView === 'revenue' 
-                                  ? 'bg-blue-600 text-white' 
-                                  : 'bg-white text-gray-700 hover:bg-gray-50'
-                              } border border-gray-200 rounded-r-lg`}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                activePlanView === 'revenue'
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-white text-indigo-600 border border-indigo-600 hover:bg-indigo-50'
+                              }`}
                             >
                               Revenue
                             </button>

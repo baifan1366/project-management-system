@@ -38,7 +38,7 @@ const AdminHeader = ({
 
   // Handle theme toggle
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
   // Handle profile updates
@@ -77,13 +77,6 @@ const AdminHeader = ({
                 {theme === 'dark' ? <FaSun /> : <FaMoon />}
               </button>
             )}
-            
-            <button 
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400"
-              aria-label="Notifications"
-            >
-              <FaBell />
-            </button>
             
             {localAdminData && (
               <div 
