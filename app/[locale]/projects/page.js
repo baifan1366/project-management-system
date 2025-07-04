@@ -149,21 +149,10 @@ export default function ProjectsPage() {
     
     loadTeams();
   }, [projects, user, showArchived, statusFilter, dispatch]);
-
-  // Add useEffect to load team users for each project's teams - this will run after teams are loaded
-  useEffect(() => {
-    if (teams.length > 0 && reduxTeamsStatus === 'succeeded') {
-      console.log(`DEBUG: Found ${teams.length} teams in Redux store, loading team users`);
-      
-      // Fetch team users for each team
-      teams.forEach(team => {
-        if (!teamUsers[team.id] || teamUsers[team.id].length === 0) {
-          console.log(`DEBUG: Dispatching fetchTeamUsers for team ${team.id}`);
-          dispatch(fetchTeamUsers(team.id));
-        }
-      });
-    }
-  }, [teams, reduxTeamsStatus, teamUsers, dispatch]);
+  // New states for on-demand team member loading
+  const [openPopoverProjectId, setOpenPopoverProjectId] = useState(null);
+  const [isLoadingTeamMembers, setIsLoadingTeamMembers] = useState(false);
+  const [teamMembersCache, setTeamMembersCache] = useState({});
 
   // 使用useMemo计算过滤后的项目列表
   const formattedProjects = useMemo(() => {
@@ -219,81 +208,70 @@ export default function ProjectsPage() {
     }));
   }, [projects, showArchived, statusFilter, user, teams, teamUsers]);
 
-  // Use useEffect to check for and load missing team user data
-  useEffect(() => {
-    if (projects.length > 0 && teams.length > 0) {
-      // Get potentially visible projects (same logic as in formattedProjects)
-      const potentiallyVisibleProjects = projects.filter(project => {
-        const matchesArchiveState = showArchived ? project.archived : !project.archived;
-        const matchesStatusFilter = statusFilter === 'ALL' || project.status === statusFilter;
-        
-        // Basic visibility check
-        const visibility = project.visibility?.toLowerCase?.() || 'private';
-        const basicVisibilityAccess = 
-          visibility === 'public' || 
-          (visibility === 'private' && user && user.id === project.created_by);
-        
-        return matchesArchiveState && matchesStatusFilter && basicVisibilityAccess;
-      });
-      
-      // For each potentially visible project, make sure we have team user data
-      potentiallyVisibleProjects.forEach(project => {
-        const projectTeams = teams.filter(team => team && team.project_id === project.id);
-        
-        projectTeams.forEach(team => {
-          if (!teamUsers[team.id] || teamUsers[team.id].length === 0) {
-            dispatch(fetchTeamUsers(team.id));
-          }
-        });
-      });
-    }
-  }, [projects, teams, teamUsers, showArchived, statusFilter, user, dispatch]);
-
-  // 获取项目的团队成员 - MODIFIED: Make this a pure function without dispatches
+  // 获取项目的团队成员 - Modified to support on-demand loading
   const getProjectTeamMembers = useCallback((projectId) => {
+    // Return cached team members if available
+    if (teamMembersCache[projectId]) {
+      return teamMembersCache[projectId];
+    }
+    
+    // If not in cache and not currently loading, return empty array
+    // The actual loading will happen when the popover is opened
+    return [];
+  }, [teamMembersCache]);
+
+  // New function to load team members on demand
+  const loadProjectTeamMembers = useCallback(async (projectId) => {
     try {
-      if (!teams || !Array.isArray(teams)) {
-        console.error("DEBUG: teams is not an array:", teams);
-        return [];
+      if (!projectId) return;
+      
+      setIsLoadingTeamMembers(true);
+      
+      // First check if we already have teams for this project
+      let projectTeams = teams.filter(team => team && team.project_id === projectId);
+      
+      // If no teams found, fetch them first
+      if (projectTeams.length === 0) {
+        await dispatch(fetchProjectTeams(projectId)).unwrap();
+        // Get updated teams after fetch
+        const updatedTeams = await dispatch((_, getState) => getState().teams?.teams || []);
+        projectTeams = updatedTeams.filter(team => team && team.project_id === projectId);
       }
       
-      if (!teamUsers || typeof teamUsers !== 'object') {
-        console.error("DEBUG: teamUsers is not an object:", teamUsers);
-        return [];
+      // Now fetch team users for each team
+      if (projectTeams.length > 0) {
+        // Create an array of promises for fetching team users
+        const fetchPromises = projectTeams.map(team => {
+          // Only fetch if we don't already have this team's users
+          if (!teamUsers[team.id] || teamUsers[team.id].length === 0) {
+            return dispatch(fetchTeamUsers(team.id)).unwrap();
+          }
+          return Promise.resolve();
+        });
+        
+        // Wait for all team user fetches to complete
+        await Promise.all(fetchPromises);
       }
       
-      // 获取项目的所有团队
-      const projectTeams = teams.filter(team => team && team.project_id === projectId);
+      // Now get the team members using updated Redux state
+      const updatedTeamUsers = await dispatch((_, getState) => getState().teamUsers?.teamUsers || {});
+      const updatedAllUsers = await dispatch((_, getState) => getState().users?.users || []);
       
-      if (!projectTeams.length) return [];
-      
-      // 获取这些团队的所有成员
+      // Process team members
       const teamMembers = [];
       projectTeams.forEach(team => {
         const teamId = team.id;
-        
-        // Check if teamUsers has data for this team
-        if (!teamUsers[teamId]) {
-          return; // Skip this team
-        }
-        
-        const members = teamUsers[teamId] || [];
+        const members = updatedTeamUsers[teamId] || [];
         
         members.forEach(member => {
-          // Check if member object is valid
-          if (!member) {
-            return; // Skip this member
-          }
+          if (!member) return;
           
           if (member.user) {
-            // 查找完整的用户信息
-            const fullUserInfo = allUsers.find(u => u && u.id === member.user.id);
+            const fullUserInfo = updatedAllUsers.find(u => u && u.id === member.user.id);
             let memberData;
             
             if (fullUserInfo) {
-              // 避免重复添加同一用户
               if (!teamMembers.some(m => m.id === fullUserInfo.id)) {
-                // Include role information from the team_user entry
                 memberData = {
                   ...fullUserInfo,
                   role: member.role || 'CAN_VIEW',
@@ -302,9 +280,7 @@ export default function ProjectsPage() {
                 teamMembers.push(memberData);
               }
             } else {
-              // 使用 teamUsers 中的基本用户信息
               if (!teamMembers.some(m => m.id === member.user.id)) {
-                // Include role information from the team_user entry
                 memberData = {
                   ...member.user,
                   role: member.role || 'CAN_VIEW',
@@ -317,12 +293,30 @@ export default function ProjectsPage() {
         });
       });
       
+      // Update cache with new team members
+      setTeamMembersCache(prevCache => ({
+        ...prevCache,
+        [projectId]: teamMembers
+      }));
+      
+      setIsLoadingTeamMembers(false);
       return teamMembers;
     } catch (error) {
-      console.error('Getting project team members failed:', error);
+      console.error('Loading project team members failed:', error);
+      setIsLoadingTeamMembers(false);
       return [];
     }
-  }, [teams, teamUsers, allUsers]);
+  }, [dispatch, teams, teamUsers, allUsers]);
+
+  // Handle popover open/close
+  const handlePopoverOpenChange = useCallback((open, projectId) => {
+    if (open) {
+      setOpenPopoverProjectId(projectId);
+      loadProjectTeamMembers(projectId);
+    } else {
+      setOpenPopoverProjectId(null);
+    }
+  }, [loadProjectTeamMembers]);
 
   // 处理打开用户资料对话框
   const handleOpenUserProfile = useCallback((user, e) => {
@@ -592,7 +586,7 @@ export default function ProjectsPage() {
                     ) : (
                       <>
                         {/* Quick Chat Popover */}
-                        <Popover>
+                        <Popover onOpenChange={(open) => handlePopoverOpenChange(open, project.id)}>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -617,8 +611,20 @@ export default function ProjectsPage() {
                             <div className="p-2">
                               <h4 className="font-medium px-2 py-1.5 text-sm">{t('teamMembers') || 'Team Members'}</h4>
                               <div className="max-h-60 overflow-y-auto">
-                                {getProjectTeamMembers(project.id).length > 0 ? (
-                                  getProjectTeamMembers(project.id).map(member => (
+                                {isLoadingTeamMembers ? (
+                                  // Skeleton loading state
+                                  Array.from({ length: 3 }).map((_, index) => (
+                                    <div key={index} className="flex items-center gap-2 p-2">
+                                      <Skeleton className="h-8 w-8 rounded-full" />
+                                      <div className="flex-1">
+                                        <Skeleton className="h-4 w-3/4 mb-2" />
+                                        <Skeleton className="h-3 w-1/2" />
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : openPopoverProjectId === project.id && teamMembersCache[project.id]?.length > 0 ? (
+                                  // Show team members from cache
+                                  teamMembersCache[project.id].map(member => (
                                     <div
                                       key={member.id}
                                       className="flex items-center gap-2 p-2 hover:bg-muted rounded-md cursor-pointer"

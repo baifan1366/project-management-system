@@ -31,33 +31,11 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { toast } from 'sonner';
 
 export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userId }) {
   const t_tasks = useTranslations('myTasks');
   const t_common = useTranslations('common');
-  const { formatDateToUserTimezone, adjustTimeByOffset } = useUserTimezone();
-  
-  // Helper function to convert local date to UTC for storing in database
-  const convertToUTC = (date) => {
-    if (!date) return null;
-    
-    try {
-      // Create a new Date that represents the same date-time in UTC
-      const year = date.getFullYear();
-      const month = date.getMonth();
-      const day = date.getDate();
-      const hours = date.getHours();
-      const minutes = date.getMinutes();
-      
-      // Create date in UTC by using the Date.UTC static method
-      return new Date(Date.UTC(year, month, day, hours, minutes));
-    } catch (error) {
-      console.error('Error converting to UTC:', error);
-      return date;
-    }
-  };
   
   // Helper function to format time as HH:MM
   const formatTimeString = (date) => {
@@ -153,29 +131,17 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
         dueMinutes
       );
       
-      // Check if start time is in the past for today, accounting for timezone
+      // Check if start time is in the past for today
       const now = new Date();
       
-      // Convert both dates to the same timezone reference for comparison
-      if (isSameDay(startDate, now)) {
-        // Get current time in UTC
-        const nowUTC = new Date(now.toISOString());
-        // Create UTC version of the selected time
-        const startDateTimeUTC = new Date(startDateTime.toISOString());
-        
- 
-        
-        if (startDateTimeUTC < nowUTC) {
-          // Use a direct string instead of translation key
-          errors.timeError = 'Cannot select a time in the past';
-          setFormErrors(errors);
-          return false;
-        }
+      if (isSameDay(startDate, now) && startDateTime < now) {
+        errors.timeError = 'Cannot select a time in the past';
+        setFormErrors(errors);
+        return false;
       }
       
       // Check if end is before start
       if (endDateTime < startDateTime) {
-        // Use a direct string instead of translation key
         errors.timeError = 'End time must be after start time';
         setFormErrors(errors);
         return false;
@@ -232,8 +198,6 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
           hours,
           minutes
         );
-        // Explicitly tell the date object this is in local time zone
-        startDateTime = convertToUTC(startDateTime);
       }
       
       if (dueDate) {
@@ -245,11 +209,9 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
           hours,
           minutes
         );
-        // Explicitly tell the date object this is in local time zone
-        dueDateTime = convertToUTC(dueDateTime);
       }
       
-      // Use the UTC date objects directly
+      // Use the date objects directly with ISO format for PostgreSQL timestamptz
       const startDateISO = startDateTime ? startDateTime.toISOString() : null;
       const dueDateISO = dueDateTime ? dueDateTime.toISOString() : null;
       

@@ -1199,10 +1199,10 @@ export default function CalendarPage() {
           }}
           title={title + (isPastEvent ? ' (' + t('pastEvent') + ')' : '')}
         >
-          <div className="flex items-center justify-between">
-            <span className="truncate">{eventType === 'google' ? (event.summary || t('untitledEvent')) : (event.title || t('untitledEvent'))}</span>
+          <div className="flex items-center justify-between max-w-full">
+            <span className="truncate break-all">{eventType === 'google' ? (event.summary || t('untitledEvent')) : (event.title || t('untitledEvent'))}</span>
             {eventType === 'google' && event.hangoutLink && (
-              <Video className="h-2.5 w-2.5 ml-1 text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Video className="h-2.5 w-2.5 ml-1 flex-shrink-0 text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
             )}
           </div>
         </div>
@@ -1230,10 +1230,10 @@ export default function CalendarPage() {
               handleEventClick(event, eventType);
             }}
           >
-            <div className="flex items-center justify-between">
-              <span className="truncate">{eventType === 'google' ? (event.summary || t('untitledEvent')) : (event.title || t('untitledEvent'))}</span>
+            <div className="flex items-center justify-between max-w-full">
+              <span className="truncate break-all">{eventType === 'google' ? (event.summary || t('untitledEvent')) : (event.title || t('untitledEvent'))}</span>
               {eventType === 'google' && event.hangoutLink && (
-                <Video className="h-2.5 w-2.5 ml-1 text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Video className="h-2.5 w-2.5 ml-1 flex-shrink-0 text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
               )}
             </div>
           </div>
@@ -2135,7 +2135,7 @@ export default function CalendarPage() {
       
       {/* Add the AllEventsDialog component */}
       <Dialog open={isAllEventsOpen} onOpenChange={setIsAllEventsOpen}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-[700px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {allEventsData.date && format(allEventsData.date, 'MMMM d, yyyy')}
@@ -2159,8 +2159,8 @@ export default function CalendarPage() {
                       handleEventClick(task, 'task');
                     }}
                   >
-                    <div className="font-medium">{task.title || t('noTitle')}</div>
-                    {task.description && <div className="text-xs mt-1">{task.description}</div>}
+                    <div className="font-medium break-words truncate">{task.title || t('noTitle')}</div>
+                    {task.description && <div className="text-xs mt-1 break-words line-clamp-2">{task.description}</div>}
                   </div>
                 ))}
               </div>
@@ -2181,7 +2181,7 @@ export default function CalendarPage() {
                     t('allDay');
                   
                   return (
-                    <div 
+                                          <div 
                       key={`all-google-${event.id}`} 
                       className={`p-2 rounded cursor-pointer ${event.hangoutLink ? 'bg-emerald-100 dark:bg-emerald-900/40 border-l-2 border-emerald-500' : 'bg-green-100 dark:bg-green-900/30'} hover:bg-opacity-80`}
                       onClick={() => {
@@ -2189,12 +2189,12 @@ export default function CalendarPage() {
                         handleEventClick(event, 'google');
                       }}
                     >
-                      <div className="font-medium">{event.summary || t('untitledEvent')}</div>
+                      <div className="font-medium break-words truncate">{event.summary || t('untitledEvent')}</div>
                       <div className="text-xs mt-1">{timeStr}</div>
-                      {event.location && <div className="text-xs mt-1">{event.location}</div>}
+                      {event.location && <div className="text-xs mt-1 break-words line-clamp-1">{event.location}</div>}
                       {event.hangoutLink && (
                         <div className="text-xs mt-1 flex items-center">
-                          <Video className="h-3 w-3 mr-1" />
+                          <Video className="h-3 w-3 mr-1 flex-shrink-0" />
                           {t('hasMeetLink')}
                         </div>
                       )}
@@ -2229,10 +2229,10 @@ export default function CalendarPage() {
                         handleEventClick(event, 'personal');
                       }}
                     >
-                      <div className="font-medium">{event.title || t('untitledEvent')}</div>
+                      <div className="font-medium break-words truncate">{event.title || t('untitledEvent')}</div>
                       <div className="text-xs mt-1">{timeStr}</div>
-                      {event.location && <div className="text-xs mt-1">{event.location}</div>}
-                      {event.description && <div className="text-xs mt-1">{event.description}</div>}
+                      {event.location && <div className="text-xs mt-1 break-words line-clamp-1">{event.location}</div>}
+                      {event.description && <div className="text-xs mt-1 break-words line-clamp-2">{event.description}</div>}
                     </div>
                   );
                 })}

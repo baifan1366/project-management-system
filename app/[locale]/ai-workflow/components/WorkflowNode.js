@@ -129,7 +129,13 @@ function WorkflowNode({ data, selected, id }) {
       // If there's only one team, auto-select it
       if (teamData.length === 1) {
         setSelectedTeamId(teamData[0].id);
-        saveTaskSettings(projectId, teamData[0].id);
+        // Update parent component directly with setTimeout to avoid React warnings
+        if (data.handleInputChange) {
+          setTimeout(() => {
+            data.handleInputChange(id, 'projectId', projectId);
+            data.handleInputChange(id, 'teamId', teamData[0].id);
+          }, 0);
+        }
       }
     } catch (error) {
       console.error('Error fetching teams:', error);
@@ -138,31 +144,34 @@ function WorkflowNode({ data, selected, id }) {
     }
   };
 
-  // Save task settings
-  const saveTaskSettings = (projectId, teamId) => {
-    if (data.handleInputChange) {
-      data.handleInputChange(id, 'projectId', projectId);
-      data.handleInputChange(id, 'teamId', teamId);
-    }
-  };
-
   // Handle project change
   const handleProjectChange = (projectId) => {
     setSelectedProjectId(projectId);
     setSelectedTeamId(''); // Reset team selection when project changes
-    saveTaskSettings(projectId, '');
   };
 
   // Handle team change
   const handleTeamChange = (teamId) => {
     setSelectedTeamId(teamId);
-    saveTaskSettings(selectedProjectId, teamId);
   };
+  
+  // Update parent when project or team changes
+  useEffect(() => {
+    if (data.handleInputChange) {
+      data.handleInputChange(id, 'projectId', selectedProjectId);
+      data.handleInputChange(id, 'teamId', selectedTeamId);
+    }
+  }, [selectedProjectId, selectedTeamId, data.handleInputChange, id]);
 
   // Handle model change
   const handleModelChange = (modelId) => {
+    // Update local state first (if needed)
+    // Then parent will be updated via useEffect
     if (data.handleInputChange) {
-      data.handleInputChange(id, 'selectedModel', modelId);
+      // Use setTimeout to defer state update to next tick
+      setTimeout(() => {
+        data.handleInputChange(id, 'selectedModel', modelId);
+      }, 0);
     }
   };
 
@@ -190,24 +199,21 @@ function WorkflowNode({ data, selected, id }) {
       
       // If already selected, remove it
       if (isSelected) {
-        const updated = prev.filter(id => id !== sessionId);
-        // Save the updated selection
-        if (data.handleInputChange) {
-          data.handleInputChange(id, 'chatSessionIds', updated);
-        }
-        return updated;
+        return prev.filter(id => id !== sessionId);
       } 
       // If not selected, add it
       else {
-        const updated = [...prev, sessionId];
-        // Save the updated selection
-        if (data.handleInputChange) {
-          data.handleInputChange(id, 'chatSessionIds', updated);
-        }
-        return updated;
+        return [...prev, sessionId];
       }
     });
   };
+  
+  // Update parent component when selectedChatSessions changes
+  useEffect(() => {
+    if (data.handleInputChange) {
+      data.handleInputChange(id, 'chatSessionIds', selectedChatSessions);
+    }
+  }, [selectedChatSessions, data.handleInputChange, id]);
 
   // Save message template
   const saveMessageTemplate = () => {
@@ -259,10 +265,14 @@ function WorkflowNode({ data, selected, id }) {
   // Handle message format change
   const handleMessageFormatChange = (format) => {
     setMessageFormat(format);
-    if (data.handleInputChange) {
-      data.handleInputChange(id, 'messageFormat', format);
-    }
   };
+  
+  // Update parent when messageFormat changes
+  useEffect(() => {
+    if (data.handleInputChange && messageFormat) {
+      data.handleInputChange(id, 'messageFormat', messageFormat);
+    }
+  }, [messageFormat, data.handleInputChange, id]);
 
   // Get background color based on node type
   const getNodeColor = () => {

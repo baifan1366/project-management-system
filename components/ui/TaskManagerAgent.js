@@ -34,8 +34,6 @@ export default function TaskManagerAgent({ userId, projectId, onInputChange, max
   const [currentView, setCurrentView] = useState("input"); // "input", "streaming", "edit"
   const [processingResponse, setProcessingResponse] = useState(false);
   
-  // Debug state
-  const [debugMode, setDebugMode] = useState(false);
   const [streamStatus, setStreamStatus] = useState("Not started");
   const [receivedChunks, setReceivedChunks] = useState(0);
   
@@ -372,14 +370,6 @@ export default function TaskManagerAgent({ userId, projectId, onInputChange, max
               {projectId ? t('pengy.greetingForProject') : t('pengy.greeting')}
             </CardDescription>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setDebugMode(!debugMode)}
-            title="Toggle debug mode"
-          >
-            <Bug className={`h-4 w-4 ${debugMode ? 'text-red-500' : 'text-muted-foreground'}`} />
-          </Button>
         </div>
       </CardHeader>
       <CardContent className="pt-6 max-h-[calc(100vh-220px)] overflow-y-auto">
@@ -448,27 +438,6 @@ export default function TaskManagerAgent({ userId, projectId, onInputChange, max
               <h3 className="font-medium text-lg">Generating Task Plan...</h3>
               {isStreaming && <div className="flex items-center"><Loader2 className="h-4 w-4 animate-spin mr-2" /> <span className="text-sm text-muted-foreground">Receiving data...</span></div>}
             </div>
-            
-            {debugMode && (
-              <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-xs">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-semibold">Debug Information</span>
-                  <Badge variant="outline" className={
-                    streamStatus.includes("Error") ? "bg-red-100" :
-                    streamStatus.includes("complete") ? "bg-green-100" :
-                    "bg-blue-100"
-                  }>
-                    {streamStatus}
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>Status: {isStreaming ? "Streaming" : "Idle"}</div>
-                  <div>Chunks: {receivedChunks}</div>
-                  <div>Response Size: {streamedResponse.length} chars</div>
-                  <div>Complete: {streamingComplete ? "Yes" : "No"}</div>
-                </div>
-              </div>
-            )}
             
             <div className="rounded-md border bg-muted/10 p-4 font-mono text-sm relative">
               {streamedResponse ? (
