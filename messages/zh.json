@@ -2308,7 +2308,19 @@
     "checkerDescription": "可以标记和评论任务。不能创建任务和项目。",
     "random": "随机",
     "addStatus": "添加状态",
-    "teamIsFullError": "该团队已满。团队所有者需要升级他们的计划以添加更多成员。"
+    "teamIsFullError": "该团队已满。团队所有者需要升级他们的计划以添加更多成员。",
+    "settings": "团队设置",
+    "manageTeam": "管理团队",
+    "noSectionsAvailable": "没有章节可用",
+    "userIdRequired": "用户ID是必填的",
+    "description": "描述",
+    "task": "任务",
+    "workflow": "工作流",
+    "taskUpdated": "任务已更新",
+    "selectStatus": "选择状态",
+    "cancelled": "已取消",
+    "onHold": "已暂停",
+    "clearSelection": "清除选择"
   },
   "Notion": {
     "knowledgeBase": "知识库",

@@ -479,7 +479,7 @@ const WorkflowLabelManager = ({
                     className="w-4 h-4 rounded-full" 
                     style={{ backgroundColor: option.color || '#e5e5e5' }}
                   ></div>
-                  <span className="font-medium">{option.label}</span>
+                  <span className="font-medium truncate max-w-[80%]">{option.label}</span>
                 </div>
                 {/* 在选择模式下显示选中标记，在管理模式下显示编辑删除按钮 */}
                 {!isCreating && !isEditing && (
