@@ -103,7 +103,6 @@ export default function AdminAnalytics() {
     return permissions.includes(permissionName);
   };
 
-  // 获取分析数据
   const fetchAnalyticsData = async (days) => {
     // Create loading toast and store its ID
     const loadingToastId = toast.loading('Updating analytics data...', {
@@ -415,12 +414,9 @@ export default function AdminAnalytics() {
       
       const planColors = [
         'rgba(79, 70, 229, 0.9)',  // indigo-600, 90% opacity
-        'rgba(79, 70, 229, 0.7)',  // indigo-600, 70% opacity
-        'rgba(79, 70, 229, 0.5)',  // indigo-600, 50% opacity
         'rgba(79, 70, 229, 0.3)',  // indigo-600, 30% opacity
         'rgba(79, 70, 229, 0.15)', // indigo-600, 15% opacity
         'rgba(79, 70, 229, 0.1)',  // indigo-600, 10% opacity
-        'rgba(79, 70, 229, 0.05)', // indigo-600, 5% opacity
         'rgba(79, 70, 229, 0.025)' // indigo-600, 2.5% opacity
       ];
       

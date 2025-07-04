@@ -115,7 +115,8 @@ export async function POST(req) {
           transaction_id,
           amount,
           currency,
-          payment_method
+          payment_method,
+          metadata
         ),
         user:user_id (
           id,
@@ -135,9 +136,21 @@ export async function POST(req) {
     }
     
     // Check if payment_id exists
-    if (!refundRequest.payment_id) {
-      console.error('payment_id is missing in refund_request record');
+    if (!refundRequest.payment_id || !refundRequest.payment) {
+      console.error('payment_id is missing or payment record not found in refund_request record');
       return NextResponse.json({ error: 'No payment record linked to this refund request' }, { status: 400 });
+    }
+    
+    // Use the payment amount for refund calculation
+    const paymentAmount = refundRequest.payment.amount;
+    if (!paymentAmount) {
+      return NextResponse.json({ error: 'Payment amount not found for this refund' }, { status: 400 });
+    }
+
+    // If refund_amount is not set, use the full payment amount (or add your own proration logic here)
+    let refundAmount = refundRequest.refund_amount;
+    if (!refundAmount || refundAmount > paymentAmount) {
+      refundAmount = paymentAmount;
     }
     
     // Get the payment intent ID from the linked payment
@@ -154,7 +167,7 @@ export async function POST(req) {
     // Process refund through Stripe
     const refund = await stripe.refunds.create({
       payment_intent: paymentIntentId,
-      amount: Math.round(refundRequest.refund_amount * 100), // Convert to cents
+      amount: Math.round(refundAmount * 100), // Convert to cents
     });
     
     // Update the original payment record to status "REFUNDED"
@@ -166,7 +179,7 @@ export async function POST(req) {
         metadata: {
           ...refundRequest.payment?.metadata,
           refundId: refund.id,
-          refundAmount: refundRequest.refund_amount,
+          refundAmount: refundAmount,
           refundDate: new Date().toISOString(),
           refundReason: refundRequest.reason
         }
@@ -175,7 +188,7 @@ export async function POST(req) {
     
     if (paymentUpdateError) {
       console.error('Error updating original payment record:', paymentUpdateError);
-      // Continue processing even if this fails, but log the error
+      return NextResponse.json({ error: 'Failed to update payment record to REFUNDED' }, { status: 500 });
     } else {
       console.log('Updated original payment record status to REFUNDED');
     }
@@ -210,12 +223,12 @@ export async function POST(req) {
           body: JSON.stringify({
             to: refundRequest.user.email,
             subject: 'Your Refund Request Has Been Approved',
-            text: `Dear ${refundRequest.user.name || 'Customer'},\n\nWe're pleased to inform you that your refund request has been approved. A refund of $${(refundRequest.refund_amount).toFixed(2)} has been processed back to your original payment method.\n\nRefund details:\n- Refund Amount: $${(refundRequest.refund_amount).toFixed(2)}\n- Refund Date: ${new Date().toLocaleDateString()}\n- Refund ID: ${refund.id}\n- Original Payment Status: Updated to REFUNDED\n\nYour subscription has been changed to our Free plan. You can upgrade at any time from your account settings.\n\nPlease note that it may take 5-10 business days for the refund to appear in your account, depending on your payment provider.\n\nIf you have any questions about your refund, please contact our support team.\n\nThank you for your understanding.\n\nBest regards,\nTeam Sync Support Team`,
+            text: `Dear ${refundRequest.user.name || 'Customer'},\n\nWe're pleased to inform you that your refund request has been approved. A refund of $${(refundAmount).toFixed(2)} has been processed back to your original payment method.\n\nRefund details:\n- Refund Amount: $${(refundAmount).toFixed(2)}\n- Refund Date: ${new Date().toLocaleDateString()}\n- Refund ID: ${refund.id}\n- Original Payment Status: Updated to REFUNDED\n\nYour subscription has been changed to our Free plan. You can upgrade at any time from your account settings.\n\nPlease note that it may take 5-10 business days for the refund to appear in your account, depending on your payment provider.\n\nIf you have any questions about your refund, please contact our support team.\n\nThank you for your understanding.\n\nBest regards,\nTeam Sync Support Team`,
             // Use the new template system
             templateType: 'refund_approved',
             templateData: {
               customerName: refundRequest.user.name || 'Customer',
-              refundAmount: refundRequest.refund_amount,
+              refundAmount: refundAmount,
               refundDate: new Date().toLocaleDateString(),
               refundId: refund.id,
               reason: refundRequest.reason,
