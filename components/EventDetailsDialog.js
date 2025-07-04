@@ -332,14 +332,14 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
   return (
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center mb-2">
               <div 
-                className="w-3 h-3 rounded-full mr-2" 
+                className="w-3 h-3 rounded-full mr-2 flex-shrink-0" 
                 style={{ backgroundColor: getEventColor() }}
               ></div>
-              <DialogTitle className="text-xl">{getEventTitle()}</DialogTitle>
+              <DialogTitle className="text-xl break-words">{getEventTitle()}</DialogTitle>
             </div>
             
             {eventType && (
@@ -365,9 +365,9 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
             {getEventLocation() && (
               <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div>
+                <div className="w-full">
                   <h4 className="font-medium text-sm">{t('location')}</h4>
-                  <p className="text-sm mt-1">{getEventLocation()}</p>
+                  <p className="text-sm mt-1 break-words">{getEventLocation()}</p>
                 </div>
               </div>
             )}
@@ -386,18 +386,18 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
                             {attendee.email?.charAt(0).toUpperCase() || '?'}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <div className="flex items-center">
-                            {getResponseStatus(attendee.responseStatus)}
-                            <span>
-                              {attendee.displayName || attendee.email}
-                              {attendee.organizer && 
-                                <span className="text-xs ml-1 text-muted-foreground">({t('organizer')})</span>
-                              }
-                            </span>
+                                                  <div className="overflow-hidden max-w-[300px]">
+                            <div className="flex items-center">
+                              {getResponseStatus(attendee.responseStatus)}
+                              <span className="truncate">
+                                {attendee.displayName || attendee.email}
+                                {attendee.organizer && 
+                                  <span className="text-xs ml-1 text-muted-foreground">({t('organizer')})</span>
+                                }
+                              </span>
+                            </div>
+                            {attendee.displayName && <span className="text-xs text-muted-foreground truncate">{attendee.email}</span>}
                           </div>
-                          {attendee.displayName && <span className="text-xs text-muted-foreground">{attendee.email}</span>}
-                        </div>
                       </li>
                     ))}
                   </ul>
@@ -428,9 +428,9 @@ export default function EventDetailsDialog({ isOpen, setIsOpen, event, eventType
             {getEventDescription() && (
               <div className="flex items-start gap-3">
                 <div className="h-5 w-5 flex-shrink-0" /> {/* Spacer to align with icons */}
-                <div>
+                <div className="w-full">
                   <h4 className="font-medium text-sm">{t('description')}</h4>
-                  <p className="text-sm mt-1 whitespace-pre-wrap">{getEventDescription()}</p>
+                  <p className="text-sm mt-1 whitespace-pre-wrap break-words">{getEventDescription()}</p>
                 </div>
               </div>
             )}
