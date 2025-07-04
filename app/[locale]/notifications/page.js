@@ -27,7 +27,12 @@ import {
   deleteNotification,
   selectNotifications,
   selectUnreadCount,
-  selectNotificationsLoading
+  selectNotificationsLoading,
+  fetchNotifications,
+  subscribeToNotifications,
+  selectIsSubscribed,
+  unsubscribeFromNotifications,
+  setForceRefresh
 } from '@/lib/redux/features/notificationSlice';
 import NotificationItem, { NotificationItemSkeleton } from '@/components/notifications/NotificationItem';
 import { useRouter } from 'next/navigation';
@@ -40,11 +45,56 @@ export default function NotificationsPage() {
   const notifications = useSelector(selectNotifications);
   const unreadCount = useSelector(selectUnreadCount);
   const loading = useSelector(selectNotificationsLoading);
+  const isSubscribed = useSelector(selectIsSubscribed);
   const [activeTab, setActiveTab] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const { user, error } = useGetUser();
   const hasInitiatedFetchRef = useRef(false);
+  const subscriptionInitializedRef = useRef(false);
   const { formatDateToUserTimezone, formatToUserTimezone } = useUserTimezone();
+
+  // Initialize notifications when component mounts and user is available
+  useEffect(() => {
+    if (!user || !user.id) return;
+
+    const initializeNotifications = async () => {
+      try {
+        // Force refresh to ignore debounce
+        dispatch(setForceRefresh(true));
+        
+        // Make sure to fetch fresh data when the page loads
+        await dispatch(fetchNotifications(user.id));
+        
+        // Reset force refresh flag
+        dispatch(setForceRefresh(false));
+
+        // Setup subscription if not already subscribed
+        if (!isSubscribed && !subscriptionInitializedRef.current) {
+          await dispatch(subscribeToNotifications(user.id));
+          subscriptionInitializedRef.current = true;
+        }
+        
+        hasInitiatedFetchRef.current = true;
+      } catch (error) {
+        console.error('Failed to initialize notifications:', error);
+        // Ensure force refresh is reset on error too
+        dispatch(setForceRefresh(false));
+      }
+    };
+
+    // Only initialize once
+    if (!hasInitiatedFetchRef.current) {
+      initializeNotifications();
+    }
+
+    return () => {
+      // If we created a subscription in this component, clean it up
+      if (subscriptionInitializedRef.current) {
+        dispatch(unsubscribeFromNotifications());
+        subscriptionInitializedRef.current = false;
+      }
+    };
+  }, [user, dispatch, isSubscribed]);
 
   // Reset fetch flag on component mount
   useEffect(() => {
@@ -191,9 +241,9 @@ export default function NotificationsPage() {
                         variant={activeTab === 'unread' ? 'default' : 'outline'} 
                         size="sm" 
                         onClick={() => setActiveTab('unread')}
-                        className="justify-start dark:text-white"
+                        className={`justify-start ${activeTab === 'unread' ? 'text-black' : 'dark:text-white'}`}
                       >
-                        <Badge variant="outline" className="mr-2 dark:text-white">{unreadCount}</Badge>
+                        <Badge variant="outline" className={`mr-2 ${activeTab === 'unread' ? 'text-black' : 'dark:text-white'}`}>{unreadCount}</Badge>
                         {t('common.unread')}
                       </Button>
                     </div>
@@ -252,7 +302,7 @@ export default function NotificationsPage() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   {activeTab === 'unread' ? t('common.unread') : t('common.notifications')}
-                  {unreadCount > 0 && activeTab !== 'unread' && (
+                  {unreadCount > 0 && (
                     <Badge variant="destructive">
                       {unreadCount}
                     </Badge>

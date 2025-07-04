@@ -21,6 +21,7 @@ import {
   subscribeToNotifications,
   unsubscribeFromNotifications,
   selectIsSubscribed,
+  setForceRefresh
 } from '@/lib/redux/features/notificationSlice';
 import { Badge } from './ui/badge';
 import { useGetUser } from '@/lib/hooks/useGetUser';
@@ -86,8 +87,14 @@ export function Header() {
         
         // Only fetch notifications once on initial mount or when user changes
         if (!initialFetchDoneRef.current || lastSubscribedUserId !== user.id) {
+          // Force refresh to bypass debounce
+          dispatch(setForceRefresh(true));
           
           await dispatch(fetchNotifications(user.id));
+          
+          // Reset force refresh flag
+          dispatch(setForceRefresh(false));
+          
           initialFetchDoneRef.current = true;
         }
         
@@ -100,6 +107,8 @@ export function Header() {
         }
       } catch (error) {
         console.error('Error setting up notifications:', error);
+        // Ensure force refresh is reset on error too
+        dispatch(setForceRefresh(false));
       }
     };
     

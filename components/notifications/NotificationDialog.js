@@ -24,7 +24,8 @@ import {
   selectNotificationsLoading,
   selectIsSubscribed,
   unsubscribeFromNotifications,
-  subscribeToNotifications
+  subscribeToNotifications,
+  setForceRefresh
 } from '@/lib/redux/features/notificationSlice';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN, enUS } from 'date-fns/locale';
@@ -52,9 +53,15 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
     
     // If Header handles subscriptions, we only refresh data but don't manage subscriptions
     if (headerHandlesSubscription) {
-      // Only refresh data, don't handle subscriptions
+      // Force refresh to bypass debounce
+      dispatch(setForceRefresh(true));
       
-      dispatch(fetchNotifications(user.id));
+      // Only refresh data, don't handle subscriptions
+      dispatch(fetchNotifications(user.id))
+        .finally(() => {
+          // Reset force refresh flag
+          dispatch(setForceRefresh(false));
+        });
       return;
     }
     
@@ -66,8 +73,14 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
       dialogSubscriptionCreatedRef.current = true;
     } else {
       // Just refresh the data if already subscribed
+      // Force refresh to bypass debounce
+      dispatch(setForceRefresh(true));
       
-      dispatch(fetchNotifications(user.id));
+      dispatch(fetchNotifications(user.id))
+        .finally(() => {
+          // Reset force refresh flag
+          dispatch(setForceRefresh(false));
+        });
     }
     
     // Clean up when dialog closes, but only if we created the subscription
@@ -77,6 +90,8 @@ export function NotificationDialog({ open, onOpenChange, headerHandlesSubscripti
         dispatch(unsubscribeFromNotifications());
         dialogSubscriptionCreatedRef.current = false;
       }
+      // Always reset force refresh flag when unmounting
+      dispatch(setForceRefresh(false));
     };
   }, [dispatch, open, user, headerHandlesSubscription, isSubscribed, dialogSubscriptionCreatedRef]);
 
