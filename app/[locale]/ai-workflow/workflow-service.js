@@ -3,14 +3,8 @@ import { safeParseJSON, executeApiRequest } from './utils';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import nodemailer from 'nodemailer';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
 import JSZip from 'jszip';
 import PptxGenJS from 'pptxgenjs';
-import Docxtemplater from 'docxtemplater';
-import PizZip from 'pizzip';
-import { promises as fsPromises } from 'fs';
 
 // Get available AI models
 const getAvailableModels = () => {

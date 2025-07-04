@@ -114,7 +114,7 @@ const initialNodes = [
       nodeType: 'process',
       description: 'AI model processing',
       handleInputChange: () => {},
-      selectedModel: 'google/gemini-2.0-flash-exp:free',
+      selectedModel: 'qwen/qwen2.5-vl-32b-instruct:free',
       inputs: {}
     }
   }
@@ -512,6 +512,8 @@ export default function AIWorkflow() {
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
   const [isNodeDragging, setIsNodeDragging] = useState(false);
+  // 使用useRef代替useState来存储已显示的错误消息，避免状态更新触发多次渲染
+  const shownErrorMessagesRef = useRef(new Set());
   const [shownErrorMessages, setShownErrorMessages] = useState(new Set());
   const [currentWorkflow, setCurrentWorkflow] = useState(null);
   const [workflowName, setWorkflowName] = useState('New Workflow');
@@ -629,12 +631,14 @@ export default function AIWorkflow() {
       // 如果拖动结束，清除已显示的错误消息集合
       else if (isNodeDragging) {
         setIsNodeDragging(false);
+        // 清除错误消息
+        shownErrorMessagesRef.current.clear();
         setShownErrorMessages(new Set());
       }
       
       setNodes((nds) => applyNodeChanges(changes, nds));
     },
-    [] // 移除依赖项中的isNodeDragging
+    [] // 移除validateNodeConnections依赖
   );
   
   // Handle edge changes
@@ -656,8 +660,17 @@ export default function AIWorkflow() {
       // 将新连接添加到边缘列表
       setEdges((eds) => addEdge(newEdge, eds));
       
-      // 提示用户连接已创建
-      toast.success(t('nodeConnected') || 'Node connected successfully');
+      // 避免显示过多的连接成功消息
+      // 使用静态变量记录上次显示时间
+      const now = Date.now();
+      if (!window.lastConnectionToastTime || (now - window.lastConnectionToastTime) > 3000) {
+        toast.success(t('nodeConnected') || 'Node connected successfully');
+        window.lastConnectionToastTime = now;
+      }
+      
+      // 清除部分错误消息，因为用户刚刚连接了一个节点
+      shownErrorMessagesRef.current.clear();
+      setShownErrorMessages(new Set());
     },
     [setEdges, t]
   );
@@ -665,6 +678,9 @@ export default function AIWorkflow() {
   // 添加标志和时间戳，用于跟踪最近添加的节点
   const [recentlyAddedNode, setRecentlyAddedNode] = useState(null);
   const [connectionValidationSuppressed, setConnectionValidationSuppressed] = useState(false);
+  
+  // 使用useRef跟踪最后一次验证时间，避免频繁验证
+  const lastValidationTimeRef = useRef(0);
   
   // Check if workflow is ready to run
   const isWorkflowRunnable = () => {
@@ -679,7 +695,16 @@ export default function AIWorkflow() {
     const hasInvalidInputFields = Object.values(inputFieldErrors).some(error => error !== null && error !== undefined);
     if (hasInvalidInputFields) return false;
     
-    // Check node connections
+    // 使用节流检查，避免频繁验证触发toast
+    const now = Date.now();
+    if (now - lastValidationTimeRef.current > 3000) {
+      lastValidationTimeRef.current = now;
+      
+      // 清除之前的错误消息
+      shownErrorMessagesRef.current.clear();
+    }
+    
+    // 验证节点连接 - 这个必须每次都检查
     const nodeConnectionsValid = validateNodeConnections(true);
     if (!nodeConnectionsValid) return false;
     
@@ -708,39 +733,44 @@ export default function AIWorkflow() {
     const processNodes = nodes.filter(node => node.data.nodeType === 'process');
     const outputNodes = nodes.filter(node => node.data.nodeType === 'output');
     
-    // 显示错误消息的辅助函数，防止重复显示
-    const showErrorToast = (errorMessage) => {
-      // 如果节点正在拖动中且该消息已显示过，则不再显示
-      if (isNodeDragging && shownErrorMessages.has(errorMessage)) {
-        return;
-      }
-      
-      // 记录该消息已被显示
-      if (isNodeDragging) {
-        setShownErrorMessages(prev => {
-          const newSet = new Set(prev);
-          newSet.add(errorMessage);
-          return newSet;
-        });
-      }
-      
-      // 显示错误消息
-      toast.error(errorMessage);
-    };
+          // 显示错误消息的辅助函数，防止重复显示
+      const showErrorToast = (errorMessage) => {
+        // 只在最终检查时显示错误消息
+        if (!isFinalCheck) {
+          return;
+        }
+        
+        // 使用ref直接访问和修改集合，避免触发重渲染
+        if (shownErrorMessagesRef.current.has(errorMessage)) {
+          return;
+        }
+        
+        // 记录该消息已被显示
+        shownErrorMessagesRef.current.add(errorMessage);
+        // 同时更新state以便其他地方使用
+        setShownErrorMessages(new Set(shownErrorMessagesRef.current));
+        
+        // 只有在最终检查时显示错误消息，避免频繁弹出
+        toast.error(errorMessage);
+      };
+    
+    let isValid = true;
     
     // Rule 1: AI processing nodes must connect to input nodes
     for (const node of processNodes) {
+      // 如果是最近添加的节点且不是最终检查，则跳过验证
+      if (node.id === recentlyAddedNode && !isFinalCheck) {
+        continue;
+      }
+      
       const sources = connectionMap[node.id] || [];
       const isConnectedToInput = sources.some(sourceId => 
         inputNodes.some(inputNode => inputNode.id === sourceId)
       );
       
       if (!isConnectedToInput) {
-        // 仅在最终检查时或者该节点不是最近添加的节点时显示错误
-        if (isFinalCheck || node.id !== recentlyAddedNode) {
-          showErrorToast(t('aiProcessingConnectionError') || 'AI processing nodes must be connected to input nodes');
-          return false;
-        }
+        showErrorToast(t('aiProcessingConnectionError') || 'AI processing nodes must be connected to input nodes');
+        isValid = false;
       }
     }
     
@@ -761,11 +791,9 @@ export default function AIWorkflow() {
         
         if (!isConnectedToProcess) {
           const nodeType = node.data.outputType === 'json' ? 'JSON' : 'Task';
-          if (isFinalCheck || node.id !== recentlyAddedNode) {
-            showErrorToast(t('outputNodeConnectionError', { type: nodeType }) || 
-              `${nodeType} nodes must be connected to AI processing nodes`);
-            return false;
-          }
+          showErrorToast(t('outputNodeConnectionError', { type: nodeType }) || 
+            `${nodeType} nodes must be connected to AI processing nodes`);
+          isValid = false;
         }
       } else if (node.data.outputType === 'api') {
         // API request nodes must connect to JSON nodes
@@ -775,10 +803,8 @@ export default function AIWorkflow() {
         );
         
         if (!isConnectedToJson) {
-          if (isFinalCheck || node.id !== recentlyAddedNode) {
-            showErrorToast(t('apiConnectionError') || 'API request nodes must be connected to JSON nodes');
-            return false;
-          }
+          showErrorToast(t('apiConnectionError') || 'API request nodes must be connected to JSON nodes');
+          isValid = false;
         }
       } else if (node.data.outputType === 'document' || node.data.outputType === 'ppt') {
         // Document and PPT nodes can connect to AI process or API request nodes
@@ -790,11 +816,9 @@ export default function AIWorkflow() {
         
         if (!isConnectedToProcessOrApi) {
           const nodeType = node.data.outputType === 'document' ? 'Document' : 'Presentation';
-          if (isFinalCheck || node.id !== recentlyAddedNode) {
-            showErrorToast(t('docPptConnectionError', { type: nodeType }) || 
-              `${nodeType} nodes must be connected to AI processing or API request nodes`);
-            return false;
-          }
+          showErrorToast(t('docPptConnectionError', { type: nodeType }) || 
+            `${nodeType} nodes must be connected to AI processing or API request nodes`);
+          isValid = false;
         }
       } else if (node.data.outputType === 'chat' || node.data.outputType === 'email') {
         // Chat and Email nodes can connect to document, PPT, API, or AI nodes
@@ -811,16 +835,14 @@ export default function AIWorkflow() {
         
         if (!isConnectedToValid) {
           const nodeType = node.data.outputType === 'chat' ? 'Chat message' : 'Email';
-          if (isFinalCheck || node.id !== recentlyAddedNode) {
-            showErrorToast(t('chatEmailConnectionError', { type: nodeType }) || 
-              `${nodeType} nodes must be connected to AI processing, Document, Presentation, or API nodes`);
-            return false;
-          }
+          showErrorToast(t('chatEmailConnectionError', { type: nodeType }) || 
+            `${nodeType} nodes must be connected to AI processing, Document, Presentation, or API nodes`);
+          isValid = false;
         }
       }
     }
     
-    return true;
+    return isValid;
   };
   
   // Handle node input changes (for model selection, etc.)
@@ -1912,14 +1934,33 @@ export default function AIWorkflow() {
       // 设置最近添加的节点ID
       setRecentlyAddedNode(node.id);
       
-      // 临时抑制连接验证5秒钟，给用户时间连接节点
+      // 临时抑制连接验证10秒钟，给用户更多时间连接节点
       setConnectionValidationSuppressed(true);
-      setTimeout(() => {
+      // 清除之前的所有错误消息
+      setShownErrorMessages(new Set());
+      
+      // 确保只有一个活跃的timeout
+      if (window.validationTimeoutId) {
+        clearTimeout(window.validationTimeoutId);
+      }
+      
+      window.validationTimeoutId = setTimeout(() => {
         setConnectionValidationSuppressed(false);
         setRecentlyAddedNode(null);
-      }, 5000);
+      }, 10000);
       
-      toast.success(`Added ${nodeType} node`);
+      // 显示成功提示，不要重复显示节点添加消息
+      if (!window.lastAddedNodeType || window.lastAddedNodeType !== nodeType) {
+        toast.success(`Added ${nodeType} node`);
+        window.lastAddedNodeType = nodeType;
+        
+        // 5秒后重置，允许再次显示相同节点类型的添加消息
+        setTimeout(() => {
+          if (window.lastAddedNodeType === nodeType) {
+            window.lastAddedNodeType = null;
+          }
+        }, 5000);
+      }
     }
   };
   
@@ -2133,7 +2174,7 @@ export default function AIWorkflow() {
           <div className="border-b border-gray-100 dark:border-[#383838] p-4 flex justify-between items-center">
             <div>
               <div className="flex items-center">
-                <div className="relative flex-grow">
+                                  <div className="flex flex-col flex-grow">
                   <input
                     type="text"
                     value={workflowName}
@@ -2149,7 +2190,7 @@ export default function AIWorkflow() {
                     placeholder="Enter Workflow Name"
                   />
                   {workflowName.length > 25 && (
-                    <div className={`text-xs absolute right-0 -bottom-5 ${
+                    <div className={`text-xs mt-1 text-right ${
                       workflowNameError ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'
                     }`}>
                       {workflowName.length}/{MAX_WORKFLOW_NAME_LENGTH}
@@ -2438,50 +2479,50 @@ export default function AIWorkflow() {
                         
                         return (
                           <div key={index} className={`flex items-center space-x-2 ${isUsedInPrompt ? 'bg-blue-50/50 dark:bg-blue-900/10 rounded-md p-1' : ''}`}>
-                            <div className="relative w-1/3">
-                              <Input
-                                value={field.name}
-                                onChange={(e) => {
-                                  const oldName = field.name;
-                                  const newValue = e.target.value;
-                                  
-                                  // Check if old name was in prompt and update it
-                                  if (usedVariables.includes(oldName)) {
-                                    const newPrompt = workflowPrompt.replaceAll(
-                                      `{{${oldName}}}`, 
-                                      `{{${newValue}}}`
-                                    );
-                                    setWorkflowPrompt(newPrompt);
-                                  }
-                                  
-                                  updateInputField(index, 'name', newValue);
-                                  
-                                  // Update errors state
-                                  setInputFieldErrors(prev => ({
-                                    ...prev,
-                                    [`name_${index}`]: newValue.length > MAX_INPUT_NAME_LENGTH ? 
-                                      `Cannot exceed ${MAX_INPUT_NAME_LENGTH} chars` : null
-                                  }));
-                                }}
+                                                          <div className="w-1/3 flex flex-col">
+                                <Input
+                                  value={field.name}
+                                  onChange={(e) => {
+                                    const oldName = field.name;
+                                    const newValue = e.target.value;
+                                    
+                                    // Check if old name was in prompt and update it
+                                    if (usedVariables.includes(oldName)) {
+                                      const newPrompt = workflowPrompt.replaceAll(
+                                        `{{${oldName}}}`, 
+                                        `{{${newValue}}}`
+                                      );
+                                      setWorkflowPrompt(newPrompt);
+                                    }
+                                    
+                                    updateInputField(index, 'name', newValue);
+                                    
+                                    // Update errors state
+                                    setInputFieldErrors(prev => ({
+                                      ...prev,
+                                      [`name_${index}`]: newValue.length > MAX_INPUT_NAME_LENGTH ? 
+                                        `Cannot exceed ${MAX_INPUT_NAME_LENGTH} chars` : null
+                                    }));
+                                  }}
+                                  maxLength={MAX_INPUT_NAME_LENGTH + 5}
+                                  placeholder="Variable name"
+                                  className={`w-full dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 ${
+                                    inputFieldErrors[`name_${index}`] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                                  } ${isUsedInPrompt ? 'border-blue-300 dark:border-blue-600' : ''}`}
+                                />
+                                {inputFieldErrors[`name_${index}`] && (
+                                  <div className="text-xs text-red-500 mt-1 truncate max-w-full">
+                                    {inputFieldErrors[`name_${index}`]}
+                                  </div>
+                                )}
+                              </div>
+                                                          <Input
+                                value={field.label}
+                                onChange={(e) => updateInputField(index, 'label', e.target.value)}
+                                placeholder="Display label"
                                 maxLength={MAX_INPUT_NAME_LENGTH + 5}
-                                placeholder="Variable name"
-                                className={`w-full dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500 ${
-                                  inputFieldErrors[`name_${index}`] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                                } ${isUsedInPrompt ? 'border-blue-300 dark:border-blue-600' : ''}`}
+                                className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
                               />
-                              {inputFieldErrors[`name_${index}`] && (
-                                <div className="text-xs text-red-500 absolute left-0 -bottom-5 truncate max-w-full">
-                                  {inputFieldErrors[`name_${index}`]}
-                                </div>
-                              )}
-                              
-                            </div>
-                            <Input
-                              value={field.label}
-                              onChange={(e) => updateInputField(index, 'label', e.target.value)}
-                              placeholder="Display label"
-                              className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
-                            />
                             <Select
                               value={field.type}
                               onValueChange={(value) => updateInputField(index, 'type', value)}
@@ -3302,7 +3343,7 @@ export default function AIWorkflow() {
                                   } ${isUsedInPrompt ? 'border-blue-300 dark:border-blue-600' : ''}`}
                                 />
                                 {inputFieldErrors[`name_${index}`] && (
-                                  <div className="text-xs text-red-500 absolute left-0 -bottom-5 truncate max-w-full">
+                                  <div className="text-xs text-red-500 relative mt-1 truncate max-w-full">
                                     {inputFieldErrors[`name_${index}`]}
                                   </div>
                                 )}
@@ -3312,6 +3353,7 @@ export default function AIWorkflow() {
                                 value={field.label}
                                 onChange={(e) => updateInputField(index, 'label', e.target.value)}
                                 placeholder="Display label"
+                                maxLength={MAX_INPUT_NAME_LENGTH + 5}
                                 className="w-1/3 dark:bg-[#333333] dark:border-[#444444] dark:text-gray-200 dark:placeholder-gray-500"
                               />
                               <Select

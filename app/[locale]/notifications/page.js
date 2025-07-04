@@ -124,6 +124,7 @@ export default function NotificationsPage() {
       case 'MENTION': return <div className="flex items-center justify-center"><User className="h-4 w-4" /></div>;
       case 'ADDED_TO_CHAT': return <div className="flex items-center justify-center"><MessageSquare className="h-4 w-4" /></div>;
       case 'MEETING_INVITE': return <div className="flex items-center justify-center"><Video className="h-4 w-4" /></div>;
+      case 'TEAM_INVITATION': return <div className="flex items-center justify-center"><User className="h-4 w-4" /></div>;
       case 'TEAM_ANNOUNCEMENT': return <div className="flex items-center justify-center"><Bell className="h-4 w-4" /></div>;
       case 'SYSTEM': return <div className="flex items-center justify-center"><Info className="h-4 w-4" /></div>;
       default: return <div className="flex items-center justify-center"><Info className="h-4 w-4" /></div>;

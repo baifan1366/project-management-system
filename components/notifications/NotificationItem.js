@@ -151,6 +151,8 @@ export default function NotificationItem({ notification, onAction, formatDateToU
         return <div className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 p-2 rounded-full flex items-center justify-center"><MessageSquare className="h-4 w-4" /></div>;
       case 'MEETING_INVITE':
         return <div className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 p-2 rounded-full flex items-center justify-center"><Video className="h-4 w-4" /></div>;
+      case 'TEAM_INVITATION':
+        return <div className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 p-2 rounded-full flex items-center justify-center"><User className="h-4 w-4" /></div>;
       case 'TEAM_ANNOUNCEMENT':
         return <div className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 p-2 rounded-full flex items-center justify-center"><Bell className="h-4 w-4" /></div>;
       case 'SYSTEM':
@@ -355,6 +357,15 @@ export default function NotificationItem({ notification, onAction, formatDateToU
     // For MENTION notifications, navigate directly to the chat
     if (notification.type === 'MENTION' && notification.data?.session_id) {
       router.push(`/chat?session=${notification.data.session_id}`);
+      
+      // Mark as read after click
+      if (!notification.is_read) {
+        onAction('read', notification.id);
+      }
+    }
+    // For TEAM_INVITATION notifications, navigate to the team invitation page
+    else if (notification.type === 'TEAM_INVITATION' && notification.data?.teamId) {
+      router.push(`/teamInvitation/${notification.data.teamId}`);
       
       // Mark as read after click
       if (!notification.is_read) {

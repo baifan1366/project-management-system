@@ -16,6 +16,7 @@ import { fetchTeamUsers } from '@/lib/redux/features/teamUserSlice';
 import { fetchTaskById, updateTask } from '@/lib/redux/features/taskSlice';
 import TagLabelManager from './TagLabelManager';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
 /**
  * 检查字段类型并返回类型常量
@@ -612,7 +613,7 @@ export function renderPeopleCell(userIdStr, taskId, teamId, editable = true) {
     return (
       <div className="flex flex-col gap-2 w-full">
         <div className="flex items-center justify-between w-full">
-          <PeopleDisplay userId={userIds[0]} />
+          <MultipleUsers userIds={userIds} taskId={taskId} />
           <div className="flex items-center">
           {/* 始终允许删除负责人 */}
           {taskId && (
@@ -640,7 +641,7 @@ export function renderPeopleCell(userIdStr, taskId, teamId, editable = true) {
   return (
     <div className="flex flex-col gap-2 w-full">
       <div className="flex items-center justify-between w-full">
-      <MultipleUsers userIds={userIds} />
+      <MultipleUsers userIds={userIds} taskId={taskId} />
       
         {/* 始终显示添加按钮，即使有多个用户 */}
         {taskId && teamId && (
@@ -711,11 +712,7 @@ export function EditablePeopleCell({ value, taskId, teamId, editable = true }) {
     return (
       <div className="flex items-center gap-2">
         {userIds.length ? (
-          userIds.length === 1 ? (
-            <PeopleDisplay userId={userIds[0]} />
-          ) : (
-            <MultipleUsers userIds={userIds} />
-          )
+          <MultipleUsers userIds={userIds} taskId={taskId} />
         ) : (
           <>
             <Avatar className="h-6 w-6">
@@ -736,15 +733,9 @@ export function EditablePeopleCell({ value, taskId, teamId, editable = true }) {
       <PopoverTrigger asChild>
         <div className="flex items-center justify-between w-full p-1 rounded-md hover:bg-accent/50 cursor-pointer">
           {userIds.length ? (
-            userIds.length === 1 ? (
-              <div className="flex-1">
-                <PeopleDisplay userId={userIds[0]} />
-              </div>
-            ) : (
-              <div className="flex-1">
-                <MultipleUsers userIds={userIds} />
-              </div>
-            )
+            <div className="flex-1">
+              <MultipleUsers userIds={userIds} taskId={taskId} />
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
@@ -904,136 +895,7 @@ function PeopleDisplay({ userId }) {
   );
 }
 
-/**
- * 多人员显示组件
- * @param {Object} props - 组件属性
- * @param {string[]} props.userIds - 用户ID数组
- * @returns {JSX.Element} 多人员显示组件
- */
-function MultipleUsers({ userIds }) {
-  const t = useTranslations('Team');  
-  const dispatch = useDispatch();
-  const { users, isLoading } = useUserData(userIds);
-  const displayCount = 3; // 最多显示3个头像
-  
-  // 预取所有用户信息
-  useEffect(() => {
-    if (!userIds.length) return;
-    
-    // 使用批量预取函数获取用户信息
-    // 这不会阻塞组件渲染，但会确保缓存中有完整的用户数据
-    prefetchUsersInfo(userIds, dispatch).catch(error => {
-      
-    });
-  }, [JSON.stringify(userIds), dispatch]);
-  
-  // 优化显示逻辑，防止不必要的渲染
-  const userAvatars = useMemo(() => {
-    return users.slice(0, displayCount).map((user, idx) => (
-      <Avatar 
-        key={user?.id || idx} 
-        className={`h-7 w-7 border-2 border-background transition-all ${
-          idx > 0 ? "group-hover:-translate-x-1" : ""
-        }`}
-      >
-        <AvatarImage src={user?.avatar_url} />
-        <AvatarFallback className="bg-primary/10 text-primary font-medium">
-          {user?.name?.[0] || <User size={14} />}
-        </AvatarFallback>
-      </Avatar>
-    ));
-  }, [users]);
-  
-  return (
-    <Popover>
-      <PopoverTrigger className="flex items-center gap-1 hover:bg-accent p-1 rounded-md transition-colors group">
-        <div className="flex items-center">
-          {/* 头像堆叠显示 */}
-          <div className="flex -space-x-3 mr-2">
-            {userAvatars}
-            
-            {/* 如果有更多用户，显示额外数量 */}
-            {userIds.length > displayCount && (
-              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background font-medium transition-transform group-hover:-translate-x-1">
-                +{userIds.length - displayCount}
-              </div>
-            )}
-            
-            {/* 如果还在加载中，显示加载指示器 */}
-            {isLoading && users.length === 0 && (
-              <div className="h-7 w-7 rounded-full bg-muted animate-pulse border-2 border-background"></div>
-            )}
-          </div>
-          
-          {/* 用户数量文本 */}
-          <span className="text-sm font-medium break-words max-w-[150px]">
-            {userIds.length > 1 ? 
-              `${userIds.length} ${t('users') || '用户'}` : 
-              (users[0]?.name || users[0]?.email || '用户')}
-          </span>
-        </div>
-      </PopoverTrigger>
-      
-      <PopoverContent className="w-72 p-0" align="start" side="bottom">
-        <div className="p-2">
-          <h4 className="text-sm font-medium mb-2 px-2 flex items-center">
-            <User size={14} className="mr-1.5 text-primary" />
-            {t('assigned_users') || '已分配用户'} 
-            <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
-              {userIds.length}
-            </span>
-          </h4>
-          <div className="max-h-60 overflow-y-auto">
-            {isLoading && userIds.length > users.length ? (
-              <div className="space-y-2 py-2">
-                {Array(Math.min(3, userIds.length - users.length)).fill(0).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 p-2">
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                    <div className="space-y-1 flex-1">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-3 w-16" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            
-            {users.map((user, idx) => (
-              <div 
-                key={user?.id || idx} 
-                className="flex items-center gap-3 p-2 hover:bg-accent/50 rounded-md transition-colors"
-              >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={user?.avatar_url} />
-                  <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                    {user?.name?.[0] || <User size={14} />}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col">
-                  <span className="font-medium text-sm break-words">{user?.name || '未知用户'}</span>
-                  <span className="text-xs text-muted-foreground break-words">{user?.email || (userIds[idx] ? `ID: ${userIds[idx].substring(0, 8)}...` : '未知ID')}</span>
-                </div>
-              </div>
-            ))}
-            
-            {/* 显示未能加载的用户ID */}
-            {userIds.filter(id => !users.some(u => u?.id === id)).map(id => (
-              <div key={id} className="flex items-center gap-3 p-2 hover:bg-accent/50 rounded-md">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-muted/60"><User size={14} /></AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col">
-                  <span className="font-medium text-sm break-words">{t('unknown_user') || '未知用户'}</span>
-                  <span className="text-xs text-muted-foreground break-words">ID: {id ? id.substring(0, 8) : '未知'}...</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
+
 
 //function add assignee
 //always show an Plus button
@@ -1647,7 +1509,7 @@ export function AssigneeManager({ teamId, taskId }) {
             <div className="space-y-1">
               {assignees.length > 1 ? (
                 <div className="flex items-center justify-between p-1 rounded-md hover:bg-accent/50 group">
-                  <MultipleUsers userIds={assignees} />
+                  <MultipleUsers userIds={assignees} taskId={taskId} />
                   <AddUserToAssignee 
                     teamId={teamId} 
                     taskId={taskId} 
@@ -1657,7 +1519,7 @@ export function AssigneeManager({ teamId, taskId }) {
               ) : (
                 assignees.map(userId => (
                 <div key={userId} className="flex items-center justify-between p-1 rounded-md hover:bg-accent/50 group">
-                  <PeopleDisplay userId={userId} />
+                  <MultipleUsers userIds={[userId]} taskId={taskId} />
                     <div className="flex items-center gap-1">
                   <RemoveUserFromAssignee 
                     taskId={taskId} 
@@ -4521,7 +4383,7 @@ export function EnhancedSingleSelect({
           teamId={teamId}
           selectedValue={selectedOption}
           onSelect={handleSelectOption}
-          selectionMode={true}
+          // selectionMode={true}
           projectThemeColor={projectThemeColor}
         />
       </PopoverContent>
@@ -4624,4 +4486,305 @@ export function validateNumberInput(value, options = {}) {
   }
   
   return { isValid: true, message: '' };
+}
+
+// 从Supabase获取任务状态的自定义Hook
+function useTaskStatus(taskId, userId) {
+  const [taskStatus, setTaskStatus] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // 如果没有任务ID或用户ID，则不执行任何操作
+    if (!taskId || !userId) return;
+
+    const fetchTaskStatus = async () => {
+      setIsLoading(true);
+      try {
+        // 使用supabase客户端从mytasks表中获取状态
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        );
+        
+        // 从mytasks表中获取任务状态
+        const { data, error } = await supabase
+          .from('mytasks')
+          .select('status')
+          .eq('task_id', taskId)
+          .single();
+        
+        if (error) throw error;
+        
+        // 解析状态值
+        if (data && data.status) {
+          try {
+            // 尝试解析JSON字符串（如果它是字符串的话）
+            const statusObj = typeof data.status === 'string' 
+              ? JSON.parse(data.status) 
+              : data.status;
+              
+            setTaskStatus(statusObj);
+          } catch (e) {
+            // 如果解析失败，则直接使用原始值
+            setTaskStatus({
+              label: String(data.status),
+              value: String(data.status).toLowerCase().replace(/\s+/g, '_'),
+              color: '#10b981' // 默认颜色
+            });
+          }
+        }
+      } catch (error) {
+        console.error('获取任务状态失败:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTaskStatus();
+  }, [taskId, userId]);
+
+  return { taskStatus, isLoading };
+}
+
+/**
+ * 多人员显示组件
+ * @param {Object} props - 组件属性
+ * @param {string[]} props.userIds - 用户ID数组
+ * @param {string} props.taskId - 任务ID，用于获取任务状态
+ * @returns {JSX.Element} 多人员显示组件
+ */
+function MultipleUsers({ userIds, taskId }) {
+  const t = useTranslations('Team');  
+  const dispatch = useDispatch();
+  const { users, isLoading } = useUserData(userIds);
+  const displayCount = 3; // 最多显示3个头像
+  const [userStatuses, setUserStatuses] = useState({});
+  const [statusLoading, setStatusLoading] = useState(false);
+  
+  // 获取每个用户的任务状态
+  useEffect(() => {
+    if (!taskId || !userIds.length) return;
+  
+    const fetchTaskStatuses = async () => {
+      setStatusLoading(true);
+      try {
+        // 使用supabase客户端从mytasks表中获取状态
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        );
+        
+        // 为每个用户单独获取任务状态
+        const { data, error } = await supabase
+          .from('mytasks')
+          .select('status, user_id')
+          .eq('task_id', taskId)
+          .in('user_id', userIds);
+        
+        if (error) throw error;
+        
+        // 解析每个用户的状态值并存储
+        const statusMap = {};
+        if (data && data.length) {
+          data.forEach(item => {
+            if (item.status) {
+              try {
+                // 尝试解析JSON字符串（如果它是字符串的话）
+                const statusObj = typeof item.status === 'string' 
+                  ? JSON.parse(item.status) 
+                  : item.status;
+                  
+                statusMap[item.user_id] = statusObj;
+              } catch (e) {
+                // 如果解析失败，则直接使用原始值
+                statusMap[item.user_id] = {
+                  label: String(item.status),
+                  value: String(item.status).toLowerCase().replace(/\s+/g, '_'),
+                  color: '#10b981' // 默认颜色
+                };
+              }
+            }
+          });
+        }
+        
+        setUserStatuses(statusMap);
+      } catch (error) {
+        console.error('获取任务状态失败:', error);
+      } finally {
+        setStatusLoading(false);
+      }
+    };
+  
+    fetchTaskStatuses();
+  }, [taskId, userIds]);
+    
+  // 预取所有用户信息
+  useEffect(() => {
+    if (!userIds.length) return;
+    
+    // 使用批量预取函数获取用户信息
+    // 这不会阻塞组件渲染，但会确保缓存中有完整的用户数据
+    prefetchUsersInfo(userIds, dispatch).catch(error => {
+      
+    });
+  }, [JSON.stringify(userIds), dispatch]);
+    
+  // 优化显示逻辑，防止不必要的渲染
+  const userAvatars = useMemo(() => {
+    return users.slice(0, displayCount).map((user, idx) => (
+      <Avatar 
+        key={user?.id || idx} 
+        className={`h-7 w-7 border-2 border-background transition-all ${
+          idx > 0 ? "group-hover:-translate-x-1" : ""
+        }`}
+      >
+        <AvatarImage src={user?.avatar_url} />
+        <AvatarFallback className="bg-primary/10 text-primary font-medium">
+          {user?.name?.[0] || <User size={14} />}
+        </AvatarFallback>
+      </Avatar>
+    ));
+  }, [users]);
+    
+  return (
+    <Popover>
+      <PopoverTrigger className="flex items-center gap-1 hover:bg-accent p-1 rounded-md transition-colors group">
+        <div className="flex items-center">
+          {/* 头像堆叠显示 */}
+          <div className="flex -space-x-3 mr-2">
+            {userAvatars}
+            
+            {/* 如果有更多用户，显示额外数量 */}
+            {userIds.length > displayCount && (
+              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background font-medium transition-transform group-hover:-translate-x-1">
+                +{userIds.length - displayCount}
+              </div>
+            )}
+            
+            {/* 如果还在加载中，显示加载指示器 */}
+            {isLoading && users.length === 0 && (
+              <div className="h-7 w-7 rounded-full bg-muted animate-pulse border-2 border-background"></div>
+            )}
+          </div>
+          
+          {/* 用户数量文本 */}
+          <span className="text-sm font-medium break-words max-w-[150px]">
+            {userIds.length > 1 ? 
+              `${userIds.length} ${t('users') || 'User'}` : 
+              (users[0]?.name || users[0]?.email || 'User')}
+          </span>
+        </div>
+      </PopoverTrigger>
+      
+      <PopoverContent className="w-72 p-0" align="start" side="bottom">
+        <div className="p-2">
+          <div className="flex items-center justify-between mb-2 px-2">
+            <h4 className="text-sm font-medium flex items-center">
+              <User size={14} className="mr-1.5 text-primary" />
+              {t('assigned_users') || '已分配用户'} 
+              <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                {userIds.length}
+              </span>
+            </h4>
+          </div>
+          
+          <div className="max-h-60 overflow-y-auto">
+            {isLoading && userIds.length > users.length ? (
+              <div className="space-y-2 py-2">
+                {Array(Math.min(3, userIds.length - users.length)).fill(0).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <div className="space-y-1 flex-1">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            
+            {users.map((user, idx) => {
+              const userId = user?.id;
+              const userStatus = userId && userStatuses[userId];
+              
+              return (
+                <div 
+                  key={userId || idx} 
+                  className="flex items-center gap-3 p-2 hover:bg-accent/50 rounded-md transition-colors"
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.avatar_url} />
+                    <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                      {user?.name?.[0] || <User size={14} />}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col flex-grow">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm break-words">{user?.name || '未知用户'}</span>
+                      {/* 显示当前用户的任务状态 */}
+                      {userStatus && (
+                        <Badge 
+                          variant="outline"
+                          className="text-xs"
+                          style={{
+                            backgroundColor: userStatus.color || '#e5e5e5',
+                            color: getContrastTextColor(userStatus.color || '#e5e5e5'),
+                            borderColor: 'transparent'
+                          }}
+                        >
+                          {userStatus.label}
+                        </Badge>
+                      )}
+                      {statusLoading && !userStatus && (
+                        <div className="h-5 w-16 bg-muted/60 animate-pulse rounded-full"></div>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground break-words">{user?.email || (userIds[idx] ? `ID: ${userIds[idx].substring(0, 8)}...` : '未知ID')}</span>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {/* 显示未能加载的用户ID */}
+            {userIds.filter(id => !users.some(u => u?.id === id)).map(id => {
+              const userStatus = userStatuses[id];
+              
+              return (
+                <div key={id} className="flex items-center gap-3 p-2 hover:bg-accent/50 rounded-md">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-muted/60"><User size={14} /></AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col flex-grow">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm break-words">{t('unknown_user') || '未知用户'}</span>
+                      {/* 显示当前用户的任务状态 */}
+                      {userStatus && (
+                        <Badge 
+                          variant="outline"
+                          className="text-xs"
+                          style={{
+                            backgroundColor: userStatus.color || '#e5e5e5',
+                            color: getContrastTextColor(userStatus.color || '#e5e5e5'),
+                            borderColor: 'transparent'
+                          }}
+                        >
+                          {userStatus.label}
+                        </Badge>
+                      )}
+                      {statusLoading && !userStatus && (
+                        <div className="h-5 w-16 bg-muted/60 animate-pulse rounded-full"></div>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground break-words">ID: {id ? id.substring(0, 8) : '未知'}...</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }

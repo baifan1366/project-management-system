@@ -1826,11 +1826,11 @@ export default function LandingPageSettings() {
                       <h3 className="text-lg font-medium mb-3">Preview</h3>
                       <div className="p-4 rounded-md text-center bg-purple-500 text-white">
                         <div className="text-lg font-bold tracking-wide">
-                          {availablePromoCodes.find(code => code.code === promoBannerSection.selectedPromoCode)?.description || 'Special offer'} 
-                          {' with '}
+                          Special Offer! Use code
                           <span className="font-black bg-purple-700 px-3 py-1 rounded mx-1">
                             "{promoBannerSection.selectedPromoCode}"
                           </span>
+                          for a discount!
                         </div>
                       </div>
                     </div>

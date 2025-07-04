@@ -1148,6 +1148,7 @@
     "save": "Save",
     "selectOptions": "Select Options",
     "selectedOptions": "Selected Options",
+    "clearSelection": "Clear Selection",
     "typeTagAndEnter": "Type tag and enter",
     "addTags": "Add Tags",
     "transferOwner": "Transfer Ownership",
@@ -2383,15 +2384,15 @@
     "messageWithAttachments": "Message with attachments",
     "emailWithAttachments": "Email with attachments",
     "attachmentsSentSuccess": "Message sent with {count} attachments",
-    "aiProcessingConnectionRule": "AI processing → Input",
-    "jsonTaskConnectionRule": "JSON/Task → AI processing",
-    "apiConnectionRule": "API request → JSON",
-    "docPptConnectionRule": "Document/PPT → AI processing or API",
-    "chatEmailConnectionRule": "Chat/Email → AI, Document, PPT, or API"
+    "aiProcessingConnectionRule": "Input → AI",
+    "jsonTaskConnectionRule": "AI → JSON/Task/Document/PPT/Chat/Email",
+    "apiConnectionRule": "JSON → API request",
+    "docPptConnectionRule": "API → Document/PPT/Chat/Email",
+    "chatEmailConnectionRule": "Document/PPT → Chat/Email"
   },
   "TeamOverview": {
     "updateSuccess": "Announcement updated successfully", 
-    "updateFailed": "Announcement update failed",
+    "updateFailed": "Announcement update failed", 
     "announcementPinned": "Announcement pinned successfully",
     "announcementUnpinned": "Announcement unpinned successfully",
     "announcementPinError": "Announcement pin error",
@@ -2577,6 +2578,8 @@
     "userNameMax": "Name must be less than 50 characters."
   },
   "Team": {
+    "teamUpdated": "Team updated successfully",
+    "teamSettingsSaved": "Team settings saved successfully",
     "optionCreated": "Option created successfully",
     "optionUpdated": "Option updated successfully",
     "optionDeleted": "Option deleted successfully",
@@ -2656,6 +2659,7 @@
     "save": "Save",
     "selectOptions": "Select Options",
     "selectedOptions": "Selected Options",
+    "clearSelection": "Clear Selection",
     "typeTagAndEnter": "Type tag and enter",
     "addTags": "Add Tags",
     "transferOwner": "Transfer Ownership",

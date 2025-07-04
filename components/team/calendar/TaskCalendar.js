@@ -963,6 +963,7 @@ export default function TaskCalendar({ teamId, projectId, teamCFId, refreshKey, 
             handleTaskClick(event.originalEvent);
           }
         }}
+        themeColor={themeColor}
       />
     )
   }
