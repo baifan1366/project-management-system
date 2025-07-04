@@ -661,6 +661,8 @@
     "description": "Description",
     "reference": "Ref",
     "taskNotFound": "Task not found",
+    "loadingAssignedUsers": "Loading assigned users...",
+    "noDescription": "No description",
     "errors": {
       "loadingFailed": "Failed to load tasks"
     },
@@ -763,6 +765,8 @@
       "update": "Project update",
       "deadline": "Deadline approaching",
       "TASK_ASSIGNED": "Task assigned to you",
+      "TASK_DELETED": "Task deleted",
+      "TASK_UNASSIGNED": "Task unassigned",
       "COMMENT_ADDED": "New comment",
       "MENTION": "Mentioned you",
       "ADDED_TO_CHAT": "Added to chat",
@@ -2119,7 +2123,13 @@
       "tokenExpired": "Your password reset token has expired",
       "verifying": "Verifying token...",
       "refreshing": "Refreshing token..."
-    }
+    },
+    "emailRequired": "Email address is required",
+    "invalidEmail": "Please enter a valid email address",
+    "emailAlreadyExists": "This email is already registered",
+    "checkingEmail": "Checking email availability...",
+    "passwordsMismatch": "Passwords do not match",
+    "userNameMax": "Name must be less than 50 characters."
   },
   "notificationType": {
     "task": "Task",

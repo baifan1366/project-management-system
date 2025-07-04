@@ -22,7 +22,7 @@ import { useRouter, usePathname } from 'next/navigation';
 
 export default function PreferencesPage() {
   const t = useTranslations('profile');
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const dispatch = useDispatch();
   const { user: currentUser, isLoading: userLoading } = useGetUser();
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,12 @@ export default function PreferencesPage() {
   // Handle hydration mismatch by only showing the actual theme state after mounting
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    // If user has a stored theme preference in the database, apply it
+    if (currentUser?.theme) {
+      setTheme(currentUser.theme);
+    }
+  }, [setTheme, currentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -101,6 +106,11 @@ export default function PreferencesPage() {
     }
   };
 
+  // Only show the UI when mounted to prevent hydration mismatch
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -118,7 +128,7 @@ export default function PreferencesPage() {
                 </p>
               </div>
               <Switch
-                checked={mounted && theme === 'dark'}
+                checked={resolvedTheme === 'dark'}
                 onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
               />
             </div>

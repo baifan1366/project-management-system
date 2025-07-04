@@ -702,10 +702,10 @@ CREATE TABLE "mytasks" (
   "description" TEXT,
   "status" TEXT NOT NULL CHECK ("status" IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE')) DEFAULT 'TODO',
   "priority" TEXT CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')) DEFAULT 'MEDIUM',
-  "expected_completion_date" TIMESTAMP,
-  "expected_start_time" TIMESTAMP,
-  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  "expected_completion_date" TIMESTAMPTZ,
+  "expected_start_time" TIMESTAMPTZ,
+  "created_at" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- create bucket policy to allow public access to media files
