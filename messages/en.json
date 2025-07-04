@@ -1148,6 +1148,7 @@
     "save": "Save",
     "selectOptions": "Select Options",
     "selectedOptions": "Selected Options",
+    "clearSelection": "Clear Selection",
     "typeTagAndEnter": "Type tag and enter",
     "addTags": "Add Tags",
     "transferOwner": "Transfer Ownership",
@@ -2519,6 +2520,8 @@
     "userNameMax": "Name must be less than 50 characters."
   },
   "Team": {
+    "teamUpdated": "Team updated successfully",
+    "teamSettingsSaved": "Team settings saved successfully",
     "optionCreated": "Option created successfully",
     "optionUpdated": "Option updated successfully",
     "optionDeleted": "Option deleted successfully",
@@ -2598,6 +2601,7 @@
     "save": "Save",
     "selectOptions": "Select Options",
     "selectedOptions": "Selected Options",
+    "clearSelection": "Clear Selection",
     "typeTagAndEnter": "Type tag and enter",
     "addTags": "Add Tags",
     "transferOwner": "Transfer Ownership",

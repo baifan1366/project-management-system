@@ -1039,7 +1039,7 @@ export default function TaskNotion({ projectId, teamId, addButtonText, triggerAc
               <span className="mr-2 text-lg">
                 {node.icon || <FileText className="h-4 w-4" />}
               </span>
-              <span className="truncate max-w-[40%] text-sm">{node.title}</span>
+              <span className="truncate max-w-[80%] text-sm">{node.title}</span>
             </div>
             
             <div className="flex items-center">

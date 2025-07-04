@@ -17,6 +17,7 @@ export default function DayView({
   t,
   tasks = [],
   handleEventClick,
+  themeColor
 }) {
   // Format the current date for display
   const formattedDate = format(currentDate, 'EEEE, MMMM d, yyyy');
@@ -352,6 +353,7 @@ export default function DayView({
         <Button 
           onClick={() => handleOpenCreateEvent(currentDate)}
           className="w-full mt-4"
+          variant={themeColor}
         >
           {t('newTask')}
         </Button>
