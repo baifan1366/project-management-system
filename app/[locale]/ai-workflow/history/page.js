@@ -283,19 +283,20 @@ export default function WorkflowHistory() {
               </div>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('workflow') || 'Workflow'}</TableHead>
-                  <TableHead>{t('executedAt') || 'Executed At'}</TableHead>
-                  <TableHead>{t('status') || 'Status'}</TableHead>
-                  <TableHead>{t('model') || 'Model'}</TableHead>
-                  <TableHead>{t('outputs') || 'Outputs'}</TableHead>
-                  <TableHead>{t('actions') || 'Actions'}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {executionHistory.map((execution) => (
+            <div className="max-h-[70vh] overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10">
+                  <TableRow>
+                    <TableHead>{t('workflow') || 'Workflow'}</TableHead>
+                    <TableHead>{t('executedAt') || 'Executed At'}</TableHead>
+                    <TableHead>{t('status') || 'Status'}</TableHead>
+                    <TableHead>{t('model') || 'Model'}</TableHead>
+                    <TableHead>{t('outputs') || 'Outputs'}</TableHead>
+                    <TableHead>{t('actions') || 'Actions'}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {executionHistory.map((execution) => (
                   <TableRow key={execution.id}>
                     <TableCell>
                       <div className="flex items-center">
@@ -422,7 +423,8 @@ export default function WorkflowHistory() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -645,7 +647,7 @@ export default function WorkflowHistory() {
                               </TabsTrigger>
                             ))}
                             
-                            {selectedExecution.result.api_results && (
+                            {selectedExecution.result.api_results && !selectedExecution.output_formats?.includes('api') && (
                               <TabsTrigger 
                                 value="api"
                                 className="flex items-center py-2 px-4 gap-1 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500"
@@ -655,7 +657,7 @@ export default function WorkflowHistory() {
                               </TabsTrigger>
                             )}
                             
-                            {selectedExecution.result.task_result && (
+                            {selectedExecution.result.task_result && !selectedExecution.output_formats?.includes('task') && (
                               <TabsTrigger 
                                 value="task"
                                 className="flex items-center py-2 px-4 gap-1 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500"
@@ -665,7 +667,7 @@ export default function WorkflowHistory() {
                               </TabsTrigger>
                             )}
                             
-                            {selectedExecution.result.email_result && (
+                            {selectedExecution.result.email_result && !selectedExecution.output_formats?.includes('email') && (
                               <TabsTrigger 
                                 value="email"
                                 className="flex items-center py-2 px-4 gap-1 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500"

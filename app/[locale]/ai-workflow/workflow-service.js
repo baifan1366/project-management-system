@@ -3,14 +3,8 @@ import { safeParseJSON, executeApiRequest } from './utils';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import nodemailer from 'nodemailer';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
 import JSZip from 'jszip';
 import PptxGenJS from 'pptxgenjs';
-import Docxtemplater from 'docxtemplater';
-import PizZip from 'pizzip';
-import { promises as fsPromises } from 'fs';
 
 // Get available AI models
 const getAvailableModels = () => {
@@ -1533,9 +1527,7 @@ async function executeWorkflow(workflowId, inputs, modelId, userId, options = {}
               
               // 发送邮件
               const emailResult = await sendEmail(nodeSettings, content, userId);
-              
-              // 存储结果
-              results['email_result'] = emailResult;
+              results.email_result = emailResult;
               
               if (emailResult.success) {
               } else {
@@ -1891,37 +1883,78 @@ Based on the above API data, please ${userPrompt}`;
  */
 async function sendChatSessionMessages(sessionIds, content, format = 'text', userId) {
   try {
+    console.log('Debug: Starting sendChatSessionMessages');
+    console.log(`Debug: SessionIds: ${JSON.stringify(sessionIds)}`);
+    console.log(`Debug: Format: ${format}`);
+    console.log(`Debug: UserId: ${userId}`);
+    console.log(`Debug: Content type: ${typeof content}`);
+    
     if (!sessionIds || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+      console.error('Debug: No chat sessions provided');
       throw new Error('No chat sessions provided');
     }
 
-    if (!content || content.trim() === '') {
+    if (!content || (typeof content === 'string' && content.trim() === '') || 
+        (typeof content === 'object' && (!content.content || content.content.trim() === ''))) {
+      console.error('Debug: Message content cannot be empty');
       throw new Error('Message content cannot be empty');
     }
 
     if (!userId) {
+      console.error('Debug: User ID is required');
       throw new Error('User ID is required');
     }
 
+    // 处理content参数，支持字符串或带附件的对象
+    let messageContent = '';
+    let attachedFiles = [];
+    
+    if (typeof content === 'string') {
+      messageContent = content;
+      console.log(`Debug: Content is string, length: ${messageContent.length}`);
+    } else if (typeof content === 'object') {
+      messageContent = content.content || '';
+      attachedFiles = content.attachedFiles || [];
+      console.log(`Debug: Content is object with content length: ${messageContent.length}`);
+      console.log(`Debug: Attached files count: ${attachedFiles.length}`);
+      if (attachedFiles.length > 0) {
+        console.log(`Debug: First attachment: ${JSON.stringify(attachedFiles[0])}`);
+      }
+    }
+
     // Format the message according to the specified format
-    let formattedContent = content;
+    let formattedContent = messageContent;
     
     // Add format-specific markers if needed
     if (format === 'markdown') {
       // If it's markdown, we don't need to do anything special
-      formattedContent = content;
+      formattedContent = messageContent;
     } else if (format === 'html') {
       // If it's HTML, wrap it in a special marker for the frontend to render correctly
-      formattedContent = `<html-content>${content}</html-content>`;
+      formattedContent = `<html-content>${messageContent}</html-content>`;
     }
+    
+    // 添加文件附件链接到消息内容
+    if (attachedFiles && attachedFiles.length > 0) {
+      console.log(`Debug: Adding ${attachedFiles.length} file attachment links to message content`);
+      formattedContent += '\n\nfile attachment  s:\n';
+      attachedFiles.forEach((file, index) => {
+        formattedContent += `${index + 1}. ${file.type === 'presentation' ? 'PowerPoint presentation' : 'Word document'}: ${file.url}\n`;
+      });
+    }
+
+    console.log(`Debug: Final formatted content length: ${formattedContent.length}`);
+    console.log(`Debug: Creating message objects for ${sessionIds.length} sessions`);
 
     // Create an array of message objects to insert
     const messagesToInsert = sessionIds.map(sessionId => ({
       session_id: sessionId,
       user_id: userId,
-      content: formattedContent,
+      content: formattedContent
     }));
 
+    console.log(`Debug: Inserting ${messagesToInsert.length} messages into chat_message table`);
+    
     // Insert all messages in a batch
     const { data, error } = await supabase
       .from('chat_message')
@@ -1932,6 +1965,8 @@ async function sendChatSessionMessages(sessionIds, content, format = 'text', use
       console.error('Error sending chat messages:', error);
       throw error;
     }
+
+    console.log(`Debug: Successfully inserted messages, IDs: ${JSON.stringify(data.map(m => m.id))}`);
 
     // For each session, we need to create read status records for all participants except the sender
     const messageIds = data.map(message => message.id);
@@ -1945,7 +1980,10 @@ async function sendChatSessionMessages(sessionIds, content, format = 'text', use
     
     if (participantsError) {
       console.error('Error fetching participants:', participantsError);
+      console.error('Participants error details:', participantsError.message, participantsError.code);
       // We don't throw here because messages were already sent
+    } else {
+      console.log(`Debug: Found ${participants?.length || 0} participants for sessions`);
     }
     
     if (participants && participants.length > 0) {
@@ -1967,21 +2005,108 @@ async function sendChatSessionMessages(sessionIds, content, format = 'text', use
       });
       
       if (readStatusRecords.length > 0) {
+        console.log(`Debug: Creating ${readStatusRecords.length} read status records`);
+        
         const { error: readStatusError } = await supabase
           .from('chat_message_read_status')
           .insert(readStatusRecords);
         
         if (readStatusError) {
           console.error('Error creating read status records:', readStatusError);
+          console.error('Read status error details:', readStatusError.message, readStatusError.code);
           // We don't throw here because messages were already sent
+        } else {
+          console.log(`Debug: Successfully created read status records`);
         }
+      }
+    }
+    
+    // 如果有附件，创建消息附件记录
+    if (attachedFiles.length > 0 && messageIds.length > 0) {
+      try {
+        console.log(`Debug: Processing ${attachedFiles.length} attachments for ${messageIds.length} messages`);
+        console.log(`Debug: Attachment files:`, JSON.stringify(attachedFiles));
+        
+        const attachmentRecords = [];
+        
+        messageIds.forEach(messageId => {
+          attachedFiles.forEach(file => {
+            const fileName = file.name || (file.type === 'presentation' ? 'presentation.pptx' : 'document.docx');
+            const fileType = file.contentType || (file.type === 'presentation' ? 
+              'application/vnd.openxmlformats-officedocument.presentationml.presentation' : 
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+            
+            console.log(`Debug: Creating attachment record for message ${messageId}:`);
+            console.log(`Debug: File URL: ${file.url}`);
+            console.log(`Debug: File name: ${fileName}`);
+            console.log(`Debug: File type: ${fileType}`);
+            
+            // Create attachment record based on chat_attachment schema in supabasev2.sql
+            // Check if the URL is a valid URL
+            if (!file.url || typeof file.url !== 'string' || !file.url.startsWith('http')) {
+              console.log(`Debug: Skipping invalid file URL: ${file.url}`);
+              return; // Skip this file
+            }
+            
+            attachmentRecords.push({
+              message_id: messageId,
+              file_url: file.url,
+              file_name: fileName,
+              file_type: fileType,
+              is_image: false,
+              uploaded_by: userId
+            });
+          });
+        });
+        
+        if (attachmentRecords.length > 0) {
+          console.log(`Debug: Inserting ${attachmentRecords.length} attachment records to chat_attachment table`);
+          
+          // 插入到chat_attachment表 - 按照数据库实际表结构
+          const { data: attachmentData, error: attachmentError } = await supabase
+            .from('chat_attachment')
+            .insert(attachmentRecords)
+            .select('id, message_id');
+          
+          if (attachmentError) {
+            console.error('Error creating message attachments:', attachmentError);
+            console.error('Attachment error details:', JSON.stringify(attachmentError));
+            console.error('First attachment record:', JSON.stringify(attachmentRecords[0]));
+            
+            // 尝试一次一个地添加附件，以隔离问题
+            console.log('Debug: Trying to add attachments one by one to isolate the issue');
+            
+            for(let i = 0; i < attachmentRecords.length; i++) {
+              const record = attachmentRecords[i];
+              console.log(`Debug: Trying attachment ${i+1}/${attachmentRecords.length}`);
+              
+              const { data: singleData, error: singleError } = await supabase
+                .from('chat_attachment')
+                .insert([record])
+                .select('id, message_id');
+                
+              if (singleError) {
+                console.error(`Error adding attachment ${i+1}:`, singleError);
+              } else {
+                console.log(`Successfully added attachment ${i+1}`);
+              }
+            }
+          } else {
+            console.log(`Debug: Successfully created ${attachmentData?.length || 0} attachments`);
+            console.log(`Debug: Attachment IDs:`, JSON.stringify(attachmentData));
+          }
+        }
+      } catch (attachmentError) {
+        console.error('Error processing attachments:', attachmentError);
+        console.error('Attachment error details:', attachmentError.message, attachmentError.stack);
       }
     }
 
     return {
       success: true,
       messageIds,
-      sessionIds: sessionIdsWithMsgs
+      sessionIds: sessionIdsWithMsgs,
+      attachments: attachedFiles.length
     };
   } catch (error) {
     console.error('Error in sendChatSessionMessages:', error);
@@ -1996,41 +2121,73 @@ async function sendChatSessionMessages(sessionIds, content, format = 'text', use
 async function sendEmail(emailSettings, content, userId) {
   try {
     
-    // Prepare the email content by replacing the content placeholder
-    let emailContent = emailSettings.template || 'Hello,\n\nThis is an automated email:\n\n{{content}}\n\nRegards,\nWorkflow System';
-    
-    // Convert content to string if it's an object
+    // 处理content参数，支持字符串或带附件的对象
     let contentStr = '';
     let attachedFiles = [];
     
-    if (typeof content === 'object') {
-      try {
-        // Check if there are attached files
-        if (content.attachedFiles && Array.isArray(content.attachedFiles) && content.attachedFiles.length > 0) {
-          attachedFiles = content.attachedFiles;
-        }
-        
-        // Try to extract a 'content' field if it exists
-        if (content.content) {
+    if (typeof content === 'string') {
+      contentStr = content;
+    } else if (typeof content === 'object') {
+      // 检查是否有附件
+      if (content.attachedFiles && Array.isArray(content.attachedFiles)) {
+        attachedFiles = content.attachedFiles;
+      }
+      
+      // 尝试提取content字段
+      if (content.content) {
+        if (typeof content.content === 'string') {
           contentStr = content.content;
+        } else if (typeof content.content === 'object') {
+          // Check if this is a formatted email object with expected fields
+          if (content.content.greeting && content.content.content && content.content.signature) {
+            // Format the email properly using the structured fields
+            contentStr = `${content.content.greeting}\n\n${content.content.content}\n\n${content.content.signature}`;
+            if (content.content.sender_name) {
+              contentStr += `\n${content.content.sender_name}`;
+            }
+            
+            // If there's a subject in the content, use it for the email subject
+            if (content.content.subject && !emailSettings.subject) {
+              emailSettings.subject = content.content.subject;
+            }
+          } else {
+            // If not a standard email structure, stringify with formatting
+            contentStr = JSON.stringify(content.content, null, 2);
+          }
         } else {
-          // Otherwise stringify the whole object without the attachedFiles field
+          // 如果content不是字符串，则尝试将其转换为JSON字符串
+          contentStr = JSON.stringify(content.content, null, 2);
+        }
+      } else {
+        // Check if the content itself is a formatted email object
+        if (content.greeting && content.content && content.signature) {
+          // Format the email properly using the structured fields
+          contentStr = `${content.greeting}\n\n${content.content}\n\n${content.signature}`;
+          if (content.sender_name) {
+            contentStr += `\n${content.sender_name}`;
+          }
+          
+          // If there's a subject in the content, use it for the email subject
+          if (content.subject && !emailSettings.subject) {
+            emailSettings.subject = content.subject;
+          }
+        } else {
+          // 否则将整个对象（不包括attachedFiles字段）转换为字符串
           const contentCopy = { ...content };
           delete contentCopy.attachedFiles;
           contentStr = JSON.stringify(contentCopy, null, 2);
         }
-      } catch (error) {
-        contentStr = String(content);
       }
-    } else {
-      contentStr = String(content);
     }
     
-    // Add file links to the content if there are any attached files
+    // Prepare the email content by replacing the content placeholder
+    let emailContent = emailSettings.template || 'Hello,\n\nThis is an automated email:\n\n{{content}}\n\nRegards,\nWorkflow System';
+    
+    // 添加文件附件链接到邮件内容
     if (attachedFiles.length > 0) {
-      contentStr += '\n\nAttachments:\n';
+      contentStr += '\n\nFile attachments:\n';
       attachedFiles.forEach((file, index) => {
-        contentStr += `${index + 1}. ${file.type === 'presentation' ? 'PowerPoint 演示文稿' : 'Word 文档'}: ${file.url}\n`;
+        contentStr += `${index + 1}. ${file.type === 'presentation' ? 'PowerPoint presentation' : 'Word document'}: ${file.url}\n`;
       });
     }
     
@@ -2089,26 +2246,44 @@ async function sendEmail(emailSettings, content, userId) {
     const mailOptions = {
       from: emailSettings.useCustomSmtp && emailSettings.smtp.from 
         ? emailSettings.smtp.from 
-        : process.env.SMTP_FROM || 'workflow@example.com',
+        : process.env.NEXT_PUBLIC_SMTP_FROM,
       to: recipientsList.join(', '),
-      subject: emailSettings.subject || 'Automated email from workflow system',
-      text: emailContent
+      subject: emailSettings.subject || 'Automated Email from Workflow System',
+      text: emailContent,
+      attachments: []
     };
+    
+    // 添加文件附件
+    if (attachedFiles.length > 0) {
+      try {
+        // 对于每个附件，我们添加URL链接，而不是实际附加文件
+        // 因为我们不希望下载和重新上传大文件，这会增加延迟和带宽使用
+        mailOptions.attachments = attachedFiles.map(file => ({
+          filename: file.name || (file.type === 'presentation' ? 'presentation.pptx' : 'document.docx'),
+          path: file.url, // URL路径，nodemailer将从URL下载文件并作为附件发送
+          contentType: file.contentType || 'application/octet-stream'
+        }));
+      } catch (attachmentError) {
+        console.error('Error adding attachments to email:', attachmentError);
+        // 继续发送邮件，但不包含附件
+      }
+    }
     
     // Send the email
     const info = await transporter.sendMail(mailOptions);
     
+    console.log('Email sent successfully:', info.messageId);
     
-    // Return success result
     return {
       success: true,
       messageId: info.messageId,
+      recipients: recipientsList.length,
       sentCount: recipientsList.length,
-      recipients: recipientsList.join(', '),
       subject: emailSettings.subject,
-      usedCustomSmtp: emailSettings.useCustomSmtp,
-      includedFiles: attachedFiles.length
+      usedCustomSmtp: !!emailSettings.useCustomSmtp,
+      attachments: attachedFiles.length
     };
+    
   } catch (error) {
     console.error('Error sending email:', error);
     return {
@@ -2321,6 +2496,7 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
     const results = { ...aiResponses };
     const documentUrls = {};
     const apiResponses = {};
+    const fileAttachments = []; // 新增：用于存储文件附件
     
     // Get the output formats from the AI responses
     const outputFormats = Object.keys(aiResponses);
@@ -2430,6 +2606,14 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
         documentUrls.document = docUrl;
         documentUrls.docxUrl = docUrl; // For backwards compatibility
         
+        // 新增：添加文档到文件附件列表
+        fileAttachments.push({
+          type: 'document',
+          url: docUrl,
+          name: 'document.docx',
+          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+        
       } catch (error) {
         console.error('Error generating document:', error);
         documentUrls.document_error = error.message;
@@ -2443,6 +2627,14 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
         const pptUrl = await generatePPTX(pptContent, userId);
         documentUrls.ppt = pptUrl;
         documentUrls.pptxUrl = pptUrl; // 添加pptxUrl以确保前端兼容性
+        
+        // 新增：添加演示文稿到文件附件列表
+        fileAttachments.push({
+          type: 'presentation',
+          url: pptUrl,
+          name: 'presentation.pptx',
+          contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
         
       } catch (error) {
         console.error('Error generating PowerPoint:', error);
@@ -2469,6 +2661,232 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
       }
     }
     
+    // 新增：处理节点连接关系，确定哪些文件应当作为附件发送
+    // 构建源节点到目标节点的映射
+    console.log('Debug: Connection map structure:', JSON.stringify(connectionMap));
+    
+    const sourceToTargetMap = {};
+    
+    // 检查connectionMap结构，确保正确处理
+    if (typeof connectionMap === 'object') {
+      // 标准格式：{ targetId: [sourceId1, sourceId2, ...] }
+      if (Object.keys(connectionMap).some(key => Array.isArray(connectionMap[key]))) {
+        console.log('Debug: Using standard connection format');
+        Object.keys(connectionMap).forEach(targetId => {
+          if (Array.isArray(connectionMap[targetId])) {
+            connectionMap[targetId].forEach(sourceId => {
+              if (!sourceToTargetMap[sourceId]) {
+                sourceToTargetMap[sourceId] = [];
+              }
+              sourceToTargetMap[sourceId].push(targetId);
+            });
+          }
+        });
+      } 
+      // 备用格式: { sourceId: { targets: [targetId1, targetId2, ...] } }
+      else if (Object.values(connectionMap).some(val => val && typeof val === 'object' && val.targets)) {
+        console.log('Debug: Using alternate connection format with targets property');
+        Object.keys(connectionMap).forEach(sourceId => {
+          if (connectionMap[sourceId] && Array.isArray(connectionMap[sourceId].targets)) {
+            if (!sourceToTargetMap[sourceId]) {
+              sourceToTargetMap[sourceId] = [];
+            }
+            sourceToTargetMap[sourceId] = [...connectionMap[sourceId].targets];
+          }
+        });
+      }
+      // 备用格式: { id: sourceId, connections: [{ source: sourceId, target: targetId }] }
+      else if (connectionMap.connections && Array.isArray(connectionMap.connections)) {
+        console.log('Debug: Using alternate connection format with connections array');
+        connectionMap.connections.forEach(conn => {
+          if (conn.source && conn.target) {
+            if (!sourceToTargetMap[conn.source]) {
+              sourceToTargetMap[conn.source] = [];
+            }
+            sourceToTargetMap[conn.source].push(conn.target);
+          }
+        });
+      }
+    }
+    
+    console.log('Debug: Processed source to target map:', JSON.stringify(sourceToTargetMap));
+    
+    // 获取所有文档和演示文稿节点
+    const docNodes = Object.keys(outputSettings).filter(nodeId => outputSettings[nodeId]?.type === 'document');
+    const pptNodes = Object.keys(outputSettings).filter(nodeId => outputSettings[nodeId]?.type === 'ppt');
+    
+    console.log(`Debug: Found ${docNodes.length} document nodes: ${JSON.stringify(docNodes)}`);
+    console.log(`Debug: Found ${pptNodes.length} presentation nodes: ${JSON.stringify(pptNodes)}`);
+    
+    // 如果没有文档节点但生成了文档，则添加一个虚拟节点
+    if (docNodes.length === 0 && documentUrls.document) {
+      console.log('Debug: No document nodes found but document URL exists, creating virtual node');
+      docNodes.push('virtual_document_node');
+      // 为虚拟节点设置输出类型
+      if (!outputSettings['virtual_document_node']) {
+        outputSettings['virtual_document_node'] = { type: 'document' };
+      }
+    }
+    
+    // 如果没有PPT节点但生成了PPT，则添加一个虚拟节点
+    if (pptNodes.length === 0 && documentUrls.ppt) {
+      console.log('Debug: No presentation nodes found but PPT URL exists, creating virtual node');
+      pptNodes.push('virtual_ppt_node');
+      // 为虚拟节点设置输出类型
+      if (!outputSettings['virtual_ppt_node']) {
+        outputSettings['virtual_ppt_node'] = { type: 'ppt' };
+      }
+    }
+    
+    // 检查邮件节点的文件附件
+    const emailAttachments = [];
+    const emailNodeIds = Object.keys(outputSettings).filter(nodeId => outputSettings[nodeId]?.type === 'email');
+    
+    console.log(`Debug: Found ${emailNodeIds.length} email nodes: ${JSON.stringify(emailNodeIds)}`);
+    
+    // 直接添加所有生成的文档附件到电子邮件节点
+    if (documentUrls.document && emailNodeIds.length > 0) {
+      console.log('Debug: Adding document attachment to email');
+      emailAttachments.push({
+        type: 'document',
+        url: documentUrls.document,
+        name: 'document.docx',
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+    }
+    
+    if (documentUrls.ppt && emailNodeIds.length > 0) {
+      console.log('Debug: Adding presentation attachment to email');
+      emailAttachments.push({
+        type: 'presentation',
+        url: documentUrls.ppt,
+        name: 'presentation.pptx',
+        contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      });
+    }
+    
+    // 基于连接映射添加文档附件
+    // 检查哪些文档和演示文稿需要附加到邮件
+    docNodes.forEach(docNodeId => {
+      if (sourceToTargetMap[docNodeId]) {
+        console.log(`Debug: Checking document node ${docNodeId} connections`);
+        sourceToTargetMap[docNodeId].forEach(targetId => {
+          if (emailNodeIds.includes(targetId) && documentUrls.document) {
+            console.log(`Debug: Found connection from document node ${docNodeId} to email node ${targetId}`);
+            // 检查是否已经添加过相同的附件
+            const alreadyAdded = emailAttachments.some(att => att.type === 'document' && att.url === documentUrls.document);
+            if (!alreadyAdded) {
+              emailAttachments.push({
+                type: 'document',
+                url: documentUrls.document,
+                name: 'document.docx',
+                contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              });
+            }
+          }
+        });
+      }
+    });
+    
+    pptNodes.forEach(pptNodeId => {
+      if (sourceToTargetMap[pptNodeId]) {
+        console.log(`Debug: Checking presentation node ${pptNodeId} connections`);
+        sourceToTargetMap[pptNodeId].forEach(targetId => {
+          if (emailNodeIds.includes(targetId) && documentUrls.ppt) {
+            console.log(`Debug: Found connection from presentation node ${pptNodeId} to email node ${targetId}`);
+            // 检查是否已经添加过相同的附件
+            const alreadyAdded = emailAttachments.some(att => att.type === 'presentation' && att.url === documentUrls.ppt);
+            if (!alreadyAdded) {
+              emailAttachments.push({
+                type: 'presentation',
+                url: documentUrls.ppt,
+                name: 'presentation.pptx',
+                contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+              });
+            }
+          }
+        });
+      }
+    });
+    
+    console.log(`Debug: Email attachments: ${emailAttachments.length}`);
+    
+    // 检查聊天节点的文件附件
+    const chatAttachments = [];
+    const chatNodeIds = Object.keys(outputSettings).filter(nodeId => outputSettings[nodeId]?.type === 'chat');
+    
+    console.log(`Debug: Found ${chatNodeIds.length} chat nodes: ${JSON.stringify(chatNodeIds)}`);
+    
+    // 直接添加所有生成的文档附件到聊天节点
+    if (documentUrls.document && chatNodeIds.length > 0) {
+      console.log('Debug: Adding document attachment to chat');
+      chatAttachments.push({
+        type: 'document',
+        url: documentUrls.document,
+        name: 'document.docx',
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+    }
+    
+    if (documentUrls.ppt && chatNodeIds.length > 0) {
+      console.log('Debug: Adding presentation attachment to chat');
+      chatAttachments.push({
+        type: 'presentation',
+        url: documentUrls.ppt,
+        name: 'presentation.pptx',
+        contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      });
+    }
+    
+    // 基于连接映射添加文档附件
+    // 检查哪些文档和演示文稿需要附加到聊天
+    docNodes.forEach(docNodeId => {
+      if (sourceToTargetMap[docNodeId]) {
+        console.log(`Debug: Checking document node ${docNodeId} connections for chat`);
+        sourceToTargetMap[docNodeId].forEach(targetId => {
+          if (chatNodeIds.includes(targetId) && documentUrls.document) {
+            console.log(`Debug: Found connection from document node ${docNodeId} to chat node ${targetId}`);
+            // 检查是否已经添加过相同的附件
+            const alreadyAdded = chatAttachments.some(att => att.type === 'document' && att.url === documentUrls.document);
+            if (!alreadyAdded) {
+              chatAttachments.push({
+                type: 'document',
+                url: documentUrls.document,
+                name: 'document.docx',
+                contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              });
+            }
+          }
+        });
+      }
+    });
+    
+    pptNodes.forEach(pptNodeId => {
+      if (sourceToTargetMap[pptNodeId]) {
+        console.log(`Debug: Checking presentation node ${pptNodeId} connections for chat`);
+        sourceToTargetMap[pptNodeId].forEach(targetId => {
+          if (chatNodeIds.includes(targetId) && documentUrls.ppt) {
+            console.log(`Debug: Found connection from presentation node ${pptNodeId} to chat node ${targetId}`);
+            // 检查是否已经添加过相同的附件
+            const alreadyAdded = chatAttachments.some(att => att.type === 'presentation' && att.url === documentUrls.ppt);
+            if (!alreadyAdded) {
+              chatAttachments.push({
+                type: 'presentation',
+                url: documentUrls.ppt,
+                name: 'presentation.pptx',
+                contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+              });
+            }
+          }
+        });
+      }
+    });
+    
+    console.log(`Debug: Chat attachments: ${chatAttachments.length}`);
+    if (chatAttachments.length > 0) {
+      console.log(`Debug: First chat attachment: ${JSON.stringify(chatAttachments[0])}`);
+    }
+    
     // Process email sending
     if (aiResponses.email) {
       try {
@@ -2486,8 +2904,14 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
           template: workflow.email_template || 'Hello,\n\nThis is an automated email:\n\n{{content}}\n\nRegards,\nWorkflow System'
         };
 
-        // Send email with edited content
-        const emailResult = await sendEmail(emailSettings, aiResponses.email, userId);
+        // 添加附件信息
+        const emailContent = {
+          content: aiResponses.email,
+          attachedFiles: emailAttachments
+        };
+
+        // Send email with edited content and attachments
+        const emailResult = await sendEmail(emailSettings, emailContent, userId);
         results.email_result = emailResult;
         
         if (emailResult.success) {
@@ -2500,13 +2924,17 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
       }
     }
     
-    // Process chat message sending
+          // Process chat message sending
     if (aiResponses.chat) {
       try {
+        console.log('Debug [processOutputs]: Processing chat messages');
+        
         // Find any chat output nodes
         const chatNodeIds = Object.keys(outputSettings).filter(
           nodeId => outputSettings[nodeId].type === 'chat'
         );
+        
+        console.log(`Debug [processOutputs]: Found ${chatNodeIds.length} chat nodes`);
         
         // Use the first chat node settings if available
         const chatNode = chatNodeIds.length > 0 ? outputSettings[chatNodeIds[0]] : null;
@@ -2516,23 +2944,79 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
         const messageFormat = chatNode?.messageFormat || 'text';
         const messageTemplate = chatNode?.messageTemplate;
         
+        console.log(`Debug [processOutputs]: Chat session IDs: ${JSON.stringify(chatSessionIds)}`);
+        console.log(`Debug [processOutputs]: Message format: ${messageFormat}`);
+        console.log(`Debug [processOutputs]: Has message template: ${!!messageTemplate}`);
+        
         // Format the message if a template is provided
         let formattedContent = aiResponses.chat.content || aiResponses.chat;
         if (messageTemplate && typeof formattedContent === 'string') {
           formattedContent = messageTemplate.replace('{{content}}', formattedContent);
         }
         
+        console.log(`Debug [processOutputs]: Formatted content type: ${typeof formattedContent}`);
+        console.log(`Debug [processOutputs]: Formatted content length: ${typeof formattedContent === 'string' ? formattedContent.length : 'N/A'}`);
+        console.log(`Debug [processOutputs]: Chat attachments: ${chatAttachments.length}`);
+        
+        if (chatAttachments.length > 0) {
+          console.log(`Debug [processOutputs]: First attachment: ${JSON.stringify(chatAttachments[0])}`);
+        }
+        
+        // 创建包含附件的聊天内容对象
+        const chatContent = {
+          content: formattedContent,
+          attachedFiles: chatAttachments
+        };
+        
+        console.log(`Debug [processOutputs]: Created chat content object with ${chatAttachments.length} attachments`);
+        console.log(`Debug [processOutputs]: Full chat content object: ${JSON.stringify(chatContent)}`);
+        
         if (chatSessionIds.length > 0) {
-          // Send message with edited content
+          console.log(`Debug [processOutputs]: Sending message to ${chatSessionIds.length} chat sessions`);
+          
+          // Force add some attachments if needed for testing
+          if (chatAttachments.length === 0 && (documentUrls.document || documentUrls.ppt)) {
+            console.log(`Debug [processOutputs]: Forcing document attachments for testing`);
+            
+            if (documentUrls.document) {
+              chatContent.attachedFiles = [
+                ...chatContent.attachedFiles,
+                {
+                  type: 'document',
+                  url: documentUrls.document,
+                  name: 'document.docx',
+                  contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                }
+              ];
+            }
+            
+            if (documentUrls.ppt) {
+              chatContent.attachedFiles = [
+                ...chatContent.attachedFiles,
+                {
+                  type: 'presentation',
+                  url: documentUrls.ppt,
+                  name: 'presentation.pptx',
+                  contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                }
+              ];
+            }
+            
+            console.log(`Debug [processOutputs]: Forced ${chatContent.attachedFiles.length} attachments`);
+          }
+          
+          // Send message with edited content and attachments
           const chatResult = await sendChatSessionMessages(
             chatSessionIds, 
-            formattedContent, 
+            chatContent, 
             messageFormat,
             userId
           );
           
+          console.log(`Debug [processOutputs]: Chat message send result: ${JSON.stringify(chatResult)}`);
           results.chat_result = chatResult;
         } else {
+          console.log(`Debug [processOutputs]: No chat sessions specified`);
           results.chat_result = {
             success: false,
             error: 'No chat sessions specified in workflow'
@@ -2540,6 +3024,7 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
         }
       } catch (error) {
         console.error('Error sending chat message:', error);
+        console.error('Chat error details:', error.message, error.stack);
         results.chat_error = error.message;
       }
     }
@@ -2562,6 +3047,7 @@ async function processOutputs(workflowId, aiResponses, userId, outputSettings = 
       results,
       outputFormats,
       apiResponses,
+      fileAttachments, // 新增：返回文件附件信息
       ...documentUrls
     };
   } catch (error) {
