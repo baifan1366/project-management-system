@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserShield, FaUserCog, FaSort, FaCamera } from 'react-icons/fa';
+import { FaUsers, FaBell, FaSearch, FaFilter, FaUserPlus, FaEdit, FaTrash, FaUserShield, FaUserCog, FaSort, FaCamera, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useSelector, useDispatch } from 'react-redux';
 import { checkAdminSession } from '@/lib/redux/features/adminSlice';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
@@ -65,6 +65,9 @@ export default function AdminUserManagement() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   // initialize the page
   useEffect(() => {
     const initDashboard = async () => {
@@ -936,6 +939,15 @@ export default function AdminUserManagement() {
     return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   };
 
+  // Toggle password visibility
+  const togglePasswordVisibility = (field) => {
+    if (field === 'password') {
+      setShowPassword(!showPassword);
+    } else if (field === 'confirmPassword') {
+      setShowConfirmPassword(!showConfirmPassword);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -1667,25 +1679,38 @@ export default function AdminUserManagement() {
                 <label htmlFor='newPassword ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                   New Password
                 </label>
-                <input
-                  type='password'
-                  id='newPassword'
-                  name='newPassword'
-                  className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
-                    placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
-                    ${passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
-                  placeholder='Enter new password'
-                  onChange={(e)=>{
-                    setPassword(e.target.value);
-                    setPasswordError('');
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value && !validatePassword(e.target.value).isValid) {
-                      setPasswordError('Password must meet all requirements.');
-                    }
-                  }}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id='newPassword'
+                    name='newPassword'
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
+                      placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                      focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                      ${passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    placeholder='Enter new password'
+                    onChange={(e)=>{
+                      setPassword(e.target.value);
+                      setPasswordError('');
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value && !validatePassword(e.target.value).isValid) {
+                        setPasswordError('Password must meet all requirements.');
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('password')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    {showPassword ? (
+                      <FaEyeSlash size={16} title="Hide password" />
+                    ) : (
+                      <FaEye size={16} title="Show password" />
+                    )}
+                  </button>
+                </div>
                 {passwordError && (
                   <p className="text-xs text-red-600 mt-1">{passwordError}</p>
                 )}
@@ -1695,25 +1720,38 @@ export default function AdminUserManagement() {
                 <label htmlFor='confirmNewPassword ' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                   Confirm New Password
                 </label>
-                <input 
-                type='password'
-                name='confirmNewPassword'
-                id='confirmNewPassword'
-                onChange={(e)=>{
-                  setConfirmPassword(e.target.value);
-                  setConfirmPasswordError('');
-                }}
-                onBlur={(e) => {
-                  if (e.target.value && e.target.value !== password) {
-                    setConfirmPasswordError('Passwords do not match.');
-                  }
-                }}
-                className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
-                placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
-                focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
-                ${confirmPasswordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
-                placeholder='Enter confirm password'
-                />
+                <div className="relative">
+                  <input 
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    name='confirmNewPassword'
+                    id='confirmNewPassword'
+                    onChange={(e)=>{
+                      setConfirmPassword(e.target.value);
+                      setConfirmPasswordError('');
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value && e.target.value !== password) {
+                        setConfirmPasswordError('Passwords do not match.');
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md text-sm shadow-sm
+                    placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
+                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                    ${confirmPasswordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    placeholder='Enter confirm password'
+                  />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('confirmPassword')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    {showConfirmPassword ? (
+                      <FaEyeSlash size={16} title="Hide password" />
+                    ) : (
+                      <FaEye size={16} title="Show password" />
+                    )}
+                  </button>
+                </div>
                 {confirmPasswordError && (
                   <p className="text-xs text-red-600 mt-1">{confirmPasswordError}</p>
                 )}

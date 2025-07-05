@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { FaUser, FaEnvelope, FaLock, FaTimes, FaPencilAlt, FaCamera } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaLock, FaTimes, FaPencilAlt, FaCamera, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import bcrypt from 'bcryptjs';
@@ -29,6 +29,9 @@ const AdminProfileModal = ({ isOpen, onClose, adminData = {}, onProfileUpdate })
   const [currentPasswordVerified, setCurrentPasswordVerified] = useState(false);
   const [currentPasswordError, setCurrentPasswordError] = useState('');
   const [currentPasswordChecking, setCurrentPasswordChecking] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Update form data when adminData changes or modal opens
   useEffect(() => {
@@ -51,6 +54,9 @@ const AdminProfileModal = ({ isOpen, onClose, adminData = {}, onProfileUpdate })
       setCurrentPasswordVerified(false);
       setCurrentPasswordError('');
       setCurrentPasswordChecking(false);
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
       setFormData({
         full_name: '',
         email: '',
@@ -79,6 +85,22 @@ const AdminProfileModal = ({ isOpen, onClose, adminData = {}, onProfileUpdate })
       ...prev,
       [name]: value
     }));
+  };
+  
+  const togglePasswordVisibility = (passwordField) => {
+    switch (passwordField) {
+      case 'current_password':
+        setShowCurrentPassword(!showCurrentPassword);
+        break;
+      case 'new_password':
+        setShowNewPassword(!showNewPassword);
+        break;
+      case 'confirm_password':
+        setShowConfirmPassword(!showConfirmPassword);
+        break;
+      default:
+        break;
+    }
   };
   
   const handleAvatarClick = () => {
@@ -450,19 +472,32 @@ const AdminProfileModal = ({ isOpen, onClose, adminData = {}, onProfileUpdate })
                 {editField === 'password' ? (
                   <div className="mt-2 space-y-2">
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="password"
-                        name="current_password"
-                        placeholder="Current Password"
-                        value={formData.current_password}
-                        onChange={e => {
-                          handleChange(e);
-                          setCurrentPasswordVerified(false);
-                          setCurrentPasswordError('');
-                        }}
-                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
-                        disabled={currentPasswordVerified}
-                      />
+                      <div className="relative w-full">
+                        <input
+                          type={showCurrentPassword ? "text" : "password"}
+                          name="current_password"
+                          placeholder="Current Password"
+                          value={formData.current_password}
+                          onChange={e => {
+                            handleChange(e);
+                            setCurrentPasswordVerified(false);
+                            setCurrentPasswordError('');
+                          }}
+                          className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
+                          disabled={currentPasswordVerified}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => togglePasswordVisibility('current_password')}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                          {showCurrentPassword ? (
+                            <FaEyeSlash size={14} title="Hide password" />
+                          ) : (
+                            <FaEye size={14} title="Show password" />
+                          )}
+                        </button>
+                      </div>
                       <button
                         type="button"
                         disabled={currentPasswordVerified || currentPasswordChecking || !formData.current_password}
@@ -503,22 +538,48 @@ const AdminProfileModal = ({ isOpen, onClose, adminData = {}, onProfileUpdate })
                     {currentPasswordError && <p className="text-xs text-red-600 mt-1">{currentPasswordError}</p>}
                     {currentPasswordVerified && (
                       <>
-                        <input
-                          type="password"
-                          name="new_password"
-                          placeholder="New Password"
-                          value={formData.new_password}
-                          onChange={handleChange}
-                          className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
-                        />
-                        <input
-                          type="password"
-                          name="confirm_password"
-                          placeholder="Confirm New Password"
-                          value={formData.confirm_password}
-                          onChange={handleChange}
-                          className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showNewPassword ? "text" : "password"}
+                            name="new_password"
+                            placeholder="New Password"
+                            value={formData.new_password}
+                            onChange={handleChange}
+                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility('new_password')}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          >
+                            {showNewPassword ? (
+                              <FaEyeSlash size={14} title="Hide password" />
+                            ) : (
+                              <FaEye size={14} title="Show password" />
+                            )}
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            name="confirm_password"
+                            placeholder="Confirm New Password"
+                            value={formData.confirm_password}
+                            onChange={handleChange}
+                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility('confirm_password')}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          >
+                            {showConfirmPassword ? (
+                              <FaEyeSlash size={14} title="Hide password" />
+                            ) : (
+                              <FaEye size={14} title="Show password" />
+                            )}
+                          </button>
+                        </div>
                         <button
                           type="button"
                           onClick={handleSubmit}
