@@ -73,6 +73,11 @@ const validateName = (name) => {
     if (!/^[A-Za-z\s]+$/.test(name)) return { valid: false, message: 'Only letters and spaces allowed.' };
     return { valid: true, message: '' };
 };
+const validateCompanyName = (name) => {
+    if (!name) return { valid: false, message: 'Company name is required.' };
+    if (name.length > 50) return { valid: false, message: 'Company name must be 50 characters or less.' };
+    return { valid: true, message: '' };
+};
 const validateMessage = (msg) => {
     if (!msg || msg.length < 20) return { valid: false, message: 'Message must be at least 20 characters.' };
     return { valid: true, message: '' };
@@ -119,6 +124,7 @@ export default function ContactUs(){
     const [messageError, setMessageError] = useState('');
     const [firstNameError, setFirstNameError] = useState('');
     const [lastNameError, setLastNameError] = useState('');
+    const [companyNameError, setCompanyNameError] = useState('');
     const [detailsError, setDetailsError] = useState('');
 
     // Effect to handle form type changes while preserving email
@@ -254,6 +260,8 @@ export default function ContactUs(){
             if (!ln.valid) { setLastNameError(ln.message); hasError = true; } else { setLastNameError(''); }
             const emailV = validateEmail(email);
             if (!emailV.valid) { setEmailError(emailV.message); hasError = true; } else { setEmailError(''); }
+            const cn = validateCompanyName(companyName);
+            if (!cn.valid) { setCompanyNameError(cn.message); hasError = true; } else { setCompanyNameError(''); }
         }
         // Refund
         if (selectedOption === 'refund') {
@@ -434,12 +442,12 @@ export default function ContactUs(){
                 <h1 className="text-4xl font-bold text-center mb-8">Contact Us</h1>
                 
                 <p className="text-center mb-2">
-                For sales and general inquiries, message us below or explore our{' '}
-                <Link href="/help" className="text-pink-500 hover:underline">help center</Link>.
+                For general and technical inquiries, message us below through
+                <span className="text-pink-500 hover:underline cursor-pointer font-bold" onClick={() => setSelectedOption('general')}> General Form</span>
                 </p>
                 <p className="text-center mb-8">
-                For larger organizations with specialized needs, please{' '}
-                <Link href="/demo" className="text-pink-500 hover:underline">request a demo</Link>.
+                For larger organizations with specialized needs, please message us through
+                <span className="text-pink-500 hover:underline cursor-pointer font-bold" onClick={() => setSelectedOption('enterprise')}> Enterprise Form</span>
                 </p>
         
                 {/* Success message */}
@@ -570,9 +578,17 @@ export default function ContactUs(){
                             type="text"
                             id="companyName"
                             value={companyName}
-                            onChange={(e) => setCompanyName(e.target.value)}
-                            className="w-full p-3 bg-gray-900 border border-gray-700 rounded"
+                            onChange={(e) => {
+                                setCompanyName(e.target.value);
+                                setCompanyNameError('');
+                            }}
+                            onBlur={(e) => {
+                                const v = validateCompanyName(e.target.value);
+                                setCompanyNameError(v.valid ? '' : v.message);
+                            }}
+                            className={`w-full p-3 bg-gray-900 border ${companyNameError ? 'border-red-500' : 'border-gray-700'} rounded`}
                             />
+                            {companyNameError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{companyNameError}</p>}
                     </div>
 
                     {/*what is your role?*/}

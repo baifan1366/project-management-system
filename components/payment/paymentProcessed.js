@@ -24,14 +24,14 @@ export default function ProcessedPaymentModal({ countdown }) {
           </p>
           
           <p className="mt-2 text-gray-600">
-            Redirecting to dashboard in <span className="font-bold text-indigo-600">{countdown}</span> seconds...
+            Redirecting to Project in <span className="font-bold text-indigo-600">{countdown}</span> seconds...
           </p>
           
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/projects')}
             className="mt-6 w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
           >
-            Go to Dashboard Now
+            Go to Project Now
           </button>
         </div>
       </div>
