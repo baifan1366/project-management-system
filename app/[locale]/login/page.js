@@ -412,7 +412,6 @@ export default function LoginPage() {
                           name="email"
                           type="email"
                           autoComplete="email"
-                          required
                           value={formData.email}
                           onChange={handleChange}
                           className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
@@ -438,7 +437,6 @@ export default function LoginPage() {
                             name="password"
                             type={showPassword ? "text" : "password"}
                             autoComplete="current-password"
-                            required
                             value={formData.password}
                             onChange={handleChange}
                             onBlur={handlePasswordBlur}
@@ -483,7 +481,7 @@ export default function LoginPage() {
                         <button 
                           type="submit" 
                           className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50" 
-                          disabled={loading}
+                          disabled={loading || !formData.email.trim() || !formData.password.trim()}
                         >
                           {loading ? t('login.loading') : t('login.button')}
                         </button>

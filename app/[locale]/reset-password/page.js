@@ -390,7 +390,6 @@ export default function ResetPasswordPage() {
                 value={formData.password}
                 onChange={handleChange}
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 pr-20"
-                required
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-2">
                 <button
@@ -497,7 +496,6 @@ export default function ResetPasswordPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 pr-12"
-                required
               />
               <button
                 type="button"
@@ -520,7 +518,7 @@ export default function ResetPasswordPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !formData.password.trim() || !formData.confirmPassword.trim()}
               className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 dark:bg-pink-500 dark:hover:bg-pink-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
             >
               {loading ? (
