@@ -990,7 +990,7 @@ export default function AdminUserManagement() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((row) => (
-                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                    <tr key={row} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse mr-3"></div>
@@ -1137,7 +1137,7 @@ export default function AdminUserManagement() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {currentAdmins.length > 0 ? (
                       currentAdmins.map((admin) => (
-                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
+                        <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => openAdminDetailsModal(admin)}>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="w-8 h-8 rounded-full flex items-center justify-center mr-3 overflow-hidden">
@@ -2045,7 +2045,7 @@ export default function AdminUserManagement() {
                             />
                             <label 
                               htmlFor={`perm-${permission.id}`} 
-                              className={`ml-2 text-sm ${
+                              className={`ml-2 text-sm group relative ${
                                 ['view_admins', 'edit_admins', 'add_admins', 'delete_admins'].includes(permission.name)
                                 ? 'font-medium text-indigo-700 dark:text-indigo-300'
                                 : 'text-gray-700 dark:text-gray-300'
@@ -2056,6 +2056,14 @@ export default function AdminUserManagement() {
                                 <span className="ml-1 text-xs text-indigo-500 dark:text-indigo-400">
                                   (affects role)
                                 </span>
+                              )}
+                              
+                              {/* Tooltip that appears on hover */}
+                              {permission.description && (
+                                <div className="absolute left-0 bottom-full mb-2 w-64 bg-black text-white text-xs rounded p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+                                  {permission.description}
+                                  <div className="absolute left-4 bottom-[-6px] w-3 h-3 bg-black transform rotate-45"></div>
+                                </div>
                               )}
                             </label>
                           </div>

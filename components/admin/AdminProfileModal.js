@@ -14,7 +14,7 @@ import bcrypt from 'bcryptjs';
  * @param {Object} props.adminData - The admin user data to display
  * @param {Function} props.onProfileUpdate - Function to call when profile is updated
  */
-const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
+const AdminProfileModal = ({ isOpen, onClose, adminData = {}, onProfileUpdate }) => {
   const [editField, setEditField] = useState(null);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -30,9 +30,9 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
   const [currentPasswordError, setCurrentPasswordError] = useState('');
   const [currentPasswordChecking, setCurrentPasswordChecking] = useState(false);
   
-  // Update form data when adminData changes
+  // Update form data when adminData changes or modal opens
   useEffect(() => {
-    if (adminData) {
+    if (adminData && isOpen) {
       setFormData({
         full_name: adminData.name || adminData.full_name || '',
         email: adminData.email || '',
@@ -42,23 +42,36 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
         confirm_password: ''
       });
     }
-  }, [adminData]);
+  }, [adminData, isOpen]);
   
   useEffect(() => {
     if (!isOpen) {
+      // Reset all form state when modal closes
+      setEditField(null);
       setCurrentPasswordVerified(false);
       setCurrentPasswordError('');
       setCurrentPasswordChecking(false);
-      setFormData(prev => ({
-        ...prev,
+      setFormData({
+        full_name: '',
+        email: '',
+        username: '',
         current_password: '',
         new_password: '',
         confirm_password: ''
-      }));
+      });
     }
   }, [isOpen]);
   
+  // Don't render the modal if it's not open
   if (!isOpen) return null;
+  
+  // Don't render if adminData is missing critical information
+  if (!adminData || (!adminData.id && isOpen)) {
+    console.error("AdminProfileModal: Missing required adminData.id");
+    toast.error("Could not load admin profile data");
+    onClose();
+    return null;
+  }
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -112,6 +125,12 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
       return;
     }
     
+    // Ensure we have a valid adminData.id
+    if (!adminData?.id) {
+      toast.error('Cannot upload avatar: missing admin ID');
+      return;
+    }
+    
     toast.promise(
       async () => {
         setUploading(true);
@@ -158,7 +177,8 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
           
           // Update local state and parent component
           if (onProfileUpdate) {
-            onProfileUpdate({ ...adminData, avatar_url: publicUrl });
+            const updatedAdminData = { ...adminData, avatar_url: publicUrl };
+            onProfileUpdate(updatedAdminData);
           }
           
           return publicUrl;
@@ -176,6 +196,13 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
   
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Ensure we have a valid adminData.id
+    if (!adminData?.id) {
+      toast.error('Cannot update profile: missing admin ID');
+      return;
+    }
+    
     // Validate passwords match if changing password
     if (formData.new_password && formData.new_password !== formData.confirm_password) {
       toast.error('New passwords do not match');
@@ -214,10 +241,22 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
           .update(updateData)
           .eq('id', adminData.id);
         if (error) throw new Error(getErrorMessage(error));
-        // Update parent component
+        
+        // Create updated admin data object with the new values
+        const updatedAdminData = { 
+          ...adminData, 
+          full_name: formData.full_name,
+          name: formData.full_name, // Update both name and full_name for consistency
+          email: formData.email,
+          username: formData.username
+        };
+        
+        // Update parent component and Redux state via callback
+        // This is crucial to keep the Redux store in sync and prevent logout issues
         if (onProfileUpdate) {
-          onProfileUpdate({ ...adminData, ...updateData });
+          onProfileUpdate(updatedAdminData);
         }
+        
         setEditField(null);
         setCurrentPasswordVerified(false);
         setCurrentPasswordError('');
@@ -243,7 +282,7 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
   };
   
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-[9999] overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 transition-opacity" onClick={onClose}>
           <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
@@ -281,7 +320,7 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
                     />
                   ) : (
                     <div className="w-16 h-16 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xl font-semibold">
-                      {adminData?.name?.charAt(0).toUpperCase() || adminData?.username?.charAt(0).toUpperCase() || 'A'}
+                      {(adminData?.name || adminData?.full_name || adminData?.username || '')?.charAt(0)?.toUpperCase() || 'A'}
                     </div>
                   )}
                   
@@ -511,18 +550,7 @@ const AdminProfileModal = ({ isOpen, onClose, adminData, onProfileUpdate }) => {
             )}
             <button
               type="button"
-              onClick={() => {
-                onClose();
-                setCurrentPasswordVerified(false);
-                setCurrentPasswordError('');
-                setCurrentPasswordChecking(false);
-                setFormData(prev => ({
-                  ...prev,
-                  current_password: '',
-                  new_password: '',
-                  confirm_password: ''
-                }));
-              }}
+              onClick={onClose}
               className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-1 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none"
             >
               Close
