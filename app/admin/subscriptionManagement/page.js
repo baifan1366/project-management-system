@@ -119,6 +119,36 @@ export default function AdminSubscriptions() {
     
     initAdminSubscriptions();
   }, [dispatch, router]);
+  
+  // Check URL query parameters to see if we need to open any modals
+  useEffect(() => {
+    // Get the URL search parameters
+    const searchParams = new URLSearchParams(window.location.search);
+    const action = searchParams.get('action');
+    const tab = searchParams.get('tab');
+    
+    // If tab parameter exists, switch to that tab
+    if (tab === 'promoCodes') {
+      setActiveTab('promoCodes');
+    }
+    
+    // If action is 'create_plan' and user has permission, open the add plan modal
+    if (action === 'create_plan' && hasPermission('add_sub_plans')) {
+      openModal({type: 'add'});
+    }
+    
+    // If action is 'create_code' and user has permission, open the add promo code modal
+    if (action === 'create_code' && hasPermission('add_promo_codes')) {
+      setActiveTab('promoCodes');
+      openModal({type: 'add'});
+    }
+    
+    // Clean up the URL by removing the query parameters
+    if (action || tab) {
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [loading]);
 
   // Add function to verify permission access TODO: 模块化这个代码
   const hasPermission = (permissionName) => {
@@ -2067,7 +2097,7 @@ export default function AdminSubscriptions() {
                   >
                     <option value="all">All Status</option>
                     <option value="COMPLETED">Completed</option>
-                    <option value="PENDING">Pending</option>
+                    <option value="REFUNDED">Refunded</option>
                     <option value="FAILED">Failed</option>
                   </select>
                   <input
@@ -2158,8 +2188,8 @@ export default function AdminSubscriptions() {
                                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                     ${payment.status === 'COMPLETED' 
                                       ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' 
-                                      : payment.status === 'PENDING'
-                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
+                                      : payment.status === 'REFUNDED'
+                                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
                                       : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
                                     }`}
                                   >

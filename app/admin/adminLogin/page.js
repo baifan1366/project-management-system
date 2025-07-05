@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginAdmin, checkAdminSession, clearError } from '@/lib/redux/features/adminSlice';
 import LogoImage from '../../../public/logo.png';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function AdminLoginPage() {
     email: '',
     password: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   // Check if admin is already logged in
   //can use in other pages
@@ -49,6 +51,10 @@ export default function AdminLoginPage() {
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   const handleSubmit = async (e) => {
@@ -108,9 +114,9 @@ export default function AdminLoginPage() {
               />
             </div>
 
-            <div>
+            <div className="relative">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 name="password"
                 placeholder="Password"
                 value={formData.password}
@@ -118,6 +124,17 @@ export default function AdminLoginPage() {
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 required
               />
+              <button
+                type="button"
+                onClick={togglePasswordVisibility}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                {showPassword ? (
+                  <FaEyeSlash size={18} title="Hide password" />
+                ) : (
+                  <FaEye size={18} title="Show password" />
+                )}
+              </button>
             </div>
 
             <div className="flex items-center justify-between">

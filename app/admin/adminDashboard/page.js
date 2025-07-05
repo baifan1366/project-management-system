@@ -8,6 +8,7 @@ import { FaUsers, FaMoneyBillWave, FaTicketAlt, FaCog, FaSignOutAlt, FaChartLine
 import { useDispatch, useSelector } from 'react-redux';
 import { Skeleton } from '@/components/ui/skeleton';
 import RecentActivityModal from '@/components/admin/RecentActivityModal';
+import { toast } from 'sonner';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -149,14 +150,7 @@ export default function AdminDashboard() {
       minute: '2-digit'
     }).format(date);
   };
-  
-  // Format currency for display
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
+
   
   if (loading) {
     return (
@@ -284,7 +278,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Revenue (This Month)</p>
-                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{formatCurrency(stats.revenueThisMonth)}</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">RM {stats.revenueThisMonth}</p>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-500 dark:text-purple-300">
                     <FaChartLine />
@@ -378,26 +372,44 @@ export default function AdminDashboard() {
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Quick Actions</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link 
-                href={`/admin/adminManagement`}
+              <button 
+                onClick={() => {
+                  if (hasPermission('add_users')) {
+                    router.push('/admin/userManagement?action=create');
+                  } else {
+                    toast.error("You don't have permission to create users");
+                  }
+                }}
                 className="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="text-gray-700 dark:text-gray-300">Create New User</span>
-              </Link>
+              </button>
               
-              <Link 
-                href={`/admin/subscriptionManagement`}
+              <button 
+                onClick={() => {
+                  if (hasPermission('add_sub_plans')) {
+                    router.push('/admin/subscriptionManagement?action=create_plan');
+                  } else {
+                    toast.error("You don't have permission to create subscription plans");
+                  }
+                }}
                 className="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="text-gray-700 dark:text-gray-300">Add Subscription Plan</span>
-              </Link>
+              </button>
               
-              <Link 
-                href={`/admin/promoCodeManagement`}
+              <button 
+                onClick={() => {
+                  if (hasPermission('add_promo_codes')) {
+                    router.push('/admin/subscriptionManagement?tab=promoCodes&action=create_code');
+                  } else {
+                    toast.error("You don't have permission to create promo codes");
+                  }
+                }}
                 className="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="text-gray-700 dark:text-gray-300">Create Promo Code</span>
-              </Link>
+              </button>
             </div>
           </div>
 
