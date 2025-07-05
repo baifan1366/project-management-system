@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
  */
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     

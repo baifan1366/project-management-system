@@ -303,6 +303,32 @@ export default function PaymentSuccess() {
         ? 'COMPLETED'
         : (paymentData?.status === 'processing' ? 'PENDING' : 'FAILED');
 
+      // Get the plan ID from metadata
+      const planId = metadata?.planId;
+      
+      // Try to fetch the plan name from the database if it's not in the metadata
+      let planName = metadata?.planName;
+      
+      if (planId && !planName) {
+        try {
+          // Fetch plan details from the database
+          const { data: planData, error: planError } = await supabase
+            .from('subscription_plan')
+            .select('name')
+            .eq('id', planId)
+            .single();
+          
+          if (!planError && planData) {
+            planName = planData.name;
+            console.log('Successfully fetched plan name from database:', planName);
+          } else {
+            console.error('Error fetching plan name:', planError);
+          }
+        } catch (err) {
+          console.error('Error fetching plan details:', err);
+        }
+      }
+
       const paymentRecord = {
         user_id: metadata?.userId,
         order_id: orderId,
@@ -315,8 +341,8 @@ export default function PaymentSuccess() {
         discount_amount: metadata?.discount ? parseFloat(metadata.discount) : 0,
         applied_promo_code: metadata?.promoCode || null,
         metadata: {
-          planId: metadata?.planId,
-          planName: metadata?.planName,
+          planId: planId,
+          planName: planName || 'Team Sync Plan', // Use the fetched plan name or fallback
         },
         is_processed: false, 
       };
@@ -420,7 +446,8 @@ export default function PaymentSuccess() {
         dispatch(setPaymentMetadata({
             ...sessionResult.metadata,
             orderId: sessionResult.metadata.orderId,
-            amount: sessionResult.amount_total
+            amount: sessionResult.amount_total,
+            planName: sessionResult.metadata.planName
         }));
       }
 
@@ -452,7 +479,7 @@ export default function PaymentSuccess() {
           if (email) {
             await sendEmail(email, {
               orderId: paymentRecord.order_id,
-              planName: paymentRecord.metadata.planName,
+              planName: paymentRecord.metadata.planName || 'Team Sync Plan',
               amount: paymentRecord.amount,
               userId: paymentRecord.user_id
             });
@@ -489,7 +516,8 @@ export default function PaymentSuccess() {
         dispatch(setPaymentMetadata({
           ...result.metadata,
           orderId: result.metadata.orderId,
-          amount: result.amount
+          amount: result.amount,
+          planName: result.metadata.planName
         }));
       }
 
@@ -512,7 +540,7 @@ export default function PaymentSuccess() {
           await sendEmail(email, {
             id: result.metadata.orderId,
             orderId: result.metadata.orderId,
-            planName: result.metadata.planName,
+            planName: result.metadata.planName || paymentRecord.metadata?.planName || 'Team Sync Plan',
             amount: result.amount / 100,
             userId: result.metadata.userId
           });
@@ -642,7 +670,10 @@ export default function PaymentSuccess() {
           <>
             {paymentDetails || metadata ? (
               <PaymentSuccessModal 
-                metadata={metadata}
+                metadata={{
+                  ...metadata,
+                  planName: metadata?.planName || paymentDetails?.metadata?.planName || sessionDetails?.metadata?.planName || 'Team Sync Plan'
+                }}
                 userEmail={userEmail}
                 formatAmount={formatAmount}
                 formatOrderId={formatOrderId}

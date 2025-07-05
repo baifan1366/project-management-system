@@ -107,7 +107,13 @@ export default function CalendarPage() {
         // 使用google_provider_id检查是否连接了Google
         if (currentUser?.google_provider_id) {
           // 从用户元数据中获取 tokens
-          const response = await fetch('/api/users/tokens?provider=google');
+          const response = await fetch('/api/users/tokens?provider=google', {
+            cache: 'no-store', // Add no-store to prevent caching
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          });
           if (!response.ok) {
             console.error('获取Google令牌失败');
             setIsGoogleConnected(false);
@@ -128,6 +134,8 @@ export default function CalendarPage() {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
+                  'Pragma': 'no-cache'
                 },
                 body: JSON.stringify({
                   access_token: accessToken,
@@ -170,7 +178,7 @@ export default function CalendarPage() {
       setIsGoogleConnected(false);
       setIsLoading(false);
     }
-  }, [currentUser, userLoading, t, userLoadTimeout]);
+  }, [currentUser, userLoading, t, userLoadTimeout, isLoadingGoogle, isLoadingPersonal]);
 
   // 获取任务的标题
   const getTaskTitle = React.useCallback((task) => {
@@ -364,7 +372,13 @@ export default function CalendarPage() {
         const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
         
         // 使用我们的自定义API端点获取Google令牌，而不是Supabase session
-        const tokensResponse = await fetch('/api/users/tokens?provider=google');
+        const tokensResponse = await fetch('/api/users/tokens?provider=google', {
+          cache: 'no-store', // Add no-store to prevent caching
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        });
         if (!tokensResponse.ok) {
           console.error('获取Google令牌失败:', tokensResponse.status);
           return;
@@ -383,7 +397,37 @@ export default function CalendarPage() {
         const response = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${accessToken || ''}&refresh_token=${refreshToken || ''}&user_id=${currentUser?.id || ''}`);
         
         if (response.status === 401) {
-          console.error('Google授权过期:', response.status);
+          console.log('尝试刷新令牌并重新获取日历事件');
+          
+          // Attempt to refresh token explicitly
+          const refreshResponse = await fetch('/api/refresh-google-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              refresh_token: refreshToken,
+              user_id: currentUser?.id 
+            }),
+          });
+          
+          if (refreshResponse.ok) {
+            // Token refreshed successfully, retry fetching events
+            const refreshData = await refreshResponse.json();
+            const newAccessToken = refreshData.access_token;
+            
+            // Retry with new token
+            const retryResponse = await fetch(`/api/google-calendar?start=${startDate}&end=${endDate}&access_token=${newAccessToken}&refresh_token=${refreshToken}&user_id=${currentUser?.id || ''}`);
+            
+            if (retryResponse.ok) {
+              const data = await retryResponse.json();
+              setGoogleEvents(data.items || []);
+              return;
+            }
+          }
+          
+          // If we get here, refresh failed or retry failed
+          console.error('Google授权过期且刷新失败:', response.status);
           toast.error(t('googleAuthExpired'), {
             action: {
               label: t('goToSettings'),
@@ -473,8 +517,15 @@ export default function CalendarPage() {
     // 显示正在连接的通知
     const toastId = toast.loading(t('connectingGoogle') || 'Connecting to Google...');
     
+    // Specify that this connection is for the calendar page
+    const currentPath = window.location.pathname;
+    const searchParams = new URLSearchParams();
+    searchParams.append('redirectTo', currentPath);
+    searchParams.append('requestCalendarAccess', 'true');
+    searchParams.append('from', 'calendar');
+    
     // 在一个步骤中请求所有权限，包括Google日历权限
-    window.location.href = `/api/auth/google?redirectTo=${encodeURIComponent(window.location.pathname)}&requestCalendarAccess=true`;
+    window.location.href = `/api/auth/google?${searchParams.toString()}`;
     
     // OAuth流程会自动重定向，不需要处理成功情况
   } catch (err) {

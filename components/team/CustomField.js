@@ -276,20 +276,34 @@ export default function CustomField({ isDialogOpen, setIsDialogOpen, teamId }) {
       isAvailable = true;
     }
 
+    // 根据计划类型和字段类型决定hover的背景色
+    let hoverBgClass = '';
+    if (isAvailable) {
+      if (field.type === 'OVERVIEW' || field.type === 'LIST' || field.type === 'CALENDAR' || field.type === 'POSTS' || field.type === 'FILES') {
+        hoverBgClass = 'hover:bg-gray-50 dark:hover:bg-gray-800';
+      } else if (field.type === 'TIMELINE' || field.type === 'NOTE' || field.type === 'KANBAN') {
+        hoverBgClass = 'hover:bg-blue-50 dark:hover:bg-blue-900';
+      } else if (field.type === 'WORKFLOW' || field.type === 'GANTT' || field.type === 'AGILE') {
+        hoverBgClass = 'hover:bg-purple-50 dark:hover:bg-purple-900';
+      } else {
+        hoverBgClass = 'hover:bg-accent dark:hover:bg-accent';
+      }
+    }
+
     return (
       <div 
         key={field.id || field.type}
-        className={`flex items-start gap-3 p-3 border rounded-md ${isAvailable ? 'cursor-pointer hover:bg-accent' : 'opacity-60 cursor-not-allowed'}`}
+        className={`flex items-start gap-3 p-3 border rounded-md ${isAvailable ? `cursor-pointer ${hoverBgClass}` : 'opacity-60 cursor-not-allowed'}`}
         onClick={() => isAvailable && handleFieldClick(field)}
         data-available={isAvailable ? 'true' : 'false'} // 用于排序
       >
-        <div className={`flex-shrink-0 w-8 h-8 rounded flex items-center justify-center ${isAvailable ? 'bg-blue-100' : 'bg-gray-100'}`}>
-          <IconComponent className={`h-5 w-5 ${isAvailable ? 'text-blue-600' : 'text-gray-400'}`} />
+        <div className={`flex-shrink-0 w-8 h-8 rounded flex items-center justify-center ${isAvailable ? 'bg-blue-100 dark:bg-blue-800' : 'bg-gray-100 dark:bg-gray-700'}`}>
+          <IconComponent className={`h-5 w-5 ${isAvailable ? 'text-blue-600 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'}`} />
         </div>
         <div>
           <div className="font-medium">{field.name}</div>
           <div className="text-xs text-muted-foreground">{field.description || t(`${field.name.toLowerCase()}_description`)}</div>
-          {!isAvailable && <div className="text-xs text-amber-500 mt-1">{t('upgrade_plan_required')}</div>}
+          {!isAvailable && <div className="text-xs text-amber-500 dark:text-amber-400 mt-1">{t('upgrade_plan_required')}</div>}
         </div>
       </div>
     );

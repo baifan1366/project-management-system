@@ -703,11 +703,6 @@ export default function LandingPage() {
               
               <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center footer-item">
                 <p className="text-gray-400 text-sm mb-4 md:mb-0">© 2025 Team Sync Project Management System. All rights reserved.</p>
-                <div className="flex space-x-6">
-                  <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Privacy Policy</a>
-                  <Link href={`/${locale}/terms-and-conditions`} className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Terms of Service</Link>
-                  <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors text-sm">Cookie Policy</a>
-                </div>
               </div>
             </div>
           </footer>

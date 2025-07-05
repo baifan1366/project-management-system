@@ -287,7 +287,6 @@ export default function NewTaskDialog({ open, onOpenChange, onTaskCreated, userI
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={t_tasks('newTask.titlePlaceholder')}
-                required
                 maxLength={50}
               />
             </div>

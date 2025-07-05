@@ -921,6 +921,9 @@ export default function ChatPage() {
         setReplyToMessage(null);
         setMentions([]);
         
+        // Refresh sessions to update last message
+        fetchChatSessions();
+        
         // Refresh other participant's status
         if (otherParticipantId) {
           getUserStatus(otherParticipantId);
@@ -929,7 +932,7 @@ export default function ChatPage() {
         console.error(t('errors.sendMessageFailed'), error);
       }
     }
-  }, [message, currentSession, mentions, replyToMessage, sendMessage, extractMentionsFromMessage, otherParticipantId, getUserStatus, t, isMentionOpen]);
+  }, [message, currentSession, mentions, replyToMessage, sendMessage, extractMentionsFromMessage, otherParticipantId, getUserStatus, t, isMentionOpen, fetchChatSessions]);
 
   // Create a debounced version of handleSendMessage
   const debouncedSendMessage = useCallback(
@@ -1031,6 +1034,9 @@ export default function ChatPage() {
       toast.success(t('attachmentAdded'));
       setMessage('');
       
+      // Refresh chat sessions to update last message in sidebar
+      fetchChatSessions();
+      
       // Refresh other participant's status
       if (otherParticipantId) {
         getUserStatus(otherParticipantId);
@@ -1067,7 +1073,7 @@ export default function ChatPage() {
     } finally {
       setIsPending(false);
     }
-  }, [currentUser, currentSession, t, supabase, otherParticipantId, getUserStatus, fetchMessages, isPending]);
+  }, [currentUser, currentSession, t, supabase, otherParticipantId, getUserStatus, fetchMessages, isPending, fetchChatSessions]);
 
   // Optimize handleInputChange with debouncing
   const debouncedPositionCalculation = useCallback(
