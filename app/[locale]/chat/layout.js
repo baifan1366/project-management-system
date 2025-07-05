@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Search, MessageSquare, X, MoreVertical, Trash2, BellOff, BellRing, Users, User, ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/contexts/ChatContext';
@@ -30,6 +30,11 @@ function ChatLayout({ children }) {
   const { formatLastSeen } = useLastSeen(); // 使用上次在线时间钩子
   const { formatChatTime } = useChatTime(); // 使用聊天时间钩子
   
+  // Add sidebar resize state
+  const [sidebarWidth, setSidebarWidth] = useState(320); // 20rem = 320px
+  const [isDragging, setIsDragging] = useState(false);
+  const sidebarRef = useRef(null);
+  
   // Add useSearchParams hook to check for mode parameter
   const searchParams = useSearchParams();
   
@@ -38,6 +43,27 @@ function ChatLayout({ children }) {
     if (!text) return '';
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
+
+  // Calculate dynamic truncation lengths based on sidebar width
+  const getDynamicTruncation = useCallback(() => {
+    // For session name in chat list items
+    const chatNameLength = Math.floor(sidebarWidth / 14); // roughly 10px per character
+    
+    // For hidden sessions (which have more space)
+    const hiddenChatNameLength = Math.floor(sidebarWidth / 8);
+    
+    // For last message preview
+    const messagePreviewLength = Math.floor(sidebarWidth / 6.5);
+    
+    return {
+      chatNameLength,
+      hiddenChatNameLength,
+      messagePreviewLength
+    };
+  }, [sidebarWidth]);
+  
+  // Get the dynamic truncation values
+  const { chatNameLength, hiddenChatNameLength, messagePreviewLength } = getDynamicTruncation();
 
   const { 
     currentUser, 
@@ -804,10 +830,73 @@ function ChatLayout({ children }) {
     };
   }, [matchingMessages, currentMessageIndex, selectedSearchSessionId, currentSession]);
 
+  // Handle resize dragging
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault();
+    setIsDragging(true);
+    document.body.style.cursor = 'ew-resize';
+  }, []);
+
+  useEffect(() => {
+    const handleResize = (e) => {
+      if (!isDragging) return;
+      
+      // Calculate new width based on mouse position
+      const newWidth = e.clientX;
+      
+      // Limit width between 240px and 480px
+      const limitedWidth = Math.max(240, Math.min(480, newWidth));
+      setSidebarWidth(limitedWidth);
+    };
+
+    const handleResizeEnd = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        document.body.style.cursor = '';
+        
+        // Save the sidebar width preference to localStorage
+        try {
+          localStorage.setItem('chat_sidebar_width', sidebarWidth.toString());
+        } catch (error) {
+          console.error('Failed to save sidebar width preference:', error);
+        }
+      }
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleResize);
+      window.addEventListener('mouseup', handleResizeEnd);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleResize);
+      window.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, [isDragging, sidebarWidth]);
+
+  // Load saved sidebar width on component mount
+  useEffect(() => {
+    try {
+      const savedWidth = localStorage.getItem('chat_sidebar_width');
+      if (savedWidth) {
+        const width = parseInt(savedWidth);
+        if (!isNaN(width) && width >= 280 && width <= 480) {
+          setSidebarWidth(width);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load sidebar width preference:', error);
+    }
+  }, []);
+
   return (
     <div className="flex h-screen">
       {/* 聊天列表侧边栏 */}
-      <div className="w-80 border-r flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div 
+        ref={sidebarRef}
+        className="border-r flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+        style={{ width: `${sidebarWidth}px` }}
+      >
         <div className="p-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t('title')}</h2>
           <button
@@ -1029,7 +1118,7 @@ function ChatLayout({ children }) {
                         <div className="flex items-baseline justify-between">
                           <div className="flex items-center gap-1">
                             <h3 className="font-medium truncate text-sm">
-                              {truncateText(sessionName, 25)}
+                              {truncateText(sessionName, hiddenChatNameLength)}
                             </h3>
                             {/* Display external badge for private chats */}
                             {(() => {
@@ -1049,7 +1138,7 @@ function ChatLayout({ children }) {
                           </button>
                         </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {truncateText(session.lastMessage?.content || t('noRecentMessages'), 50)}
+                        {truncateText(session.lastMessage?.content || t('noRecentMessages'), messagePreviewLength)}
                       </p>
                     </div>
                   </div>
@@ -1117,7 +1206,7 @@ function ChatLayout({ children }) {
                           <div className="flex items-baseline justify-between">
                             <div className="flex items-center gap-1">
                               <h3 className="font-medium truncate text-sm">
-                                {truncateText(sessionName, 25)}
+                                {truncateText(sessionName, hiddenChatNameLength)}
                               </h3>
                               {/* Display external badge for private chats */}
                               {(() => {
@@ -1137,7 +1226,7 @@ function ChatLayout({ children }) {
                             </button>
                           </div>
                           <p className="text-xs text-muted-foreground truncate">
-                            {truncateText(session.lastMessage?.content || t('noRecentMessages'), 50)}
+                            {truncateText(session.lastMessage?.content || t('noRecentMessages'), messagePreviewLength)}
                           </p>
                         </div>
                       </div>
@@ -1233,7 +1322,7 @@ function ChatLayout({ children }) {
                                                 <div className="flex items-baseline justify-between">
                             <div className="flex items-center gap-1">
                               <h3 className={`font-medium truncate ${session.unreadCount > 0 && !mutedSessions[session.id] ? 'text-foreground font-semibold' : ''}`}>
-                                {truncateText(sessionName, 17)}
+                                {truncateText(sessionName, chatNameLength)}
                               </h3>
                               {/* Display external badge for private chats */}
                               {(() => {
@@ -1252,12 +1341,12 @@ function ChatLayout({ children }) {
                       <div className="flex items-center justify-between mt-1">
                         <p className={`text-sm truncate ${session.unreadCount > 0 && !mutedSessions[session.id] ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
                           {lastMessageContent
-                              ? (session.lastMessage?.role === 'assistant' ? `🤖 ${truncateText(lastMessageContent, 40)}` : truncateText(lastMessageContent, 40))
+                              ? (session.lastMessage?.role === 'assistant' ? `🤖 ${truncateText(lastMessageContent, messagePreviewLength)}` : truncateText(lastMessageContent, messagePreviewLength))
                               : t('noRecentMessages')}
                         </p>
                         {session.unreadCount > 0 && !mutedSessions[session.id] && currentSession?.id !== session.id && (
                           <div className="ml-2 w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"
-                               title={t('unreadMessages', { count: session.unreadCount }) || `${session.unreadCount} 未读消息`}></div>
+                               title={t('unreadMessages', { count: session.unreadCount }) || `${session.unreadCount} unread messages`}></div>
                         )}
                       </div>
                       {/* 在线状态指示器 */}
@@ -1368,6 +1457,23 @@ function ChatLayout({ children }) {
             <NewChatPopover />
           )}
         </div>
+      </div>
+
+      {/* Add resizer handle */}
+      <div
+        className="relative"
+        style={{ width: '5px', cursor: 'ew-resize', zIndex: 10 }}
+      >
+        <div
+          className="absolute inset-y-0 left-0 w-1 bg-border hover:bg-primary/50 transition-colors"
+          onMouseDown={handleResizeStart}
+          style={{
+            cursor: 'ew-resize',
+            height: '100%',
+            width: '5px',
+            zIndex: 10
+          }}
+        ></div>
       </div>
 
       {/* 聊天内容区域 */}
