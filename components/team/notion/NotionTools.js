@@ -552,7 +552,6 @@ export default function NotionTools({
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={t('pageTitlePlaceholder')}
                 className="col-span-3"
-                required
                 autoFocus
                 maxLength={50}
               />
@@ -604,7 +603,7 @@ export default function NotionTools({
             >
               {t('cancel')}
             </Button>
-            <Button type="submit" disabled={isSubmitting} variant={projectThemeColor}>
+            <Button type="submit" disabled={isSubmitting || title.trim().length < 2} variant={projectThemeColor}>
               {isSubmitting ? (
                 <>
                   {editingPage ? t('updating') : t('creating')}

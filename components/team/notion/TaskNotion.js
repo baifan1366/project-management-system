@@ -136,7 +136,6 @@ function CreateSectionDialog({ projectId, isOpen, setIsOpen, teamId, onSectionCr
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('sectionNamePlaceholder')}
-                required
                 maxLength={50}
                 autoFocus
               />
@@ -154,7 +153,8 @@ function CreateSectionDialog({ projectId, isOpen, setIsOpen, teamId, onSectionCr
             >
               {t('cancel')}
             </Button>
-            <Button type="submit" disabled={isSubmitting} variant={projectThemeColor}>
+            {/*disabled the button when the input is less than 2 characters */}
+            <Button type="submit" disabled={isSubmitting || name.trim().length < 2} variant={projectThemeColor}>
               {isSubmitting ? t('creating') : t('create')}
             </Button>
           </DialogFooter>

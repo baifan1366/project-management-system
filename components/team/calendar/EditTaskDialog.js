@@ -337,7 +337,6 @@ export default function EditTaskDialog({
                   onChange={(e) => setName(e.target.value)}
                   placeholder={t('enterTaskName')}
                   className={cn(errors.name && "border-red-500")}
-                  required
                   disabled={isReadOnly}
                   maxLength={50}
                 />
@@ -533,7 +532,7 @@ export default function EditTaskDialog({
                 
                 <Button 
                   type="submit" 
-                  disabled={isSubmitting || !isFormValid() || isDeleting || isReadOnly}
+                  disabled={isSubmitting || !isFormValid() || isDeleting || isReadOnly || name.trim().length < 2}
                   variant={themeColor}
                 >
                   {isSubmitting ? (
