@@ -154,7 +154,7 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
     const parts = formattedDesc.split(/(@\[USER:[0-9a-f-]+\])/g);
     
     return (
-      <p className="text-sm mt-1 whitespace-pre-wrap">
+      <div className="text-sm mt-1 whitespace-pre-wrap">
         {parts.map((part, index) => {
           // Check if this part is a user reference
           const userMatch = part.match(/@\[USER:([0-9a-f-]+)\]/);
@@ -182,7 +182,7 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
           
           return part; // Return regular text parts as is
         })}
-      </p>
+      </div>
     );
   };
   
@@ -519,12 +519,12 @@ export default function TaskDetailsDialog({ isOpen, setIsOpen, task, onEdit, onD
                   <div className="flex flex-col gap-4">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
-                      <p>{t('deleteConfirmationMessage')}</p>
+                      <div>{t('deleteConfirmationMessage')}</div>
                     </div>
-                                                      <div className="bg-muted/50 p-3 rounded-md">
-                                    <p className="font-medium break-all hyphens-auto">{task.title || t('noTitle')}</p>
-                                    <p className="text-sm text-muted-foreground mt-1">{formatDueDate()}</p>
-                                  </div>
+                    <div className="bg-muted/50 p-3 rounded-md">
+                      <div className="font-medium break-all hyphens-auto">{task.title || t('noTitle')}</div>
+                      <div className="text-sm text-muted-foreground mt-1">{formatDueDate()}</div>
+                    </div>
                   </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>

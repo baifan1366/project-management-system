@@ -68,6 +68,26 @@ export default function PreferencesPage() {
     }));
   };
 
+  // New function to handle theme toggle with immediate save
+  const handleThemeToggle = async (checked) => {
+    const newTheme = checked ? 'dark' : 'light';
+    setTheme(newTheme);
+    
+    if (!currentUser) return;
+    
+    try {
+      // Update the theme in database immediately
+      await dispatch(updateUserPreference({ 
+        userId: currentUser.id, 
+        preferenceData: { theme: newTheme }
+      }));
+      toast.success(t('saved'));
+    } catch (error) {
+      console.error('Error saving theme preference:', error);
+      toast.error(t('error'));
+    }
+  };
+
   const handleSavePreferences = async () => {
     if (!currentUser) return;
     setLoading(true);
@@ -129,7 +149,7 @@ export default function PreferencesPage() {
               </div>
               <Switch
                 checked={resolvedTheme === 'dark'}
-                onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+                onCheckedChange={handleThemeToggle}
               />
             </div>
             <div className="space-y-2">

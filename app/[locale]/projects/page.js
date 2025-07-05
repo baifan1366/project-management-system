@@ -399,18 +399,49 @@ export default function ProjectsPage() {
 
   if (status === 'loading') {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="overflow-hidden bg-card/50 backdrop-blur-sm">
-            <CardHeader>
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-3 w-full" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="h-full m-6">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <Skeleton className="h-8 w-48" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-9 w-44" />
+            <Skeleton className="h-9 w-9 rounded-md" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i} className="overflow-hidden bg-card/50 backdrop-blur-sm border">
+              <CardHeader className="pb-2">
+                <Skeleton className="h-6 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-5/6" />
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-24 ml-auto" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16 ml-auto" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-24 ml-auto" />
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="pt-0 pb-4 px-6 flex justify-end">
+                <Skeleton className="h-8 w-8 rounded-full" />
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }

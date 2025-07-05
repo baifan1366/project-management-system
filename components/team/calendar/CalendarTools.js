@@ -307,7 +307,6 @@ export default function CalendarTools({
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={t('taskTitlePlaceholder')}
                   className={cn(errors.title && "border-red-500")}
-                  required
                   maxLength={50}
                   autoFocus
                 />
@@ -429,7 +428,7 @@ export default function CalendarTools({
             <Button 
               type="submit"
               variant={themeColor}
-              disabled={taskStatus === 'loading' || !isFormValid()}
+              disabled={taskStatus === 'loading' || !isFormValid() || title.trim().length < 2}
             >
               {taskStatus === 'loading' ? t('creating') : t('create')}
             </Button>

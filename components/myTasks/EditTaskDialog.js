@@ -341,7 +341,6 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t('taskTitlePlaceholder')}
-              required
               disabled={task?.task_id && !isTeamMember || isPastDue}
               maxLength={50}
             />
@@ -514,7 +513,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
             </Button>
             <Button 
               type="submit" 
-              disabled={loading || (task?.task_id && !isTeamMember) || isPastDue}
+              disabled={loading || (task?.task_id && !isTeamMember) || isPastDue || !title.trim()}
             >
               {loading ? t_common('saving') : t_common('save')}
             </Button>

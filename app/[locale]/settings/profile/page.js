@@ -110,8 +110,11 @@ export default function ProfilePage() {
       // Get tokens from our tokens API
       const response = await fetch('/api/users/tokens?provider=google', {
         method: 'GET',
+        cache: 'no-store', // Prevent caching
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         },
       });
       
@@ -129,8 +132,11 @@ export default function ProfilePage() {
       // Check calendar scope with tokens
       const scopeResponse = await fetch('/api/check-calendar-scope', {
         method: 'POST',
+        cache: 'no-store', // Prevent caching
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         },
         body: JSON.stringify({
           access_token: tokenData.access_token,
@@ -324,7 +330,9 @@ export default function ProfilePage() {
         // Add calendar scope if requested for Google
         if (provider === 'google' && withCalendarScope) {
           // Add calendar flag to request calendar permissions
-          searchParams.append('calendar', 'true');
+          searchParams.append('requestCalendarAccess', 'true');
+          // Add special flag to indicate this is specifically for calendar authorization
+          searchParams.append('calendarAuth', 'true');
         }
         
         // Append search params to redirect URL
@@ -429,17 +437,42 @@ export default function ProfilePage() {
     const urlParams = new URLSearchParams(window.location.search);
     const authCompleted = urlParams.get('auth') === 'success';
     const provider = urlParams.get('provider');
+    const isCalendarAuth = urlParams.get('calendarAuth') === 'true';
     
     if (authCompleted) {
-      // Refresh user data without cache after auth completion
-      refreshUser();
+      // Add a small delay to ensure the backend has time to process the OAuth completion
+      const timeoutId = setTimeout(async () => {
+        // Refresh user data without cache after auth completion
+        await refreshUser();
+        
+        // After Google auth is completed, also check calendar scope
+        // Add another small delay to ensure user data is refreshed
+        if (provider === 'google') {
+          // If this was a calendar-specific authorization, use a toast to inform the user
+          if (isCalendarAuth) {
+            toast.info(t('checkingCalendarAccess') || 'Checking calendar access...');
+          }
+          
+          setTimeout(() => {
+            checkCalendarScope().then(result => {
+              // If this was a calendar-specific authorization, show a success message
+              if (isCalendarAuth) {
+                toast.success(t('calendarAccessGranted') || 'Calendar access successfully granted!');
+              }
+            }).catch(err => {
+              console.error('Error checking calendar scope:', err);
+              if (isCalendarAuth) {
+                toast.error(t('calendarAccessFailed') || 'Failed to verify calendar access');
+              }
+            });
+          }, 1000);
+        }
+      }, 1000);
       
-      // After Google auth is completed, also check calendar scope
-      if (provider === 'google' && user?.google_provider_id) {
-        checkCalendarScope();
-      }
+      // Clean up timeout if component unmounts
+      return () => clearTimeout(timeoutId);
     }
-  }, [user, checkCalendarScope, refreshUser]);
+  }, [checkCalendarScope, refreshUser, t]);
 
   return (
     <div className="space-y-4">

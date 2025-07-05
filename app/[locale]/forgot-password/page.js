@@ -113,7 +113,6 @@ export default function ForgotPasswordPage() {
                   onChange={handleEmailChange}
                   placeholder={t('forgotPassword.emailPlaceholder')}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  required
                 />
               </div>
 
@@ -125,7 +124,7 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !email.trim()}
                 className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 dark:bg-pink-500 dark:hover:bg-pink-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
               >
                 {loading ? (
