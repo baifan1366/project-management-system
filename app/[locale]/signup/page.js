@@ -34,8 +34,10 @@ export default function SignupPage() {
   });
   const [error, setError] = useState('');
   const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
@@ -46,6 +48,42 @@ export default function SignupPage() {
     number: false,
     special: false,
   });
+
+  // Email validation check
+  const checkEmailExists = async (email) => {
+    if (!email || email.trim() === '') return;
+    
+    try {
+      setCheckingEmail(true);
+      const response = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        // If there was a server error
+        setEmailError(data.error || 'Error checking email');
+        return true;
+      }
+      
+      if (data.exists) {
+        setEmailError(t('emailAlreadyExists'));
+        return true;
+      }
+      
+      return false;
+    } catch (err) {
+      console.error('Error checking email:', err);
+      return false;
+    } finally {
+      setCheckingEmail(false);
+    }
+  };
 
   // Check requirements whenever password changes
   useEffect(() => {
@@ -94,8 +132,22 @@ export default function SignupPage() {
   // Name validation function
   const validateName = (name) => {
     if (name.length > 50) {
-      return { valid: false, message: t('validationRules.userNameMax') };
+      return { valid: false, message: t('userNameMax') };
     }
+    return { valid: true, message: '' };
+  };
+
+  // Email validation function
+  const validateEmail = (email) => {
+    if (!email || email.trim() === '') {
+      return { valid: false, message: t('emailRequired') };
+    }
+    
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return { valid: false, message: t('invalidEmail') };
+    }
+    
     return { valid: true, message: '' };
   };
 
@@ -111,6 +163,9 @@ export default function SignupPage() {
     }
     if (e.target.name === 'name') {
       setNameError('');
+    }
+    if (e.target.name === 'email') {
+      setEmailError('');
     }
   };
 
@@ -150,16 +205,47 @@ export default function SignupPage() {
     }
   };
 
+  // Validate email on blur
+  const handleEmailBlur = async () => {
+    if (formData.email) {
+      const { valid, message } = validateEmail(formData.email);
+      if (!valid) {
+        setEmailError(message);
+        return;
+      }
+      
+      // Check if email already exists
+      const exists = await checkEmailExists(formData.email);
+      if (!exists) {
+        setEmailError('');
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setPasswordError('');
     setNameError('');
+    setEmailError('');
     
     // Validate name length
     const nameValidation = validateName(formData.name);
     if (!nameValidation.valid) {
       setNameError(nameValidation.message);
+      return;
+    }
+    
+    // Validate email format
+    const emailValidation = validateEmail(formData.email);
+    if (!emailValidation.valid) {
+      setEmailError(emailValidation.message);
+      return;
+    }
+    
+    // Check if email already exists
+    const emailExists = await checkEmailExists(formData.email);
+    if (emailExists) {
       return;
     }
     
@@ -171,7 +257,7 @@ export default function SignupPage() {
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('passwordsMismatch'));
       return;
     }
 
@@ -181,12 +267,16 @@ export default function SignupPage() {
       const result = await signup(formData);
 
       if (!result.success) {
-        setError(result.error || 'Failed to sign up. Please try again.');
+        if (result.error && result.error.includes('Email already registered')) {
+          setEmailError(t('emailAlreadyExists'));
+        } else {
+          setError(result.error || t('signupFailed'));
+        }
       }
       // The verification sent state is handled by the Redux store
     } catch (err) {
       console.error('Signup error:', err);
-      setError(err.message || 'Failed to sign up. Please try again.');
+      setError(err.message || t('signupFailed'));
     } finally {
       setLoading(false);
     }
@@ -349,9 +439,16 @@ export default function SignupPage() {
                 placeholder="Email Address"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                onBlur={handleEmailBlur}
+                className={`w-full px-4 py-3 rounded-lg border ${emailError ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400`}
                 required
               />
+              {emailError && (
+                <p className="text-sm text-red-500 mt-1">{emailError}</p>
+              )}
+              {checkingEmail && (
+                <p className="text-sm text-blue-500 mt-1">{t('checkingEmail')}</p>
+              )}
             </div>
 
             <div className="relative">
@@ -470,7 +567,7 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || checkingEmail}
               className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 dark:bg-pink-500 dark:hover:bg-pink-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
             >
               {loading ? t('signup.loading') : t('signup.button')}

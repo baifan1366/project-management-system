@@ -9,19 +9,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, isBefore, startOfToday, parseISO, isSameDay, endOfDay } from 'date-fns';
+import { format, isBefore, startOfToday, parseISO, isSameDay, endOfDay, addHours } from 'date-fns';
 import { CalendarIcon, Clock, ShieldAlert, ClockIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
 import useTeamMembership from '@/hooks/useTeamMembership';
 import useGetUser from '@/lib/hooks/useGetUser';
 
 export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
   const t = useTranslations('myTasks');
   const t_common = useTranslations('common');
-  const { adjustTimeByOffset } = useUserTimezone();
   const { user } = useGetUser();
   
   // Initialize the team membership hook
@@ -67,7 +65,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
       // 处理截止日期
       if (task.expected_completion_date) {
         try {
-          const dateObj = adjustTimeByOffset(task.expected_completion_date);
+          const dateObj = new Date(task.expected_completion_date);
           
           setDueDate(dateObj);
           
@@ -85,7 +83,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
       // 处理开始日期 - 添加安全检查
       if (task.expected_start_time) {
         try {
-          const dateObj = adjustTimeByOffset(task.expected_start_time);
+          const dateObj = new Date(task.expected_start_time);
           
           setStartDate(dateObj);
           
@@ -103,7 +101,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
     
     // 调用内部函数处理日期
     processTaskDates();
-  }, [task, isOpen, adjustTimeByOffset]);
+  }, [task, isOpen]);
   
   // 调试用，查看任务对象
   useEffect(() => {
@@ -124,7 +122,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
 
   // Check if task is past due
   const isPastDue = task?.expected_completion_date ? 
-    isBefore(new Date(task.expected_completion_date), endOfDay(new Date())) : 
+    isBefore(new Date(task.expected_completion_date), new Date()) : 
     false;
 
   // Validate form data
@@ -166,29 +164,17 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
         dueMinutes
       );
       
-      // Check if start time is in the past for today, accounting for timezone
+      // Check if start time is in the past for today
       const now = new Date();
       
-      // Convert both dates to the same timezone reference for comparison
-      if (isSameDay(startDate, now)) {
-        // Get current time in UTC
-        const nowUTC = new Date(now.toISOString());
-        // Create UTC version of the selected time
-        const startDateTimeUTC = new Date(startDateTime.toISOString());
-        
-
-        
-        if (startDateTimeUTC < nowUTC) {
-          // Use an existing translation key that likely exists
-          errors.timeError = 'Cannot select a time in the past';
-          setFormErrors(errors);
-          return false;
-        }
+      if (isSameDay(startDate, now) && startDateTime < now) {
+        errors.timeError = 'Cannot select a time in the past';
+        setFormErrors(errors);
+        return false;
       }
       
       // Check if end is before start
       if (endDateTime < startDateTime) {
-        // Use an existing translation key that likely exists or a direct string
         errors.timeError = 'End time must be after start time';
         setFormErrors(errors);
         return false;
@@ -270,7 +256,7 @@ export default function EditTaskDialog({ isOpen, setIsOpen, task, onSuccess }) {
         );
       }
       
-      // Convert to ISO strings for database
+      // Use ISO format for timestamptz in PostgreSQL
       const startDateISO = startDateTime ? startDateTime.toISOString() : null;
       const dueDateISO = dueDateTime ? dueDateTime.toISOString() : null;
       

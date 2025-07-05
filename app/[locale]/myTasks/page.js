@@ -19,13 +19,30 @@ import { supabase } from '@/lib/supabase';
 import NewTaskDialog from '@/components/myTasks/NewTaskDialog';
 import TaskDetailsDialog from '@/components/myTasks/TaskDetailsDialog';
 import EditTaskDialog from '@/components/myTasks/EditTaskDialog';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
+
+// 简单的日期格式化函数
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return dateString;
+  }
+};
 
 // 任务看板视图组件
 export default function MyTasksPage() {
   const t_tasks = useTranslations('myTasks');
   const t_common = useTranslations('common');
-  const { formatDateToUserTimezone } = useUserTimezone();
   const [tasks, setTasks] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
   const [columns, setColumns] = useState({
@@ -93,37 +110,6 @@ export default function MyTasksPage() {
     
     return null;
   }, []);
-  
-  // 获取任务的状态
-  const getTaskStatus = React.useCallback((task) => {
-    if (!task?.tag_values) return null;
-    
-    // 记录可能的状态值
-    const statusValues = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
-    
-    // 遍历所有tag_values，查找任何匹配状态的值
-    for (const [key, value] of Object.entries(task.tag_values)) {
-      if (statusValues.includes(value)) {
-        return value;
-      }
-    }
-    
-    // 对于键12，我们假设它可能是状态
-    if ('12' in task.tag_values) {
-      return task.tag_values['12'];
-    }
-    
-    // 如果没有找到明确的状态，默认为TODO
-    return 'TODO';
-  }, []);
-  
-  // 获取任务的执行者
-  const getTaskAssignee = React.useCallback((task) => {
-    if (!task?.tag_values) return null;
-    const assigneeKey = getKeyForField('assignee_id', task.tag_values);
-    return assigneeKey ? task.tag_values[assigneeKey] : null;
-  }, [getKeyForField]);
-  
   // 获取任务的标题
   const getTaskTitle = React.useCallback((task) => {
     if (task.title) return task.title;
@@ -156,13 +142,6 @@ export default function MyTasksPage() {
     if (!task?.tag_values) return null;
     const projectKey = getKeyForField('project_id', task.tag_values);
     return projectKey ? task.tag_values[projectKey] : null;
-  }, [getKeyForField]);
-  
-  // 获取任务的截止日期
-  const getTaskDueDate = React.useCallback((task) => {
-    if (!task?.tag_values) return null;
-    const dueDateKey = getKeyForField('due_date', task.tag_values);
-    return dueDateKey ? task.tag_values[dueDateKey] : null;
   }, [getKeyForField]);
   
   // 从列ID获取对应的任务状态
@@ -402,8 +381,8 @@ export default function MyTasksPage() {
     // 应用搜索过滤
     if (searchQuery) {
       filtered = filtered.filter(task => 
-        (task.title && task.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (task.title && typeof task.title === 'string' && task.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (task.description && typeof task.description === 'string' && task.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (task.tag_values && 
           Object.values(task.tag_values).some(value => 
             value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())
@@ -413,8 +392,9 @@ export default function MyTasksPage() {
     
     // 按类型过滤（基于任务截止日期）
     if (selectedType !== 'upcoming') {
+      const now = new Date(); // 当前时间，包含小时和分钟
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0); // 今天的开始时间
       
       filtered = filtered.filter(task => {
         const dueDate = task.expected_completion_date
@@ -423,7 +403,7 @@ export default function MyTasksPage() {
           
         switch (selectedType) {
           case 'pastDue':
-            return dueDate && dueDate < today;
+            return dueDate && dueDate < now; // 使用当前时间而不是今天的开始时间
           case 'today':
             return dueDate && dueDate.toDateString() === today.toDateString();
           case 'noDate':
@@ -594,8 +574,9 @@ export default function MyTasksPage() {
       if (!tasks || tasks.length === 0) return 0;
       
       if (value === 'pastDue' || value === 'today' || value === 'upcoming' || value === 'noDate') {
+        const now = new Date(); // 当前时间，包含小时和分钟
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0); // 今天的开始时间
         
         return tasks.filter(task => {
           const dueDate = task.expected_completion_date
@@ -604,7 +585,7 @@ export default function MyTasksPage() {
             
           switch (value) {
             case 'pastDue':
-              return dueDate && dueDate < today;
+              return dueDate && dueDate < now; // 使用当前时间而不是今天的开始时间
             case 'today':
               return dueDate && dueDate.toDateString() === today.toDateString();
             case 'upcoming':
@@ -718,15 +699,15 @@ export default function MyTasksPage() {
         <TooltipProvider>
           <Tooltip delayDuration={300}>
             <TooltipTrigger asChild>
-              <div 
+                              <div 
                 className="text-xs bg-muted px-1.5 py-0.5 rounded flex items-center gap-1 cursor-help"
                 onMouseEnter={() => {
                   setHoveredTaskId(task.task_id);
                   fetchTaskContext(task.task_id);
                 }}
               >
-                <Info className="h-3 w-3" />
-                {t_tasks('reference') || 'Ref'}: {task.task_id}
+                <Info className="h-3 w-3 flex-shrink-0" />
+                {t_tasks('reference') || 'Ref'}: <span className="break-all max-w-[80px] line-clamp-1">{task.task_id}</span>
               </div>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="p-3 max-w-sm">
@@ -970,21 +951,21 @@ export default function MyTasksPage() {
   }
 
   return (
-    <div className="p-4 h-screen">
-      <div className="flex justify-between items-center mb-4">
+          <div className="p-4 h-screen overflow-hidden flex flex-col">
+      <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <h1 className="text-2xl font-bold">{t_tasks('title')}</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap sm:flex-nowrap">
           <div className="relative">
             <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="pl-9 w-64"
+              className="pl-9 w-full sm:w-64"
               placeholder={t_tasks('searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               maxLength={30}
             />
           </div>
-          <Button onClick={handleCreateTask}>
+          <Button onClick={handleCreateTask} className="whitespace-nowrap">
             <PlusCircle className="h-4 w-4 mr-2" />
             {t_common('create')}
           </Button>
@@ -1014,9 +995,9 @@ export default function MyTasksPage() {
         onSuccess={handleTaskUpdate}
       />
 
-      <div className="flex gap-4 h-[calc(100vh-105px)]">
+      <div className="flex gap-4 flex-1 overflow-hidden">
         {/* 左侧过滤器面板 */}
-        <div className="w-64 bg-background border rounded-md p-4">
+        <div className="w-64 bg-background border rounded-md p-4 flex-shrink-0 overflow-y-auto hidden md:block">
           {/* TYPE 过滤器 */}
           <div className="mb-5">
             <h3 className="text-xs text-muted-foreground mb-2">{t_tasks('type.label')}</h3>
@@ -1077,14 +1058,27 @@ export default function MyTasksPage() {
         </div>
 
         {/* 右侧任务看板 */}
-        <div className="flex-1">
-          <div className="text-sm text-muted-foreground mb-3">
-            {filteredTasks ? filteredTasks.length : 0} {t_tasks('results')}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="text-sm text-muted-foreground mb-3 flex-shrink-0 flex justify-between items-center">
+            <span>{filteredTasks ? filteredTasks.length : 0} {t_tasks('results')}</span>
+            {/* Mobile filters button */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="md:hidden" 
+              onClick={() => {
+                // You could implement a mobile filter modal/drawer here
+                alert(t_tasks('filtersComingSoon'));
+              }}
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              {t_common('filters')}
+            </Button>
           </div>
           <DragDropContext onDragEnd={onDragEnd}>
-            <div className="flex space-x-4 overflow-x-auto pb-4 h-full">
+            <div className="flex space-x-4 overflow-x-auto overflow-y-hidden pb-4 h-full">
               {Object.values(columns).map(column => (
-                <div key={column.id} className="flex-1 bg-background border rounded-md shadow min-w-[250px]">
+                <div key={column.id} className="flex-none bg-background border rounded-md shadow w-[85vw] sm:w-[250px] md:w-[220px] lg:w-[280px]">
                   <div className="p-2 border-b bg-muted/30 sticky top-0 z-10">
                     <h2 className="text-sm font-semibold">
                       {column.title} ({column.tasks.length})
@@ -1098,7 +1092,10 @@ export default function MyTasksPage() {
                         className={`h-full p-2 overflow-y-auto ${
                           snapshot.isDraggingOver ? "bg-accent/20" : ""
                         }`}
-                        style={{ minHeight: "calc(100% - 40px)" }}
+                        style={{ 
+                          minHeight: "calc(100% - 40px)",
+                          maxHeight: "calc(100vh - 180px)"
+                        }}
                       >
                         {column.tasks.length > 0 ? (
                           column.tasks.map((task, index) => (
@@ -1138,7 +1135,7 @@ export default function MyTasksPage() {
                                     // Normal task display
                                     <>
                                       <div className="mb-2 flex justify-between">
-                                        <h3 className="font-medium text-sm">
+                                        <h3 className="font-medium text-sm max-w-[75%] break-all line-clamp-1">
                                           {getTaskTitle(task) || t_tasks('noTitle')}
                                         </h3>
                                         <div className="relative group">
@@ -1153,7 +1150,7 @@ export default function MyTasksPage() {
                                             {getTaskPriority(task) || 'LOW'}
                                           </Badge>
                                           <div className="absolute right-0 mt-1 hidden group-hover:block z-10">
-                                            <div className="bg-card border rounded-md shadow-md py-1 min-w-[100px]">
+                                            <div className="bg-card border rounded-md shadow-md py-1 min-w-[120px]">
                                               {['URGENT', 'HIGH', 'MEDIUM', 'LOW'].map(priority => (
                                                 <div 
                                                   key={priority}
@@ -1171,7 +1168,7 @@ export default function MyTasksPage() {
                                         </div>
                                       </div>
                                       {getTaskDescription(task) && (
-                                        <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                                        <p className="text-xs text-muted-foreground line-clamp-3 mb-2 break-all hyphens-auto">
                                           {getTaskDescription(task)}
                                         </p>
                                       )}
@@ -1184,20 +1181,20 @@ export default function MyTasksPage() {
                                           )}
                                           {renderTaskReference(task)}
                                         </div>
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex flex-wrap items-center gap-1 sm:gap-3">
                                           {task.expected_start_time && (
                                             <div className="flex items-center gap-1">
-                                              <Clock className="w-3 h-3" />
-                                              <span>
-                                                {formatDateToUserTimezone(task.expected_start_time)}
+                                              <Clock className="w-3 h-3 flex-shrink-0" />
+                                              <span className="break-all max-w-[100px] sm:max-w-[150px] line-clamp-1">
+                                                {formatDate(task.expected_start_time)}
                                               </span>
                                             </div>
                                           )}
                                           {task.expected_completion_date && (
                                             <div className="flex items-center gap-1">
-                                              <Calendar className="w-3 h-3" />
-                                              <span>
-                                                {formatDateToUserTimezone(task.expected_completion_date)}
+                                              <Calendar className="w-3 h-3 flex-shrink-0" />
+                                              <span className="break-all max-w-[100px] sm:max-w-[150px] line-clamp-1">
+                                                {formatDate(task.expected_completion_date)}
                                               </span>
                                             </div>
                                           )}

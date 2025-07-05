@@ -9,6 +9,14 @@ import { useSelector, useDispatch } from 'react-redux';
 import AccessRestrictedModal from '@/components/admin/accessRestrictedModal';
 import { toast } from 'sonner';
 
+// Add currency formatter for MYR
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('ms-MY', {
+    style: 'currency',
+    currency: 'MYR'
+  }).format(amount);
+}
+
 export default function AdminSupport() {
   const router = useRouter();
   const params = useParams();
@@ -583,12 +591,30 @@ export default function AdminSupport() {
       
       // Calculate remaining days (if current date is past end date, remaining days is 0)
       const remainingDays = Math.max(0, Math.ceil((endDate - currentDate) / (1000 * 60 * 60 * 24)));
+
+      // Cap remaining days to not exceed total days
+      const cappedRemainingDays = Math.min(remainingDays, totalDays);
+
+      // Use the actual payment amount for refund calculation
+      let totalCost = 0;
+      if (refundData.payment && refundData.payment.amount) {
+        totalCost = refundData.payment.amount;
+      } else {
+        // Fetch payment record if not present (fallback)
+        const { data: paymentRecord, error: paymentError } = await supabase
+          .from('payment')
+          .select('amount')
+          .eq('id', refundData.payment_id)
+          .single();
+        if (!paymentError && paymentRecord && paymentRecord.amount) {
+          totalCost = paymentRecord.amount;
+        } else {
+          totalCost = 0;
+        }
+      }
       
-      // Get total cost
-      const totalCost = refundData.current_subscription?.subscription_plan?.price || 0;
-      
-      // Calculate refund amount: (Remaining days ÷ Total days) × Total cost
-      const calculatedRefundAmount = (remainingDays / totalDays) * totalCost;
+      // Calculate refund amount: (Capped Remaining days ÷ Total days) × Total cost
+      const calculatedRefundAmount = (cappedRemainingDays / totalDays) * totalCost;
       
       // Round to 2 decimal places
       const roundedRefundAmount = Math.round(calculatedRefundAmount * 100) / 100;
@@ -597,11 +623,10 @@ export default function AdminSupport() {
       const finalRefundAmount = roundedRefundAmount;
       
       // Log the calculation for admin reference
-      console.log(`Automatic refund calculation: $${finalRefundAmount} (${remainingDays} remaining days ÷ ${totalDays} total days × $${totalCost} total cost)`);
+      console.log(`Automatic refund calculation: ${formatCurrency(finalRefundAmount)} (${cappedRemainingDays} remaining days ÷ ${totalDays} total days × ${formatCurrency(totalCost)} total cost)`);
       
-      // Show toast with calculation info
-      toast.info(`Calculated refund: $${finalRefundAmount}`, {
-        description: `Based on ${remainingDays}/${totalDays} days remaining and $${totalCost} total cost.`
+      toast.info(`Calculated refund: ${formatCurrency(finalRefundAmount)}`, {
+        description: `Based on ${cappedRemainingDays}/${totalDays} days remaining and ${formatCurrency(totalCost)} total cost.`
       });
 
       // Process the refund request
@@ -612,7 +637,7 @@ export default function AdminSupport() {
           processed_by: adminData.id,
           processed_at: new Date().toISOString(),
           refund_amount: finalRefundAmount,
-          notes: `Refund approved for $${finalRefundAmount}. Calculation: (${remainingDays} remaining days ÷ ${totalDays} total days) × $${totalCost} total cost = $${roundedRefundAmount}\nRefund payment record created with status 'REFUNDED'.\nUser subscription changed to FREE plan.`
+          notes: `Refund approved for ${formatCurrency(finalRefundAmount)}. Calculation: (${cappedRemainingDays} remaining days ÷ ${totalDays} total days) × ${formatCurrency(totalCost)} total cost = ${formatCurrency(roundedRefundAmount)}\nRefund payment record created with status 'REFUNDED'.\nUser subscription changed to FREE plan.`
         })
         .eq('id', refundData.id);
       
@@ -662,7 +687,7 @@ export default function AdminSupport() {
       }
       
       // Add a note to the ticket
-      const noteContent = `Refund request approved. Amount: $${finalRefundAmount}\nCalculation: (${remainingDays} remaining days ÷ ${totalDays} total days) × $${totalCost} total cost = $${roundedRefundAmount}\nRefund payment record created with status 'REFUNDED'.\nUser subscription changed to FREE plan.`;
+      const noteContent = `Refund request approved. Amount: ${formatCurrency(finalRefundAmount)}\nCalculation: (${cappedRemainingDays} remaining days ÷ ${totalDays} total days) × ${formatCurrency(totalCost)} total cost = ${formatCurrency(roundedRefundAmount)}\nRefund payment record created with status 'REFUNDED'.\nUser subscription changed to FREE plan.`;
         
       const { error: replyError } = await supabase
           .from('contact_reply')
@@ -684,7 +709,7 @@ export default function AdminSupport() {
       await fetchTicketReplies(selectedTicket.id);
       
       toast.dismiss(loadingToastId);
-      toast.success(`Refund processed successfully for $${finalRefundAmount}`, {
+      toast.success(`Refund processed successfully for ${formatCurrency(finalRefundAmount)}`, {
         description: `Refund for ${refundData.current_subscription?.subscription_plan?.name || 'subscription'} has been approved and processed. User switched to FREE plan.`
       });
       
@@ -1250,7 +1275,7 @@ export default function AdminSupport() {
                             }`}>
                               Request {refundData.status.toLowerCase()}
                               {refundData.processed_at && ` on ${formatDate(refundData.processed_at)}`}
-                              {refundData.refund_amount && refundData.status === 'APPROVED' && ` - Amount: $${refundData.refund_amount}`}
+                              {refundData.refund_amount && refundData.status === 'APPROVED' && ` - Amount: ${formatCurrency(refundData.refund_amount)}`}
                             </div>
                             {refundData.processed_by && (
                               <div className="text-sm text-gray-500 dark:text-gray-400">
