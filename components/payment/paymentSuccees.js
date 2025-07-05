@@ -28,7 +28,7 @@ export default function PaymentSuccessModal({
           {/* Title and Subtitle */}
           <h2 className="mt-4 text-2xl font-bold text-gray-900">Payment Successful!</h2>
           <p className="mt-2 text-gray-600">
-            Thank you for subscribing to {metadata.planName}
+            Thank you for subscribing to {metadata?.planName || 'Team Sync Plan'}
           </p>
 
           {/* Order Summary */}
@@ -63,7 +63,7 @@ export default function PaymentSuccessModal({
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-600">Plan</dt>
-                  <dd className="text-gray-900">{metadata.planName}</dd>
+                  <dd className="text-gray-900">{metadata?.planName || 'Team Sync Plan'}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-600">Amount</dt>
@@ -89,13 +89,13 @@ export default function PaymentSuccessModal({
               href="/projects"
               className="block w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 transition-colors text-center"
             >
-              Go to Dashboard
+              Go to Project
             </Link>
             <Link 
-              href="/"
+              href="/pricing"
               className="block w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-md hover:bg-gray-200 transition-colors text-center"
             >
-              Return to Home
+              Return to Pricing
             </Link>
           </div>
         </div>
