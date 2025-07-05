@@ -850,6 +850,7 @@ export default function CreateCalendarEvent({
               value={formData.title}
               onChange={handleInputChange}
               placeholder={t('titlePlaceholder')}
+              maxLength={50}
             />
           </div>
 
@@ -862,6 +863,7 @@ export default function CreateCalendarEvent({
               onChange={handleInputChange}
               placeholder={t('descriptionPlaceholder')}
               className="resize-none h-20"
+              maxLength={100}
             />
           </div>
 
@@ -983,6 +985,7 @@ export default function CreateCalendarEvent({
                 value={formData.location} 
                 onChange={handleInputChange} 
                 placeholder={t('locationPlaceholder')} 
+                maxLength={30}
               />
             </div>
           )}
@@ -1036,6 +1039,7 @@ export default function CreateCalendarEvent({
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full bg-transparent focus:outline-none"
+                    maxLength={30}
                   />
                 </div>
                 
