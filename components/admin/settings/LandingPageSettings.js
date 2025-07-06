@@ -1249,15 +1249,17 @@ export default function LandingPageSettings() {
               {featuresSection.features && featuresSection.features.map((feature, index) => (
                 <div 
                   key={index} 
-                  className={`p-6 border rounded-lg relative bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-lg ${deletedItems.features.includes(index) ? 'opacity-50' : ''}`}
+                  className={`p-6 border rounded-lg relative bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 text-gray-900 dark:text-white shadow-lg ${deletedItems.features.includes(index) ? 'opacity-50' : ''}`}
                   style={{ 
                     borderColor: unsavedChanges.features[index]?.h2 || 
                                 unsavedChanges.features[index]?.span || 
-                                unsavedChanges.features[index]?.media ? 'rgb(34, 197, 94)' : 'rgb(229, 231, 235)', 
+                                unsavedChanges.features[index]?.media ? 'rgb(34, 197, 94)' : '',
                     borderWidth: unsavedChanges.features[index]?.h2 || 
                                 unsavedChanges.features[index]?.span || 
-                                unsavedChanges.features[index]?.media ? '2px' : '1px',
-                    borderStyle: 'solid'
+                                unsavedChanges.features[index]?.media ? '2px' : '',
+                    borderStyle: unsavedChanges.features[index]?.h2 || 
+                                unsavedChanges.features[index]?.span || 
+                                unsavedChanges.features[index]?.media ? 'solid' : '',
                   }}
                 >
                   {deletedItems.features.includes(index) && (
@@ -1306,9 +1308,10 @@ export default function LandingPageSettings() {
                       borderWidth: unsavedChanges.features[index]?.h2 ? '2px' : '',
                       borderStyle: unsavedChanges.features[index]?.h2 ? 'solid' : '',
                       padding: unsavedChanges.features[index]?.h2 ? '8px' : '',
-                      borderRadius: unsavedChanges.features[index]?.h2 ? '6px' : ''
+                      borderRadius: unsavedChanges.features[index]?.h2 ? '6px' : '',
+                      background: 'inherit',
                     }}>
-                      <Label htmlFor={`feature-h2-${index}`} className="text-gray-300 text-sm font-medium mb-1 block">Feature Title (H2):</Label>
+                      <Label htmlFor={`feature-h2-${index}`} className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-1 block">Feature Title (H2):</Label>
                       <Input
                         id={`feature-h2-${index}`}
                         placeholder="Advanced Features"
@@ -1349,9 +1352,10 @@ export default function LandingPageSettings() {
                       borderWidth: unsavedChanges.features[index]?.span ? '2px' : '',
                       borderStyle: unsavedChanges.features[index]?.span ? 'solid' : '',
                       padding: unsavedChanges.features[index]?.span ? '8px' : '',
-                      borderRadius: unsavedChanges.features[index]?.span ? '6px' : ''
+                      borderRadius: unsavedChanges.features[index]?.span ? '6px' : '',
+                      background: 'inherit',
                     }}>
-                      <Label htmlFor={`feature-span-${index}`} className="text-gray-300 text-sm font-medium mb-1 block">Feature Description:</Label>
+                      <Label htmlFor={`feature-span-${index}`} className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-1 block">Feature Description:</Label>
                       <Input
                         id={`feature-span-${index}`}
                         placeholder="Discover our powerful features that help you work smarter"
@@ -1392,9 +1396,10 @@ export default function LandingPageSettings() {
                       borderWidth: unsavedChanges.features[index]?.media ? '2px' : '',
                       borderStyle: unsavedChanges.features[index]?.media ? 'solid' : '',
                       padding: unsavedChanges.features[index]?.media ? '8px' : '',
-                      borderRadius: unsavedChanges.features[index]?.media ? '6px' : ''
+                      borderRadius: unsavedChanges.features[index]?.media ? '6px' : '',
+                      background: 'inherit',
                     }}>
-                      <Label className="text-gray-300 text-sm font-medium mb-1 block">Feature Media:</Label>
+                      <Label className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-1 block">Feature Media:</Label>
                       <Tabs 
                         defaultValue="video" 
                         value={feature.mediaType}
@@ -1592,7 +1597,7 @@ export default function LandingPageSettings() {
                 {solutionsSection.cards && solutionsSection.cards.map((card, index) => (
                   <div 
                     key={index} 
-                    className={`p-6 border rounded-lg relative bg-slate-800 text-white shadow-lg ${deletedItems.solutionCards.includes(index) ? 'opacity-50' : ''}`}
+                    className={`p-6 border rounded-lg relative bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-lg ${deletedItems.solutionCards.includes(index) ? 'opacity-50' : ''}`}
                     style={{ 
                       borderColor: unsavedChanges.solutionsCards[index] ? 'rgb(34, 197, 94)' : 'rgb(229, 231, 235)', 
                       borderWidth: unsavedChanges.solutionsCards[index] ? '2px' : '1px',
@@ -1645,9 +1650,10 @@ export default function LandingPageSettings() {
                         borderWidth: unsavedChanges.solutionsCards[index] ? '2px' : '',
                         borderStyle: unsavedChanges.solutionsCards[index] ? 'solid' : '',
                         padding: unsavedChanges.solutionsCards[index] ? '8px' : '',
-                        borderRadius: unsavedChanges.solutionsCards[index] ? '6px' : ''
+                        borderRadius: unsavedChanges.solutionsCards[index] ? '6px' : '',
+                        background: 'inherit',
                       }}>
-                        <Label htmlFor={`card-title-${index}`} className="text-gray-300 text-sm font-medium mb-1 block">Card Title:</Label>
+                        <Label htmlFor={`card-title-${index}`} className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-1 block">Card Title:</Label>
                         <Input
                           id={`card-title-${index}`}
                           placeholder="Workflow"
@@ -1680,7 +1686,7 @@ export default function LandingPageSettings() {
                           className="mt-1 bg-slate-700 border-slate-600 text-white placeholder-gray-400"
                         />
                       
-                        <Label htmlFor={`card-content-${index}`} className="text-gray-300 text-sm font-medium mb-1 block mt-3">Card Content:</Label>
+                        <Label htmlFor={`card-content-${index}`} className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-1 block mt-3">Card Content:</Label>
                         <Input
                           id={`card-content-${index}`}
                           placeholder="Automate your workflows with AI"
