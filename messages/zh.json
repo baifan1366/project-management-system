@@ -529,7 +529,8 @@
     "showArchivedProjects": "显示归档项目",
     "restoreProjectConfirmTitle": "恢复项目",
     "restoreProjectConfirmDescription": "您确定要恢复此项目吗？",
-    "noArchivedProjects": "没有归档项目"
+    "noArchivedProjects": "没有归档项目",
+    "goToPricing": "前往定价页面"
   },
   "tasks": {
     "title": "任务",
@@ -805,7 +806,8 @@
     "subscriptionLimitReached": "订阅限制达到",
     "subscriptionLimitWarning": "您接近当前订阅计划的最多项目数量。考虑升级到更高计划。",
     "projectUsage": "项目使用",
-    "projectUsageDescription": "您已使用 {currentValue} 个项目,超出 {limit} 个项目的限制。请升级到更高计划以创建更多项目。"
+    "projectUsageDescription": "您已使用 {currentValue} 个项目,超出 {limit} 个项目的限制。请升级到更高计划以创建更多项目。",
+    "goToPricing": "前往定价页面"
   },
   "CreateTask": {
     "assignees": "指派人",

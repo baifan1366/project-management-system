@@ -922,7 +922,8 @@
     "subscriptionLimitReached": "Subscription limit reached",
     "subscriptionLimitWarning": "You are approaching the maximum number of projects for your subscription plan. Consider upgrading to a higher plan.",
     "projectUsage": "Project usage",
-    "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects."
+    "projectUsageDescription": "You have used {currentValue} out of {limit} projects for your subscription plan. Please upgrade to a higher plan to create more projects.",
+    "goToPricing": "Go to Pricing"
   },
   "CreateTask": {
     "failedToLoadUsers": "Failed to load users",

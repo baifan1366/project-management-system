@@ -796,7 +796,8 @@
     "subscriptionLimitReached": "Had langganan tercapai",
     "subscriptionLimitWarning": "Anda hampir mencapai bilangan maksimum projek untuk pelan langganan anda. Pertimbangkan untuk menaik taraf ke pelan yang lebih tinggi.",
     "projectUsage": "Penggunaan projek",
-    "projectUsageDescription": "Anda telah menggunakan {currentValue} daripada {limit} projek untuk pelan langganan anda. Sila naik taraf ke pelan yang lebih tinggi untuk mencipta lebih banyak projek."
+    "projectUsageDescription": "Anda telah menggunakan {currentValue} daripada {limit} projek untuk pelan langganan anda. Sila naik taraf ke pelan yang lebih tinggi untuk mencipta lebih banyak projek.",
+    "goToPricing": "Pergi ke Halaman Harga"
   },
   "CreateTask": {
     "assignees": "Penerima Tugasan",
