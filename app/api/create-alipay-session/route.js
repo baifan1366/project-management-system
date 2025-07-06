@@ -45,31 +45,26 @@ export async function POST(req) {
     
     // Calculate the amount to charge (use finalAmount if provided, otherwise use price)
     const amountToCharge = finalAmount || price;
-    
-    // Convert USD to CNY (approximate exchange rate, in production you'd use a real-time rate)
-    // As of 2024, roughly 1 USD = 7.2 CNY
-    // const exchangeRate = 7.2;
-    // const amountInCNY = Math.round(amountToCharge * exchangeRate * 100); // Convert to CNY cents
         
-    // Create Alipay session with CNY currency
+    const DOMAIN = 'https://team-sync-pms.vercel.app';
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['alipay'],
       line_items: [
         {
           price_data: {
-            currency: 'myr', // Using CNY which is fully supported by Alipay
+            currency: 'myr',
             product_data: {
               name: planName,
               description: `${planName} Subscription`,
             },
-            unit_amount: Math.round(amountToCharge * 100), // Amount in MYR cents
+            unit_amount: Math.round(amountToCharge * 100),
           },
           quantity: quantity,
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/en/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/en/payment`,
+      success_url: `${DOMAIN}/en/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${DOMAIN}/en/payment`,
       customer_email: email,
       locale: 'en', // Set language to English
       metadata: {

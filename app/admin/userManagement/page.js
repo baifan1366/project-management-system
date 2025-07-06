@@ -178,6 +178,22 @@ export default function UserManagement() {
     initializeUserManagement();
   }, [dispatch, router, filter, sortOption]);
   
+  // Check URL query parameters to see if we need to open the add user modal
+  useEffect(() => {
+    // Get the URL search parameters
+    const searchParams = new URLSearchParams(window.location.search);
+    const action = searchParams.get('action');
+    
+    // If action is 'create' and user has permission, open the add user modal
+    if (action === 'create' && hasPermission('add_users')) {
+      openModal('add');
+      
+      // Clean up the URL by removing the query parameter
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
+
   // Add function to verify permission access
   const hasPermission = (permissionName) => {
     return permissions.includes(permissionName);
@@ -924,7 +940,7 @@ export default function UserManagement() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {currentUsers.length > 0 ? (
                   currentUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer" onClick={() => openModal('details', user)}>
+                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => openModal('details', user)}>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold mr-3">

@@ -614,7 +614,8 @@
     "cancelled": "已取消",
     "noTeams": "没有可用团队",
     "noDescription": "未提供描述",
-    "created": "已创建"
+    "created": "已创建",
+    "goToPricing": "前往定价页面"
   },
   "tasks": {
     "title": "任务",
@@ -922,7 +923,8 @@
     "subscriptionLimitReached": "订阅限制达到",
     "subscriptionLimitWarning": "您接近当前订阅计划的最多项目数量。考虑升级到更高计划。",
     "projectUsage": "项目使用",
-    "projectUsageDescription": "您已使用 {currentValue} 个项目,超出 {limit} 个项目的限制。请升级到更高计划以创建更多项目。"
+    "projectUsageDescription": "您已使用 {currentValue} 个项目,超出 {limit} 个项目的限制。请升级到更高计划以创建更多项目。",
+    "goToPricing": "前往定价页面"
   },
   "CreateTask": {
     "failedToLoadUsers": "加载用户失败",
