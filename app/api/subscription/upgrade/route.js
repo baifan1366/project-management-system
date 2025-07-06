@@ -157,9 +157,9 @@ export async function POST(request) {
     };
 
     // Create return URL with success/cancel paths
-    const origin = request.headers.get('origin') || 'http://localhost:3000';
-    const successUrl = `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${origin}/settings/subscription`;
+    const DOMAIN = 'https://your-vercel-domain.vercel.app'; // TODO: 替换为你的 vercel 线上域名
+    const successUrl = `${DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${DOMAIN}/settings/subscription`;
 
     // Prepare stripe session creation parameters
     const sessionParams = {
