@@ -220,7 +220,6 @@ export default function CreateProjectDialog({ open, onOpenChange }) {
       );
     }
 
-    // 如果用户超出订阅限制，显示提示信息
     if (subscriptionInfo && !subscriptionInfo.allowed) {
       return (
         <div className="py-2">
@@ -243,13 +242,23 @@ export default function CreateProjectDialog({ open, onOpenChange }) {
             
             <Button
               onClick={() => {
-                onOpenChange(false);
-                router.push('/settings/subscription');
+                onOpenChange(false);  
+                window.open('/settings/subscription', '_blank');
               }}
               variant="destructive"
-              className="mt-2"
+              className="mt-2 mr-2"
             >
               {t('upgrade')}
+            </Button>
+            <Button
+              onClick={() => {
+                onOpenChange(false);
+                window.open('/pricing', '_blank');
+              }}
+              variant="outline"
+              className="mt-2"
+            >
+              {t('goToPricing')}
             </Button>
           </div>
         </div>
