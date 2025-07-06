@@ -119,6 +119,36 @@ export default function AdminSubscriptions() {
     
     initAdminSubscriptions();
   }, [dispatch, router]);
+  
+  // Check URL query parameters to see if we need to open any modals
+  useEffect(() => {
+    // Get the URL search parameters
+    const searchParams = new URLSearchParams(window.location.search);
+    const action = searchParams.get('action');
+    const tab = searchParams.get('tab');
+    
+    // If tab parameter exists, switch to that tab
+    if (tab === 'promoCodes') {
+      setActiveTab('promoCodes');
+    }
+    
+    // If action is 'create_plan' and user has permission, open the add plan modal
+    if (action === 'create_plan' && hasPermission('add_sub_plans')) {
+      openModal({type: 'add'});
+    }
+    
+    // If action is 'create_code' and user has permission, open the add promo code modal
+    if (action === 'create_code' && hasPermission('add_promo_codes')) {
+      setActiveTab('promoCodes');
+      openModal({type: 'add'});
+    }
+    
+    // Clean up the URL by removing the query parameters
+    if (action || tab) {
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [loading]);
 
   // Add function to verify permission access TODO: 模块化这个代码
   const hasPermission = (permissionName) => {
@@ -369,6 +399,14 @@ export default function AdminSubscriptions() {
         }
         
         const planName = planData?.name || 'Plan';
+        
+        // Check if this is the default free plan (plan_id = 1) and trying to deactivate it
+        if (id === 1 && !isActive) {
+          toast.error(`Cannot deactivate the default free plan`, {
+            description: "This is the system default plan and must remain active."
+          });
+          return;
+        }
         
         const { data, error } = await supabase
           .from('subscription_plan')
@@ -772,12 +810,14 @@ export default function AdminSubscriptions() {
     if (!code || code.length < 5) {
       return "Promo code must be at least 5 characters long";
     }
-    
+    // Check if code is uppercase
+    if (code !== code.toUpperCase()) {
+      return "Promo code must be uppercase";
+    }
     // Check if code contains special characters or spaces
-    if (!/^[a-zA-Z0-9]+$/.test(code)) {
+    if (!/^[A-Z0-9]+$/.test(code)) {
       return "Promo code cannot contain spaces or special characters";
     }
-    
     return "";
   };
   
@@ -852,11 +892,13 @@ export default function AdminSubscriptions() {
   // Fix the addPromoCode function
   const addPromoCode = async (codeData) =>{
     try{
-      setLoading(true);
+      // Note: We're now setting processing state in the form submission handler
+      // to avoid duplicate state changes
 
       const { data, error } = await supabase
         .from('promo_code')
         .insert({
+          // Let the database generate the ID automatically
           code: codeData.code,
           discount_type: codeData.discount_type,
           discount_value: codeData.discount_value,
@@ -866,7 +908,8 @@ export default function AdminSubscriptions() {
           end_date: codeData.end_date,
           current_uses: 0,
           max_uses: codeData.max_uses || 0
-        });
+        })
+        .select();
         
       if(error){
         console.error('Error in addPromoCode:', error);
@@ -886,9 +929,8 @@ export default function AdminSubscriptions() {
       console.error('Error in addPromoCode:', error);
       toast.error('An unexpected error occurred while adding the promo code');
       return false;
-    } finally {
-      setLoading(false);
     }
+    // Note: We're now handling the loading state in the form submission handler
   };
 
   // Add subscription plan
@@ -930,6 +972,17 @@ export default function AdminSubscriptions() {
   const deleteSubscriptionPlan = async () => {
     if (deleteConfirmation !== isPlanToDelete.name) {
       toast.error('Please type the plan name correctly to confirm deletion');
+      return;
+    }
+
+    // Check if this is the default free plan (plan_id = 1)
+    if (isPlanToDelete.id === 1) {
+      toast.error('Cannot delete the default free plan', {
+        description: 'This is the system default plan and cannot be deleted.'
+      });
+      setIsPlanToDelete(null);
+      setDeleteConfirmation('');
+      closeModal();
       return;
     }
 
@@ -1296,10 +1349,20 @@ export default function AdminSubscriptions() {
                 {hasPermission('add_sub_plans') && (
                   <button
                     onClick={() => openModal({ type: 'add' })}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm flex items-center space-x-2"
+                    disabled={loading}
+                    className={`px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm flex items-center space-x-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <FaPlus className="h-4 w-4" />
-                    <span>Add New Plan</span>
+                    {loading ? (
+                      <>
+                        <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                        <span>Adding...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FaPlus className="h-4 w-4" />
+                        <span>Add New Plan</span>
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -1340,10 +1403,20 @@ export default function AdminSubscriptions() {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {subscriptionPlans.map((plan) => (
-                        <tr key={plan.id} className={!plan.is_active ? 'bg-gray-50 dark:bg-gray-900/50' : ''}>
+                        <tr key={plan.id} className={!plan.is_active ? 'bg-gray-50 dark:bg-gray-900/50' : plan.id === 1 ? 'bg-blue-50 dark:bg-blue-900/10' : ''} 
+                          title={plan.id === 1 ? "This is the system default free plan and cannot be deactivated or deleted" : ""}>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{plan.name}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{plan.description}</div>
+                            <div className="flex items-center">
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">{plan.name}</div>
+                              {plan.id === 1 && (
+                                <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {plan.description}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -1405,11 +1478,15 @@ export default function AdminSubscriptions() {
                               {hasPermission('toggle_sub_status') && (
                               <button
                                 onClick={() => toggleActive(plan.id, !plan.is_active, 'subscription_plan')}
+                                disabled={plan.id === 1 && plan.is_active}
+                                title={plan.id === 1 ? "Default free plan cannot be deactivated" : plan.is_active ? "Deactivate plan" : "Activate plan"}
                                 className={clsx(
                                   'text-2xl transition-colors duration-200',
-                                  plan.is_active 
-                                    ? 'text-indigo-600 hover:text-indigo-700'
-                                    : 'text-gray-400 hover:text-gray-500'
+                                  plan.id === 1 && plan.is_active
+                                    ? 'text-indigo-300 cursor-not-allowed'
+                                    : plan.is_active 
+                                      ? 'text-indigo-600 hover:text-indigo-700'
+                                      : 'text-gray-400 hover:text-gray-500'
                                 )}
                               >
                                 {plan.is_active ? <FaToggleOn /> : <FaToggleOff />}
@@ -1423,7 +1500,13 @@ export default function AdminSubscriptions() {
                                   setModalType('delete');
                                   setIsModalOpen(true);
                                 }}
-                                className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                disabled={plan.id === 1}
+                                title={plan.id === 1 ? "Default free plan cannot be deleted" : "Delete plan"}
+                                className={clsx(
+                                  plan.id === 1
+                                    ? "text-red-300 cursor-not-allowed"
+                                    : "text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                )}
                               >
                                 <FaTrash />
                               </button>
@@ -1448,11 +1531,21 @@ export default function AdminSubscriptions() {
                 <div className="flex space-x-2">
                   {hasPermission('add_promo_codes') && (
                   <button 
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm flex items-center space-x-2"
+                    className={`px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm flex items-center space-x-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={() => openModal({type: 'add'})}
+                    disabled={loading}
                   >
-                    <FaPlus className="mr-2" />
-                    Add New Code
+                    {loading ? (
+                      <>
+                        <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                        <span>Adding...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FaPlus className="mr-2" />
+                        <span>Add New Code</span>
+                      </>
+                    )}
                   </button>
                   )}
                 </div>
@@ -2067,7 +2160,7 @@ export default function AdminSubscriptions() {
                   >
                     <option value="all">All Status</option>
                     <option value="COMPLETED">Completed</option>
-                    <option value="PENDING">Pending</option>
+                    <option value="REFUNDED">Refunded</option>
                     <option value="FAILED">Failed</option>
                   </select>
                   <input
@@ -2158,8 +2251,8 @@ export default function AdminSubscriptions() {
                                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                     ${payment.status === 'COMPLETED' 
                                       ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' 
-                                      : payment.status === 'PENDING'
-                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
+                                      : payment.status === 'REFUNDED'
+                                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
                                       : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
                                     }`}
                                   >
@@ -2381,7 +2474,7 @@ export default function AdminSubscriptions() {
                   
                   <div>
                     <label htmlFor='add-price' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Price
+                      Price (RM)
                     </label>
                     <input
                       type='number'
@@ -2636,6 +2729,7 @@ export default function AdminSubscriptions() {
                       </button>
                       <button
                         type='submit'
+                        disabled={processing}
                         onClick={(e) => {
                           if (newFeature.trim()) {
                             e.preventDefault(); // 阻止表单提交
@@ -2648,9 +2742,16 @@ export default function AdminSubscriptions() {
                         }}
                         className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                           text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                          focus:ring-offset-2 focus:ring-indigo-500'
+                          focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed'
                       >
-                        Create Plan
+                        {processing ? (
+                          <>
+                            <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                            <span>Creating...</span>
+                          </>
+                        ) : (
+                          'Create Plan'
+                        )}
                       </button>
                     </div>
                   </>
@@ -2785,7 +2886,7 @@ export default function AdminSubscriptions() {
                   
                   <div>
                     <label htmlFor='edit-price' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-                      Price
+                      Price (RM)
                     </label>
                     <input
                       type='number'
@@ -3140,10 +3241,15 @@ export default function AdminSubscriptions() {
               };
               
               // Add promo code logic
+              setProcessing(true);
               addPromoCode(codeData).then(success => {
                 if (success) {
                   closeModal();
                 }
+                setProcessing(false);
+              }).catch(error => {
+                console.error('Error adding promo code:', error);
+                setProcessing(false);
               });
             }}>
               <div className='space-y-4'>
@@ -3162,9 +3268,9 @@ export default function AdminSubscriptions() {
                       ${codeNameError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter promo code'
                     onChange={(e) => {
-                      setCodeName(e.target.value);
+                      setCodeName(e.target.value.toUpperCase());
                       if (codeNameError) {
-                        setCodeNameError(validatePromoCode(e.target.value));
+                        setCodeNameError(validatePromoCode(e.target.value.toUpperCase()));
                       }
                     }}
                     onBlur={(e) => setCodeNameError(validatePromoCode(e.target.value))}
@@ -3360,11 +3466,19 @@ export default function AdminSubscriptions() {
                 </button>
                 <button
                   type='submit'
+                  disabled={processing}
                   className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                     text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2
-                    focus:ring-offset-2 focus:ring-indigo-500'
+                    focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed'
                 >
-                  Add Promo Code
+                  {processing ? (
+                    <>
+                      <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                      <span>Adding...</span>
+                    </>
+                  ) : (
+                    'Add Promo Code'
+                  )}
                 </button>
               </div>
             </form>
@@ -3398,11 +3512,19 @@ export default function AdminSubscriptions() {
               </button>
               <button
                 onClick={deletePromoCode}
+                disabled={processing}
                 className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                   text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2
-                  focus:ring-offset-2 focus:ring-red-500'
+                  focus:ring-offset-2 focus:ring-red-500 disabled:bg-red-400 disabled:cursor-not-allowed'
               >
-                Delete
+                {processing ? (
+                  <>
+                    <span className="inline-block animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  'Delete'
+                )}
               </button>
             </div>
           </div>
@@ -3483,9 +3605,9 @@ export default function AdminSubscriptions() {
                       ${codeNameError ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     placeholder='Enter promo code'
                     onChange={(e) => {
-                      setCodeName(e.target.value);
+                      setCodeName(e.target.value.toUpperCase());
                       if (codeNameError) {
-                        setCodeNameError(validatePromoCode(e.target.value));
+                        setCodeNameError(validatePromoCode(e.target.value.toUpperCase()));
                       }
                     }}
                     onBlur={(e) => setCodeNameError(validatePromoCode(e.target.value))}

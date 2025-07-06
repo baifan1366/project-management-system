@@ -16,7 +16,7 @@ import AdminProfileModal from './AdminProfileModal';
  */
 const AdminHeader = ({ 
   title, 
-  adminData, 
+  adminData = null, 
   onAdminDataUpdate,
   extraContent,
   showThemeToggle = true
@@ -92,11 +92,13 @@ const AdminHeader = ({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span>{localAdminData?.username?.charAt(0).toUpperCase() || 'A'}</span>
+                    <span>{(localAdminData?.username || localAdminData?.name || '')?.charAt(0)?.toUpperCase() || 'A'}</span>
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{truncateText(localAdminData?.username, 20)}</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {truncateText(localAdminData?.username || localAdminData?.name || 'Admin', 20)}
+                  </p>
                 </div>
               </div>
             )}
@@ -104,12 +106,14 @@ const AdminHeader = ({
         </div>
       </div>
 
-      <AdminProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        adminData={localAdminData}
-        onProfileUpdate={handleProfileUpdate}
-      />
+      {localAdminData && (
+        <AdminProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          adminData={localAdminData}
+          onProfileUpdate={handleProfileUpdate}
+        />
+      )}
     </header>
   );
 };

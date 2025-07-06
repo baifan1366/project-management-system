@@ -296,14 +296,13 @@ export default function PaymentPage() {
     return planDetails.price * 1;
   }
 
-  // Add this where your payment button is
-  const getPaymentButtonText = () => {
+  const getAlipayPaymentButtonText = () => {
     if (paymentStatus === 'processing') return 'Processing...';
     
     switch(selectedPaymentMethod) {
-      case 'card':
+
       case 'alipay':
-        return 'Pay Now';
+        return 'Pay With Alipay';
       default:
         return 'Select Payment Method';
     }
@@ -935,28 +934,29 @@ export default function PaymentPage() {
                           </div>
                         </div>
                       </label>
+                      
+                      {selectedPaymentMethod === 'alipay' && (
+                        <div className="p-4 border-t">
+                          <button
+                            onClick={handlePaymentButtonClick}
+                            disabled={paymentStatus === 'processing' || isProcessing}
+                            className={`w-full py-3 rounded-md ${
+                              paymentStatus === 'processing' || isProcessing
+                              ? 'bg-indigo-400 cursor-wait'
+                              : 'bg-indigo-600 hover:bg-indigo-700'
+                            } text-white`}
+                          >
+                            {paymentStatus === 'processing' || isProcessing ? (
+                              <div className="flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                Processing...
+                              </div>
+                            ) : getAlipayPaymentButtonText()}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {/* Payment Button */}
-                  <button
-                    onClick={handlePaymentButtonClick}
-                    disabled={!selectedPaymentMethod || paymentStatus === 'processing' || isProcessing}
-                    className={`w-full py-3 rounded-md mt-6 ${
-                      !selectedPaymentMethod 
-                        ? 'bg-gray-400 cursor-not-allowed' 
-                        : paymentStatus === 'processing' || isProcessing
-                        ? 'bg-indigo-400 cursor-wait'
-                        : 'bg-indigo-600 hover:bg-indigo-700'
-                    } text-white`}
-                  >
-                    {paymentStatus === 'processing' || isProcessing ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Processing...
-                      </div>
-                    ) : getPaymentButtonText()}
-                  </button>
                 </div>
               </div>
             </div>

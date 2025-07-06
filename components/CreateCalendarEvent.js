@@ -843,7 +843,7 @@ export default function CreateCalendarEvent({
           </Tabs>
 
           <div className="space-y-2">
-            <Label htmlFor="title">{t('title')}</Label>
+            <Label htmlFor="title">{t('title')} <span className="text-red-500">*</span></Label>
             <Input
               id="title"
               name="title"

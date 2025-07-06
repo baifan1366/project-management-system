@@ -11,7 +11,7 @@ import { Provider } from 'react-redux';
 import { store } from '@/lib/redux/store';
 import { ThemeProvider } from 'next-themes';
 import { useDispatch } from 'react-redux';
-import { checkAdminSession, logoutAdmin, checkAdminPermissions } from '@/lib/redux/features/adminSlice';
+import { checkAdminSession, logoutAdmin, checkAdminPermissions, updateAdminProfile } from '@/lib/redux/features/adminSlice';
 import { Toaster } from 'sonner';
 
 // Redux wrapper for accessing dispatch
@@ -137,6 +137,20 @@ function AdminLayoutInner({ children }) {
     }
   };
   
+  // Handle profile updates
+  const handleProfileUpdate = async (updatedData) => {
+    try {
+      // Update the admin data in the component state
+      setAdminData(updatedData);
+      
+      // Dispatch the updateAdminProfile action to update Redux state
+      await dispatch(updateAdminProfile(updatedData));
+      
+    } catch (error) {
+      console.error('Error updating admin profile in Redux:', error);
+    }
+  };
+  
   // Don't show sidebar on login page
   if (isLoginPage) {
     return (
@@ -157,6 +171,7 @@ function AdminLayoutInner({ children }) {
         <AdminHeader 
           title={getPageTitle()}
           adminData={adminData}
+          onAdminDataUpdate={handleProfileUpdate}
         />
         <main className="flex-1 overflow-y-auto p-4">{children}</main>
       </div>
