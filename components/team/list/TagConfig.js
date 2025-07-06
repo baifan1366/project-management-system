@@ -4366,7 +4366,7 @@ export function EnhancedSingleSelect({
                 className="w-3 h-3 rounded-full flex-shrink-0" 
                 style={{ backgroundColor: selectedOption.color || '#e5e5e5' }}
               ></div>
-              <span className="text-sm truncate max-w-[70%]">{selectedOption.label}</span>
+              <span className="text-sm truncate max-w-[90%]">{selectedOption.label}</span>
             </div>
           ) : (
             <span className="text-sm text-muted-foreground truncate max-w-[80%]">{t('selectOption') || '选择选项'}</span>
@@ -4383,7 +4383,7 @@ export function EnhancedSingleSelect({
           teamId={teamId}
           selectedValue={selectedOption}
           onSelect={handleSelectOption}
-          // selectionMode={true}
+          selectionMode={true}
           projectThemeColor={projectThemeColor}
         />
       </PopoverContent>
