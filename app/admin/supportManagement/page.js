@@ -1071,7 +1071,7 @@ export default function AdminSupport() {
                   <div className="mb-6">
                     <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Message</h4>
                     <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line break-words">
                         {selectedTicket.message || 'No message provided.'}
                       </p>
                     </div>
@@ -1168,7 +1168,7 @@ export default function AdminSupport() {
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         placeholder="Type your reply here..."
-                        className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 min-h-[120px]"
+                        className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 min-h-[120px] max-h-60 resize-y overflow-auto break-words"
                         required
                         disabled={isSendingReply}
                       ></textarea>
