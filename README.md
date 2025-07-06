@@ -4,17 +4,17 @@ A comprehensive, full-featured project management application built with Next.js
 
 ## Features
 
-- **Project Dashboard**: Visualize and manage project progress, tasks, and timelines.
-- **Task Management**: Create, assign, and track tasks with deadlines and priorities.
-- **Team Collaboration**: Manage team members, roles, and permissions.
-- **Calendar Integration**: Schedule meetings, deadlines, and events.
-- **Chat Functionality**: Real-time communication between team members.
-- **Gantt Charts**: Visualize project timelines and dependencies.
-- **Internationalization**: Multi-language support for global teams.
-- **Document Management**: Store and share project-related documents.
-- **Activity Tracking**: Monitor project activity and user contributions.
-- **Subscription Management**: Different subscription tiers with varying features.
-- **Admin Dashboard**: Comprehensive admin controls for managing the platform.
+- **Project Dashboard**: Visualize and manage project progress, tasks, and timelines
+- **Task Management**: Create, assign, and track tasks with deadlines and priorities
+- **Team Collaboration**: Manage team members, roles, and permissions
+- **Calendar Integration**: Schedule meetings, deadlines, and events
+- **Real-time Chat**: Instant communication between team members
+- **Internationalization**: Multi-language support for global teams
+- **Activity Tracking**: Monitor project activity and user contributions
+- **Subscription Management**: Different subscription tiers with varying features
+- **Admin Dashboard**: Comprehensive admin controls for managing the platform
+- **Automated Workflows**: Custom triggers and automated actions
+- **Reporting & Analytics**: Generate insightful reports and data visualizations
 
 ## Tech Stack
 
@@ -32,7 +32,6 @@ A comprehensive, full-featured project management application built with Next.js
 - **Internationalization**: next-intl
 - **Date Handling**: date-fns
 - **AI Integration**: OpenAI, HuggingFace
-- **3D Visualization**: Three.js, React Three Fiber
 
 ## Getting Started
 
@@ -96,7 +95,6 @@ The application uses Supabase (PostgreSQL) with the following main tables:
 - Notifications
 - Activity Logs
 - Subscriptions
-- Documents
 
 Database migration scripts are available in the `db/migrations` directory.
 
@@ -153,6 +151,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Next.js Team
 - Supabase Team
 - Tailwind CSS Team
-- All open-source libraries used in this project
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/baifan1366/project-management-system)

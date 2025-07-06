@@ -284,7 +284,7 @@ const TagLabelManager = ({
   
   // 处理选择状态
   const handleSelectOption = (option) => {
-    if (selectionMode && onSelect) {
+    if (onSelect) {
       onSelect(option);
     }
   };
@@ -320,10 +320,10 @@ const TagLabelManager = ({
       <div className="p-3">
         {/* 标题和创建按钮 */}
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium text-sm">{selectionMode ? t('selectOption') || '选择选项' : t('manageOptions') || '管理选项'}</h3>
+          <h3 className="font-medium text-sm">{t('manageOptions') || '管理选项'}</h3>
           
-          {/* 只在管理模式下显示添加按钮 - 选择模式下在底部显示 */}
-          {!selectionMode && !isCreating && !isEditing && (
+          {/* 在顶部显示添加按钮 */}
+          {!isCreating && !isEditing && (
             <Button
               variant={projectThemeColor}
               size="sm"
@@ -410,8 +410,8 @@ const TagLabelManager = ({
           </div>
         )}
         
-        {/* 编辑选项表单 - 仅在非选择模式下显示 */}
-        {isEditing && editingOption && !selectionMode && (
+        {/* 编辑选项表单 */}
+        {isEditing && editingOption && (
           <div className="mb-4 p-3 border rounded-lg bg-background">
             <div className="flex justify-between items-center mb-3">
               <h4 className="font-medium text-sm">{t('editOption') || '编辑选项'}</h4>
@@ -482,11 +482,11 @@ const TagLabelManager = ({
             singleSelectOptions.map((option, index) => (
               <div 
                 key={index}
-                className={`flex items-center justify-between p-2 border ${selectedValue && selectedValue.value === option.value ? 'border-primary ring-1 ring-primary' : 'border-gray-300 dark:border-gray-700'} rounded-lg transition-all duration-200 ${selectionMode ? 'cursor-pointer hover:bg-accent/10' : ''}`}
+                className={`flex items-center justify-between p-2 border ${selectedValue && selectedValue.value === option.value ? 'border-primary ring-1 ring-primary' : 'border-gray-300 dark:border-gray-700'} rounded-lg transition-all duration-200 cursor-pointer hover:bg-accent/10`}
                 style={{ borderLeft: `3px solid ${option.color}` }}
-                onClick={selectionMode ? () => handleSelectOption(option) : undefined}
-                tabIndex={selectionMode ? 0 : undefined}
-                role={selectionMode ? "button" : undefined}
+                onClick={() => handleSelectOption(option)}
+                tabIndex={0}
+                role="button"
               >
                 <div className="flex items-center gap-2">
                   <div 
@@ -494,42 +494,41 @@ const TagLabelManager = ({
                     style={{ backgroundColor: option.color || '#e5e5e5' }}
                   ></div>
                   <span className="font-medium text-sm">{option.label}</span>
+                  
+                  {/* 始终显示选中标记 */}
+                  {selectedValue && selectedValue.value === option.value && (
+                    <Check className="w-4 h-4 text-primary ml-1" />
+                  )}
                 </div>
                 
-                {/* 在选择模式下显示选中标记，在管理模式下显示编辑删除按钮 */}
+                {/* 始终显示编辑删除按钮，无论是否为选择模式 */}
                 {!isCreating && !isEditing && (
-                  selectionMode ? (
-                    selectedValue && selectedValue.value === option.value && (
-                      <Check className="w-4 h-4 text-primary" />
-                    )
-                  ) : (
-                    <div className="flex gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0.5 rounded-full opacity-70 hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEditOption(option);
-                        }}
-                        disabled={loading}
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0.5 rounded-full text-destructive hover:text-destructive opacity-70 hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteOption(option.value);
-                        }}
-                        disabled={loading}
-                      >
-                        <Trash className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  )
+                  <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0.5 rounded-full opacity-70 hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditOption(option);
+                      }}
+                      disabled={loading}
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0.5 rounded-full text-destructive hover:text-destructive opacity-70 hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteOption(option.value);
+                      }}
+                      disabled={loading}
+                    >
+                      <Trash className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 )}
               </div>
             ))
@@ -539,25 +538,6 @@ const TagLabelManager = ({
             </div>
           )}
         </div>
-        
-        {/* 在选择模式下显示添加选项按钮 */}
-        {selectionMode && !isCreating && !isEditing && (
-          <div className="mt-3">
-            <Button
-              variant={projectThemeColor}
-              size="sm"
-              onClick={() => {
-                setIsCreating(true);
-                setIsEditing(false);
-              }}
-              disabled={loading}
-              className="w-full h-8"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              {t('addOption')}
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   );
