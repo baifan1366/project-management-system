@@ -55,21 +55,28 @@ export default function SecurityPage() {
   const [showDisableEmailModal, setShowDisableEmailModal] = useState(false);
   
   // Get current user using the useGetUser hook
-  const { user, isLoading, mutate } = useGetUser();
+  const { user, isLoading, refreshUser: originalRefreshUser, error } = useGetUser();
   
-  // Use mutate as refreshUser function and update Redux store
-  const refreshUser = () => {
-    if (typeof mutate === 'function') {
-      mutate().then(() => {
-        // Update Redux store with new MFA status if user exists
+  // Enhanced refreshUser function to bypass cache when updating security settings
+  const refreshUser = async () => {
+    // Reset global cache in useGetUser hook
+    if (typeof originalRefreshUser === 'function') {
+      try {
+        // Force refresh without cache
+        await originalRefreshUser();
+        
+        // Update Redux store with new security status
         if (user) {
           dispatch(updateUserData({
             is_mfa_enabled: user.is_mfa_enabled,
             is_email_2fa_enabled: user.is_email_2fa_enabled
           }));
         }
-      });
-      return true;
+        return true;
+      } catch (error) {
+        console.error('Error refreshing user data:', error);
+        return false;
+      }
     }
     return false;
   };
@@ -224,11 +231,17 @@ export default function SecurityPage() {
         currentPassword: passwords.currentPassword,
         newPassword: passwords.newPassword
       });
+      
+      // Reset password fields
       setPasswords({
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       });
+      
+      // Force refresh user data without cache
+      await refreshUser();
+      
       toast.success(t('passwordChanged'));
     } catch (error) {
       console.error('Error changing password:', error);
@@ -437,19 +450,15 @@ export default function SecurityPage() {
           ) : (
             <TOTPSetup 
               userId={user?.id} 
-              onSetupComplete={() => {
+              onSetupComplete={async () => {
                 setShowTotpSetup(false);
                 // Update the user data to reflect the change
-                refreshUser();
-                // Force a delay and then refresh again to ensure UI updates
-                setTimeout(() => {
-                  refreshUser();
-                  // Also explicitly update Redux store
-                  dispatch(updateUserData({
-                    is_mfa_enabled: true
-                  }));
-                  toast.success(t('success'));
-                }, 500);
+                await refreshUser();
+                // Also explicitly update Redux store
+                dispatch(updateUserData({
+                  is_mfa_enabled: true
+                }));
+                toast.success(t('success'));
               }}
               onCancel={() => setShowTotpSetup(false)}
               locale={locale}
@@ -486,19 +495,15 @@ export default function SecurityPage() {
             <EmailSetup 
               userId={user?.id} 
               userEmail={user?.email}
-              onSetupComplete={() => {
+              onSetupComplete={async () => {
                 setShowEmailSetup(false);
                 // Update the user data to reflect the change
-                refreshUser();
-                // Force a delay and then refresh again to ensure UI updates
-                setTimeout(() => {
-                  refreshUser();
-                  // Also explicitly update Redux store
-                  dispatch(updateUserData({
-                    is_email_2fa_enabled: true
-                  }));
-                  toast.success(t('success'));
-                }, 500);
+                await refreshUser();
+                // Also explicitly update Redux store
+                dispatch(updateUserData({
+                  is_email_2fa_enabled: true
+                }));
+                toast.success(t('success'));
               }}
               onCancel={() => setShowEmailSetup(false)}
               locale={locale}
@@ -512,19 +517,15 @@ export default function SecurityPage() {
         <DisableTOTPModal
           userId={user?.id}
           onClose={() => setShowDisableTotpModal(false)}
-          onDisabled={() => {
+          onDisabled={async () => {
             setShowDisableTotpModal(false);
             // Update the user data to reflect the change
-            refreshUser();
-            // Force a delay and then refresh again to ensure UI updates
-            setTimeout(() => {
-              refreshUser();
-              // Also explicitly update Redux store
-              dispatch(updateUserData({
-                is_mfa_enabled: false
-              }));
-              toast.success(t('success'));
-            }, 500);
+            await refreshUser();
+            // Also explicitly update Redux store
+            dispatch(updateUserData({
+              is_mfa_enabled: false
+            }));
+            toast.success(t('success'));
           }}
         />
       )}
@@ -534,19 +535,15 @@ export default function SecurityPage() {
         <DisableEmailModal
           userId={user?.id}
           onClose={() => setShowDisableEmailModal(false)}
-          onDisabled={() => {
+          onDisabled={async () => {
             setShowDisableEmailModal(false);
             // Update the user data to reflect the change
-            refreshUser();
-            // Force a delay and then refresh again to ensure UI updates
-            setTimeout(() => {
-              refreshUser();
-              // Also explicitly update Redux store
-              dispatch(updateUserData({
-                is_email_2fa_enabled: false
-              }));
-              toast.success(t('success'));
-            }, 500);
+            await refreshUser();
+            // Also explicitly update Redux store
+            dispatch(updateUserData({
+              is_email_2fa_enabled: false
+            }));
+            toast.success(t('success'));
           }}
         />
       )}
