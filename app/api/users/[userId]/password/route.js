@@ -22,8 +22,8 @@ export async function PATCH(request, { params }) {
     // Get the userId from the route parameters
     const { userId } = params;
     
-    // Get current authenticated user
-    const userData = await getCurrentUser();
+    // Get current authenticated user with noCache=true to bypass cache
+    const userData = await getCurrentUser(true);
     
     // Check if user is authenticated
     if (!userData || !userData.user) {

@@ -188,7 +188,7 @@ const SprintRetrospective = ({ sprint, agileMembers = [], themeColor }) => {
               <ul className="space-y-2">
                 {whatWentWell.length > 0 ? (
                   whatWentWell.map((item, index) => (
-                    <li key={index} className="flex justify-between items-start p-3 rounded bg-slate-50">
+                    <li key={index} className="flex justify-between items-start p-3 rounded bg-muted-background">
                       <span>{item}</span>
                       <Button 
                         variant="ghost" 
@@ -200,7 +200,7 @@ const SprintRetrospective = ({ sprint, agileMembers = [], themeColor }) => {
                     </li>
                   ))
                 ) : (
-                  <li className="text-center p-4 bg-slate-50 rounded">
+                  <li className="text-center p-4 bg-muted-background rounded">
                     {t('noItemsYet')}
                   </li>
                 )}
@@ -230,7 +230,7 @@ const SprintRetrospective = ({ sprint, agileMembers = [], themeColor }) => {
               <ul className="space-y-2">
                 {toImprove.length > 0 ? (
                   toImprove.map((item, index) => (
-                    <li key={index} className="flex justify-between items-start p-3 rounded bg-slate-50">
+                    <li key={index} className="flex justify-between items-start p-3 rounded bg-muted-background">
                       <span>{item}</span>
                       <Button 
                         variant="ghost" 
@@ -242,7 +242,7 @@ const SprintRetrospective = ({ sprint, agileMembers = [], themeColor }) => {
                     </li>
                   ))
                 ) : (
-                  <li className="text-center p-4 bg-slate-50 rounded">
+                  <li className="text-center p-4 bg-muted-background rounded">
                     {t('noItemsYet')}
                   </li>
                 )}
