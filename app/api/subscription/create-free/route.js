@@ -17,13 +17,22 @@ export async function POST(req) {
     // The user has specified that the free plan ID is 1.
     const freePlanId = 1;
 
-    // Create the subscription, setting it to be active for 100 years
+    // Create the subscription with null end_date for free plans
     const { error: subError } = await supabase.from('user_subscription_plan').insert({
       user_id: userId,
       plan_id: freePlanId,
       status: 'ACTIVE',
       start_date: new Date().toISOString(),
-      end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 100)).toISOString()
+      end_date: null, // Free plans don't have an end date
+      auto_renew: false,
+      current_projects: 0,
+      current_teams: 0,
+      current_members: 0,
+      current_ai_chat: 0,
+      current_ai_task: 0,
+      current_ai_workflow: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     });
 
     if (subError) {
