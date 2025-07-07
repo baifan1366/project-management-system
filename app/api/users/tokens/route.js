@@ -8,8 +8,8 @@ import { getCurrentUser } from '@/lib/auth/auth';
  */
 export async function GET(request) {
   try {
-    // Get authentication status
-    const userData = await getCurrentUser();
+    // Get authentication status with noCache=true to bypass cache and get fresh data
+    const userData = await getCurrentUser(true);
     
     if (!userData || !userData.user) {
       return NextResponse.json(
