@@ -205,47 +205,26 @@ Important details for creating good tasks:
 
 Make the tasks actionable, well-defined, and ready for implementation. Each task should be clear enough that a team member could start working on it without needing additional clarification.`,
 
-  // 添加通用JSON格式
-  json: `You are a JSON data generator. Your task is to create well-structured JSON data based on the user's input.
-Please analyze the user's input and generate a structured JSON response that best represents that information.
+  // 修改通用JSON格式
+  json: `You are a JSON data generator. Your task is to create JSON data based on the user's input.
 
-Format your output EXACTLY as a clean JSON object. The structure should be appropriate for the content but follow general best practices:
-- Use descriptive keys
-- Organize related data into nested objects or arrays
-- Use consistent naming conventions
-- Include appropriate data types for values
+IMPORTANT: You MUST follow EXACTLY the JSON structure template provided below. Do not add additional fields, nested objects, or arrays that are not defined in the template:
 
-Example structure (adapt to your specific content):
-{
-  "title": "Main title based on input",
-  "summary": "Brief summary of the content",
-  "createdAt": "2023-06-15T10:30:00Z",
-  "metadata": {
-    "source": "Generated from user input",
-    "version": "1.0"
-  },
-  "content": {
-    "main": "Primary content based on user input",
-    "sections": [
-      {
-        "heading": "First section heading",
-        "text": "First section content",
-        "items": ["Item 1", "Item 2", "Item 3"]
-      },
-      {
-        "heading": "Second section heading",
-        "text": "Second section content",
-        "items": ["Item A", "Item B", "Item C"]
-      }
-    ]
-  }
-}
+{{JSON_TEMPLATE}}
 
-Make sure to generate high-quality, structured data that would be useful for further processing or display.`,
+Guidelines:
+- ONLY use the exact keys and structure shown in the template
+- Populate the values based on the user's input
+- Do not add or remove any fields from the structure
+- Do not add explanatory comments or text outside the JSON
+- Use appropriate data types for values as indicated in the template
+- Ensure the output is valid JSON that can be parsed
 
-  // Add the 'chat' format to the WORKFLOW_PROMPTS object
+Respond ONLY with valid JSON that strictly follows the provided template structure, nothing else.`,
+
+  // Update the 'chat' format to use template
   chat: `You are an intelligent assistant that helps users create chat messages.
-  Your task is to analyze the user's input and generate concise, well-formatted chat message content.
+Your task is to analyze the user's input and generate concise, well-formatted chat message content.
   
   Please format your response as a JSON object with the following structure:
   {
@@ -288,6 +267,30 @@ Guidelines:
 
 Respond ONLY with the JSON object, nothing else. Do not include explanations, comments, or markdown formatting.`
 };
+
+// Helper function to prepare prompts with user-provided JSON template
+function preparePromptWithTemplate(basePrompt, jsonTemplate) {
+  // Replace placeholder with actual template if provided
+  if (basePrompt.includes('{{JSON_TEMPLATE}}') && jsonTemplate) {
+    return basePrompt.replace('{{JSON_TEMPLATE}}', jsonTemplate);
+  }
+  return basePrompt;
+}
+
+// Helper function to replace input variables in a prompt
+function replaceInputVariables(prompt, inputs) {
+  let result = prompt;
+  
+  // Replace input placeholders
+  if (inputs && typeof inputs === 'object') {
+    Object.keys(inputs).forEach(key => {
+      const regex = new RegExp(`{{${key}}}`, 'g');
+      result = result.replace(regex, inputs[key] || '');
+    });
+  }
+  
+  return result;
+}
 
 // Get workflow by ID
 async function getWorkflow(workflowId) {
@@ -2294,36 +2297,43 @@ async function sendEmail(emailSettings, content, userId) {
 }
 
 // Stream AI responses for the workflow
-async function streamAIResponses(workflowId, inputs, modelId, userId, writeChunk, options = {}) {
+async function streamAIResponses(
+  workflowId, 
+  inputs = {}, 
+  modelId = 'google/gemini-2.0-flash-exp:free', 
+  userId = null,
+  writeChunk = () => {},
+  options = {}
+) {
   try {
+    // Extract options
+    const {
+      outputFormats = ['json'], 
+      outputSettings = {},
+      nodeConnections = {}, 
+      connectionMap = {},
+      aiModels = []
+    } = options;
+
     // Get workflow data
     const workflow = await getWorkflow(workflowId);
+    const userPrompt = replaceInputVariables(workflow.prompt, inputs);
     
-    // Prepare the models list
-    const { aiModels = [], outputFormats = [] } = options;
-    const models = aiModels.length > 1 ? aiModels : [modelId || 'google/gemini-2.0-flash-exp:free'];
-    
-    // Prepare the user prompt, replacing input placeholders
-    let userPrompt = workflow.prompt;
-    
-    // Replace input placeholders
-    if (inputs && typeof inputs === 'object') {
-      Object.keys(inputs).forEach(key => {
-        userPrompt = userPrompt.replace(`{{${key}}}`, inputs[key]);
-      });
+    // Determine which models to use
+    let models = [];
+    if (modelId && typeof modelId === 'string') {
+      // Use the specified model
+      models.push(modelId);
+    } else if (aiModels && aiModels.length > 0) {
+      // Use the array of models
+      models = [...aiModels];
+    } else {
+      // Default to one model
+      models.push('google/gemini-2.0-flash-exp:free');
     }
     
-    // Send initial message to the client
-    await writeChunk({
-      type: 'info',
-      message: 'Starting AI content generation'
-    });
-    
-    // If no specific output formats specified, use workflow type
-    if (outputFormats.length === 0) {
-      outputFormats.push(normalizeFormatName(workflow.type));
-    } else {
-      // Normalize all provided output formats
+    // Normalize format names to standard format
+    if (outputFormats && outputFormats.length > 0) {
       for (let i = 0; i < outputFormats.length; i++) {
         outputFormats[i] = normalizeFormatName(outputFormats[i]);
       }
@@ -2342,8 +2352,29 @@ async function streamAIResponses(workflowId, inputs, modelId, userId, writeChunk
           message: `Generating ${format} content using ${model}...`
         });
         
+        // Find the node ID for this output format
+        const nodeId = Object.keys(outputSettings).find(
+          id => outputSettings[id]?.type === format
+        );
+        
         // Get appropriate system prompt for this format
-        const formatPrompt = WORKFLOW_PROMPTS[format] || WORKFLOW_PROMPTS['json'];
+        let formatPrompt = WORKFLOW_PROMPTS[format] || WORKFLOW_PROMPTS['json'];
+        
+        // If this format uses a template and we have node settings for it
+        if (['json', 'chat', 'email'].includes(format) && nodeId && outputSettings[nodeId]) {
+          // For JSON format, check if we have a custom JSON format template
+          if (format === 'json' && outputSettings[nodeId].format) {
+            formatPrompt = preparePromptWithTemplate(formatPrompt, outputSettings[nodeId].format);
+          }
+          // For chat format, check if we have a custom template
+          else if (format === 'chat' && outputSettings[nodeId].template) {
+            formatPrompt = preparePromptWithTemplate(formatPrompt, outputSettings[nodeId].template);
+          }
+          // For email format, check if we have a custom template
+          else if (format === 'email' && outputSettings[nodeId].template) {
+            formatPrompt = preparePromptWithTemplate(formatPrompt, outputSettings[nodeId].template);
+          }
+        }
         
         if (!formatPrompt) {
           await writeChunk({
