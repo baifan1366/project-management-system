@@ -95,15 +95,14 @@ export default function ContactUs(){
     const [userSubscription, setUserSubscription] = useState(null);
     const [availablePlans, setAvailablePlans] = useState([]);
     const currentUserPlan = useSelector(selectCurrentPlan);
+    const [latestPaymentAmount, setLatestPaymentAmount] = useState(null);
 
     // 从URL参数获取初始表单类型
     const defaultForm = searchParams.get('form');
     
     // Move all state declarations to the top
     const [selectedOption, setSelectedOption] = useState(
-        defaultForm === 'refund' ? 'refund' : 
-        defaultForm === 'enterprise' ? 'enterprise' : 
-        'general'
+        defaultForm === 'refund' ? 'refund' : 'general'
     );
     const [email, setEmail] = useState('');
     const [accountEmail, setAccountEmail] = useState(''); // User's actual account email
@@ -186,6 +185,22 @@ export default function ContactUs(){
                     if (!error && subscriptionData) {
                         setUserSubscription(subscriptionData);
 
+                        // After setting the user subscription, fetch the latest payment record
+                        const { data: paymentData, error: paymentError } = await supabase
+                            .from('payment')
+                            .select('amount')
+                            .eq('user_id', user.id)
+                            .eq('status', 'COMPLETED')
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .maybeSingle();
+
+                        if (!paymentError && paymentData) {
+                            setLatestPaymentAmount(paymentData.amount);
+                        } else {
+                            console.error('Error fetching latest payment:', paymentError);
+                        }
+
                         if (user.email) {
                             setEmail(user.email);
                             setAccountEmail(user.email); // Set the account email
@@ -199,13 +214,12 @@ export default function ContactUs(){
                 setIsAuthenticated(false);
                 setUserSubscription(null);
                 setAvailablePlans([]);
+                setLatestPaymentAmount(null);
             }
             
             // 如果URL中有form参数，强制选择对应表单
             if (defaultForm === 'refund') {
                 setSelectedOption('refund');
-            } else if (defaultForm === 'enterprise') {
-                setSelectedOption('enterprise');
             }
         };
 
@@ -368,8 +382,9 @@ export default function ContactUs(){
     const renderContactOptions = () => {
         // Base options always available
         const options = [
-            { id: 'general', label: 'General' },
-            { id: 'enterprise', label: 'Enterprise' }
+            { id: 'general', label: 'General' }
+            // Enterprise option commented out
+            // { id: 'enterprise', label: 'Enterprise' }
         ];
 
         // Add refund option only for authenticated users with active paid subscription
@@ -387,8 +402,7 @@ export default function ContactUs(){
                             {
                                 'w-1/2': options.length === 2,
                                 'w-1/3': options.length === 3,
-                                'translate-x-full': selectedOption === 'enterprise',
-                                'translate-x-[200%]': selectedOption === 'refund',
+                                'translate-x-full': selectedOption === 'refund',
                                 'translate-x-0': selectedOption === 'general'
                             }
                         )}
@@ -441,13 +455,9 @@ export default function ContactUs(){
             <div className="max-w-4xl mx-auto py-12 px-4">
                 <h1 className="text-4xl font-bold text-center mb-8">Contact Us</h1>
                 
-                <p className="text-center mb-2">
+                <p className="text-center mb-8">
                 For general and technical inquiries, message us below through
                 <span className="text-pink-500 hover:underline cursor-pointer font-bold" onClick={() => setSelectedOption('general')}> General Form</span>
-                </p>
-                <p className="text-center mb-8">
-                For larger organizations with specialized needs, please message us through
-                <span className="text-pink-500 hover:underline cursor-pointer font-bold" onClick={() => setSelectedOption('enterprise')}> Enterprise Form</span>
                 </p>
         
                 {/* Success message */}
@@ -518,10 +528,9 @@ export default function ContactUs(){
                     </div>
                 )}
 
-                {/* Enterprise form */}
-                {selectedOption === 'enterprise' && (
+                {/* Enterprise form - commented out as requested */}
+                {/* {selectedOption === 'enterprise' && (
                     <div>
-                    {/* Contact form */}
                     <form onSubmit={handleSubmit} className="space-y-6">
                     <span className="text-2xl font-bold mb-6">Tell us about yourself?</span>
                     <div>
@@ -591,7 +600,6 @@ export default function ContactUs(){
                             {companyNameError && <p className="text-xs text-red-600 mt-1" style={{minHeight: '1.25em'}}>{companyNameError}</p>}
                     </div>
 
-                    {/*what is your role?*/}
                     <div>
                         <label htmlFor="" className="block mb-2">What is your role? <span className="text-pink-500">*</span></label>
                         <div className="flex flex-wrap gap-2">
@@ -612,7 +620,6 @@ export default function ContactUs(){
                         </div>
                         {!selectedRole && <p className="text-xs text-pink-500 mt-1">Please select your role</p>}
                     </div>
-                    {/*timeline of making purchase decision*/}
                     <div>
                         <label htmlFor="" className="block mb-2">What is your timeline of making a purchase decision <span className="text-pink-500">*</span></label>
                         <div className="flex flex-wrap gap-2">
@@ -632,7 +639,6 @@ export default function ContactUs(){
                         {!selectedTimeline && <p className="text-xs text-pink-500 mt-1">Please select your timeline</p>}
                     </div>
 
-                    {/*how many users are you looking to onboard?*/}
                     <div>
                         <label htmlFor="" className="block mb-2">How many users are you looking to onboard? <span className="text-pink-500">*</span></label>
                         <div className="flex flex-wrap gap-2">
@@ -658,7 +664,7 @@ export default function ContactUs(){
                     </button>
                     </form>
                     </div>
-                )}
+                )} */}
 
                 {/* Add Refund Request Form */}
                 {selectedOption === 'refund' && (
@@ -731,9 +737,15 @@ export default function ContactUs(){
                                 </div>
                             </div>
                             <div>
-                                <label className="text-sm text-gray-400">Price</label>
+                                <label className="text-sm text-gray-400">Plan Price</label>
                                 <div className="w-full p-3 bg-gray-800 border border-gray-700 rounded">
-                                    ${userSubscription?.subscription_plan?.price}
+                                    RM {userSubscription?.subscription_plan?.price}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-400">Actual Payment Price</label>
+                                <div className="w-full p-3 bg-gray-800 border border-gray-700 rounded">
+                                    RM {latestPaymentAmount !== null ? latestPaymentAmount : userSubscription?.subscription_plan?.price}
                                 </div>
                             </div>
                         </div>

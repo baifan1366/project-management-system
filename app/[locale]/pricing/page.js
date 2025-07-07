@@ -33,15 +33,14 @@ export default function PricingPage() {
 
   const handlePlanSelection = async (plan) => {
     try {
-      // Special handling for Enterprise plans - redirect to contact us page
+      // Enterprise plans now handled like other plans - no special redirection
       if (plan.type === 'ENTERPRISE') {
         // If user is on Enterprise plan, redirect to /projects
         if (currentUserPlan && Number(currentUserPlan.plan_id) === Number(plan.id)) {
           router.push(`/${locale}/projects`);
           return;
         }
-        router.push(`/${locale}/contactUs?form=enterprise`);
-        return;
+        // Continue with normal flow - no redirection to contact form
       }
 
       // 检查是否是当前计划，如果是则重定向到仪表板
@@ -53,11 +52,17 @@ export default function PricingPage() {
           return;
         }
         
-        // 检查是否是降级操作，如果是则重定向到联系我们页面
+        // 检查是否是降级操作
         if (Number(currentPlanId) > Number(plan.id)) {
-          // 降级操作，重定向到联系我们页面，并默认选择降级表单
-          router.push(`/${locale}/contactUs?form=downgrade&from=${currentPlanId.toString()}&to=${plan.id.toString()}`);
-          return;
+          // 降级操作
+          if (plan.price === 0) {
+            // 如果是降级到免费计划，使用标准流程
+            // 此处不需要特殊处理
+          } else {
+            // 降级到其他付费计划，重定向到联系我们页面
+            router.push(`/${locale}/contactUs?form=downgrade&from=${currentPlanId.toString()}&to=${plan.id.toString()}`);
+            return;
+          }
         }
       }
       
@@ -187,7 +192,7 @@ export default function PricingPage() {
 
     // Not logged in
     if (!currentUserPlan) {
-      if (plan.type === 'ENTERPRISE') return { text: 'Contact Us', disabled: false };
+      if (plan.type === 'ENTERPRISE') return { text: `Buy ${plan.name}`, disabled: false };
       if (plan.id === 1) return { text: 'Get Started for Free', disabled: false };
       if (plan.id === 2 || plan.id === 3) return { text: `Buy ${plan.name}`, disabled: false };
       return { text: 'Subscribe', disabled: false };
@@ -199,7 +204,7 @@ export default function PricingPage() {
     // Enterprise plan
     if (plan.type === 'ENTERPRISE') {
       if (currentPlanId === thisPlanId) return { text: 'Current Plan', disabled: false };
-      return { text: 'Contact Us', disabled: false };
+      return { text: 'Upgrade', disabled: false };
     }
 
     // Free plan (downgrade)

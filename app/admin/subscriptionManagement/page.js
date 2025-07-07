@@ -659,7 +659,6 @@ export default function AdminSubscriptions() {
   const exportPaymentsToCSV = async () => {
     try {
       // Show loading toast
-      const loadingToast = toast.loading('Preparing payment history export...');
       setIsPaymentLoading(true);
       
       // Use the filtered payments instead of fetching from the database
@@ -702,7 +701,6 @@ export default function AdminSubscriptions() {
       document.body.removeChild(link);
       
       // Dismiss loading toast and show success toast
-      toast.dismiss(loadingToast);
       toast.success(`Payment history exported to ${fileName}`, {
         description: `${paymentsToExport.length} records exported successfully`
       });
@@ -2482,6 +2480,7 @@ export default function AdminSubscriptions() {
                       name='price'
                       required
                       min='0'
+                      max='10000'
                       step='0.01'
                       value={planPrice}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
@@ -2519,6 +2518,7 @@ export default function AdminSubscriptions() {
                       id='add-description'
                       name='description'
                       rows='3'
+                      maxLength='200'
                       value={description}
                       className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm shadow-sm
                         placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-700 dark:text-white
@@ -2535,7 +2535,8 @@ export default function AdminSubscriptions() {
                     <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                       Features for Display
                     </label>
-                    
+                    {/* 0 is unlimited */}
+                    <p className='text-sm text-gray-500 dark:text-gray-400 pb-2'>0 is unlimited for unlimited features.</p>
                     {/* Features List */}
                     <div className='space-y-2 mb-2 border border-gray-300 dark:border-gray-500 rounded-md p-4'>
                       {features.map((feature, index) => (
@@ -4431,10 +4432,11 @@ export default function AdminSubscriptions() {
               <button
                 type='button'
                 onClick={deleteSubscriptionPlan}
-                disabled={processing}
-                className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
+                disabled={processing || (isPlanToDelete?.active_users > 0)}
+                className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium
                   text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2
-                  focus:ring-offset-2 focus:ring-red-500'
+                  focus:ring-offset-2 focus:ring-red-500 ${isPlanToDelete?.active_users > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={isPlanToDelete?.active_users > 0 ? "Cannot delete plans with active users" : ""}
               >
                 {processing ? (
                   <>
