@@ -2236,11 +2236,11 @@ export default function AdminSubscriptions() {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm text-gray-900 dark:text-white">
-                                    {parseFloat(payment.amount).toFixed(2)} {payment.currency}
+                                    RM {parseFloat(payment.amount).toFixed(2)}
                                   </div>
                                   {payment.discount_amount > 0 && (
                                     <div className="text-xs text-green-600 dark:text-green-400 flex flex-col">
-                                      <span>Discount: ${parseFloat(payment.discount_amount).toFixed(2)}</span> 
+                                      <span>Discount: RM{parseFloat(payment.discount_amount).toFixed(2)}</span> 
                                       <span>Promo Code: {payment.applied_promo_code}</span> 
                                     </div>
                                   )}
